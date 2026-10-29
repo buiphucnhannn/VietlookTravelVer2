@@ -11,18 +11,18 @@ import HeroVideos from "./HeroVideos";
 // Desktop 1080p ~3.5–4.8MB; mobile 960p ≤1.8MB + poster nhẹ (yêu cầu SEO: hero mobile ≤2–3MB).
 const videos = [
   {
-    src: "/videos/rice-terraces-sunrise.mp4",
-    srcMobile: "/videos/rice-terraces-sunrise-m.mp4",
-    poster: "/videos/rice-terraces-sunrise.webp",
-    posterMobile: "/videos/rice-terraces-sunrise-m.webp",
-    label: { en: "Rice terraces at sunrise, North Vietnam", zh: "北越梯田日出" },
-  },
-  {
     src: "/videos/phu-quoc-sunset.mp4",
     srcMobile: "/videos/phu-quoc-sunset-m.mp4",
     poster: "/videos/phu-quoc-sunset.webp",
     posterMobile: "/videos/phu-quoc-sunset-m.webp",
     label: { en: "Sunset over the sea, Phu Quoc", zh: "富国岛海上日落" },
+  },
+  {
+    src: "/videos/rice-terraces-sunrise.mp4",
+    srcMobile: "/videos/rice-terraces-sunrise-m.mp4",
+    poster: "/videos/rice-terraces-sunrise.webp",
+    posterMobile: "/videos/rice-terraces-sunrise-m.webp",
+    label: { en: "Rice terraces at sunrise, North Vietnam", zh: "北越梯田日出" },
   },
   {
     src: "/videos/hoi-an-lanterns.mp4",
