@@ -1,0 +1,314 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens – nhận diện Vietlook Travel (logo: xanh dương + mặt trời đỏ cam/vàng).
+ * Bố cục & typography tham khảo localvietnam.com (Poppins, tiêu đề đậm, phụ đề màu + gạch chân).
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #22323d;
+  --surface: #f4f6f8;
+  --muted: #5b6b77;
+  --border: #e3e8ec;
+}
+
+/* Màn hình thấp (laptop nhỏ, trình duyệt có nhiều thanh công cụ): gọn các khung dính bên cạnh */
+@custom-variant short (@media (min-width: 1024px) and (max-height: 900px));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --font-sans:
+    var(--font-poppins), "PingFang SC", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui,
+    sans-serif;
+}
+
+@theme {
+  /* Xanh Vietlook – màu chủ đạo */
+  --color-brand-50: #eef7fd;
+  --color-brand-100: #d6ebf8;
+  --color-brand-200: #acd5f0;
+  --color-brand-300: #72b6e3;
+  --color-brand-400: #3b98d3;
+  --color-brand-500: #1780c1; /* xanh logo */
+  --color-brand-600: #0f6aa6;
+  --color-brand-700: #0d5687;
+  --color-brand-800: #0f4870;
+  --color-brand-900: #103c5c;
+  --color-brand-950: #0a253c;
+
+  /* Đỏ mặt trời logo – nút kêu gọi hành động */
+  --color-sun-50: #fff1f0;
+  --color-sun-100: #ffdedb;
+  --color-sun-400: #f3685f;
+  --color-sun-500: #ee3b35; /* đỏ logo */
+  --color-sun-600: #d62a24;
+  --color-sun-700: #b0201b;
+
+  /* Vàng nắng – điểm nhấn (sao đánh giá, khối chủ đề) */
+  --color-amber-brand: #f7b32b;
+  /* Tông ấm theo yêu cầu khách (bớt xanh): kem – cát – đất nung – rừng */
+  --color-cream-50: #fbf7f0;
+  --color-cream-100: #f5eee1;
+  --color-cream-200: #ecdfc8;
+  --color-sand-300: #d9c3a0;
+  --color-clay-500: #c5733b;
+  --color-clay-600: #a85d2c;
+  --color-forest-700: #1f4d3f;
+  --color-forest-900: #0f2a22;
+  --color-ink: #22323d;
+  --font-hand: var(--font-caveat), "Segoe Script", cursive;
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-road: road 1.1s linear infinite;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-drive-in: drive-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-spin-slow: spin 14s linear infinite;
+  --animate-spin-slower: spin 40s linear infinite;
+  --animate-spin-reverse: spin-reverse 60s linear infinite;
+  --animate-spin-orbit: spin 48s linear infinite;
+  --animate-spin-orbit-reverse: spin-reverse 48s linear infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes road {
+    from {
+      background-position-x: 0;
+    }
+    to {
+      background-position-x: -120px;
+    }
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes drive-in {
+    from {
+      opacity: 0;
+      transform: translateX(-28%) scale(0.96);
+      filter: blur(3px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+@keyframes spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+html {
+  scroll-padding-top: 7rem;
+}
+
+/* Lenis (cuộn mượt) */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@layer components {
+  /* Tiêu đề lớn kiểu localvietnam: rất đậm, chữ khít */
+  .heading-xl {
+    @apply text-4xl leading-[1.05] font-extrabold tracking-[-0.035em] sm:text-5xl lg:text-6xl;
+  }
+  .heading-lg {
+    @apply text-3xl leading-tight font-bold tracking-[-0.03em] sm:text-4xl lg:text-[2.75rem];
+  }
+
+  /* Khung ảnh bo vòm (arch) – yêu cầu khách: viền mảnh, nền kem, đồng bộ toàn web */
+  .arch {
+    border-radius: 999px 999px 1.25rem 1.25rem;
+  }
+  .arch-frame {
+    border-radius: 999px 999px 1.25rem 1.25rem;
+    border: 1px solid color-mix(in oklab, var(--color-sand-300) 70%, transparent);
+    background: var(--color-cream-100);
+    padding: 0.5rem;
+    box-shadow: 0 18px 40px -24px rgba(60, 40, 10, 0.35);
+  }
+
+  /* Ảnh dạng "blob" hữu cơ như hero các trang điểm đến của localvietnam */
+  .blob {
+    border-radius: 58% 42% 46% 54% / 47% 58% 42% 53%;
+  }
+  .blob-alt {
+    border-radius: 41% 59% 62% 38% / 55% 39% 61% 45%;
+  }
+
+  /* Nét cọ phía sau tiêu đề (localvietnam: "Vietnam Package Tours") */
+  .brush {
+    position: relative;
+    isolation: isolate;
+    padding: 0.15em 0.6em 0.25em;
+  }
+  .brush::before {
+    content: "";
+    position: absolute;
+    inset: 0 -0.2em;
+    z-index: -1;
+    background: currentColor;
+    color: var(--brush-color, var(--color-clay-600));
+    opacity: 0.88;
+    -webkit-mask: url("/icons/brush.svg") center / 100% 100% no-repeat;
+    mask: url("/icons/brush.svg") center / 100% 100% no-repeat;
+  }
+
+  /* Đường kẻ đứt kiểu bản đồ lộ trình */
+  .route-dash {
+    background-image: linear-gradient(to right, currentColor 0 55%, transparent 55% 100%);
+    background-size: 14px 2px;
+    background-repeat: repeat-x;
+    background-position: center;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Nội dung bài viết cẩm nang */
+  .prose-guide {
+    @apply text-[1.05rem] leading-8 text-foreground/90;
+  }
+  .prose-guide h2 {
+    @apply mt-10 mb-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl;
+  }
+  .prose-guide h3 {
+    @apply mt-7 mb-2 text-xl font-semibold text-ink;
+  }
+  .prose-guide p {
+    @apply my-4;
+  }
+  .prose-guide ul {
+    @apply my-4 list-disc space-y-1.5 pl-6 marker:text-brand-500;
+  }
+  .prose-guide ol {
+    @apply my-4 list-decimal space-y-1.5 pl-6 marker:font-semibold marker:text-brand-600;
+  }
+  .prose-guide a {
+    @apply font-medium text-brand-600 underline decoration-brand-200 underline-offset-4 hover:decoration-brand-500;
+  }
+  .prose-guide strong {
+    @apply font-semibold text-ink;
+  }
+}
+
+/*
+ * Mobile (<640px): biến lưới thẻ thành dải vuốt ngang có snap, thẻ 82% bề rộng (hé thẻ kế tiếp
+ * để gợi ý vuốt). Từ 640px trở lên giữ nguyên lưới của desktop.
+ */
+@utility rail {
+  @media (width < 40rem) {
+    display: flex !important;
+    gap: 0.875rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    margin-inline: -1rem;
+    padding: 0.875rem 1rem 0.75rem;
+    scroll-padding-inline: 1rem;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    & > * {
+      flex: 0 0 82%;
+      min-width: 0;
+      scroll-snap-align: start;
+    }
+  }
+}
+
+/*
+ * Tiếng Trung: chữ Hán là khối vuông đặc – bỏ khoảng cách chữ âm (tracking-tight của tiêu đề tiếng Anh)
+ * và nới dòng để các chữ không dính nhau.
+ */
+:lang(zh) :is(h1, h2, h3, h4),
+:lang(zh) :is(h1, h2, h3, h4) * {
+  letter-spacing: 0.02em !important;
+}
+:lang(zh) :is(h1, h2, h3, h4) {
+  line-height: 1.3;
+}
+:lang(zh) :is(h1, h2) > span {
+  line-height: 1.15 !important;
+}
+/* Chữ viết tay (Caveat không có chữ Hán) → nới dòng, cỡ nhỏ lại cho cân */
+:lang(zh) .font-hand {
+  line-height: 1.45 !important;
+  font-size: 1.2rem;
+}
+
+/* Chống rớt 1 chữ lẻ xuống dòng cuối: tiêu đề cân dòng, đoạn văn ngắt đẹp.
+   Đặt trong @layer base để class Tailwind (text-balance, text-left…) vẫn ghi đè được. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+  p,
+  li,
+  blockquote,
+  figcaption {
+    text-wrap: pretty;
+  }
+}
+
+/* Dải logo chạy ngang (PartnerStrip) – theo mẫu TranDuyMedia.
+   Dừng khi rê chuột hoặc khi focus bằng bàn phím – luôn chạy, kể cả khi Windows tắt hiệu ứng. */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee var(--marquee-duration, 60s) linear infinite;
+}
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track {
+  animation-play-state: paused;
+}

@@ -1,0 +1,103 @@
+// Đánh giá thật của khách trên TripAdvisor (lấy từ widget trang chủ vietlooktravel.com).
+// Tên khách không được công khai trên widget -> hiển thị tiêu đề đánh giá + chuyến đi.
+import zh from "./generated/reviews-zh.json";
+
+const list = [
+  {
+    title: "Wonderful experience, family trip",
+    trip: { en: "Family trip · Hanoi & Da Nang", zh: "家庭游 · 河内与岘港" },
+    text: "We enjoyed our stay in Hanoi and Da Nang. The trip was well organised and both guides, Mr. Tinh (Hanoi) and Ms. Alana (Da Nang), were wonderful, knowledgeable and always smiling. They planned the spots so we enjoyed each one at the best time of the day.",
+    rating: 5,
+    date: "2026-08-01",
+    source: "tripadvisor",
+    avatar: "/images/tours/default-avatar-2020-54.jpg",
+    photo: "/images/tours/v2/da-nang-19927758.jpg",
+  },
+  {
+    title: "Excellent in Da Nang",
+    trip: { en: "Holiday · Da Nang", zh: "度假 · 岘港" },
+    text: "I had a very good holiday in Da Nang city. The service is very good and we were very happy with Tracy, our guide from Vietlook Travel. She is very helpful and friendly, took care of us well and gave us good information. Next time we will be back again!",
+    rating: 5,
+    date: "2026-07-14",
+    source: "tripadvisor",
+    avatar: "/images/tours/default-avatar-2020-10.jpg",
+    photo: "/images/tours/v2/da-nang-20539373.jpg",
+  },
+  {
+    title: "Patel family – Phu Quoc",
+    trip: { en: "Family tour · Phu Quoc", zh: "家庭游 · 富国岛" },
+    text: "We had a wonderful experience on our Phu Quoc tour. The guide explained the history and local culture in a way that was easy to understand. We felt very well taken care of the whole time. Comfortable, safe and well organised – we would definitely recommend.",
+    rating: 5,
+    date: "2026-06-22",
+    source: "tripadvisor",
+    avatar: "/images/tours/default-avatar-2020-37.jpg",
+    photo: "/images/tours/v2/phu-quoc-14787924.jpg",
+  },
+  {
+    title: "Unforgettable journey to Da Nang",
+    trip: { en: "City & beach · Da Nang", zh: "城市与海滩 · 岘港" },
+    text: "One of the most unforgettable trips of my life. Beaches, friendly locals and delicious food made every moment special. Special thanks to our tour guide Tracy – a very kind person who helped us a lot during the tour.",
+    rating: 5,
+    date: "2026-06-03",
+    source: "tripadvisor",
+    avatar: "/images/tours/default-avatar-2020-53.jpg",
+    photo: "/images/tours/hd/cham-islands-da-nang.jpg",
+  },
+  {
+    title: "Hanoi tour, 3 days",
+    trip: { en: "3-day tour · Hanoi", zh: "3天游 · 河内" },
+    text: "Our 3 days in Hanoi were very memorable. Our tour guide Tinh explained everything very well. Everything was made perfect for us.",
+    rating: 5,
+    date: "2026-05-18",
+    source: "tripadvisor",
+    avatar: "/images/tours/default-avatar-2020-25.jpg",
+    photo: "/images/tours/v2/hanoi-920561.jpg",
+  },
+  {
+    title: "Great time in Phu Quoc",
+    trip: { en: "Island tour · Phu Quoc", zh: "海岛游 · 富国岛" },
+    text: "Thank you so much for being such a kind and thoughtful guide. You made our trip easy and fun – from showing us all the beautiful spots to helping us try local food. The kids had an amazing time too!",
+    rating: 5,
+    date: "2026-04-27",
+    source: "tripadvisor",
+    avatar: "/images/tours/default-avatar-2020-61.jpg",
+    photo: "/images/tours/v2/phu-quoc-26742975.jpg",
+  },
+  {
+    title: "Perfectly organised",
+    trip: { en: "City tours · Vietnam", zh: "城市游 · 越南" },
+    text: "It was a good experience to explore the cities. A nice trip, perfectly organised. Our guide was very knowledgeable, had good English and looked after us very well.",
+    rating: 5,
+    date: "2026-04-09",
+    source: "google",
+    avatar: "/images/tours/default-avatar-2020-64.jpg",
+    photo: "/images/tours/hd/hcm-tour-2-1.jpg",
+  },
+  {
+    title: "Amazing guide",
+    trip: { en: "Private day tours", zh: "私人一日游" },
+    text: "An amazing experience. He explained everything and suggested the best timings for each daily tour so we wasted no time. Very helpful, and his English is good.",
+    rating: 5,
+    date: "2026-03-21",
+    source: "google",
+    avatar: "/images/tours/default-avatar-2020-68.jpg",
+    photo: "/images/tours/v2/ninh-binh-c47.jpg",
+  },
+  {
+    title: "Nice trip with great explanations",
+    trip: { en: "Da Nang trip", zh: "岘港之旅" },
+    text: "Nice guidance and explanation by our tour guide about the history of each place. Good hotel and dinner restaurant.",
+    rating: 5,
+    date: "2026-02-12",
+    source: "tripadvisor",
+    avatar: "/images/tours/default-avatar-2020-52.jpg",
+    photo: "/images/tours/v2/hoi-an-20605047.jpg",
+  },
+];
+
+// Gắn bản dịch tiếng Trung
+export const reviews = list.map((r, i) => ({
+  ...r,
+  title: { en: r.title, zh: zh[i]?.title },
+  text: { en: r.text, zh: zh[i]?.text },
+}));
