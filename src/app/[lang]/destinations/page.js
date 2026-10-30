@@ -81,6 +81,8 @@ export default async function DestinationsPage({ params }) {
                       image={x.image}
                       tripsLabel={dict.common.trips}
                       className="aspect-[3/4]"
+                      // Khung dọc 3:4 với ảnh ngang → cần ảnh rộng ≈ 2× ô để không mờ
+                      sizes="(min-width: 1024px) 50vw, (min-width: 768px) 66vw, 100vw"
                     />
                   </Reveal>
                 ))}

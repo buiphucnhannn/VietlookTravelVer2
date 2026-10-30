@@ -36,7 +36,13 @@ export default function TourCard({ card, lang, labels, badge, className, priorit
           alt=""
           fill
           priority={priority}
-          sizes="(min-width: 1280px) 300px, (min-width: 768px) 45vw, 100vw"
+          // Ảnh nguồn đa số ngang 3:2 mà khung dọc (4:5) / vuông → object-cover phóng ảnh theo
+          // chiều cao: bề rộng ảnh cần ≈ 1.9× (vuông: 1.5×) bề rộng thẻ, nếu không sẽ bị mờ
+          sizes={
+            compact
+              ? "(min-width: 1280px) 600px, (min-width: 768px) 70vw, 150vw"
+              : "(min-width: 1280px) 760px, (min-width: 768px) 90vw, 170vw"
+          }
           className="object-cover transition-transform duration-700 group-hover:scale-105"
         />
         {badge && (
