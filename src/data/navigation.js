@@ -1,5 +1,5 @@
 import { href, tr } from "@/i18n/config";
-import { destinationsByRegion, regions } from "./destinations";
+import { destinationsByRegion, getDestination, regions } from "./destinations";
 import { themes } from "./themes";
 
 /**
@@ -29,9 +29,11 @@ export function buildNavigation(lang, dict) {
   const regionColumns = regions.map((r) => ({
     title: tr(r.name, lang),
     href: h(`/destinations/${r.slug}`),
+    image: r.image,
     links: destinationsByRegion(r.slug).map((d) => ({
       label: tr(d.name, lang),
       href: h(`/destinations/${d.slug}`),
+      image: d.image,
     })),
     footer: {
       label: {
@@ -42,6 +44,13 @@ export function buildNavigation(lang, dict) {
       href: h(`/destinations/${r.slug}`),
     },
   }));
+
+  const themeLink = (t) => ({
+    label: tr(t.name, lang),
+    href: h(`/themes/${t.slug}`),
+    image: t.image,
+  });
+  const img = (slug) => getDestination(slug)?.image;
 
   return [
     {
@@ -184,24 +193,28 @@ export function buildNavigation(lang, dict) {
         {
           title: n.byDuration,
           links: [
-            { label: n.allPackages, href: h("/packages") },
-            { label: n.week1, href: h("/packages#1-week") },
-            { label: n.week2, href: h("/packages#2-weeks") },
-            { label: n.week3, href: h("/packages#3-weeks") },
-            { label: n.tailorMade, href: h("/group-tailor-made-tours") },
+            {
+              label: n.allPackages,
+              href: h("/packages"),
+              image: "/images/tours/v2/vietnam-12674100.jpg",
+            },
+            { label: n.week1, href: h("/packages#1-week"), image: img("hanoi") },
+            { label: n.week2, href: h("/packages#2-weeks"), image: img("hoi-an") },
+            { label: n.week3, href: h("/packages#3-weeks"), image: img("sapa") },
+            {
+              label: n.tailorMade,
+              href: h("/group-tailor-made-tours"),
+              image: "/images/tours/v2/sapa-235925.jpg",
+            },
           ],
         },
         {
           title: n.byTheme,
-          links: themes
-            .slice(0, 4)
-            .map((t) => ({ label: tr(t.name, lang), href: h(`/themes/${t.slug}`) })),
+          links: themes.slice(0, 4).map(themeLink),
         },
         {
           title: " ",
-          links: themes
-            .slice(4)
-            .map((t) => ({ label: tr(t.name, lang), href: h(`/themes/${t.slug}`) })),
+          links: themes.slice(4).map(themeLink),
         },
       ],
       promo: {
@@ -220,11 +233,9 @@ export function buildNavigation(lang, dict) {
         {
           title: n.specialTours,
           links: [
-            { label: n.halong, href: h("/halong-bay-cruises") },
-            { label: n.dayTours, href: h("/tours?duration=1") },
-            ...themes
-              .slice(2, 6)
-              .map((t) => ({ label: tr(t.name, lang), href: h(`/themes/${t.slug}`) })),
+            { label: n.halong, href: h("/halong-bay-cruises"), image: img("halong-bay") },
+            { label: n.dayTours, href: h("/tours?duration=1"), image: img("ninh-binh") },
+            ...themes.slice(2, 6).map(themeLink),
           ],
           footer: { label: n.allTours, href: h("/tours") },
         },

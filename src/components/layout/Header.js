@@ -58,7 +58,27 @@ function MenuColumns({ columns, onNavigate }) {
       {columns.map((col, i) => (
         <div key={i}>
           {col.title &&
-            (col.href ? (
+            (col.image ? (
+              // Tiêu đề miền: banner ảnh nền + lớp phủ tối để chữ trắng dễ đọc
+              <Link
+                href={col.href}
+                onClick={onNavigate}
+                className="group relative mb-3 flex h-20 items-end overflow-hidden rounded-xl p-3"
+              >
+                <Image
+                  src={col.image}
+                  alt=""
+                  fill
+                  sizes="300px"
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <span className="absolute inset-0 bg-gradient-to-t from-brand-950/85 via-brand-950/30 to-transparent" />
+                <span className="relative flex w-full items-center justify-between text-lg font-semibold text-white">
+                  {col.title}
+                  <ChevronRight className="size-4 transition-transform group-hover:translate-x-1" />
+                </span>
+              </Link>
+            ) : col.href ? (
               <Link
                 href={col.href}
                 onClick={onNavigate}
@@ -72,13 +92,35 @@ function MenuColumns({ columns, onNavigate }) {
           <ul className={cn(col.grid ? "grid grid-cols-3 gap-x-6 gap-y-1" : "space-y-1")}>
             {col.links.map((l) => (
               <li key={l.href + l.label}>
-                <Link
-                  href={l.href}
-                  onClick={onNavigate}
-                  className="block py-1.5 text-[0.95rem] text-muted transition-colors hover:translate-x-0.5 hover:text-sun-500"
-                >
-                  {l.label}
-                </Link>
+                {l.image ? (
+                  <Link
+                    href={l.href}
+                    onClick={onNavigate}
+                    className="group flex items-center gap-3.5 rounded-lg py-1 text-[0.95rem] text-muted transition-colors hover:text-sun-500"
+                  >
+                    {/* Ảnh ngang 4:3 hợp với ảnh phong cảnh hơn ô vuông */}
+                    <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg shadow-sm ring-1 ring-black/5">
+                      <Image
+                        src={l.image}
+                        alt=""
+                        fill
+                        sizes="128px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                    </span>
+                    <span className="transition-transform group-hover:translate-x-0.5">
+                      {l.label}
+                    </span>
+                  </Link>
+                ) : (
+                  <Link
+                    href={l.href}
+                    onClick={onNavigate}
+                    className="block py-1.5 text-[0.95rem] text-muted transition-colors hover:translate-x-0.5 hover:text-sun-500"
+                  >
+                    {l.label}
+                  </Link>
+                )}
               </li>
             ))}
             {col.footer && (
