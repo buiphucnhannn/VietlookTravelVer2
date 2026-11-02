@@ -1,43 +1,27 @@
-import Image from "next/image";
-import SpinBadge from "@/components/ui/SpinBadge";
-import BgImage from "@/components/ui/BgImage";
 import { BadgeDollarSign, Hotel, Layers, MessageCircle, SlidersHorizontal } from "lucide-react";
 import { Button, Container, Reveal } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { lp } from "@/i18n/config";
+import RibbonStar from "./RibbonStar";
 
 const icons = [Hotel, MessageCircle, SlidersHorizontal, Layers, BadgeDollarSign];
 
-/** Khối "Custom Made Trip" theo localvietnam.com: ảnh blob + nội dung + danh sách lợi ích. */
+/**
+ * Khối "Custom / Make a trip" (yêu cầu khách 31/10, mục 3): thay ảnh ruộng bậc thang hình tròn
+ * và huy hiệu xoay bằng hình "dải lụa xoắn" của Demo 3; nền giấy kem vân tròn nhẹ.
+ */
 export default function CustomTrip({ lang, dict }) {
   const t = dict.home;
   const points = t.customPoints;
   return (
-    <section className="relative isolate overflow-hidden bg-cream-50 py-14 lg:py-[4.5rem]">
-      <BgImage src="/images/tours/hd/hoang-su-phi-ha-giang.jpg" tone="mist" position="50% 75%" />
-      <Container className="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-14">
-        <Reveal className="relative mx-auto w-full max-w-[540px] lg:ml-0 lg:max-w-[min(540px,calc(100svh-260px))] lg:pb-20">
-          <SpinBadge className="absolute top-4 right-2 z-10 sm:right-6" />
-          <div className="blob relative aspect-square overflow-hidden shadow-xl">
-            <Image
-              src="/images/tours/v2/sapa-6130917.jpg"
-              alt=""
-              fill
-              sizes="(min-width: 1024px) 540px, 90vw"
-              className="object-cover object-[30%_40%]"
-            />
-          </div>
-          {/* Ghi chú viết tay ở góc dưới trái (không khung, viền sáng nhẹ để dễ đọc) */}
-          <div
-            className="absolute bottom-0 left-2 hidden items-start gap-1 font-hand text-[1.6rem] leading-[1.1] text-forest-700 [text-shadow:0_1px_14px_rgba(255,255,255,0.95),0_0_4px_rgba(255,255,255,0.8)] lg:flex"
-            aria-hidden
-          >
-            <p className="relative whitespace-pre-line">{t.customNote}</p>
-          </div>
+    <section className="relative isolate overflow-hidden bg-cream-50 bg-[radial-gradient(circle_at_28%_50%,rgba(255,255,255,0.9),rgba(255,255,255,0)_55%),repeating-radial-gradient(circle_at_28%_50%,rgba(160,130,80,0.09)_0_1px,transparent_1px_26px)] py-14 lg:py-[4.5rem]">
+      <Container className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+        <Reveal className="mx-auto w-full max-w-[min(520px,calc(100svh-200px))] animate-float px-4 sm:px-0">
+          <RibbonStar lang={lang} />
         </Reveal>
 
         <div>
-          <p className="text-sm font-bold tracking-[0.18em] text-forest-700 uppercase">
+          <p className="text-sm font-bold tracking-[0.18em] text-clay-600 uppercase">
             {t.customEyebrow}
           </p>
           <h2 className="heading-lg mt-3 text-ink">{t.customTitle}</h2>
@@ -53,11 +37,11 @@ export default function CustomTrip({ lang, dict }) {
                   key={p}
                   delay={i * 70}
                   className={cn(
-                    "flex items-center gap-3 rounded-xl bg-white/85 p-3 shadow-sm ring-1 ring-white backdrop-blur",
+                    "flex items-center gap-3 rounded-xl bg-white/90 p-3 shadow-sm ring-1 ring-sand-300/50",
                     i === points.length - 1 && points.length % 2 && "sm:col-span-2",
                   )}
                 >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-cream-100 text-forest-700">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-cream-100 text-clay-600">
                     <Icon className="size-5" />
                   </span>
                   <span className="text-[0.95rem] leading-snug font-semibold text-ink">{p}</span>
@@ -66,7 +50,7 @@ export default function CustomTrip({ lang, dict }) {
             })}
           </ul>
 
-          <Button href={`${lp(lang)}/plan-your-trip`} variant="primary" size="lg" className="mt-8">
+          <Button href={`${lp(lang)}/plan-your-trip`} variant="cta" size="lg" className="mt-8">
             {t.customCta}
           </Button>
         </div>

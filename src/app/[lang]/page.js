@@ -25,7 +25,7 @@ import BookingSteps from "@/components/home/BookingSteps";
 import DestinationGrid, { toGridItem } from "@/components/home/DestinationGrid";
 import PartnersBlock from "@/components/home/PartnersBlock";
 import PartnerStrip from "@/components/home/PartnerStrip";
-import HeritageDrum from "@/components/home/HeritageDrum";
+import DrumStats from "@/components/home/DrumStats";
 import { getDestination } from "@/data/destinations";
 
 export async function generateMetadata({ params }) {
@@ -109,7 +109,7 @@ export default async function HomePage({ params }) {
         others={gridOthers}
         total={destinations.length + regions.length}
       />
-      <HeritageDrum lang={lang} dict={dict} />
+      <DrumStats lang={lang} dict={dict} />
       <LongTours
         lang={lang}
         dict={dict}

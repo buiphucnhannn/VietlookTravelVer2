@@ -81,7 +81,7 @@ export default async function GroupTailorMadePage({ params }) {
       </Container>
 
       {/* Thanh tab kiểu localvietnam */}
-      <div data-scroll-offset className="sticky top-16 z-30 bg-[#dff3f1] lg:top-[72px]">
+      <div data-scroll-offset className="sticky top-16 z-30 bg-[#dff3f1] lg:top-[108px]">
         {/* Chỉ các mục chuyển tới khối trong trang, căn giữa (nút Free Trip Planning đã có trên header) */}
         <Container>
           <nav className="flex scrollbar-none gap-1 overflow-x-auto py-1 md:justify-center">

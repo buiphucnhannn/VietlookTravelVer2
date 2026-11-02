@@ -84,7 +84,7 @@ export default function FloatingContact({ labels, contact, messaging }) {
           aria-label={labels.top}
           tabIndex={showTop && !open ? 0 : -1}
           className={cn(
-            "grid size-10 place-items-center rounded-full bg-white text-brand-700 shadow-lg ring-1 ring-border transition-all duration-300 hover:-translate-y-0.5",
+            "hidden size-10 place-items-center rounded-full bg-white text-brand-700 shadow-lg ring-1 ring-border transition-all duration-300 hover:-translate-y-0.5 sm:grid",
             showTop && !open ? "opacity-100" : "pointer-events-none translate-y-3 opacity-0",
           )}
         >
@@ -144,7 +144,7 @@ export default function FloatingContact({ labels, contact, messaging }) {
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
             aria-label={labels.contact}
-            className="relative grid size-12 place-items-center rounded-full bg-brand-600 text-white shadow-xl shadow-brand-900/30 transition hover:bg-brand-700"
+            className="relative grid size-11 place-items-center rounded-full bg-brand-600 text-white shadow-xl shadow-brand-900/30 transition hover:bg-brand-700 sm:size-12"
           >
             {!open && (
               <span className="absolute inset-0 animate-ping rounded-full bg-brand-500/40" />

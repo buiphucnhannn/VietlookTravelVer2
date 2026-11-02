@@ -11,11 +11,21 @@ import { smoothScrollTo } from "@/components/fx/SmoothScroll";
  * Logo ngang: biểu tượng chim hạc + chữ VIETLOOK TRAVEL (cắt từ logo gốc).
  * light: chữ chuyển trắng (trên nền ảnh/tối). compact: cỡ nhỏ cho header thấp.
  */
-export default function Logo({ lang = "en", small, compact, light, className, onNavigate }) {
+export default function Logo({
+  lang = "en",
+  small,
+  compact,
+  light,
+  tagline = true,
+  taglineClassName,
+  className,
+  onNavigate,
+}) {
   const pathname = usePathname();
   const home = href(lang);
   return (
     <Link
+      prefetch={false}
       href={home}
       // Đang ở trang chủ: lướt mượt lên đầu hero thay vì tải lại
       onClick={(e) => {
@@ -56,6 +66,33 @@ export default function Logo({ lang = "en", small, compact, light, className, on
           light && "brightness-0 drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] invert",
         )}
       />
+      {/* Yêu cầu khách 31/10: thêm "Vietnam DMC" + "Since 2009" cạnh logo cho khối logo đỡ đơn điệu */}
+      {tagline && (
+        <span
+          className={cn(
+            "hidden flex-col justify-center border-l-2 pl-2.5 leading-none sm:flex",
+            light ? "border-white/40" : "border-sun-500/70",
+            taglineClassName,
+          )}
+        >
+          <span
+            className={cn(
+              "text-[0.8rem] font-extrabold tracking-[0.08em] whitespace-nowrap uppercase",
+              light ? "text-white" : "text-sun-500",
+            )}
+          >
+            Vietnam DMC
+          </span>
+          <span
+            className={cn(
+              "mt-1 text-[0.68rem] font-semibold tracking-[0.22em] whitespace-nowrap uppercase",
+              light ? "text-white/75" : "text-brand-600",
+            )}
+          >
+            Since 2009
+          </span>
+        </span>
+      )}
     </Link>
   );
 }

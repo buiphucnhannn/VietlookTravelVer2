@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   CreditCard,
+  FileText,
   Handshake,
   Info,
   Mail,
@@ -47,6 +48,7 @@ const icons = {
   shield: Shield,
   map: MapIcon,
   book: BookOpen,
+  file: FileText,
 };
 
 function MenuColumns({ columns, onNavigate }) {
@@ -89,7 +91,15 @@ function MenuColumns({ columns, onNavigate }) {
             ) : (
               <p className="mb-3 text-lg font-semibold text-brand-700">{col.title}</p>
             ))}
-          <ul className={cn(col.grid ? "grid grid-cols-3 gap-x-6 gap-y-1" : "space-y-1")}>
+          <ul
+            className={cn(
+              col.grid
+                ? col.gridCols === 2
+                  ? "grid grid-cols-2 gap-x-6 gap-y-1"
+                  : "grid grid-cols-3 gap-x-6 gap-y-1"
+                : "space-y-1",
+            )}
+          >
             {col.links.map((l) => (
               <li key={l.href + l.label}>
                 {l.image ? (
@@ -141,10 +151,50 @@ function MenuColumns({ columns, onNavigate }) {
   );
 }
 
+/** Thẻ ảnh nổi bật bên phải dropdown – cao bằng phần nội dung bên cạnh (cân đối 2 bên). */
+function PromoCard({ promo, onNavigate }) {
+  return (
+    <Link
+      href={promo.href}
+      onClick={onNavigate}
+      className="group relative flex h-full min-h-56 flex-col justify-end overflow-hidden rounded-2xl p-5 text-white"
+    >
+      <Image
+        src={promo.image}
+        alt=""
+        fill
+        sizes="300px"
+        className="object-cover transition-transform duration-700 group-hover:scale-105"
+      />
+      <span className="absolute inset-0 bg-gradient-to-t from-brand-950/90 via-brand-950/25 to-transparent" />
+      {promo.badge && (
+        <span className="absolute top-4 left-4 rounded-full bg-amber-brand px-3 py-1 text-xs font-bold text-ink">
+          {promo.badge}
+        </span>
+      )}
+      <span className="relative flex items-center justify-between gap-2 text-lg leading-tight font-semibold">
+        {promo.title}
+        <ChevronRight className="size-5 shrink-0 transition-transform group-hover:translate-x-1" />
+      </span>
+      {promo.text && <span className="relative mt-1 text-sm text-white/80">{promo.text}</span>}
+    </Link>
+  );
+}
+
+/**
+ * Dropdown dạng tab: [danh sách tab | nội dung tab | ảnh nổi bật]. Chiều cao tối thiểu cố định
+ * để khi rê qua các tab, khung không co giãn/nhảy.
+ */
 function TabsPanel({ tabs, onNavigate }) {
   const [active, setActive] = useState(0);
+  const tab = tabs[active];
   return (
-    <div className="grid grid-cols-[230px_1fr] gap-10">
+    <div
+      className={cn(
+        "grid min-h-[340px] gap-10",
+        tab.promo ? "grid-cols-[250px_1fr_280px]" : "grid-cols-[250px_1fr]",
+      )}
+    >
       <ul className="space-y-1 border-r border-border pr-6" role="tablist">
         {tabs.map((t, i) => (
           <li key={t.label}>
@@ -156,7 +206,7 @@ function TabsPanel({ tabs, onNavigate }) {
               onFocus={() => setActive(i)}
               onClick={() => setActive(i)}
               className={cn(
-                "flex w-full items-center justify-between rounded-md px-4 py-2.5 text-left font-medium transition-colors",
+                "flex w-full items-center justify-between gap-2 rounded-md px-4 py-2.5 text-left font-medium whitespace-nowrap transition-colors",
                 active === i ? "bg-brand-50 text-brand-700" : "text-ink hover:bg-surface",
               )}
             >
@@ -166,17 +216,26 @@ function TabsPanel({ tabs, onNavigate }) {
           </li>
         ))}
       </ul>
-      <MenuColumns columns={tabs[active].columns} onNavigate={onNavigate} />
+      <MenuColumns columns={tab.columns} onNavigate={onNavigate} />
+      {tab.promo && <PromoCard promo={tab.promo} onNavigate={onNavigate} />}
     </div>
   );
 }
 
-/** Thẻ dịch vụ / giới thiệu: icon + tiêu đề + mô tả ngắn, kèm cột phụ và ảnh nổi bật. */
+/**
+ * Dropdown dạng thẻ: [lưới thẻ | (cột phụ) | ảnh nổi bật]. Không còn cột trống khi không có
+ * cột phụ; các thẻ cao bằng nhau, ảnh nổi bật cao bằng cả lưới thẻ.
+ */
 function CardsPanel({ item, contact, onNavigate }) {
   const { links, cols, aside, help, promo } = item;
   return (
-    <div className="grid grid-cols-[1fr_auto_300px] gap-8">
-      <ul className={cn("grid content-start gap-3", cols === 3 ? "grid-cols-3" : "grid-cols-2")}>
+    <div
+      className={cn(
+        "grid items-stretch gap-8",
+        aside ? "grid-cols-[1fr_250px_280px]" : promo ? "grid-cols-[1fr_280px]" : "grid-cols-1",
+      )}
+    >
+      <ul className={cn("grid auto-rows-fr gap-3", cols === 3 ? "grid-cols-3" : "grid-cols-2")}>
         {links.map((l) => {
           const Icon = icons[l.icon] || ChevronRight;
           return (
@@ -184,7 +243,7 @@ function CardsPanel({ item, contact, onNavigate }) {
               <Link
                 href={l.href}
                 onClick={onNavigate}
-                className="group flex h-full gap-4 rounded-2xl p-4 ring-1 ring-border transition hover:bg-brand-50/60 hover:ring-brand-200"
+                className="group flex h-full items-center gap-4 rounded-2xl p-4 ring-1 ring-border transition hover:bg-brand-50/60 hover:ring-brand-200"
               >
                 <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-600 group-hover:text-white">
                   <Icon className="size-5" />
@@ -211,16 +270,20 @@ function CardsPanel({ item, contact, onNavigate }) {
               </span>
               <span className="min-w-0">
                 <span className="block font-semibold text-ink">{help.title}</span>
-                <span className="mt-1 block text-sm leading-snug text-muted">{help.text}</span>
-                <span className="mt-1 block text-sm font-bold text-sun-600">{contact.hotline}</span>
+                <span className="mt-1 block text-sm leading-snug text-muted">
+                  {help.text} ·{" "}
+                  <span className="font-bold whitespace-nowrap text-sun-600">
+                    {contact.hotline}
+                  </span>
+                </span>
               </span>
             </a>
           </li>
         )}
       </ul>
 
-      {aside ? (
-        <div className="w-60 border-l border-border pl-8">
+      {aside && (
+        <div className="border-l border-border pl-8">
           <p className="mb-3 text-xs font-bold tracking-[0.18em] text-brand-700 uppercase">
             {aside.title}
           </p>
@@ -234,7 +297,7 @@ function CardsPanel({ item, contact, onNavigate }) {
                     onClick={onNavigate}
                     className="group flex items-center gap-2.5 rounded-lg py-2 text-[0.95rem] whitespace-nowrap text-muted transition-colors hover:text-sun-500"
                   >
-                    <Icon className="size-4 text-brand-500 group-hover:text-sun-500" />
+                    <Icon className="size-4 shrink-0 text-brand-500 group-hover:text-sun-500" />
                     {l.label}
                   </Link>
                 </li>
@@ -242,65 +305,30 @@ function CardsPanel({ item, contact, onNavigate }) {
             })}
           </ul>
         </div>
-      ) : (
-        <span />
       )}
 
-      {promo && (
-        <Link
-          href={promo.href}
-          onClick={onNavigate}
-          className={cn(
-            "group relative flex min-h-60 flex-col justify-end overflow-hidden rounded-2xl p-5 text-white",
-            promo.cutout && "bg-[radial-gradient(circle_at_70%_15%,#3b98d3,#0f4870_70%)]",
-          )}
-        >
-          {promo.cutout ? (
-            <Image
-              src={promo.image}
-              alt=""
-              width={477}
-              height={261}
-              className="absolute top-11 left-1/2 w-[74%] -translate-x-1/2 transition-transform duration-500 group-hover:-translate-y-1 group-hover:scale-[1.04]"
-            />
-          ) : (
-            <>
-              <Image
-                src={promo.image}
-                alt=""
-                fill
-                sizes="300px"
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <span className="absolute inset-0 bg-gradient-to-t from-brand-950/90 via-brand-950/25 to-transparent" />
-            </>
-          )}
-          <span className="absolute top-4 left-4 rounded-full bg-amber-brand px-3 py-1 text-xs font-bold text-ink">
-            {promo.badge}
-          </span>
-          <span className="relative flex items-center justify-between gap-2 text-lg leading-tight font-semibold">
-            {promo.title}
-            <ChevronRight className="size-5 shrink-0 transition-transform group-hover:translate-x-1" />
-          </span>
-          <span className="relative mt-1 text-sm text-white/80">{promo.text}</span>
-        </Link>
-      )}
+      {promo && <PromoCard promo={promo} onNavigate={onNavigate} />}
     </div>
   );
 }
 
-// Mọi trang đều mở đầu bằng hero ảnh/video tối → header trong suốt phủ lên.
-// Ngoại lệ: chi tiết tour (mở đầu bằng album ảnh trên nền sáng) và trang cảm ơn (nền kem).
+// Trang mở đầu bằng banner ảnh/video → ở đầu trang header trong suốt, "ăn" nền banner.
+// Ngoại lệ: chi tiết tour (album ảnh nền sáng) và trang cảm ơn (nền kem) → luôn nền trắng.
 const SOLID = [/^(\/(en|zh))?\/tours\/[^/]+\/?$/, /^(\/(en|zh))?\/thank-you\/?$/];
 const isOverlayRoute = (p) => !SOLID.some((re) => re.test(p || ""));
 
+/**
+ * Header cố định (yêu cầu khách 31/10 + góp ý 02/11):
+ * - Ở đầu trang: trong suốt trên nền banner (không viền/vạch kẻ).
+ * - Cuộn xuống: nền trắng và giữ nguyên như vậy (topbar không thu gọn).
+ * - Rê chuột / mở menu KHÔNG làm header đổi nền hay chuyển động – chỉ phụ thuộc vị trí cuộn.
+ */
 export default function Header({ lang, nav, labels, contact }) {
   const pathname = usePathname();
   const [openKey, setOpenKey] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSection, setMobileSection] = useState(null);
   const [scrolled, setScrolled] = useState(false);
-  const closeTimer = useRef(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -308,6 +336,7 @@ export default function Header({ lang, nav, labels, contact }) {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  const closeTimer = useRef(null);
 
   // Đóng menu khi chuyển trang (cập nhật state ngay trong render theo khuyến nghị của React)
   const [lastPath, setLastPath] = useState(pathname);
@@ -341,23 +370,21 @@ export default function Header({ lang, nav, labels, contact }) {
 
   const isActive = (item) => pathname?.startsWith(item.href.split("#")[0].split("?")[0]);
   const current = nav.find((i) => i.key === openKey);
-  // Trong suốt khi ở đầu trang có ảnh/video nền tối; cuộn xuống hoặc mở menu → nền trắng
   const overlayRoute = isOverlayRoute(pathname);
-  const clear = overlayRoute && !scrolled && !openKey;
+  // Chỉ phụ thuộc vị trí cuộn (không đổi khi rê chuột/mở menu)
+  const clear = overlayRoute && !scrolled;
 
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-50">
-        {/* Thanh trên cùng – thu gọn khi đã cuộn */}
+        {/* Thanh trên cùng – luôn hiển thị (không thu gọn khi cuộn) */}
         <div
           className={cn(
-            "relative z-10 hidden text-[0.8rem] transition-[max-height,background-color,opacity] duration-500 lg:block",
-            // Chỉ ẩn phần tràn khi thu gọn – để dropdown ngôn ngữ không bị cắt
-            scrolled ? "max-h-0 overflow-hidden opacity-0" : "max-h-9 opacity-100",
-            clear ? "bg-black/20 text-white/85 backdrop-blur-[2px]" : "bg-brand-950 text-white/85",
+            "relative z-10 hidden text-[0.8rem] text-white/85 transition-colors duration-500 lg:block",
+            clear ? "bg-black/25 backdrop-blur-[2px]" : "bg-brand-950",
           )}
         >
-          <Container className="flex h-9 items-center justify-between gap-6">
+          <Container className="flex h-9 items-center justify-between gap-6 whitespace-nowrap">
             <p className="font-medium tracking-wide">{labels.dmc}</p>
             <div className="flex items-center gap-5">
               <a
@@ -368,16 +395,25 @@ export default function Header({ lang, nav, labels, contact }) {
               </a>
               <a
                 href={`mailto:${contact.email}`}
-                className="flex items-center gap-1.5 hover:text-white"
+                className="hidden items-center gap-1.5 hover:text-white xl:flex"
               >
                 <Mail className="size-3.5" /> {contact.email}
               </a>
               <span className="h-4 w-px bg-white/20" />
               <Link
+                prefetch={false}
                 href={`${lp(lang)}/partners`}
                 className="flex items-center gap-1.5 font-semibold text-amber-brand hover:text-white"
               >
                 <Handshake className="size-3.5" /> {labels.partners}
+              </Link>
+              {/* Desktop: nút lên kế hoạch nằm ở thanh này để menu chính đủ rộng, giãn cách thoáng */}
+              <Link
+                prefetch={false}
+                href={`${lp(lang)}/plan-your-trip`}
+                className="rounded-full bg-sun-500 px-3 py-0.5 font-semibold text-white hover:bg-sun-600"
+              >
+                {labels.planTrip}
               </Link>
               <LanguageSwitcher lang={lang} variant="dark" />
             </div>
@@ -387,57 +423,69 @@ export default function Header({ lang, nav, labels, contact }) {
         {/* Thanh chính */}
         <div
           className={cn(
-            "relative transition-[background-color,box-shadow,border-color] duration-500",
+            "relative transition-[background-color,box-shadow] duration-500",
             clear
-              ? "border-b border-white/15 bg-gradient-to-b from-black/35 to-transparent"
-              : "border-b border-border bg-white shadow-[0_6px_24px_-14px_rgba(15,62,95,0.35)]",
+              ? "bg-gradient-to-b from-black/35 to-transparent"
+              : "bg-white shadow-[0_6px_24px_-14px_rgba(15,62,95,0.35)]",
           )}
           onMouseLeave={scheduleClose}
         >
           <Container className="flex h-16 items-center justify-between gap-4 lg:h-[72px]">
-            <Logo lang={lang} light={clear} compact className="min-w-0" />
+            <Logo
+              lang={lang}
+              compact
+              light={clear}
+              taglineClassName="lg:hidden xl:flex"
+              className="min-w-0"
+            />
 
-            <nav className="hidden items-center lg:flex" aria-label={labels.menu}>
+            {/* Trải đều các mục từ sau logo đến mép phải → khoảng cách giữa các mục bằng nhau, 2 bên cân đối */}
+            <nav
+              className="hidden flex-1 items-center justify-between lg:ml-4 lg:flex xl:ml-10 2xl:ml-12"
+              aria-label={labels.menu}
+            >
               {nav.map((item) => (
                 <div key={item.key} onMouseEnter={() => open(item.key)}>
-                  {/* Rê chuột / focus: mở dropdown; bấm thẳng vào mục: sang trang tổng (vd. All travel guides) */}
+                  {/* Rê chuột / focus: mở dropdown; bấm thẳng vào mục: sang trang tổng (vd. All travel guides).
+                      prefetch={false}: các link header hiện ngay khi tải trang chủ "/" (được proxy rewrite
+                      sang /en) khiến router Next 16.4 prefetch lặp vô hạn (~160 request/giây). Tắt prefetch
+                      cho link header → hết vòng lặp; trang đều dựng sẵn nên bấm vẫn chuyển ~40–100ms. */}
                   <Link
+                    prefetch={false}
                     href={item.href}
                     aria-expanded={openKey === item.key}
                     aria-haspopup="true"
                     onFocus={() => open(item.key)}
                     onClick={() => setOpenKey(null)}
+                    // Không hiệu ứng chuyển động khi rê chuột: chỉ đổi màu chữ
                     className={cn(
-                      "relative flex items-center gap-1 px-3.5 py-3 text-[0.95rem] font-semibold transition-colors xl:px-4",
+                      "flex items-center gap-1 px-1 py-3 text-[0.82rem] font-semibold whitespace-nowrap xl:px-2 xl:text-[0.92rem] 2xl:px-2.5 2xl:text-[0.95rem]",
                       clear
-                        ? "text-white hover:text-amber-brand"
+                        ? openKey === item.key
+                          ? "text-amber-brand [text-shadow:0_1px_6px_rgba(0,0,0,0.45)]"
+                          : "text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.45)] hover:text-amber-brand"
                         : openKey === item.key || isActive(item)
-                          ? "text-brand-600"
-                          : "text-ink hover:text-brand-600",
+                          ? "text-sun-500"
+                          : "text-ink hover:text-sun-500",
                     )}
                   >
                     {item.label}
-                    <ChevronDown
-                      className={cn(
-                        "size-4 transition-transform",
-                        openKey === item.key && "rotate-180",
-                      )}
-                    />
-                    <span
-                      className={cn(
-                        "absolute inset-x-3.5 -bottom-[1px] h-[3px] rounded-full bg-sun-500 transition-transform duration-300 xl:inset-x-4",
-                        openKey === item.key ? "scale-x-100" : "scale-x-0",
-                      )}
-                    />
+                    {/* Mũi tên ▾: báo hiệu mục có menu thả xuống */}
+                    {item.type && (
+                      <ChevronDown
+                        aria-hidden
+                        className="size-3.5 shrink-0 opacity-75 2xl:size-4"
+                      />
+                    )}
                   </Link>
                 </div>
               ))}
             </nav>
 
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:hidden">
               <Link
                 href={`${lp(lang)}/plan-your-trip`}
-                className="hidden h-10 items-center rounded-md bg-sun-500 px-5 text-[0.95rem] font-semibold text-white shadow-sm shadow-sun-500/30 transition-colors hover:bg-sun-600 sm:flex"
+                className="hidden h-10 items-center rounded-md bg-sun-500 px-5 text-[0.95rem] font-semibold whitespace-nowrap text-white shadow-sm shadow-sun-500/30 transition-colors hover:bg-sun-600 sm:flex lg:hidden"
               >
                 {labels.planTrip}
               </Link>
@@ -588,12 +636,6 @@ export default function Header({ lang, nav, labels, contact }) {
                   </div>
                 );
               })}
-              <Link
-                href={`${lp(lang)}/partners`}
-                className="mt-4 flex items-center gap-2 px-2 py-2 font-semibold text-brand-700"
-              >
-                <Handshake className="size-5" /> {labels.partners}
-              </Link>
             </nav>
             <div className="space-y-3 border-t border-border p-5">
               <Link
@@ -612,7 +654,7 @@ export default function Header({ lang, nav, labels, contact }) {
           </div>
         </div>
       </header>
-      {/* Trang không có ảnh nền ở đầu: chừa chỗ cho header cố định */}
+      {/* Trang không có banner ở đầu: chừa chỗ cho header cố định */}
       {!overlayRoute && <div aria-hidden className="h-16 lg:h-[108px]" />}
     </>
   );

@@ -1,6 +1,4 @@
-import fs from "fs";
 import BgImage from "@/components/ui/BgImage";
-import path from "path";
 import Image from "next/image";
 import {
   BadgeCheck,
@@ -49,34 +47,44 @@ export async function generateMetadata({ params }) {
     path: "/car-rental",
     title: dict.car.eyebrow,
     description: dict.car.text,
-    image: "/images/rent-car/1061814248554042666112-1.jpg",
+    image: "/images/fleet/luxury-1.webp",
   });
 }
 
-// Ảnh thật trong kho: nội thất & ngoại thất (bỏ ảnh studio đã tách nền)
-function fleetPhotos() {
-  const dir = path.join(process.cwd(), "public/images/rent-car");
-  const studio = new Set(["bus16.jpg", "limo.jpg", "mpv.jpg", "sedan.jpg", "download.jpeg"]);
-  const interior = new Set([
-    "152217964357731898522-copy.jpg",
-    "1000000308_20250818190016682_thumb.jpg",
-    "1000000309_20250818190027336_thumb.jpg",
-    "1000000311_20250818190121267_thumb.jpg",
-    "152217964357731898510-1.jpg",
-    "152217964357731898512-1.jpg",
-    "1567-HUnazjjSgm-anh_thumb.jpg",
-    "1000000307_20250818190049226_thumb.jpg",
-    "image_picker_416D4046-EA36-4326-BE20-41291B4B55FB-44080-00000C3327D88568_20260410210656122_thumb.jpg",
-    "image_picker_5C359F19-74E1-4A11-BDB8-20A7A35B088F-44080-00000C32F06A4669_20260410210617247_thumb.jpg",
-    "image_picker_CB288E27-E76A-4A22-9419-EAE35F54FE96-2705-000001068784230C_20260330071843712_thumb.jpg",
-    "image_picker_F73F5A32-4EC0-4898-8945-896D669E6D65-2705-00000106877F1B93_20260330071843711_thumb.jpg",
-  ]);
-  const files = fs.readdirSync(dir).filter((f) => /\.(jpe?g|png|webp)$/i.test(f) && !studio.has(f));
-  return {
-    exterior: files.filter((f) => !interior.has(f)).map((f) => `/images/rent-car/${f}`),
-    interior: [...interior].map((f) => `/images/rent-car/${f}`),
-  };
-}
+// Dải ảnh đội xe: ảnh HD (≥1600px, Pexels – miễn phí thương mại) thay cho ảnh thumbnail ≤600px bị mờ.
+const HD = "/images/fleet";
+const fleetPhotos = () => ({
+  exterior: [
+    "sedan-1",
+    "suv-1",
+    "minivan-1",
+    "luxury-1",
+    "limo-1",
+    "van16-1",
+    "coach29-1",
+    "coach45-1",
+    "ext-chauffeur-1",
+    "sedan-2",
+    "suv-2",
+    "ext-vn-road",
+    "van16-2",
+    "coach29-2",
+    "coach45-2",
+    "ext-coach-side",
+    "ext-chauffeur-2",
+    "ext-saigon-street",
+  ].map((n) => `${HD}/${n}.webp`),
+  interior: [
+    "luxury-2",
+    "limo-2",
+    "int-limo-white",
+    "int-vclass",
+    "int-van-lounge",
+    "int-beige",
+    "int-leather",
+    "int-beige-2",
+  ].map((n) => `${HD}/${n}.webp`),
+});
 
 export default async function CarRentalPage({ params }) {
   const { lang } = await params;
@@ -148,20 +156,21 @@ export default async function CarRentalPage({ params }) {
       <JsonLd data={jsonLd} />
 
       {/* ========== HERO ========== */}
-      {/* Hero tối thiểu 1 màn hình (cao thêm khi form mở rộng): nội dung ở trên, dải đường + xe nằm riêng bên dưới – không đè nhau */}
+      {/* Hero: ẢNH THẬT xe chạy trên đèo Hà Giang (yêu cầu 31/10, mục 2 – bớt cảm giác ảnh minh hoạ).
+          Ảnh: Pexels #28315416 (giấy phép miễn phí thương mại). */}
       <section className="relative isolate flex flex-col overflow-hidden bg-[#0b1b2b] text-white lg:min-h-[min(100svh,960px)]">
         <Image
-          src="/images/rent-car/download.jpeg"
-          alt=""
+          src="/images/heroes/car-ha-giang-road.webp"
+          alt="Private car on the Ha Giang mountain pass, Vietnam"
           fill
           priority
           sizes="100vw"
-          className="-z-20 object-cover object-bottom opacity-70"
+          className="-z-20 object-cover object-[50%_70%]"
         />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b1b2b] via-[#0b1b2b]/80 to-[#0b1b2b]/30" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0b1b2b] via-transparent to-transparent" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b1b2b]/90 via-[#0b1b2b]/55 to-transparent" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0b1b2b]/70 via-transparent to-transparent" />
 
-        <Container className="grid flex-1 items-center gap-10 pt-28 pb-8 lg:grid-cols-[1fr_440px] lg:gap-12 lg:pt-[124px] lg:pb-6 xl:grid-cols-[1fr_460px] xl:gap-16">
+        <Container className="grid flex-1 items-center gap-10 pt-28 pb-12 lg:grid-cols-[1fr_440px] lg:gap-12 lg:pt-[140px] lg:pb-14 xl:grid-cols-[1fr_460px] xl:gap-16">
           <div>
             <Breadcrumbs
               light
@@ -206,44 +215,6 @@ export default async function CarRentalPage({ params }) {
             vehicles={vehicles}
           />
         </Container>
-
-        {/* Con đường & chiếc xe đang chạy – nằm trong luồng bố cục, dưới nội dung */}
-        <div className="relative h-28 shrink-0 sm:h-32" aria-hidden>
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-[#1b2733] to-[#121c26]" />
-          <div className="absolute inset-x-0 bottom-7 h-1.5 animate-road bg-[repeating-linear-gradient(90deg,#f7b32b_0_60px,transparent_60px_120px)]" />
-          <div className="absolute inset-x-0 bottom-16 h-px bg-white/15" />
-          <div className="absolute bottom-4 left-[6%] w-[min(300px,58vw)] animate-float">
-            <div
-              className="absolute top-1/2 right-[96%] hidden w-40 space-y-2 sm:block"
-              aria-hidden
-            >
-              {[90, 60, 75].map((w, i) => (
-                <span
-                  key={i}
-                  className="block h-[3px] rounded-full bg-gradient-to-l from-white/60 to-transparent"
-                  style={{ width: `${w}%`, marginLeft: `${100 - w}%` }}
-                />
-              ))}
-            </div>
-            <Image
-              src="/images/rent-car/cutouts/limousine-studio.webp"
-              alt="Vietlook limousine"
-              width={777}
-              height={272}
-              priority
-              className="h-auto w-full drop-shadow-[0_24px_18px_rgba(0,0,0,0.6)]"
-            />
-          </div>
-          <div className="absolute right-[6%] bottom-5 hidden w-[min(190px,22vw)] md:block">
-            <Image
-              src="/images/rent-car/cutouts/kia-carnival-front.webp"
-              alt=""
-              width={324}
-              height={166}
-              className="h-auto w-full -scale-x-100 opacity-90 drop-shadow-[0_18px_14px_rgba(0,0,0,0.6)]"
-            />
-          </div>
-        </div>
       </section>
 
       {/* ========== DẢI ĐIỂM MẠNH (như hltcarservice.com) ========== */}
@@ -279,7 +250,11 @@ export default async function CarRentalPage({ params }) {
             <h2 className="heading-lg text-white">{t.fleetTitle}</h2>
             <p className="mt-3 text-white/70">{t.fleetSubtitle}</p>
           </header>
-          <FleetStage fleet={fleetData} t={{ ...t, contactPrice: dict.common.contactPrice }} />
+          <FleetStage
+            lang={lang}
+            fleet={fleetData}
+            t={{ ...t, contactPrice: dict.common.contactPrice }}
+          />
         </Container>
       </section>
 
@@ -364,7 +339,7 @@ export default async function CarRentalPage({ params }) {
 
       {/* ========== GIÁ ĐÃ BAO GỒM ========== */}
       <section className="relative isolate overflow-hidden pt-8 pb-14 lg:pt-10 lg:pb-[4.5rem]">
-        <BgImage src="/images/rent-car/1061814248554042666108-1.jpg" tone="light" />
+        <BgImage src="/images/fleet/ext-saigon-street.webp" tone="light" />
         <Container>
           <header className="mb-10 max-w-2xl">
             <h2 className="heading-lg text-ink">{t.includedTitle}</h2>
@@ -393,7 +368,7 @@ export default async function CarRentalPage({ params }) {
         </Container>
       </section>
 
-      {/* ========== ẢNH ĐỘI XE THẬT (marquee) ========== */}
+      {/* ========== DẢI ẢNH ĐỘI XE (marquee) ========== */}
       <section className="overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
         <Container className="mb-8 text-center lg:mb-10">
           <h2 className="heading-lg text-ink">{t.galleryTitle}</h2>
@@ -411,7 +386,7 @@ export default async function CarRentalPage({ params }) {
 
       {/* ========== CÁCH ĐẶT XE ========== */}
       <section className="relative isolate overflow-hidden bg-[#0b1b2b] py-14 text-white lg:py-[4.5rem]">
-        <BgImage src="/images/rent-car/152217964357731898522-copy.jpg" tone="night" />
+        <BgImage src="/images/fleet/int-limo-white.webp" tone="night" />
         <div className="absolute -top-40 -right-40 size-[520px] rounded-full bg-amber-brand/10 blur-3xl" />
         <Container className="relative">
           <h2 className="heading-lg">{t.howTitle}</h2>
@@ -590,8 +565,8 @@ export default async function CarRentalPage({ params }) {
             </div>
             <div className="relative mt-6 h-56 overflow-hidden rounded-3xl">
               <Image
-                src="/images/rent-car/1061814248554042666103-1.jpg"
-                alt="Vietlook Kia Carnival fleet"
+                src="/images/fleet/luxury-1.webp"
+                alt="Private MPV with captain seats"
                 fill
                 sizes="(min-width: 1024px) 35vw, 100vw"
                 className="object-cover"

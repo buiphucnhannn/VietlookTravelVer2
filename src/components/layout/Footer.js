@@ -252,7 +252,7 @@ export default function Footer({ lang, dict }) {
           </div>
         </Container>
         {/* Tầng 2: bản quyền – mobile xếp dọc từng dòng (không tràn ngang); từ md nối 1 hàng, ngắt theo cụm */}
-        <Container className="flex flex-col items-center gap-1 py-4 text-center text-xs text-white/45 md:flex-row md:flex-wrap md:justify-center md:gap-x-2">
+        <Container className="flex flex-col items-center gap-1 pt-4 pb-20 text-center text-xs text-white/45 sm:pb-4 md:flex-row md:flex-wrap md:justify-center md:gap-x-2">
           <span className="md:whitespace-nowrap">
             © {siteConfig.since}–2026 {siteConfig.legalName}. {f.rights}
           </span>

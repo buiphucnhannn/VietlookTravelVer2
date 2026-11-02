@@ -3,8 +3,12 @@ import { destinationsByRegion, getDestination, regions } from "./destinations";
 import { themes } from "./themes";
 
 /**
- * Cây menu nhiều cấp (theo kiểu localvietnam.com). Trả về dữ liệu thuần để truyền xuống
- * Header (client component).
+ * Cây menu nhiều cấp. Trả về dữ liệu thuần để truyền xuống Header (client component).
+ *
+ * Yêu cầu khách 31/10 (mục 11): các mục Tours / Destinations / Tour Themes / Packages bị trùng
+ * → gộp về MỘT mục "Tours & Packages" (tab: theo điểm đến · theo thời lượng · theo chủ đề ·
+ * thiết kế riêng). Mỗi đường dẫn chỉ xuất hiện ở một mục menu; thứ tự theo định hướng nội dung:
+ * Tour (toàn Việt Nam) → Thuê xe → Visa & fast-track → B2B → Cẩm nang → Giới thiệu.
  */
 export function buildNavigation(lang, dict) {
   const n = dict.nav;
@@ -54,66 +58,246 @@ export function buildNavigation(lang, dict) {
 
   return [
     {
+      key: "tours",
+      label: z("Tours & Packages", "线路与套餐"),
+      href: h("/tours"),
+      type: "tabs",
+      tabs: [
+        {
+          label: z("By destination", "按目的地"),
+          columns: regionColumns,
+        },
+        {
+          label: n.byDuration,
+          columns: [
+            {
+              title: n.byDuration,
+              links: [
+                { label: n.dayTours, href: h("/tours?duration=1"), image: img("ninh-binh") },
+                { label: n.week1, href: h("/packages#1-week"), image: img("hanoi") },
+                { label: n.week2, href: h("/packages#2-weeks"), image: img("hoi-an") },
+                { label: n.week3, href: h("/packages#3-weeks"), image: img("sapa") },
+              ],
+              footer: { label: n.allPackages, href: h("/packages") },
+            },
+            {
+              title: n.specialTours,
+              links: [
+                { label: n.halong, href: h("/halong-bay-cruises"), image: img("halong-bay") },
+                {
+                  label: n.groupTours,
+                  href: h("/group-tailor-made-tours"),
+                  image: "/images/tours/v2/sapa-235925.jpg",
+                },
+              ],
+              footer: { label: n.allTours, href: h("/tours") },
+            },
+          ],
+          promo: {
+            image: "/images/tours/v2/halong-bay-1018475.jpg",
+            badge: z("1–3 weeks", "1至3周"),
+            title: n.allPackages,
+            text: z("Private, flexible, door-to-door", "私人专属，灵活安排，门到门服务"),
+            href: h("/packages"),
+          },
+        },
+        {
+          label: n.byTheme,
+          columns: [
+            { title: n.byTheme, links: themes.slice(0, 4).map(themeLink) },
+            { title: " ", links: themes.slice(4).map(themeLink) },
+          ],
+          promo: {
+            image: "/images/tours/v2/sapa-235925.jpg",
+            badge: z("Free planning", "免费规划"),
+            title: n.tailorMade,
+            text: z("Tell us your ideas – we design the rest", "说出想法，其余交给我们"),
+            href: h("/plan-your-trip"),
+          },
+        },
+      ],
+    },
+    {
+      key: "car",
+      label: z("Private Car", "包车服务"),
+      href: h("/car-rental"),
+      type: "cards",
+      cols: 2,
+      links: [
+        {
+          label: n.carHire,
+          href: h("/car-rental"),
+          icon: "car",
+          desc: z(
+            "4–45 seat vehicles with English or Chinese-speaking drivers",
+            "4–45座车辆，配英语或中文司机",
+          ),
+        },
+        {
+          label: n.airportTransfer,
+          href: h("/car-rental#services"),
+          icon: "plane",
+          desc: z("Meet & greet at every major airport", "各大机场接机送机"),
+        },
+        {
+          label: z("Our fleet", "车型一览"),
+          href: h("/car-rental#fleet"),
+          icon: "users",
+          desc: z("Sedan, SUV, limousine, van & coach", "轿车、SUV、豪华商务车、面包车与大巴"),
+        },
+        {
+          label: z("Get a car quote", "获取包车报价"),
+          href: h("/car-rental#quote"),
+          icon: "message",
+          desc: z(
+            "Fixed price by route – reply in about 30 minutes",
+            "按线路固定报价，约30分钟回复",
+          ),
+        },
+      ],
+      promo: {
+        // Ảnh xe HD (thay ảnh 555px bị mờ)
+        image: "/images/fleet/luxury-1.webp",
+        badge: z("Most booked", "最受欢迎"),
+        title: n.carHire,
+        text: z("Get a fixed price in about 30 minutes", "约30分钟内获得固定报价"),
+        href: h("/car-rental#quote"),
+      },
+    },
+    {
+      key: "visa",
+      label: z("Visa & Fast-track", "签证与快速通关"),
+      href: h("/visa-fast-track"),
+      type: "cards",
+      cols: 2,
+      links: [
+        {
+          label: z("Airport fast-track", "机场快速通关"),
+          href: h("/visa-fast-track#fast-track"),
+          icon: "plane",
+          desc: z(
+            "Priority & VIP lanes at SGN, HAN, DAD, CXR, PQC",
+            "胡志明、河内、岘港、金兰、富国机场优先及VIP通道",
+          ),
+        },
+        {
+          label: z("Vietnam visa & e-visa", "越南签证与电子签证"),
+          href: h("/visa-fast-track#visa"),
+          icon: "stamp",
+          desc: z("Visa types, fees and e-visa support", "签证类型、费用与电子签证协助"),
+        },
+        {
+          label: z("Book the service", "预订服务"),
+          href: h("/visa-fast-track#book-visa"),
+          icon: "calendar",
+          desc: z("Send your flight details – we confirm fast", "提交航班信息，快速确认"),
+        },
+      ],
+      help: {
+        title: z("Need it urgently?", "急需办理？"),
+        text: z("Call or message us 24/7", "全天候致电或留言"),
+      },
+      promo: {
+        image: "/images/services/airport-pick-up-one-way.webp",
+        badge: z("5 airports", "5个机场"),
+        title: z("Visa & Fast-track", "签证与快速通关"),
+        text: z("Skip the queues on arrival and departure", "入境与出境免排队"),
+        href: h("/visa-fast-track"),
+      },
+    },
+    {
+      key: "b2b",
+      label: z("B2B Partners", "B2B合作"),
+      href: h("/partners"),
+      type: "cards",
+      cols: 2,
+      links: [
+        {
+          label: n.partners,
+          href: h("/partners"),
+          icon: "handshake",
+          desc: z(
+            "Agencies, OTAs & MICE – net rates, quotes within 24h",
+            "旅行社、OTA与会奖团队：净价，24小时内报价",
+          ),
+        },
+        {
+          label: z("What we offer", "合作内容"),
+          href: h("/partners#offers"),
+          icon: "star",
+          desc: z("Ground handling across all of Vietnam", "覆盖越南全境的地接服务"),
+        },
+        {
+          label: z("MICE & incentive groups", "会奖与团队旅游"),
+          href: h("/group-tailor-made-tours#groups"),
+          icon: "users",
+          desc: z("Groups & incentives from 2 to 200+ pax", "2至200+人的团队与奖励旅游"),
+        },
+        {
+          label: z("Request net rates", "索取净价"),
+          href: h("/partners#partner-form"),
+          icon: "mail",
+          desc: z("Tell us about your company and volume", "介绍贵公司与业务量"),
+        },
+      ],
+      promo: {
+        image: "/images/b2b/emperor-cruises.webp",
+        badge: z("Since 2009", "始于2009年"),
+        title: z("Your ground partner", "您的越南地接伙伴"),
+        text: z("North to South, one local team", "从北到南，一个本地团队"),
+        href: h("/partners"),
+      },
+    },
+    {
       key: "guide",
       label: n.guide,
       href: h("/travel-guide"),
       type: "tabs",
+      // Mỗi tab: 2 cột nội dung cân nhau + 1 ảnh nổi bật bên phải (bố cục cân đối)
       tabs: [
-        {
-          label: n.guideDestinations,
-          columns: regionColumns.map((c) => ({
-            ...c,
-            href: h(`/travel-guide/category/destinations`),
-            footer: undefined,
-          })),
-        },
         {
           label: n.guideEssentials,
           columns: [
             {
-              title: n.guideEssentials,
+              title: z("Before you go", "出发前"),
               links: [
                 {
-                  label: lang === "zh" ? "越南签证指南" : "Vietnam visa guide",
+                  label: z("Vietnam visa guide", "越南签证指南"),
                   href: h("/travel-guide/vietnam-visa-guide"),
                 },
                 {
-                  label: lang === "zh" ? "货币与付款" : "Currency & money",
+                  label: z("Currency & money", "货币与付款"),
                   href: h("/travel-guide/vietnam-currency-money-tips"),
                 },
                 {
-                  label: lang === "zh" ? "电话卡与网络" : "SIM cards & internet",
+                  label: z("SIM cards & internet", "电话卡与网络"),
                   href: h("/travel-guide/vietnam-sim-card-internet"),
                 },
                 {
-                  label: lang === "zh" ? "越南安全吗？" : "Is Vietnam safe?",
+                  label: z("Is Vietnam safe?", "越南安全吗？"),
                   href: h("/travel-guide/is-vietnam-safe"),
-                },
-                {
-                  label: lang === "zh" ? "最佳旅游时间" : "Best time to visit",
-                  href: h("/travel-guide/best-time-to-visit-vietnam"),
-                },
-                {
-                  label: lang === "zh" ? "小费与礼仪" : "Tipping & etiquette",
-                  href: h("/travel-guide/tipping-etiquette-vietnam"),
                 },
               ],
             },
             {
-              title: n.visa,
+              title: z("Plan better", "更好地规划"),
               links: [
                 {
-                  label: lang === "zh" ? "电子签证" : "Vietnam e-visa",
-                  href: h("/visa-fast-track#visa"),
+                  label: z("Best time to visit", "最佳旅游时间"),
+                  href: h("/travel-guide/best-time-to-visit-vietnam"),
                 },
-                {
-                  label: lang === "zh" ? "机场快速通关" : "Airport fast-track",
-                  href: h("/visa-fast-track#fast-track"),
-                },
-                { label: n.allTours, href: h("/tours") },
+                { label: n.guideDestinations, href: h("/travel-guide/category/destinations") },
               ],
+              footer: { label: n.guideAll, href: h("/travel-guide") },
             },
           ],
+          promo: {
+            image: "/images/tours/v2/hanoi-3300834.jpg",
+            badge: z("Guide", "攻略"),
+            title: z("Best time to visit Vietnam", "越南最佳旅游时间"),
+            text: z("North, Centre & South – season by season", "北中南三地，逐季解析"),
+            href: h("/travel-guide/best-time-to-visit-vietnam"),
+          },
         },
         {
           label: n.guideMonths,
@@ -125,8 +309,15 @@ export function buildNavigation(lang, dict) {
                 label: months[i],
                 href: h(`/travel-guide/vietnam-in-${m}`),
               })),
+              footer: { label: n.guideMonths, href: h("/travel-guide/category/vietnam-by-month") },
             },
           ],
+          promo: {
+            image: "/images/tours/v2/sapa-2131899.jpg",
+            badge: z("When to go", "何时出发"),
+            title: z("Different seasons, different adventures", "不同季节，不同精彩"),
+            href: h("/travel-guide/category/vietnam-by-month"),
+          },
         },
         {
           label: n.guideTransport,
@@ -135,178 +326,82 @@ export function buildNavigation(lang, dict) {
               title: n.guideTransport,
               links: [
                 {
-                  label: lang === "zh" ? "国内航班" : "Domestic flights",
+                  label: z("Domestic flights", "国内航班"),
                   href: h("/travel-guide/domestic-flights-vietnam"),
                 },
                 {
-                  label: lang === "zh" ? "越南火车" : "Train travel in Vietnam",
+                  label: z("Train travel in Vietnam", "越南火车"),
                   href: h("/travel-guide/train-travel-vietnam"),
                 },
-                { label: n.carHire, href: h("/car-rental") },
-                { label: n.airportTransfer, href: h("/car-rental#services") },
               ],
+              footer: { label: n.guideTransport, href: h("/travel-guide/category/getting-around") },
             },
             {
-              title: lang === "zh" ? "热门路线" : "Popular routes",
+              title: z("Popular routes", "热门路线"),
               links: [
                 {
-                  label: lang === "zh" ? "河内 → 下龙湾" : "Hanoi → Halong Bay",
+                  label: z("Hanoi → Halong Bay", "河内 → 下龙湾"),
                   href: h("/travel-guide/hanoi-to-halong-bay"),
                 },
+                { label: z("Hanoi → Sapa", "河内 → 沙坝"), href: h("/travel-guide/hanoi-to-sapa") },
                 {
-                  label: lang === "zh" ? "河内 → 沙坝" : "Hanoi → Sapa",
-                  href: h("/travel-guide/hanoi-to-sapa"),
-                },
-                {
-                  label: lang === "zh" ? "河内 → 宁平" : "Hanoi → Ninh Binh",
+                  label: z("Hanoi → Ninh Binh", "河内 → 宁平"),
                   href: h("/travel-guide/hanoi-to-ninh-binh"),
                 },
-                { label: n.guideTransport, href: h("/travel-guide/category/getting-around") },
               ],
             },
           ],
+          promo: {
+            image: "/images/tours/hd/emperor-cruises.jpg",
+            badge: z("Route guide", "路线攻略"),
+            title: z("Hanoi to Halong Bay", "河内到下龙湾"),
+            text: z("Every way to get there, compared", "各种交通方式对比"),
+            href: h("/travel-guide/hanoi-to-halong-bay"),
+          },
         },
         {
           label: n.guideCulture,
           columns: [
             {
-              title: n.guideCulture,
+              title: z("Food", "美食"),
               links: [
-                { label: n.guideCulture, href: h("/travel-guide/category/food-culture") },
                 {
-                  label: lang === "zh" ? "旅游资讯" : "Travel news",
-                  href: h("/travel-guide/category/travel-news"),
+                  label: z("Ninh Binh specialties", "宁平特色美食"),
+                  href: h(
+                    "/travel-guide/must-try-local-specialties-in-ninh-binh-you-should-not-miss",
+                  ),
                 },
-                { label: n.guideAll, href: h("/travel-guide") },
+                {
+                  label: z("Sapa: what to eat & where to stay", "沙坝吃住指南"),
+                  href: h("/travel-guide/sapa-summer-travel-guide-what-to-eat-where-to-stay"),
+                },
               ],
             },
-          ],
-        },
-      ],
-    },
-    {
-      key: "packages",
-      label: n.packages,
-      href: h("/packages"),
-      type: "columns",
-      columns: [
-        {
-          title: n.byDuration,
-          links: [
             {
-              label: n.allPackages,
-              href: h("/packages"),
-              image: "/images/tours/v2/vietnam-12674100.jpg",
-            },
-            { label: n.week1, href: h("/packages#1-week"), image: img("hanoi") },
-            { label: n.week2, href: h("/packages#2-weeks"), image: img("hoi-an") },
-            { label: n.week3, href: h("/packages#3-weeks"), image: img("sapa") },
-            {
-              label: n.tailorMade,
-              href: h("/group-tailor-made-tours"),
-              image: "/images/tours/v2/sapa-235925.jpg",
+              title: z("Culture", "文化"),
+              links: [
+                {
+                  label: z("Hmong culture & traditions", "苗族文化与传统"),
+                  href: h(
+                    "/travel-guide/exploring-the-culture-and-traditions-of-the-hmong-people-in-vietnam",
+                  ),
+                },
+                {
+                  label: z("Tipping & etiquette", "小费与礼仪"),
+                  href: h("/travel-guide/tipping-etiquette-vietnam"),
+                },
+              ],
+              footer: { label: n.guideCulture, href: h("/travel-guide/category/food-culture") },
             },
           ],
-        },
-        {
-          title: n.byTheme,
-          links: themes.slice(0, 4).map(themeLink),
-        },
-        {
-          title: " ",
-          links: themes.slice(4).map(themeLink),
+          promo: {
+            image: "/images/tours/v2/food-98874.jpg",
+            badge: z("Food & culture", "美食与文化"),
+            title: z("Taste Vietnam like a local", "像本地人一样品味越南"),
+            href: h("/travel-guide/category/food-culture"),
+          },
         },
       ],
-      promo: {
-        image: "/images/tours/v2/halong-bay-1018475.jpg",
-        title: n.halong,
-        href: h("/halong-bay-cruises"),
-      },
-    },
-    {
-      key: "tours",
-      label: n.tours,
-      href: h("/tours"),
-      type: "columns",
-      columns: [
-        ...regionColumns,
-        {
-          title: n.specialTours,
-          links: [
-            { label: n.halong, href: h("/halong-bay-cruises"), image: img("halong-bay") },
-            { label: n.dayTours, href: h("/tours?duration=1"), image: img("ninh-binh") },
-            ...themes.slice(2, 6).map(themeLink),
-          ],
-          footer: { label: n.allTours, href: h("/tours") },
-        },
-      ],
-    },
-    {
-      key: "services",
-      label: n.services,
-      href: h("/services"),
-      type: "cards",
-      cols: 3,
-      // 5 dịch vụ chính theo tài liệu yêu cầu
-      links: [
-        {
-          label: n.groupTours,
-          href: h("/group-tailor-made-tours"),
-          icon: "users",
-          desc: z(
-            "Private itineraries for families, friends & corporate groups",
-            "为家庭、朋友与企业团体定制私人行程",
-          ),
-        },
-        {
-          label: z("Vietnam Package Tours", "越南套餐线路"),
-          href: h("/packages"),
-          icon: "map",
-          desc: z(
-            "1–3 week tours, tours by theme & Halong Bay cruises",
-            "1至3周线路、主题线路与下龙湾游轮",
-          ),
-        },
-        {
-          label: n.carHire,
-          href: h("/car-rental"),
-          icon: "car",
-          desc: z(
-            "4–45 seat vehicles, airport transfers & intercity trips",
-            "4–45座车辆，接送机与城际出行",
-          ),
-        },
-        {
-          label: n.visa,
-          href: h("/visa-fast-track"),
-          icon: "stamp",
-          desc: z(
-            "E-visa support & VIP lanes at every major airport",
-            "电子签证协助与各大机场VIP通道",
-          ),
-        },
-        {
-          label: n.guide,
-          href: h("/travel-guide"),
-          icon: "book",
-          desc: z(
-            "Destination guides & practical tips from our local team",
-            "本地团队撰写的目的地攻略与实用贴士",
-          ),
-        },
-      ],
-      help: {
-        title: z("Not sure what you need?", "不确定需要哪项服务？"),
-        text: z("Call or message us – we reply within hours", "致电或留言，我们数小时内回复"),
-      },
-      promo: {
-        image: "/images/rent-car/cutouts/kia-carnival-open.webp",
-        cutout: true,
-        badge: z("Most booked", "最受欢迎"),
-        title: n.carHire,
-        text: z("Get a fixed price in about 30 minutes", "约30分钟内获得固定报价"),
-        href: h("/car-rental#quote"),
-      },
     },
     {
       key: "about",

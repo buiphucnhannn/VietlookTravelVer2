@@ -1,6 +1,6 @@
 import Image from "next/image";
-import SpinBadge from "@/components/ui/SpinBadge";
 import BgImage from "@/components/ui/BgImage";
+import B2BSlides from "./B2BSlides";
 import {
   CheckCircle2,
   Clock4,
@@ -44,67 +44,98 @@ export function WhyUs({ dict }) {
   );
 }
 
-/** Khối B2B: thể hiện Vietlook là DMC/đối tác mặt đất cho đại lý (khách hàng hướng B2B). */
+// Ảnh di sản Bắc → Nam cho 2 khung viền cọ (ảnh từ thư viện Vietlook, ≥1920px)
+// Mỗi khung một bộ ảnh RIÊNG (không ảnh nào chung) → 2 khung không bao giờ trùng ảnh.
+// Khung lớn: miền Bắc · khung nhỏ: miền Trung & Nam – thể hiện dịch vụ toàn Việt Nam.
+const northImages = [
+  "/images/b2b/emperor-cruises.webp",
+  "/images/b2b/tam-coc-bich-dong.webp",
+  "/images/tours/v2/sapa-235925.jpg",
+];
+const centralSouthImages = [
+  "/images/b2b/hoi-an-9-copy.webp",
+  "/images/b2b/da-nang.webp",
+  "/images/b2b/phu-quoc.webp",
+];
+
+/**
+ * Khối B2B theo phong cách Demo 1 (yêu cầu khách 31/10, mục 8): nền ảnh du thuyền Hạ Long phủ tối,
+ * 2 khung ảnh viền cọ đổi ảnh luân phiên + 2 huy hiệu số liệu; bên phải thông điệp B2B rõ ràng:
+ * đối tượng (agencies, OTA, MICE), giá net, báo giá trong 24h.
+ */
 export function B2BBlock({ lang, dict }) {
   const t = dict.home;
+  const audiences =
+    lang === "zh"
+      ? ["旅行社", "OTA平台", "会奖（MICE）", "批发商"]
+      : ["Travel agencies", "OTAs", "MICE organisers", "Tour operators"];
   return (
-    <section className="relative isolate overflow-hidden bg-forest-900 py-14 text-white lg:py-[4.5rem]">
-      <BgImage src="/images/tours/v2/halong-bay-58597.jpg" tone="dark" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(197,115,59,0.35),transparent_50%),radial-gradient(circle_at_90%_90%,rgba(247,179,43,0.18),transparent_45%)]" />
+    <section
+      id="b2b"
+      className="relative isolate scroll-mt-28 overflow-hidden bg-brand-950 py-14 text-white lg:py-[4.5rem]"
+    >
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <Image
+          src="/images/b2b/tourduthuyenhalong1ngay1-2.webp"
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-950/90 via-brand-950/70 to-brand-950/35" />
+      </div>
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_20%,rgba(23,128,193,0.4),transparent_50%),radial-gradient(circle_at_90%_90%,rgba(238,59,53,0.25),transparent_45%)]" />
+
       <Container className="relative grid items-center gap-12 lg:grid-cols-2">
-        <Reveal className="mx-auto w-full max-w-lg">
-          {/* Cụm ảnh */}
-          <div className="relative h-[340px] sm:h-[400px]">
-            <SpinBadge className="absolute top-[3%] right-0 z-10 sm:top-[4%] sm:right-[1%]" />
-            <div className="absolute top-0 left-0 h-[68%] w-[64%] overflow-hidden rounded-2xl shadow-2xl ring-4 ring-white/10">
-              <Image
-                src="/images/tours/v2/halong-bay-5531592.jpg"
-                alt=""
-                fill
-                sizes="320px"
-                className="object-cover"
-              />
-            </div>
-            <div className="absolute right-0 bottom-0 h-[62%] w-[58%] overflow-hidden rounded-2xl shadow-2xl ring-4 ring-white/10">
-              <Image
-                src="/images/tours/v2/phu-quoc-26742974.jpg"
-                alt=""
-                fill
-                sizes="300px"
-                className="object-cover"
-              />
+        <Reveal className="relative mx-auto h-[320px] w-full max-w-lg sm:h-[440px]">
+          <B2BSlides
+            images={northImages}
+            mask="/images/b2b/brush-mask.svg"
+            interval={4800}
+            className="top-0 left-0 h-[66%] w-[70%]"
+          />
+          {/* Cùng nhịp nhưng lệch nửa chu kỳ → 2 khung không đổi ảnh cùng lúc */}
+          <B2BSlides
+            images={centralSouthImages}
+            mask="/images/b2b/brush-mask-2.svg"
+            interval={4800}
+            startDelay={2400}
+            className="right-0 bottom-0 h-[60%] w-[64%] animate-float"
+          />
+          {/* Huy hiệu: thời gian báo giá */}
+          <div className="absolute bottom-[8%] left-[4%] flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-ink shadow-xl">
+            <Clock4 className="size-8 text-sun-500" />
+            <div className="leading-tight">
+              <p className="text-2xl font-extrabold">24h</p>
+              <p className="text-xs text-muted">{lang === "zh" ? "报价回复" : "quote turnaround"}</p>
             </div>
           </div>
-          {/* Số liệu nổi bật – hàng riêng dưới cụm ảnh, không đè lên ảnh */}
-          <div className="mt-8 flex items-center justify-center gap-5 sm:gap-12">
-            <div className="flex items-center gap-3">
-              <Clock4 className="size-8 shrink-0 text-amber-brand sm:size-10" />
-              <div className="leading-none">
-                <p className="text-3xl font-extrabold tracking-tight whitespace-nowrap text-amber-brand sm:text-5xl">
-                  24h
-                </p>
-                <p className="mt-2 text-xs font-semibold tracking-[0.14em] whitespace-nowrap text-white/85 uppercase">
-                  {lang === "zh" ? "报价回复" : "quote turnaround"}
-                </p>
-              </div>
-            </div>
-            <span aria-hidden className="h-14 w-px bg-white/20" />
-            <div className="leading-none">
-              <p className="text-3xl font-extrabold tracking-tight whitespace-nowrap text-amber-brand sm:text-5xl">
-                2–200+
-              </p>
-              <p className="mt-2 text-xs font-semibold tracking-[0.14em] whitespace-nowrap text-white/85 uppercase">
-                {dict.common.paxGroup}
-              </p>
-            </div>
+          {/* Huy hiệu: quy mô đoàn */}
+          <div className="absolute top-[10%] right-[3%] rounded-xl bg-sun-500 px-4 py-3 text-center shadow-xl">
+            <p className="text-2xl font-extrabold">2–200+</p>
+            <p className="text-xs text-white/90">{dict.common.paxGroup}</p>
           </div>
         </Reveal>
+
         <div>
           <p className="text-xs font-bold tracking-[0.25em] text-amber-brand uppercase">
             {t.b2bEyebrow}
           </p>
-          <h2 className="heading-lg mt-3 text-white">{t.b2bTitle}</h2>
-          <p className="mt-5 text-lg leading-relaxed text-white/80">{t.b2bText}</p>
+          <h2 className="mt-3 text-4xl leading-[1.08] font-extrabold tracking-[-0.03em] text-white sm:text-5xl">
+            {t.b2bTitle}
+          </h2>
+          {/* Đối tượng đối tác – thể hiện rõ hướng B2B */}
+          <ul className="mt-5 flex flex-wrap gap-2">
+            {audiences.map((a) => (
+              <li
+                key={a}
+                className="rounded-full border border-white/25 bg-white/10 px-3.5 py-1 text-sm font-semibold text-white backdrop-blur"
+              >
+                {a}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-5 text-lg leading-relaxed text-white/85">{t.b2bText}</p>
           <ul className="mt-7 grid gap-3 sm:grid-cols-2">
             {t.b2bPoints.map((p) => (
               <li key={p} className="flex items-start gap-2.5">
@@ -114,7 +145,7 @@ export function B2BBlock({ lang, dict }) {
             ))}
           </ul>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Button href={`${lp(lang)}/partners`} variant="cta" size="lg">
+            <Button href={`${lp(lang)}/partners`} variant="cta" size="lg" className="bg-sun-500 hover:bg-sun-600">
               <Handshake className="size-5" /> {t.b2bCta}
             </Button>
             <Button href={`${lp(lang)}/group-tailor-made-tours`} variant="outline-white" size="lg">

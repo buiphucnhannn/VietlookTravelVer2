@@ -16,10 +16,17 @@ export default function Breadcrumbs({ items, className, light, baseUrl }) {
   };
 
   return (
-    <nav aria-label="Breadcrumb" className={cn("text-sm", className)}>
+    <nav aria-label="Breadcrumb" className={cn("max-w-full text-sm", className)}>
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((item, i) => (
-          <li key={i} className="flex items-center gap-1.5">
+          // Mục cuối (trang hiện tại) có thể rất dài (tên bài viết/tour) → 1 dòng, cắt "…"
+          <li
+            key={i}
+            className={cn(
+              "flex items-center gap-1.5",
+              i === items.length - 1 && "max-w-full min-w-0 [&>span]:truncate",
+            )}
+          >
             {i > 0 && (
               <ChevronRight
                 className={cn("size-3.5", light ? "text-white/60" : "text-brand-500")}

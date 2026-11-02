@@ -50,7 +50,10 @@ export default async function PartnersPage({ params }) {
         </p>
       </Container>
 
-      <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
+      <section
+        id="offers"
+        className="relative isolate scroll-mt-28 overflow-hidden py-14 lg:py-[4.5rem]"
+      >
         <BgImage src="/images/tours/hd/emperor-cruises.jpg" tone="light" />
         <Container>
           <SectionHeading title={p.offerTitle} />
@@ -71,7 +74,7 @@ export default async function PartnersPage({ params }) {
         </Container>
       </section>
 
-      <section className="bg-brand-950 py-14 lg:py-[4.5rem]">
+      <section id="partner-form" className="scroll-mt-28 bg-brand-950 py-14 lg:py-[4.5rem]">
         <Container className="grid gap-10 lg:grid-cols-2">
           {/* Bento: ảnh lớn trái + 2 ảnh phải + 1 ảnh ngang dưới; cả cụm cao đúng bằng form bên cạnh */}
           <div className="grid h-[420px] grid-cols-2 grid-rows-[1fr_1fr_0.9fr] gap-4 sm:h-[560px] lg:h-full">

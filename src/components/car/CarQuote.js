@@ -315,8 +315,8 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
                         {t.bestMatch}
                       </span>
                     )}
-                    <span className="relative h-10 w-20 shrink-0">
-                      <Image src={v.image} alt="" fill sizes="80px" className="object-contain" />
+                    <span className="relative h-10 w-16 shrink-0 overflow-hidden rounded-lg">
+                      <Image src={v.image} alt="" fill sizes="64px" className="object-cover" />
                     </span>
                     <span className="flex-1 leading-tight">
                       <span className="block text-sm font-bold">{v.name}</span>

@@ -63,7 +63,7 @@ export default function PriceTable({ table }) {
       {heading && (
         <p className="bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white">{heading}</p>
       )}
-      <table className="w-full text-left text-sm">
+      <table className="w-full min-w-[520px] text-left text-sm">
         {header && (
           <thead className="bg-brand-50 text-brand-800">
             <tr>

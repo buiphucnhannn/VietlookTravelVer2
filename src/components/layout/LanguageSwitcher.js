@@ -69,6 +69,7 @@ export default function LanguageSwitcher({ lang, variant = "light", compact }) {
           {locales.map((l) => (
             <li key={l}>
               <Link
+                prefetch={false}
                 href={switchLocalePath(pathname, l)}
                 hrefLang={localeMeta[l].hreflang}
                 onClick={() => {

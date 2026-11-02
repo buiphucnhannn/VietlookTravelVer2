@@ -14,12 +14,12 @@ import { usePathname } from "next/navigation";
  */
 const easeOutExpo = (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
 /**
- * Khoảng chừa phía trên khi cuộn tới một khối: header (đã thu gọn khi cuộn: 72px desktop / 64px mobile)
+ * Khoảng chừa phía trên khi cuộn tới một khối: header cố định (topbar 36px + thanh chính 72px = 108px desktop / 64px mobile)
  * + các thanh dính khác đang có trên trang (đánh dấu data-scroll-offset, vd. tab Overview/Itinerary)
  * + 24px khoảng thở để tiêu đề khối không sát mép.
  */
 const headerOffset = () => {
-  const header = window.innerWidth >= 1024 ? 72 : 64;
+  const header = window.innerWidth >= 1024 ? 108 : 64;
   const bars = [...document.querySelectorAll("[data-scroll-offset]")].reduce(
     (sum, el) => sum + el.offsetHeight,
     0,

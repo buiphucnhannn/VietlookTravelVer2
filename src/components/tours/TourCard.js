@@ -26,7 +26,7 @@ export default function TourCard({ card, lang, labels, badge, className, priorit
         className={cn(
           "arch relative block overflow-hidden bg-sand-300/40",
           // compact: ảnh vuông để lưới 8 tour trên trang chủ gọn trong 2 hàng
-          compact ? "aspect-square" : "aspect-[4/5]",
+          compact ? "aspect-square" : "aspect-[5/4] sm:aspect-[4/5]",
         )}
         tabIndex={-1}
         aria-hidden

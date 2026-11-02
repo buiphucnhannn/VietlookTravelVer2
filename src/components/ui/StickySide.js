@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * cao hơn màn hình thì top âm → cột cuộn theo trang đến khi lộ hết phần đáy rồi mới dính,
  * nên luôn xem/điền được toàn bộ nội dung mà không phải chờ cột bên kia cuộn hết.
  */
-export default function StickySide({ offset = 96, gap = 16, className, children }) {
+export default function StickySide({ offset = 124, gap = 16, className, children }) {
   const ref = useRef(null);
   const [top, setTop] = useState(offset);
 

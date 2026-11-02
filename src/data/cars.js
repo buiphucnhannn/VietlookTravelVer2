@@ -1,8 +1,9 @@
 // Dịch vụ xe riêng kèm tài xế. Giá tuyến lấy từ vietlooktravel.com (USD/xe, đã gồm cầu đường & xăng).
 import routes from "./generated/car-routes.json";
 
-// Ảnh đội xe: ảnh tách nền từ Wikimedia Commons thuộc CC0 / Public domain (không cần ghi công)
-const C = "/images/rent-car/cutouts";
+// Ảnh hạng xe: ảnh HD (≥1600px) từ Pexels – giấy phép miễn phí thương mại; đúng loại/mẫu xe
+// trong từng hạng (Vios, Avanza, County, Universe…). Ảnh xe thật của Vietlook quá nhỏ (≤600px) → mờ.
+const HD = "/images/fleet";
 
 /** Hạng xe (4 – 45 chỗ). `priceKey` ứng với cột giá trong bảng tuyến của website cũ. */
 export const fleet = [
@@ -13,7 +14,7 @@ export const fleet = [
     luggage: 2,
     name: { en: "Sedan", zh: "轿车" },
     tagline: { en: "Comfort for 1–3 travellers", zh: "1–3人舒适出行" },
-    images: [`${C}/fleet/cc0-sedan-1.webp`, `${C}/fleet/cc0-sedan-2.webp`],
+    images: [`${HD}/sedan-1.webp`, `${HD}/sedan-2.webp`],
     models: ["Toyota Vios", "Hyundai Accent", "Honda City", "Mazda 3", "Honda Civic"],
     ideal: {
       en: ["Airport transfers", "Business trips", "City tours"],
@@ -29,7 +30,7 @@ export const fleet = [
     luggage: 4,
     name: { en: "SUV / Crossover", zh: "SUV / 跨界车" },
     tagline: { en: "Space & power for long roads", zh: "长途出行空间与动力兼备" },
-    images: [`${C}/fleet/cc0-suv-1.webp`, `${C}/fleet/cc0-suv-2.webp`],
+    images: [`${HD}/suv-1.webp`, `${HD}/suv-2.webp`],
     models: [
       "Toyota Fortuner",
       "Mitsubishi Xpander",
@@ -51,7 +52,7 @@ export const fleet = [
     luggage: 5,
     name: { en: "Minivan / MPV", zh: "MPV 商务车" },
     tagline: { en: "Flexible seats for small groups", zh: "灵活座椅，适合小团体" },
-    images: [`${C}/fleet/cc0-minivan-1.webp`, `${C}/fleet/cc0-minivan-2.webp`],
+    images: [`${HD}/minivan-1.webp`, `${HD}/minivan-2.webp`],
     models: ["Toyota Innova", "Mitsubishi Xpander", "Suzuki Ertiga", "Toyota Avanza / Veloz"],
     ideal: {
       en: ["Small groups", "Resort transfers", "Multi-day trips"],
@@ -68,7 +69,7 @@ export const fleet = [
     vip: true,
     name: { en: "Luxury MPV", zh: "豪华MPV" },
     tagline: { en: "VIP captain seats & electric doors", zh: "VIP航空座椅与电动侧门" },
-    images: [`${C}/fleet/cc0-luxury-1.webp`, `${C}/fleet/cc0-luxury-2.webp`],
+    images: [`${HD}/luxury-1.webp`, `${HD}/luxury-2.webp`],
     models: ["Kia Carnival", "Kia Sedona", "Toyota Granvia"],
     ideal: {
       en: ["VIP guests", "Honeymooners", "Executive transfers"],
@@ -85,7 +86,7 @@ export const fleet = [
     vip: true,
     name: { en: "Limousine Van 9–11", zh: "豪华商务车 9–11座" },
     tagline: { en: "Lounge seats, ambient lights, Wi-Fi", zh: "沙发座椅、氛围灯与Wi-Fi" },
-    images: [`${C}/fleet/cc0-limo9-1.webp`, `${C}/fleet/cc0-limo9-2.webp`],
+    images: [`${HD}/limo-1.webp`, `${HD}/limo-2.webp`],
     models: ["DCar Limousine", "Auto Kingdom", "Ford Tourneo", "Hyundai Starex"],
     ideal: {
       en: ["Halong & Sapa trips", "Corporate guests", "Families with seniors"],
@@ -101,7 +102,7 @@ export const fleet = [
     luggage: 12,
     name: { en: "16-seat Van", zh: "16座中巴" },
     tagline: { en: "The go-to for mid-size groups", zh: "中型团队首选" },
-    images: [`${C}/fleet/cc0-van16-1.webp`, `${C}/fleet/cc0-van16-2.webp`],
+    images: [`${HD}/van16-1.webp`, `${HD}/van16-2.webp`],
     models: ["Ford Transit", "Hyundai Solati", "Toyota Hiace"],
     ideal: {
       en: ["Group tours", "Team outings", "Airport groups"],
@@ -117,7 +118,7 @@ export const fleet = [
     luggage: 20,
     name: { en: "29-seat Coach", zh: "29座大巴" },
     tagline: { en: "Comfortable mini-coach for groups", zh: "舒适中型大巴" },
-    images: [`${C}/fleet/cc0-coach29-1.webp`, `${C}/fleet/cc0-coach29-2.webp`],
+    images: [`${HD}/coach29-1.webp`, `${HD}/coach29-2.webp`],
     models: ["Hyundai County", "Thaco Meadow"],
     ideal: {
       en: ["School & study tours", "Incentive groups", "Weddings"],
@@ -133,7 +134,7 @@ export const fleet = [
     luggage: 40,
     name: { en: "45-seat Coach", zh: "45座大巴" },
     tagline: { en: "Full-size coach for big events", zh: "大型活动全尺寸大巴" },
-    images: [`${C}/fleet/cc0-coach45-1.webp`, `${C}/fleet/cc0-coach45-2.webp`],
+    images: [`${HD}/coach45-1.webp`, `${HD}/coach45-2.webp`],
     models: ["Hyundai Universe", "Thaco"],
     ideal: {
       en: ["MICE & conferences", "Large tour groups", "Event shuttles"],
@@ -180,7 +181,7 @@ export const carAreas = [
     key: "ho-chi-minh-city",
     name: { en: "Ho Chi Minh City", zh: "胡志明市" },
     airport: "Tan Son Nhat (SGN)",
-    image: "/images/tours/hcm-tour-2 (2).jpg",
+    image: "/images/tours/v2/ho-chi-minh-city-18883378.jpg",
   },
   {
     key: "phu-quoc",

@@ -82,28 +82,14 @@ export default function HeroVideos({ videos, maxMs = 10500 }) {
         );
       })}
 
-      {/* Chấm chuyển video + tên địa danh */}
-      <div className="absolute inset-x-0 bottom-6 z-10 flex flex-col items-center gap-2.5 lg:bottom-8">
+      {/* Tên địa danh của video đang chạy (đã bỏ dãy chấm chuyển video theo yêu cầu) */}
+      <div className="absolute inset-x-0 bottom-6 z-10 hidden justify-center sm:flex lg:bottom-8">
         <span
           key={i}
           className="animate-fade-up text-sm font-semibold tracking-wide text-white/90 [text-shadow:0_1px_6px_rgba(0,0,0,.6)]"
         >
           {videos[i].label}
         </span>
-        <div className="flex gap-2">
-          {videos.map((vid, idx) => (
-            <button
-              key={vid.src}
-              type="button"
-              aria-label={vid.label}
-              onClick={() => setI(idx)}
-              className={cn(
-                "relative h-1.5 rounded-full transition-all duration-500 after:absolute after:-inset-x-1 after:-inset-y-3 after:content-['']",
-                idx === i ? "w-8 bg-white" : "w-3 bg-white/50 hover:bg-white/80",
-              )}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );

@@ -56,7 +56,7 @@ export default async function AboutPage({ params }) {
               {dict.common.since} {siteConfig.since}
             </p>
             <h2 className="heading-lg mt-2 text-ink">{a.storyTitle}</h2>
-            <div className="mt-6 space-y-4 text-justify text-lg leading-relaxed hyphens-auto text-ink/80">
+            <div className="mt-6 space-y-4 text-base leading-relaxed text-ink/80 sm:text-justify sm:text-lg sm:hyphens-auto">
               {tr(about.story, lang).map((p) => (
                 <p key={p.slice(0, 20)}>{p}</p>
               ))}

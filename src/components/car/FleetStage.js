@@ -7,8 +7,8 @@ import { cn, formatUSD } from "@/lib/utils";
 import { useCarQuote } from "./CarQuote";
 
 /**
- * "Sân khấu" đội xe: chọn hạng xe theo số chỗ, xe lướt vào bệ xoay có ánh sáng,
- * kèm thông số và các mẫu xe thực tế của Vietlook.
+ * "Sân khấu" đội xe: chọn hạng xe theo số chỗ (lưới ô đều nhau), ảnh xe tiêu biểu của hạng
+ * trong khung bo góc, kèm thông số, mẫu xe, giá từ và nút chọn xe.
  */
 export default function FleetStage({ fleet, t }) {
   const { update, goToQuick } = useCarQuote();
@@ -23,71 +23,101 @@ export default function FleetStage({ fleet, t }) {
 
   return (
     <div>
-      {/* Chọn hạng xe theo số chỗ */}
+      {/* Chọn hạng xe: lưới ô đều nhau – 1 hàng 8 ô (≥1280px), 2 hàng 4 ô (tablet),
+          vuốt ngang có hít ô (mobile). Số chỗ to làm điểm nhấn, tên hạng xe bên dưới. */}
       <div
-        className="-mx-4 flex scrollbar-none gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:justify-center sm:px-0"
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 scrollbar-none gap-3 overflow-x-auto px-4 pt-2 pb-3 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 xl:grid-cols-8"
         role="tablist"
       >
-        {fleet.map((f, i) => (
-          <button
-            key={f.key}
-            type="button"
-            role="tab"
-            aria-selected={i === active}
-            onClick={() => select(i)}
-            className={cn(
-              "group flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
-              i === active
-                ? "border-transparent bg-white text-brand-800 shadow-lg shadow-black/20"
-                : "border-white/20 bg-white/5 text-white/80 hover:bg-white/15 hover:text-white",
-            )}
-          >
-            <span
+        {fleet.map((f, i) => {
+          const on = i === active;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => select(i)}
               className={cn(
-                "grid size-7 place-items-center rounded-full text-xs font-bold",
-                i === active ? "bg-sun-500 text-white" : "bg-white/15 text-white",
+                "group relative flex w-[8.5rem] shrink-0 snap-start flex-col items-center justify-center rounded-2xl border px-2 pt-3.5 pb-3 text-center transition duration-300 sm:w-auto",
+                on
+                  ? "-translate-y-1 border-transparent bg-white text-brand-800 shadow-[0_18px_40px_-16px_rgba(0,0,0,0.7)] ring-2 ring-sun-500"
+                  : "border-white/15 bg-white/[0.06] text-white hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/[0.12]",
               )}
             >
-              {f.seats}
-            </span>
-            {f.name.label}
-            {f.vip && <Crown className="size-3.5 text-amber-brand" />}
-          </button>
-        ))}
+              {f.vip && (
+                <Crown
+                  aria-label="VIP"
+                  className={cn(
+                    "absolute top-2 right-2 size-4",
+                    on ? "text-sun-500" : "text-amber-brand",
+                  )}
+                />
+              )}
+              <span className="flex items-baseline gap-1 leading-none">
+                <span
+                  className={cn(
+                    "text-[1.9rem] font-extrabold tracking-tight",
+                    on ? "text-sun-500" : "text-white",
+                  )}
+                >
+                  {f.seats}
+                </span>
+                <span
+                  className={cn(
+                    "text-[0.7rem] font-semibold uppercase",
+                    on ? "text-brand-700/70" : "text-white/55",
+                  )}
+                >
+                  {t.seats}
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "mt-2 line-clamp-2 flex min-h-[2.5em] items-center text-[0.82rem] leading-tight font-semibold",
+                  on ? "text-brand-800" : "text-white/85",
+                )}
+              >
+                {f.name.label}
+              </span>
+              {/* gạch chỉ báo ô đang chọn */}
+              <span
+                className={cn(
+                  "absolute -bottom-px left-1/2 h-1 w-10 -translate-x-1/2 rounded-full transition",
+                  on ? "bg-sun-500" : "bg-transparent",
+                )}
+              />
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-8 grid items-center gap-10 lg:grid-cols-[1.35fr_1fr]">
         {/* Sân khấu */}
         <div className="relative">
+          {/* Ảnh xe trong khung bo góc */}
           <div className="relative mx-auto aspect-[16/10] max-w-2xl">
-            {/* vòng sáng & bệ xoay */}
+            {/* vầng sáng theo màu hạng xe phía sau khung ảnh */}
             <div
-              className="absolute inset-x-[6%] bottom-[8%] h-[28%] rounded-[50%] opacity-80 blur-sm transition-colors duration-700"
-              style={{ background: `radial-gradient(closest-side, ${car.accent}cc, transparent)` }}
+              className="absolute inset-[-6%] rounded-[2rem] opacity-70 blur-2xl transition-colors duration-700"
+              style={{ background: `radial-gradient(closest-side, ${car.accent}aa, transparent)` }}
             />
-            <div className="absolute inset-x-[10%] bottom-[10%] h-[20%] animate-spin-slow rounded-[50%] border border-white/25 bg-gradient-to-b from-white/15 to-white/0" />
-            <div className="absolute inset-x-[16%] bottom-[13%] h-[12%] rounded-[50%] border border-dashed border-white/25" />
-            <span className="pointer-events-none absolute top-0 right-2 text-[7rem] leading-none font-extrabold text-white/5 select-none sm:text-[10rem]">
-              {car.seats}
-            </span>
-            {/* xe */}
-            {/* Khung cố định: xe căn giữa, bánh xe chạm bệ xoay; ảnh nào cũng vừa khung đều nhau */}
             <div
               key={`${car.key}-${img}`}
-              className="absolute inset-x-[4%] top-[6%] bottom-[12%] animate-drive-in"
+              className="absolute inset-0 animate-fade-up overflow-hidden rounded-[1.75rem] shadow-[0_30px_60px_-25px_rgba(0,0,0,0.7)] ring-1 ring-white/20"
             >
               <Image
                 src={car.images[img]}
                 alt={`${car.name.label} – ${car.models[0]}`}
                 fill
                 sizes="(min-width: 1024px) 50vw, 90vw"
-                className="object-contain object-bottom drop-shadow-[0_32px_24px_rgba(0,0,0,0.55)]"
+                className="object-cover"
               />
             </div>
           </div>
           {/* các mẫu xe thực tế trong hạng */}
           {car.images?.length > 1 && (
-            <div className="mt-2 flex justify-center gap-2">
+            <div className="mt-4 flex justify-center gap-2">
               {car.images.map((src, i) => (
                 <button
                   key={src}
@@ -95,13 +125,13 @@ export default function FleetStage({ fleet, t }) {
                   onClick={() => setImg(i)}
                   aria-label={`Model ${i + 1}`}
                   className={cn(
-                    "relative h-14 w-20 rounded-xl border p-1 transition",
+                    "relative h-14 w-20 overflow-hidden rounded-xl border-2 transition",
                     i === img
                       ? "border-amber-brand bg-white/15"
                       : "border-white/15 bg-white/5 hover:bg-white/10",
                   )}
                 >
-                  <Image src={src} alt="" fill sizes="80px" className="object-contain p-1" />
+                  <Image src={src} alt="" fill sizes="80px" className="object-cover" />
                 </button>
               ))}
             </div>
