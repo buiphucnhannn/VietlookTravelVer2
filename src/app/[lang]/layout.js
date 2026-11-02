@@ -3,7 +3,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import FloatingContact from "@/components/layout/FloatingContact";
 import SmoothScroll from "@/components/fx/SmoothScroll";
-import ConsentBanner from "@/components/layout/ConsentBanner";
+// import ConsentBanner from "@/components/layout/ConsentBanner"; // tạm ẩn banner cookie
 import { siteConfig } from "@/constants/site";
 import { buildNavigation } from "@/data/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -97,7 +97,8 @@ export default async function LangLayout({ children, params }) {
           contact={siteConfig.contact}
           messaging={siteConfig.messaging}
         />
-        <ConsentBanner labels={dict.consent} privacyHref={href(lang, "/policies/privacy")} />
+        {/* Tạm ẩn banner xin cookie (theo yêu cầu). Bật lại: bỏ comment dòng dưới. */}
+        {/* <ConsentBanner labels={dict.consent} privacyHref={href(lang, "/policies/privacy")} /> */}
       </body>
     </html>
   );

@@ -3,7 +3,7 @@ import routes from "./generated/car-routes.json";
 
 // Ảnh hạng xe: ảnh HD (≥1600px) từ Pexels – giấy phép miễn phí thương mại; đúng loại/mẫu xe
 // trong từng hạng (Vios, Avanza, County, Universe…). Ảnh xe thật của Vietlook quá nhỏ (≤600px) → mờ.
-const HD = "/images/fleet";
+const HD = "/images/cars";
 
 /** Hạng xe (4 – 45 chỗ). `priceKey` ứng với cột giá trong bảng tuyến của website cũ. */
 export const fleet = [
@@ -14,7 +14,7 @@ export const fleet = [
     luggage: 2,
     name: { en: "Sedan", zh: "轿车" },
     tagline: { en: "Comfort for 1–3 travellers", zh: "1–3人舒适出行" },
-    images: [`${HD}/sedan-1.webp`, `${HD}/sedan-2.webp`],
+    images: [`${HD}/sedan-v3a.webp`, `${HD}/sedan-v3b.webp`],
     models: ["Toyota Vios", "Hyundai Accent", "Honda City", "Mazda 3", "Honda Civic"],
     ideal: {
       en: ["Airport transfers", "Business trips", "City tours"],
@@ -30,8 +30,9 @@ export const fleet = [
     luggage: 4,
     name: { en: "SUV / Crossover", zh: "SUV / 跨界车" },
     tagline: { en: "Space & power for long roads", zh: "长途出行空间与动力兼备" },
-    images: [`${HD}/suv-1.webp`, `${HD}/suv-2.webp`],
+    images: [`${HD}/suv-u1.webp`, `${HD}/suv-u2.webp`],
     models: [
+      "Hyundai Santa Fe",
       "Toyota Fortuner",
       "Mitsubishi Xpander",
       "Ford Everest",
@@ -69,7 +70,7 @@ export const fleet = [
     vip: true,
     name: { en: "Luxury MPV", zh: "豪华MPV" },
     tagline: { en: "VIP captain seats & electric doors", zh: "VIP航空座椅与电动侧门" },
-    images: [`${HD}/luxury-1.webp`, `${HD}/luxury-2.webp`],
+    images: [`${HD}/luxury-v3a.webp`, `${HD}/luxury-2.webp`],
     models: ["Kia Carnival", "Kia Sedona", "Toyota Granvia"],
     ideal: {
       en: ["VIP guests", "Honeymooners", "Executive transfers"],
@@ -86,7 +87,7 @@ export const fleet = [
     vip: true,
     name: { en: "Limousine Van 9–11", zh: "豪华商务车 9–11座" },
     tagline: { en: "Lounge seats, ambient lights, Wi-Fi", zh: "沙发座椅、氛围灯与Wi-Fi" },
-    images: [`${HD}/limo-1.webp`, `${HD}/limo-2.webp`],
+    images: [`${HD}/limo-1.webp`, `${HD}/limo-v3b.webp`],
     models: ["DCar Limousine", "Auto Kingdom", "Ford Tourneo", "Hyundai Starex"],
     ideal: {
       en: ["Halong & Sapa trips", "Corporate guests", "Families with seniors"],
@@ -118,8 +119,8 @@ export const fleet = [
     luggage: 20,
     name: { en: "29-seat Coach", zh: "29座大巴" },
     tagline: { en: "Comfortable mini-coach for groups", zh: "舒适中型大巴" },
-    images: [`${HD}/coach29-1.webp`, `${HD}/coach29-2.webp`],
-    models: ["Hyundai County", "Thaco Meadow"],
+    images: [`${HD}/coach29-u1.webp`, `${HD}/coach29-u2.webp`],
+    models: ["Toyota Coaster", "Hyundai County", "Thaco Meadow"],
     ideal: {
       en: ["School & study tours", "Incentive groups", "Weddings"],
       zh: ["研学团", "奖励旅游", "婚礼用车"],
@@ -134,7 +135,7 @@ export const fleet = [
     luggage: 40,
     name: { en: "45-seat Coach", zh: "45座大巴" },
     tagline: { en: "Full-size coach for big events", zh: "大型活动全尺寸大巴" },
-    images: [`${HD}/coach45-1.webp`, `${HD}/coach45-2.webp`],
+    images: [`${HD}/coach45-u1.webp`, `${HD}/coach45-u2.webp`],
     models: ["Hyundai Universe", "Thaco"],
     ideal: {
       en: ["MICE & conferences", "Large tour groups", "Event shuttles"],

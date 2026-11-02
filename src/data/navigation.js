@@ -157,7 +157,7 @@ export function buildNavigation(lang, dict) {
       ],
       promo: {
         // Ảnh xe HD (thay ảnh 555px bị mờ)
-        image: "/images/fleet/luxury-1.webp",
+        image: "/images/cars/luxury-v3a.webp",
         badge: z("Most booked", "最受欢迎"),
         title: n.carHire,
         text: z("Get a fixed price in about 30 minutes", "约30分钟内获得固定报价"),

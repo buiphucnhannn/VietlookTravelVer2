@@ -47,30 +47,30 @@ export async function generateMetadata({ params }) {
     path: "/car-rental",
     title: dict.car.eyebrow,
     description: dict.car.text,
-    image: "/images/fleet/luxury-1.webp",
+    image: "/images/cars/luxury-v3a.webp",
   });
 }
 
 // Dải ảnh đội xe: ảnh HD (≥1600px, Pexels – miễn phí thương mại) thay cho ảnh thumbnail ≤600px bị mờ.
-const HD = "/images/fleet";
+const HD = "/images/cars";
 const fleetPhotos = () => ({
   exterior: [
-    "sedan-1",
-    "suv-1",
+    "sedan-v3a",
+    "suv-u1",
     "minivan-1",
-    "luxury-1",
+    "luxury-v3a",
     "limo-1",
     "van16-1",
-    "coach29-1",
-    "coach45-1",
+    "coach29-u1",
+    "coach45-u1",
     "ext-chauffeur-1",
-    "sedan-2",
-    "suv-2",
-    "ext-vn-road",
+    "sedan-v3b",
+    "suv-u2",
+    "limo-v3b",
     "van16-2",
-    "coach29-2",
-    "coach45-2",
-    "ext-coach-side",
+    "coach29-u2",
+    "coach45-u2",
+    "coach45-vn",
     "ext-chauffeur-2",
     "ext-saigon-street",
   ].map((n) => `${HD}/${n}.webp`),
@@ -339,7 +339,7 @@ export default async function CarRentalPage({ params }) {
 
       {/* ========== GIÁ ĐÃ BAO GỒM ========== */}
       <section className="relative isolate overflow-hidden pt-8 pb-14 lg:pt-10 lg:pb-[4.5rem]">
-        <BgImage src="/images/fleet/ext-saigon-street.webp" tone="light" />
+        <BgImage src="/images/cars/ext-saigon-street.webp" tone="light" />
         <Container>
           <header className="mb-10 max-w-2xl">
             <h2 className="heading-lg text-ink">{t.includedTitle}</h2>
@@ -386,7 +386,7 @@ export default async function CarRentalPage({ params }) {
 
       {/* ========== CÁCH ĐẶT XE ========== */}
       <section className="relative isolate overflow-hidden bg-[#0b1b2b] py-14 text-white lg:py-[4.5rem]">
-        <BgImage src="/images/fleet/int-limo-white.webp" tone="night" />
+        <BgImage src="/images/cars/int-limo-white.webp" tone="night" />
         <div className="absolute -top-40 -right-40 size-[520px] rounded-full bg-amber-brand/10 blur-3xl" />
         <Container className="relative">
           <h2 className="heading-lg">{t.howTitle}</h2>
@@ -565,7 +565,7 @@ export default async function CarRentalPage({ params }) {
             </div>
             <div className="relative mt-6 h-56 overflow-hidden rounded-3xl">
               <Image
-                src="/images/fleet/luxury-1.webp"
+                src="/images/cars/luxury-v3a.webp"
                 alt="Private MPV with captain seats"
                 fill
                 sizes="(min-width: 1024px) 35vw, 100vw"

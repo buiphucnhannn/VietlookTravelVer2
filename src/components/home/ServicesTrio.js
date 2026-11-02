@@ -24,7 +24,7 @@ export default function ServicesTrio({ lang, dict }) {
       key: "car",
       icon: Car,
       href: `${lp(lang)}/car-rental`,
-      image: "/images/fleet/luxury-1.webp",
+      image: "/images/cars/luxury-v3a.webp",
       position: "object-[50%_60%]",
     },
     {
