@@ -106,7 +106,7 @@ const en = {
     callUs: "Call us",
     chatWhatsApp: "Chat on WhatsApp",
     addWeChat: "Add us on WeChat",
-    wechatHint: "Scan or search our WeChat ID",
+    wechatHint: "Search our WeChat ID in the app to add us",
     copy: "Copy",
     copied: "Copied!",
     adults: "Adults",
@@ -132,6 +132,8 @@ const en = {
     heroTitleMain: "Vietnam",
     heroText:
       "From misty rice terraces in the north to lantern‑lit old towns and sun‑soaked southern islands – journeys shaped by locals who know every road, every season and every hidden corner of Vietnam.",
+    // Bản ngắn cho điện thoại (trọn ý, không bị cắt)
+    heroTextShort: "Rice terraces, lantern-lit old towns and tropical islands – journeys shaped by locals who know Vietnam.",
     heroCta: "Start exploring",
     heroCta2: "Plan my trip",
     trust: [

@@ -18,15 +18,33 @@ import {
 import { cn, formatUSD } from "@/lib/utils";
 import {
   Counter,
+  DateInput,
   Field,
   FormError,
   Honeypot,
   Input,
+  PhoneInput,
   Select,
   SuccessPanel,
   Textarea,
+  formMsg,
+  isFutureDate,
+  minBookingDate,
   useEnquiry,
+  validate,
 } from "@/components/forms/fields";
+
+/** Kiểm tra ngày đi / ngày về của báo giá xe: không được là ngày đã qua; ngày về ≥ ngày đi. */
+function carDateErrors(q, lang) {
+  const m = formMsg(lang);
+  const e = {};
+  if (q.date && !isFutureDate(q.date)) e.date = m.dateFuture;
+  if (q.tripType === "roundTrip" && q.returnDate) {
+    if (!isFutureDate(q.returnDate) || (q.date && q.returnDate < q.date))
+      e.returnDate = m.dateFuture;
+  }
+  return e;
+}
 
 const QuoteCtx = createContext(null);
 
@@ -99,6 +117,7 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
   const { quote, update } = useCarQuote();
   const [shown, setShown] = useState(false);
   const [open, setOpen] = useState(false);
+  const [dateErr, setDateErr] = useState({});
   const kindFor = quote.tripType === "byDay" ? "day" : "transfer";
 
   const fromOptions = useMemo(() => {
@@ -218,10 +237,16 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
           <CalendarDays className="pointer-events-none absolute bottom-3.5 left-3 size-4 text-muted" />
           <input
             type="date"
+            min={minBookingDate()}
+            suppressHydrationWarning
             value={quote.date}
-            onChange={(e) => update({ date: e.target.value })}
-            className="h-12 w-full rounded-xl border border-border pr-2 pl-9 text-sm focus:border-brand-500 focus:outline-none"
+            onChange={(e) => (update({ date: e.target.value }), setDateErr({}))}
+            aria-invalid={!!dateErr.date}
+            className="h-12 w-full rounded-xl border border-border pr-2 pl-9 text-sm focus:border-brand-500 focus:outline-none aria-[invalid=true]:border-sun-500"
           />
+          {dateErr.date && (
+            <span className="mt-1 block text-xs font-medium text-sun-600">{dateErr.date}</span>
+          )}
         </label>
         <label className="relative">
           <span className="mb-1 block text-xs font-semibold text-muted">{t.time}</span>
@@ -239,10 +264,18 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
               <span className="mb-1 block text-xs font-semibold text-muted">{t.returnDate}</span>
               <input
                 type="date"
+                min={quote.date || minBookingDate()}
+                suppressHydrationWarning
                 value={quote.returnDate}
-                onChange={(e) => update({ returnDate: e.target.value })}
-                className="h-12 w-full rounded-xl border border-border px-3 text-sm focus:border-brand-500 focus:outline-none"
+                onChange={(e) => (update({ returnDate: e.target.value }), setDateErr({}))}
+                aria-invalid={!!dateErr.returnDate}
+                className="h-12 w-full rounded-xl border border-border px-3 text-sm focus:border-brand-500 focus:outline-none aria-[invalid=true]:border-sun-500"
               />
+              {dateErr.returnDate && (
+                <span className="mt-1 block text-xs font-medium text-sun-600">
+                  {dateErr.returnDate}
+                </span>
+              )}
             </label>
             <label className="relative">
               <span className="mb-1 block text-xs font-semibold text-muted">{t.returnTime}</span>
@@ -362,7 +395,13 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
           </div>
           <button
             type="button"
-            onClick={() => (update({ vehicle: selected?.key || "" }), setOpen(true))}
+            onClick={() => {
+              const e = carDateErrors(quote, lang);
+              setDateErr(e);
+              if (Object.keys(e).length) return;
+              update({ vehicle: selected?.key || "" });
+              setOpen(true);
+            }}
             className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-amber-brand font-bold text-ink hover:brightness-105"
           >
             {t.continue}
@@ -414,7 +453,7 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
     notes: "",
     payment: "cash",
   });
-  const [error, setError] = useState("");
+  const [errs, setErrs] = useState({});
   const set = (k) => (e) => setD({ ...d, [k]: e.target.value });
 
   useEffect(() => {
@@ -424,9 +463,9 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!d.name.trim() || (!d.phone.trim() && !/^\S+@\S+\.\S+$/.test(d.email)))
-      return setError(`${c.required}: ${c.fullName} + ${c.phone} / Email`);
-    setError("");
+    const v = { ...validate(d, lang, { email: "either" }), ...carDateErrors(payload, lang) };
+    setErrs(v);
+    if (Object.keys(v).length) return;
     await submit({ ...payload, ...d, summary }, formRef.current);
   };
 
@@ -477,20 +516,32 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
                 <dd className="text-lg font-extrabold text-ink">{summary.price}</dd>
               </div>
             </dl>
-            <Field label={c.fullName} required htmlFor="ck-name">
-              <Input id="ck-name" autoComplete="name" value={d.name} onChange={set("name")} />
+            <Field label={c.fullName} required htmlFor="ck-name" error={errs.name}>
+              <Input
+                id="ck-name"
+                autoComplete="name"
+                value={d.name}
+                onChange={set("name")}
+                aria-invalid={!!errs.name}
+              />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={c.phone} htmlFor="ck-phone">
-                <Input id="ck-phone" autoComplete="tel" value={d.phone} onChange={set("phone")} />
+              <Field label={c.phone} htmlFor="ck-phone" error={errs.phone}>
+                <PhoneInput
+                  id="ck-phone"
+                  value={d.phone}
+                  onChange={set("phone")}
+                  aria-invalid={!!errs.phone}
+                />
               </Field>
-              <Field label="Email" htmlFor="ck-email">
+              <Field label="Email" htmlFor="ck-email" error={errs.email}>
                 <Input
                   id="ck-email"
                   type="email"
                   autoComplete="email"
                   value={d.email}
                   onChange={set("email")}
+                  aria-invalid={!!errs.email}
                 />
               </Field>
             </div>
@@ -540,7 +591,10 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
                 ))}
               </div>
             </fieldset>
-            <FormError show={!!error} text={error} />
+            <FormError
+              show={Object.keys(errs).length > 0}
+              text={errs.date || errs.returnDate || formMsg(lang).fix}
+            />
             <FormError show={status === "error"} text={c.errorGeneric} />
             <div className="grid grid-cols-2 gap-3 pt-1">
               <button
@@ -573,7 +627,7 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
   const { quote, update } = useCarQuote();
   const { status, code, submit, reset } = useEnquiry("car", lang);
   const [contact, setContact] = useState({ name: "", email: "", phone: "", notes: "" });
-  const [error, setError] = useState("");
+  const [errs, setErrs] = useState({});
 
   if (status === "success") {
     return (
@@ -589,10 +643,9 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!contact.name.trim() || (!contact.email.trim() && !contact.phone.trim())) {
-      return setError(`${c.required}: ${c.fullName} + Email / ${c.phone}`);
-    }
-    setError("");
+    const v = { ...validate(contact, lang, { email: "either" }), ...carDateErrors(quote, lang) };
+    setErrs(v);
+    if (Object.keys(v).length) return;
     await submit({ ...quote, ...contact }, formRef.current);
   };
 
@@ -616,12 +669,12 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
           onChange={(e) => update({ route: e.target.value })}
         />
       </Field>
-      <Field label={t.date} htmlFor="cq-date">
-        <Input
+      <Field label={t.date} htmlFor="cq-date" error={errs.date}>
+        <DateInput
           id="cq-date"
-          type="date"
           value={quote.date}
           onChange={(e) => update({ date: e.target.value })}
+          aria-invalid={!!errs.date}
         />
       </Field>
       <Field label={t.time} htmlFor="cq-time">
@@ -675,27 +728,34 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
           placeholder="VN123"
         />
       </Field>
-      <Field label={c.fullName} required htmlFor="cq-name">
+      <Field label={c.fullName} required htmlFor="cq-name" error={errs.name}>
         <Input
           id="cq-name"
+          aria-invalid={!!errs.name}
           autoComplete="name"
           value={contact.name}
           onChange={(e) => setContact({ ...contact, name: e.target.value })}
         />
       </Field>
-      <Field label="Email" htmlFor="cq-email">
+      <Field label="Email" htmlFor="cq-email" error={errs.email}>
         <Input
           id="cq-email"
+          aria-invalid={!!errs.email}
           type="email"
           autoComplete="email"
           value={contact.email}
           onChange={(e) => setContact({ ...contact, email: e.target.value })}
         />
       </Field>
-      <Field label={c.phone} className="sm:col-span-2 lg:col-span-1" htmlFor="cq-phone">
-        <Input
+      <Field
+        label={c.phone}
+        className="sm:col-span-2 lg:col-span-1"
+        htmlFor="cq-phone"
+        error={errs.phone}
+      >
+        <PhoneInput
           id="cq-phone"
-          autoComplete="tel"
+          aria-invalid={!!errs.phone}
           value={contact.phone}
           onChange={(e) => setContact({ ...contact, phone: e.target.value })}
         />
@@ -709,7 +769,7 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
         />
       </Field>
       <div className="space-y-3 sm:col-span-2 lg:col-span-3">
-        <FormError show={!!error} text={error} />
+        <FormError show={Object.keys(errs).length > 0} text={formMsg(lang).fix} />
         <FormError show={status === "error"} text={c.errorGeneric} />
         <button
           type="submit"

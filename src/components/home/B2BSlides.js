@@ -26,7 +26,7 @@ export default function B2BSlides({ images, mask, interval = 4800, startDelay = 
 
   return (
     <div
-      className={cn("absolute drop-shadow-[0_18px_30px_rgba(0,0,0,0.45)]", className)}
+      className={cn("absolute drop-shadow-[0_6px_10px_rgba(0,0,0,0.16)]", className)}
       aria-hidden
     >
       <div

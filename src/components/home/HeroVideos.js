@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 
-// Chọn bản video mobile/desktop theo cỡ màn hình (server: null → chỉ poster)
+// Chọn bản video mobile/desktop theo cỡ màn hình (server: null → chưa biết)
 const MQ = "(max-width: 767px)";
 const subscribeMq = (cb) => {
   const m = window.matchMedia(MQ);
@@ -14,56 +14,92 @@ const getMq = () => window.matchMedia(MQ).matches;
 
 /**
  * Video nền hero chạy luân phiên (cross-fade).
- * - Chỉ tải video đang phát + video kế tiếp (tiết kiệm băng thông).
- * - Hết video (hoặc tối đa `maxMs`) thì chuyển sang video sau.
- * - Poster video đầu dùng <picture> (mobile/desktop theo media query) → chỉ tải 1 ảnh đúng cỡ,
- *   hiện ngay từ HTML (ảnh LCP); poster các video sau chỉ gắn khi đã biết cỡ màn hình.
+ * - Clip ĐẦU: có sẵn trong HTML (autoPlay + <source media>) → trình duyệt tự chọn bản mobile/desktop
+ *   và phát NGAY khi đủ dữ liệu, không chờ JavaScript hay trang tải xong. Poster <picture> nằm dưới
+ *   làm ảnh LCP cho tới khi khung hình đầu hiện.
+ * - Clip sau: chỉ tải khi clip trước đã chạy (không giành băng thông với clip đầu); clip kế tiếp được
+ *   tải sẵn → chuyển cảnh không khựng.
+ * - Chuyển khi clip hiện tại còn ~1.1s → 2 video chồng mờ lúc cả hai đang chạy.
  */
-export default function HeroVideos({ videos, maxMs = 10500 }) {
+export default function HeroVideos({ videos, maxMs = 14000 }) {
   const [i, setI] = useState(0);
-  // null = chưa biết cỡ màn hình → chỉ hiện poster; sau khi mount chọn bản mobile/desktop
   const small = useSyncExternalStore(subscribeMq, getMq, () => null);
-  // Chỉ tải video sau khi trang đã tải xong (poster hiện trước) → không giành băng thông với nội dung đầu trang
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const go = () => setTimeout(() => setReady(true), 600);
-    if (document.readyState === "complete") go();
-    else window.addEventListener("load", go, { once: true });
-    return () => window.removeEventListener("load", go);
-  }, []);
+  // Đã chuyển qua clip thứ 2 ít nhất 1 lần → clip đầu được phát lại từ đầu như các clip khác
+  const [looped, setLooped] = useState(false);
+  // Clip đầu đã chạy được ~1.5s → mới bắt đầu tải clip kế tiếp (dồn băng thông cho clip đầu)
+  const [warm, setWarm] = useState(false);
   const refs = useRef([]);
   const n = videos.length;
   const next = (i + 1) % n;
 
   useEffect(() => {
     const v = refs.current[i];
-    if (!v || small === null || !ready) return;
-    v.currentTime = 0;
-    v.play().catch(() => {});
-    const advance = () => setI((x) => (x + 1) % n);
+    if (!v) return;
+    // Clip đầu lần đầu: đã tự phát từ HTML → KHÔNG tua lại (tránh giật); chỉ đảm bảo đang chạy
+    if (i === 0 && !looped) {
+      if (v.paused) v.play().catch(() => {});
+    } else {
+      if (small === null) return;
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    }
+    let done = false;
+    const advance = () => {
+      if (done) return;
+      done = true;
+      if (i === n - 1) setLooped(true);
+      setI((x) => (x + 1) % n);
+    };
+    const onTime = () => {
+      if (v.currentTime > 1.5) setWarm(true);
+      if (v.duration && v.duration - v.currentTime < 1.1) advance();
+    };
+    v.addEventListener("timeupdate", onTime);
     v.addEventListener("ended", advance);
     const t = setTimeout(advance, maxMs);
     return () => {
+      v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("ended", advance);
       clearTimeout(t);
     };
-  }, [i, n, maxMs, small, ready]);
+  }, [i, n, maxMs, small, looped]);
 
+  const first = videos[0];
   return (
     <div className="absolute inset-0 overflow-hidden bg-forest-900">
-      {/* Ảnh LCP: poster video đầu, chọn bản theo màn hình ngay từ HTML */}
+      {/* Ảnh LCP: poster clip đầu, chọn bản theo màn hình ngay từ HTML */}
       <picture>
-        <source media={MQ} srcSet={videos[0].posterMobile} />
+        <source media={MQ} srcSet={first.posterMobile} />
         <img
-          src={videos[0].poster}
+          src={first.poster}
           alt=""
           fetchPriority="high"
           decoding="async"
           className="absolute inset-0 size-full object-cover"
         />
       </picture>
-      {videos.map((vid, idx) => {
-        const load = idx === i || idx === next;
+
+      {/* Clip đầu: render sẵn từ server, tự phát */}
+      <video
+        ref={(el) => (refs.current[0] = el)}
+        className={cn(
+          "absolute inset-0 size-full object-cover transition-opacity duration-[1400ms] ease-out",
+          i === 0 ? "opacity-100" : "opacity-0",
+        )}
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        aria-hidden
+      >
+        <source media={MQ} src={first.srcMobile} type="video/mp4" />
+        <source src={first.src} type="video/mp4" />
+      </video>
+
+      {/* Các clip sau: gắn nguồn khi tới lượt (đang phát hoặc kế tiếp) */}
+      {videos.slice(1).map((vid, k) => {
+        const idx = k + 1;
+        const load = small !== null && (idx === i || (idx === next && warm));
         return (
           <video
             key={vid.src}
@@ -72,17 +108,16 @@ export default function HeroVideos({ videos, maxMs = 10500 }) {
               "absolute inset-0 size-full object-cover transition-opacity duration-[1400ms] ease-out",
               idx === i ? "opacity-100" : "opacity-0",
             )}
-            src={ready && load && small !== null ? (small ? vid.srcMobile : vid.src) : undefined}
-            poster={small === null || !load ? undefined : small ? vid.posterMobile : vid.poster}
+            src={load ? (small ? vid.srcMobile : vid.src) : undefined}
             muted
             playsInline
-            preload={idx === i ? "auto" : "none"}
+            preload={load ? "auto" : "none"}
             aria-hidden
           />
         );
       })}
 
-      {/* Tên địa danh của video đang chạy (đã bỏ dãy chấm chuyển video theo yêu cầu) */}
+      {/* Tên địa danh của video đang chạy */}
       <div className="absolute inset-x-0 bottom-6 z-10 hidden justify-center sm:flex lg:bottom-8">
         <span
           key={i}

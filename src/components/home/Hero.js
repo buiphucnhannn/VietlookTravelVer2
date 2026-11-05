@@ -7,11 +7,8 @@ import { destinationsByRegion, regions } from "@/data/destinations";
 import { Container } from "@/components/ui";
 import HeroVideos from "./HeroVideos";
 
-// Video nền TƯƠI SÁNG, ban ngày, rõ nét (yêu cầu 31/10 mục 12 – tham khảo localvietnam.com;
-// không dùng video có tên tàu; tránh tông xanh dương – brief 27/10).
-// Hành trình Bắc → Nam, núi → biển (định hướng "toàn Việt Nam"). Nguồn gốc 2.5K–4K trên Pexels
-// (giấy phép miễn phí thương mại): Sapa #34208500 · Hà Giang #17566209 · Hội An #12966127 ·
-// bãi thuyền thúng #33913445. Desktop 1080p ≤3.9MB; mobile 540p ≤1.5MB + poster nhẹ (SEO).
+// Video nền: 4 clip cắt từ video do khách cung cấp (public/videos/vietlooktravel_video.mp4), chỉ cảnh
+// KHÔNG có người; làm chậm bằng nội suy chuyển động (30fps thật) + chuyển mờ giữa các cảnh → mượt.
 const clip = (name, label) => ({
   src: `/videos/${name}.mp4`,
   srcMobile: `/videos/${name}-m.mp4`,
@@ -20,10 +17,10 @@ const clip = (name, label) => ({
   label,
 });
 const videos = [
-  clip("ha-giang-nho-que", { en: "Nho Que River pass, Ha Giang", zh: "河江 · 侬桂河山路" }),
-  clip("sapa-terraces", { en: "Rice terraces, Sapa", zh: "沙坝梯田" }),
-  clip("hoi-an-riverside", { en: "Hoi An Ancient Town", zh: "会安古镇" }),
-  clip("basket-boats-beach", { en: "Basket boats on the coast", zh: "海边的簸箕船" }),
+  clip("vl2-halong", { en: "Ha Long Bay", zh: "下龙湾" }),
+  clip("vl2-heritage", { en: "Ha Long Bay & Hanoi heritage", zh: "下龙湾 · 河内古迹" }),
+  clip("vl2-mountains", { en: "Mountains at sunset", zh: "山间日落" }),
+  clip("vl2-golden-bridge", { en: "Golden Bridge, Da Nang", zh: "岘港金桥" }),
 ];
 
 /**
@@ -72,8 +69,9 @@ export default function Hero({ lang, dict }) {
             {t.heroTitleMain}
           </span>
         </h1>
-        <p className="mt-[clamp(0.6rem,1.8svh,1.25rem)] line-clamp-3 max-w-2xl animate-fade-up text-[0.88rem] leading-snug text-white/90 [animation-delay:220ms] sm:line-clamp-none sm:text-[clamp(1rem,2.2svh,1.125rem)] sm:leading-normal [@media(max-height:620px)]:hidden">
-          {t.heroText}
+        <p className="mt-[clamp(0.6rem,1.8svh,1.25rem)] max-w-2xl animate-fade-up text-[0.88rem] leading-snug text-white/90 [animation-delay:220ms] sm:text-[clamp(1rem,2.2svh,1.125rem)] sm:leading-normal [@media(max-height:620px)]:hidden">
+          <span className="sm:hidden">{t.heroTextShort || t.heroText}</span>
+          <span className="hidden sm:inline">{t.heroText}</span>
         </p>
 
         {/* Ô tìm kiếm tour theo từ khóa & điểm đến */}

@@ -5,13 +5,17 @@ import { Send } from "lucide-react";
 import {
   Chips,
   Counter,
+  DateInput,
   Field,
   FormError,
   Honeypot,
   Input,
+  PhoneInput,
   Select,
   SuccessPanel,
+  formMsg,
   useEnquiry,
+  validate,
 } from "./fields";
 
 /**
@@ -21,7 +25,7 @@ import {
 export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) {
   const formRef = useRef(null);
   const { status, code, submit, reset } = useEnquiry("visa", lang);
-  const [error, setError] = useState("");
+  const [errs, setErrs] = useState({});
   const [d, setD] = useState({
     service: t.services[0],
     level: levels.find((l) => l.popular)?.key || levels[0].key,
@@ -59,10 +63,9 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!d.name.trim() || !/^\S+@\S+\.\S+$/.test(d.email) || !d.nationality.trim()) {
-      return setError(`${c.required}: ${t.nationality} / ${c.fullName} / Email`);
-    }
-    setError("");
+    const v = validate(d, lang, { dates: { entryDate: false }, required: ["nationality"] });
+    setErrs(v);
+    if (Object.keys(v).length) return;
     await submit(d, formRef.current);
   };
 
@@ -102,9 +105,10 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
               ))}
         </Select>
       </Field>
-      <Field label={t.nationality} required htmlFor="vs-nat">
+      <Field label={t.nationality} required htmlFor="vs-nat" error={errs.nationality}>
         <Input
           id="vs-nat"
+          aria-invalid={!!errs.nationality}
           value={d.nationality}
           onChange={set("nationality")}
           autoComplete="country-name"
@@ -119,8 +123,13 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
           label={t.travellers}
         />
       </Field>
-      <Field label={t.entryDate} htmlFor="vs-date">
-        <Input id="vs-date" type="date" value={d.entryDate} onChange={set("entryDate")} />
+      <Field label={t.entryDate} htmlFor="vs-date" error={errs.entryDate}>
+        <DateInput
+          id="vs-date"
+          value={d.entryDate}
+          onChange={set("entryDate")}
+          aria-invalid={!!errs.entryDate}
+        />
       </Field>
       <Field label={t.arrivalAirport} htmlFor="vs-airport">
         <Select id="vs-airport" value={d.airport} onChange={set("airport")}>
@@ -139,23 +148,35 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
           placeholder="VN301 / CZ3045"
         />
       </Field>
-      <Field label={c.fullName} required htmlFor="vs-name">
-        <Input id="vs-name" value={d.name} onChange={set("name")} autoComplete="name" />
+      <Field label={c.fullName} required htmlFor="vs-name" error={errs.name}>
+        <Input
+          id="vs-name"
+          value={d.name}
+          onChange={set("name")}
+          autoComplete="name"
+          aria-invalid={!!errs.name}
+        />
       </Field>
-      <Field label="Email" required htmlFor="vs-email">
+      <Field label="Email" required htmlFor="vs-email" error={errs.email}>
         <Input
           id="vs-email"
           type="email"
           value={d.email}
           onChange={set("email")}
           autoComplete="email"
+          aria-invalid={!!errs.email}
         />
       </Field>
-      <Field label={c.phone} className="sm:col-span-2" htmlFor="vs-phone">
-        <Input id="vs-phone" value={d.phone} onChange={set("phone")} autoComplete="tel" />
+      <Field label={c.phone} className="sm:col-span-2" htmlFor="vs-phone" error={errs.phone}>
+        <PhoneInput
+          id="vs-phone"
+          value={d.phone}
+          onChange={set("phone")}
+          aria-invalid={!!errs.phone}
+        />
       </Field>
       <div className="space-y-3 sm:col-span-2">
-        <FormError show={!!error} text={error} />
+        <FormError show={Object.keys(errs).length > 0} text={formMsg(lang).fix} />
         <FormError show={status === "error"} text={c.errorGeneric} />
         <button
           type="submit"

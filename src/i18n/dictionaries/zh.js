@@ -105,7 +105,7 @@ const zh = {
     callUs: "致电我们",
     chatWhatsApp: "WhatsApp 咨询",
     addWeChat: "添加微信",
-    wechatHint: "扫码或搜索我们的微信号",
+    wechatHint: "在微信中搜索我们的微信号添加好友",
     copy: "复制",
     copied: "已复制！",
     adults: "成人",
@@ -131,6 +131,7 @@ const zh = {
     heroTitleMain: "越南",
     heroText:
       "从北部云雾缭绕的梯田，到灯笼点亮的古镇，再到阳光明媚的南方海岛——由熟悉每条道路、每个季节和每处秘境的本地团队，为您打造难忘的越南之旅。",
+    heroTextShort: "从云雾梯田到灯笼古镇与热带海岛——由最懂越南的本地团队为您打造旅程。",
     heroCta: "开始探索",
     heroCta2: "定制我的行程",
     trust: [

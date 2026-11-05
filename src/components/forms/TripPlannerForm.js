@@ -6,14 +6,18 @@ import { cn } from "@/lib/utils";
 import {
   Chips,
   Counter,
+  DateInput,
   Field,
   FormError,
   Honeypot,
   Input,
+  PhoneInput,
   Select,
   SuccessPanel,
   Textarea,
+  formMsg,
   useEnquiry,
+  validate as validateFields,
 } from "./fields";
 
 /**
@@ -25,6 +29,7 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
   const { status, code, submit, reset } = useEnquiry("planner", lang);
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
+  const [errs, setErrs] = useState({});
   const [data, setData] = useState({
     destinations: [],
     arrival: "",
@@ -50,15 +55,26 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
     }));
 
   const steps = t.steps;
+  // Kiểm tra theo từng bước; lỗi ô nào báo ngay dưới ô đó
   const validate = () => {
-    if (step === 0 && data.destinations.length === 0) return t.destinationsHint;
-    if (step === 3 && (!data.name.trim() || !/^\S+@\S+\.\S+$/.test(data.email)))
-      return `${c.required}: ${t.fullName || "Name"} / Email`;
-    return "";
+    if (step === 0) {
+      if (data.destinations.length === 0) return { msg: t.destinationsHint, errs: {} };
+      const e = validateFields({ name: "x", arrival: data.arrival }, lang, {
+        email: "optional",
+        dates: { arrival: false },
+      });
+      return { msg: e.arrival ? formMsg(lang).fix : "", errs: e };
+    }
+    if (step === 3) {
+      const e = validateFields(data, lang);
+      return { msg: Object.keys(e).length ? formMsg(lang).fix : "", errs: e };
+    }
+    return { msg: "", errs: {} };
   };
   const next = async () => {
-    const msg = validate();
+    const { msg, errs: e } = validate();
     setError(msg);
+    setErrs(e);
     if (msg) return;
     if (step < steps.length - 1) setStep(step + 1);
     else await submit(data, formRef.current);
@@ -147,8 +163,13 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
               />
             </Field>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t.startDate} htmlFor="tp-arrival">
-                <Input id="tp-arrival" type="date" value={data.arrival} onChange={set("arrival")} />
+              <Field label={t.startDate} htmlFor="tp-arrival" error={errs.arrival}>
+                <DateInput
+                  id="tp-arrival"
+                  value={data.arrival}
+                  onChange={set("arrival")}
+                  aria-invalid={!!errs.arrival}
+                />
                 <label className="mt-2 flex items-center gap-2 text-sm text-muted">
                   <input
                     type="checkbox"
@@ -259,20 +280,32 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
 
         {step === 3 && (
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label={t.fullName} required htmlFor="tp-name">
-              <Input id="tp-name" value={data.name} onChange={set("name")} autoComplete="name" />
+            <Field label={t.fullName} required htmlFor="tp-name" error={errs.name}>
+              <Input
+                id="tp-name"
+                value={data.name}
+                onChange={set("name")}
+                autoComplete="name"
+                aria-invalid={!!errs.name}
+              />
             </Field>
-            <Field label="Email" required htmlFor="tp-email">
+            <Field label="Email" required htmlFor="tp-email" error={errs.email}>
               <Input
                 id="tp-email"
                 type="email"
                 value={data.email}
                 onChange={set("email")}
                 autoComplete="email"
+                aria-invalid={!!errs.email}
               />
             </Field>
-            <Field label={t.phone} htmlFor="tp-phone">
-              <Input id="tp-phone" value={data.phone} onChange={set("phone")} autoComplete="tel" />
+            <Field label={t.phone} htmlFor="tp-phone" error={errs.phone}>
+              <PhoneInput
+                id="tp-phone"
+                value={data.phone}
+                onChange={set("phone")}
+                aria-invalid={!!errs.phone}
+              />
             </Field>
             <Field label={t.nationality} htmlFor="tp-nat">
               <Input

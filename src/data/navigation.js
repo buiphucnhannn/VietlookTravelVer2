@@ -10,6 +10,43 @@ import { themes } from "./themes";
  * thiết kế riêng). Mỗi đường dẫn chỉ xuất hiện ở một mục menu; thứ tự theo định hướng nội dung:
  * Tour (toàn Việt Nam) → Thuê xe → Visa & fast-track → B2B → Cẩm nang → Giới thiệu.
  */
+/**
+ * Ảnh THẬT của Vietlook dùng riêng trong menu thả xuống (ảnh tour web cũ vietlooktravel.com, ảnh đội xe,
+ * ảnh nhân viên đón khách). Chỉ ghi đè trong menu – dữ liệu điểm đến/chủ đề ở các trang khác giữ nguyên.
+ * Điểm đến chưa có ảnh thật (Đà Lạt, Quảng Bình, Mekong, Vũng Tàu) dùng ảnh hiện có.
+ */
+const NAV_DEST = {
+  hanoi: "/images/tours/hd/hanoi7.jpg",
+  "halong-bay": "/images/tours/hd/ha-long.jpg",
+  "ninh-binh": "/images/b2b/tam-coc-bich-dong.webp",
+  sapa: "/images/tours/hd/du-lich-tay-bac.jpg",
+  "ha-giang": "/images/tours/hd/hoang-su-phi-ha-giang.jpg",
+  "cao-bang": "/images/tours/cao-bang.jpg",
+  "moc-chau": "/images/tours/hd/doi-che-moc-chau.jpg",
+  hue: "/images/tours/hue-tour.jpg",
+  "da-nang": "/images/tours/da-nang-tour-copy.jpg",
+  "hoi-an": "/images/b2b/hoi-an-9-copy.webp",
+  "nha-trang": "/images/tours/hd/tourdulichnhatranggiare.jpg",
+  "ho-chi-minh-city": "/images/tours/hd/hcm-tour-2-1.jpg",
+  "phu-quoc": "/images/b2b/phu-quoc.webp",
+  "mui-ne": "/images/tours/hd/nha-trang-da-lat-mui-ne-ho-chi-minh-city.jpg",
+};
+const NAV_REGION = {
+  "north-vietnam": "/images/tours/hd/bao-lac-cao-bang.jpg",
+  "central-vietnam": "/images/b2b/da-nang.webp",
+  "south-vietnam": "/images/tours/hd/cho-lon-binh-tay-market.jpg",
+};
+const NAV_THEME = {
+  luxury: "/images/tours/hd/glaming.jpg",
+  "hand-picked": "/images/tours/hd/bai-dinh.jpg",
+  culture: "/images/tours/hue-tour.jpg",
+  family: "/images/tours/hd/cham-islands-da-nang.jpg",
+  honeymoon: "/images/b2b/phu-quoc.webp",
+  classic: "/images/tours/hd/ha-long.jpg",
+  photography: "/images/tours/hd/hoang-su-phi-ha-giang.jpg",
+  "tailor-made": "/images/tours/hd/du-lich-tay-bac.jpg",
+};
+
 export function buildNavigation(lang, dict) {
   const n = dict.nav;
   const h = (p) => href(lang, p);
@@ -33,11 +70,11 @@ export function buildNavigation(lang, dict) {
   const regionColumns = regions.map((r) => ({
     title: tr(r.name, lang),
     href: h(`/destinations/${r.slug}`),
-    image: r.image,
+    image: NAV_REGION[r.slug] || r.image,
     links: destinationsByRegion(r.slug).map((d) => ({
       label: tr(d.name, lang),
       href: h(`/destinations/${d.slug}`),
-      image: d.image,
+      image: NAV_DEST[d.slug] || d.image,
     })),
     footer: {
       label: {
@@ -52,9 +89,9 @@ export function buildNavigation(lang, dict) {
   const themeLink = (t) => ({
     label: tr(t.name, lang),
     href: h(`/themes/${t.slug}`),
-    image: t.image,
+    image: NAV_THEME[t.slug] || t.image,
   });
-  const img = (slug) => getDestination(slug)?.image;
+  const img = (slug) => NAV_DEST[slug] || getDestination(slug)?.image;
 
   return [
     {
@@ -87,14 +124,14 @@ export function buildNavigation(lang, dict) {
                 {
                   label: n.groupTours,
                   href: h("/group-tailor-made-tours"),
-                  image: "/images/tours/v2/sapa-235925.jpg",
+                  image: "/images/tours/hd/cham-islands-da-nang.jpg",
                 },
               ],
               footer: { label: n.allTours, href: h("/tours") },
             },
           ],
           promo: {
-            image: "/images/tours/v2/halong-bay-1018475.jpg",
+            image: "/images/nav/nav-packages.webp",
             badge: z("1–3 weeks", "1至3周"),
             title: n.allPackages,
             text: z("Private, flexible, door-to-door", "私人专属，灵活安排，门到门服务"),
@@ -108,7 +145,7 @@ export function buildNavigation(lang, dict) {
             { title: " ", links: themes.slice(4).map(themeLink) },
           ],
           promo: {
-            image: "/images/tours/v2/sapa-235925.jpg",
+            image: "/images/nav/nav-tailor.webp",
             badge: z("Free planning", "免费规划"),
             title: n.tailorMade,
             text: z("Tell us your ideas – we design the rest", "说出想法，其余交给我们"),
@@ -156,8 +193,8 @@ export function buildNavigation(lang, dict) {
         },
       ],
       promo: {
-        // Ảnh xe HD (thay ảnh 555px bị mờ)
-        image: "/images/cars/luxury-v3a.webp",
+        // Ảnh xe THẬT của Vietlook (Kia Carnival, giữ biển số)
+        image: "/images/services/svc-car-menu.webp",
         badge: z("Most booked", "最受欢迎"),
         title: n.carHire,
         text: z("Get a fixed price in about 30 minutes", "约30分钟内获得固定报价"),
@@ -198,7 +235,7 @@ export function buildNavigation(lang, dict) {
         text: z("Call or message us 24/7", "全天候致电或留言"),
       },
       promo: {
-        image: "/images/services/airport-pick-up-one-way.webp",
+        image: "/images/nav/nav-visa-welcome.webp",
         badge: z("5 airports", "5个机场"),
         title: z("Visa & Fast-track", "签证与快速通关"),
         text: z("Skip the queues on arrival and departure", "入境与出境免排队"),
@@ -241,7 +278,7 @@ export function buildNavigation(lang, dict) {
         },
       ],
       promo: {
-        image: "/images/b2b/emperor-cruises.webp",
+        image: "/images/nav/nav-b2b.webp",
         badge: z("Since 2009", "始于2009年"),
         title: z("Your ground partner", "您的越南地接伙伴"),
         text: z("North to South, one local team", "从北到南，一个本地团队"),
@@ -292,7 +329,7 @@ export function buildNavigation(lang, dict) {
             },
           ],
           promo: {
-            image: "/images/tours/v2/hanoi-3300834.jpg",
+            image: "/images/nav/nav-guide-essentials-hue.webp",
             badge: z("Guide", "攻略"),
             title: z("Best time to visit Vietnam", "越南最佳旅游时间"),
             text: z("North, Centre & South – season by season", "北中南三地，逐季解析"),
@@ -313,7 +350,7 @@ export function buildNavigation(lang, dict) {
             },
           ],
           promo: {
-            image: "/images/tours/v2/sapa-2131899.jpg",
+            image: "/images/nav/nav-guide-months.webp",
             badge: z("When to go", "何时出发"),
             title: z("Different seasons, different adventures", "不同季节，不同精彩"),
             href: h("/travel-guide/category/vietnam-by-month"),
@@ -352,7 +389,7 @@ export function buildNavigation(lang, dict) {
             },
           ],
           promo: {
-            image: "/images/tours/hd/emperor-cruises.jpg",
+            image: "/images/nav/nav-guide-route.webp",
             badge: z("Route guide", "路线攻略"),
             title: z("Hanoi to Halong Bay", "河内到下龙湾"),
             text: z("Every way to get there, compared", "各种交通方式对比"),
@@ -395,7 +432,7 @@ export function buildNavigation(lang, dict) {
             },
           ],
           promo: {
-            image: "/images/tours/v2/food-98874.jpg",
+            image: "/images/nav/nav-guide-food.webp",
             badge: z("Food & culture", "美食与文化"),
             title: z("Taste Vietnam like a local", "像本地人一样品味越南"),
             href: h("/travel-guide/category/food-culture"),
@@ -445,7 +482,7 @@ export function buildNavigation(lang, dict) {
         ],
       },
       promo: {
-        image: "/images/tours/v2/vietnam-12674100.jpg",
+        image: "/images/nav/nav-about-hanoi.webp",
         badge: z("Since 2009", "始于2009年"),
         title: z("Our story", "我们的故事"),
         text: z("The local team behind every Vietlook trip", "每一段 Vietlook 旅程背后的本地团队"),

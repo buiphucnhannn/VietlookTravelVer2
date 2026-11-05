@@ -32,11 +32,29 @@ const priceMatch = {
   "1000+": (p) => p != null && p >= 1000,
 };
 
+/**
+ * Chuẩn hoá để tìm kiếm: bỏ dấu, đ→d, chữ thường, BỎ MỌI khoảng trắng/ký tự đặc biệt
+ * → "Hà Nội" = "ha noi" = "hanoi", "Sa Pa" = "sapa", "Đà Nẵng" = "danang".
+ */
 const normalize = (s) =>
   String(s || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+    .replace(/đ/gi, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9一-鿿]+/g, "");
+
+// Tên gọi khác của cùng một địa danh (đã chuẩn hoá)
+const SYNONYMS = [
+  ["saigon", "hochiminh", "hochiminhcity", "hcmc", "sgn"],
+  ["halong", "halongbay", "vinhhalong"],
+  ["hue", "imperialcity"],
+  ["phuquoc", "phuquocisland"],
+];
+const queryVariants = (q) => {
+  const group = SYNONYMS.find((g) => g.some((w) => q === w || q.startsWith(w)));
+  return group ? [q, ...group] : [q];
+};
 
 /**
  * Danh sách tour + bộ lọc (điểm đến, chủ đề, số ngày, khoảng giá) + tìm kiếm + phân trang.
@@ -80,15 +98,15 @@ export default function TourExplorer({
 
   const filtered = useMemo(() => {
     const q = normalize(f.q);
+    const variants = q ? queryVariants(q) : [];
     const regionSlugs = new Set(destinationOptions.filter((o) => o.region).map((o) => o.value));
     let list = cards.filter((c) => {
-      if (
-        q &&
-        !normalize(
-          `${c.title} ${c.summary} ${c.destinationNames.join(" ")} ${c.code || ""}`,
-        ).includes(q)
-      )
-        return false;
+      if (q) {
+        const hay = normalize(
+          `${c.title} ${c.summary} ${c.destinationNames.join(" ")} ${c.destinations.join(" ")} ${c.code || ""}`,
+        );
+        if (!variants.some((v) => hay.includes(v))) return false;
+      }
       if (f.destination) {
         const ok = regionSlugs.has(f.destination)
           ? c.regions.includes(f.destination)
@@ -135,7 +153,7 @@ export default function TourExplorer({
           <span className="flex h-12 items-center gap-2 bg-amber-brand px-5 font-bold tracking-wide text-ink uppercase lg:h-auto">
             <SlidersHorizontal className="size-4" /> {t.filters}
           </span>
-          <div className="grid flex-1 grid-cols-2 divide-y divide-border lg:flex lg:divide-y-0">
+          <div className="grid flex-1 grid-cols-1 divide-y divide-border sm:grid-cols-2 lg:flex lg:divide-y-0">
             {!hide.includes("destination") && (
               <label className={wrap}>
                 <span className="sr-only">{t.destination}</span>

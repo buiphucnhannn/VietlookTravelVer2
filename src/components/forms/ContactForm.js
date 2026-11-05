@@ -7,17 +7,20 @@ import {
   FormError,
   Honeypot,
   Input,
+  PhoneInput,
   Select,
   SuccessPanel,
   Textarea,
+  formMsg,
   useEnquiry,
+  validate,
 } from "./fields";
 
 /** Form liên hệ (kiểu "Send us a request" của localvietnam). Dùng chung cho trang Đối tác (type="partner"). */
 export default function ContactForm({ lang, t, c, type = "contact", extraFields = [] }) {
   const formRef = useRef(null);
   const { status, code, submit, reset } = useEnquiry(type, lang);
-  const [error, setError] = useState("");
+  const [errs, setErrs] = useState({});
   const [d, setD] = useState({
     subject: t.subjects?.[0] || "",
     name: "",
@@ -40,9 +43,9 @@ export default function ContactForm({ lang, t, c, type = "contact", extraFields 
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!d.name.trim() || !/^\S+@\S+\.\S+$/.test(d.email))
-      return setError(`${c.required}: ${c.fullName} / Email`);
-    setError("");
+    const v = validate(d, lang);
+    setErrs(v);
+    if (Object.keys(v).length) return;
     await submit(d, formRef.current);
   };
 
@@ -85,26 +88,38 @@ export default function ContactForm({ lang, t, c, type = "contact", extraFields 
             </Select>
           </Field>
         )}
-        <Field label={c.fullName} required htmlFor="cf-name">
-          <Input id="cf-name" autoComplete="name" value={d.name} onChange={set("name")} />
+        <Field label={c.fullName} required htmlFor="cf-name" error={errs.name}>
+          <Input
+            id="cf-name"
+            autoComplete="name"
+            value={d.name}
+            onChange={set("name")}
+            aria-invalid={!!errs.name}
+          />
         </Field>
-        <Field label="Email" required htmlFor="cf-email">
+        <Field label="Email" required htmlFor="cf-email" error={errs.email}>
           <Input
             id="cf-email"
             type="email"
             autoComplete="email"
             value={d.email}
             onChange={set("email")}
+            aria-invalid={!!errs.email}
           />
         </Field>
-        <Field label={c.phone} className="sm:col-span-2" htmlFor="cf-phone">
-          <Input id="cf-phone" autoComplete="tel" value={d.phone} onChange={set("phone")} />
+        <Field label={c.phone} className="sm:col-span-2" htmlFor="cf-phone" error={errs.phone}>
+          <PhoneInput
+            id="cf-phone"
+            value={d.phone}
+            onChange={set("phone")}
+            aria-invalid={!!errs.phone}
+          />
         </Field>
         <Field label={c.message} className="sm:col-span-2" htmlFor="cf-msg">
           <Textarea id="cf-msg" rows={5} value={d.message} onChange={set("message")} />
         </Field>
       </div>
-      <FormError show={!!error} text={error} />
+      <FormError show={Object.keys(errs).length > 0} text={formMsg(lang).fix} />
       <FormError show={status === "error"} text={c.errorGeneric} />
       <button
         type="submit"

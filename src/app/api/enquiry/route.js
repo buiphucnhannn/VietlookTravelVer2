@@ -85,8 +85,28 @@ export async function POST(request) {
   if (!name || (!email && !phone)) {
     return NextResponse.json({ error: "Name and email or phone are required." }, { status: 422 });
   }
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (email && !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) {
     return NextResponse.json({ error: "Invalid email address." }, { status: 422 });
+  }
+  if (phone) {
+    const digits = phone.replace(/\D/g, "").length;
+    if (!/^\+?[\d\s().-]+$/.test(phone) || digits < 6 || digits > 15) {
+      return NextResponse.json({ error: "Invalid phone number." }, { status: 422 });
+    }
+  }
+  // Ngày đi/nhập cảnh/khởi hành không được là ngày đã qua (so theo giờ Việt Nam)
+  const todayVN = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(
+    new Date(),
+  );
+  for (const key of ["date", "returnDate", "entryDate", "arrival", "departureDate"]) {
+    const v = data[key];
+    if (v == null || v === "") continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v)) || String(v) < todayVN) {
+      return NextResponse.json({ error: "Please choose a future date." }, { status: 422 });
+    }
+  }
+  if (data.returnDate && data.date && data.returnDate < data.date) {
+    return NextResponse.json({ error: "Please choose a future date." }, { status: 422 });
   }
 
   const code = requestCode(type);

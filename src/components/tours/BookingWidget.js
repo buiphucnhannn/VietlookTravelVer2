@@ -9,10 +9,13 @@ import {
   FormError,
   Honeypot,
   Input,
+  PhoneInput,
   Select,
   SuccessPanel,
   Textarea,
+  formMsg,
   useEnquiry,
+  validate,
 } from "@/components/forms/fields";
 
 const noopSubscribe = () => () => {};
@@ -52,6 +55,7 @@ export default function BookingWidget({ lang, tour, t, c }) {
     notes: "",
   });
   const [error, setError] = useState("");
+  const [errs, setErrs] = useState({});
 
   // Ngày hôm nay chỉ đọc phía client (server trả chuỗi rỗng) để tránh lệch khi render sẵn
   const today = useSyncExternalStore(noopSubscribe, todayISO, () => "");
@@ -92,13 +96,22 @@ export default function BookingWidget({ lang, tour, t, c }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    const m = formMsg(lang);
     if (step === 0) {
-      if (!date) return setError(`${c.required}: ${t.departureDate}`);
+      // Ngày khởi hành bắt buộc và không được sớm hơn ngày sớm nhất có thể đặt (kể cả khi gõ tay)
+      const bad = !date
+        ? m.date
+        : !/^\d{4}-\d{2}-\d{2}$/.test(date) || (minDate && date < minDate)
+          ? m.dateFuture
+          : "";
+      setErrs(bad ? { date: bad } : {});
+      if (bad) return setError("");
       setError("");
       return setStep(1);
     }
-    if (!contact.name.trim() || !/^\S+@\S+\.\S+$/.test(contact.email))
-      return setError(`${c.required}: ${t.fullName} / ${t.email}`);
+    const v = validate(contact, lang);
+    setErrs(v);
+    if (Object.keys(v).length) return setError(m.fix);
     setError("");
     await submit(
       {
@@ -128,7 +141,7 @@ export default function BookingWidget({ lang, tour, t, c }) {
       {step === 0 && <p className="-mt-2 text-sm leading-snug text-muted">{t.bookSubtitle}</p>}
       {step === 0 ? (
         <>
-          <Field label={t.departureDate} required htmlFor="bk-date">
+          <Field label={t.departureDate} required htmlFor="bk-date" error={errs.date}>
             <div className="relative">
               <CalendarDays className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-brand-500" />
               <Input
@@ -137,6 +150,7 @@ export default function BookingWidget({ lang, tour, t, c }) {
                 min={minDate}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                aria-invalid={!!errs.date}
                 className="pl-11 short:h-11"
               />
             </div>
@@ -268,30 +282,32 @@ export default function BookingWidget({ lang, tour, t, c }) {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t.fullName} required htmlFor="bk-name">
+            <Field label={t.fullName} required htmlFor="bk-name" error={errs.name}>
               <Input
                 id="bk-name"
                 autoComplete="name"
                 value={contact.name}
+                aria-invalid={!!errs.name}
                 onChange={(e) => setContact({ ...contact, name: e.target.value })}
               />
             </Field>
-            <Field label={t.email} required htmlFor="bk-email">
+            <Field label={t.email} required htmlFor="bk-email" error={errs.email}>
               <Input
                 id="bk-email"
                 type="email"
                 autoComplete="email"
                 value={contact.email}
+                aria-invalid={!!errs.email}
                 onChange={(e) => setContact({ ...contact, email: e.target.value })}
               />
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t.phone} htmlFor="bk-phone">
-              <Input
+            <Field label={t.phone} htmlFor="bk-phone" error={errs.phone}>
+              <PhoneInput
                 id="bk-phone"
-                autoComplete="tel"
                 value={contact.phone}
+                aria-invalid={!!errs.phone}
                 onChange={(e) => setContact({ ...contact, phone: e.target.value })}
               />
             </Field>

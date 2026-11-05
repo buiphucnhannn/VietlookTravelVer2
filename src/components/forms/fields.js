@@ -6,7 +6,109 @@ import { CheckCircle2, Copy, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const inputClass =
-  "h-12 w-full rounded-lg border border-border bg-white px-4 text-[0.95rem] text-ink placeholder:text-muted/70 transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none";
+  "h-12 w-full rounded-lg border border-border bg-white px-4 text-[0.95rem] text-ink placeholder:text-muted/70 transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none aria-[invalid=true]:border-sun-500 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-sun-500/10";
+
+/* ───────────── Kiểm tra dữ liệu form (dùng chung mọi form) ───────────── */
+
+const pad = (n) => String(n).padStart(2, "0");
+const isoLocal = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** Ngày sớm nhất được chọn: NGÀY MAI (YYYY-MM-DD theo giờ máy khách). */
+export function minBookingDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return isoLocal(d);
+}
+export const isFutureDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= minBookingDate();
+export const isEmail = (v) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(String(v).trim());
+/** Số điện thoại: chỉ số, khoảng trắng, + ( ) - . ; 6–15 chữ số. */
+export const cleanPhone = (v) => String(v).replace(/[^\d+\s().-]/g, "");
+export const isPhone = (v) => {
+  const s = String(v).trim();
+  const digits = s.replace(/\D/g, "").length;
+  return /^\+?[\d\s().-]+$/.test(s) && digits >= 6 && digits <= 15;
+};
+
+const MSG = {
+  en: {
+    name: "Please enter your full name",
+    email: "Please enter your email address",
+    emailInvalid: "Please enter a valid email address",
+    phoneInvalid: "Please enter a valid phone number (digits and + only)",
+    contactNeeded: "Please enter your email or phone number",
+    date: "Please choose a date",
+    dateFuture: "Please choose a future date",
+    required: "This field is required",
+    fix: "Please check the highlighted fields.",
+  },
+  zh: {
+    name: "请输入您的姓名",
+    email: "请输入您的邮箱",
+    emailInvalid: "请输入有效的邮箱地址",
+    phoneInvalid: "请输入有效的电话号码（仅限数字和 +）",
+    contactNeeded: "请输入邮箱或电话号码",
+    date: "请选择日期",
+    dateFuture: "请选择今天之后的日期",
+    required: "此项为必填",
+    fix: "请检查标红的字段。",
+  },
+};
+export const formMsg = (lang) => MSG[lang] || MSG.en;
+
+/**
+ * Kiểm tra các ô chung: tên, email, điện thoại, ngày.
+ * opts.email: "required" | "optional" | "either" (email HOẶC điện thoại); opts.dates: { key: required? }
+ * opts.required: các ô bắt buộc khác. Trả về { key: thông báo } – rỗng = hợp lệ.
+ */
+export function validate(d, lang, { email = "required", dates = {}, required = [] } = {}) {
+  const m = formMsg(lang);
+  const e = {};
+  if (!String(d.name || "").trim()) e.name = m.name;
+  const em = String(d.email || "").trim();
+  const ph = String(d.phone || "").trim();
+  if (em && !isEmail(em)) e.email = m.emailInvalid;
+  else if (!em && email === "required") e.email = m.email;
+  if (ph && !isPhone(ph)) e.phone = m.phoneInvalid;
+  if (email === "either" && !em && !ph) e.email = m.contactNeeded;
+  for (const [k, req] of Object.entries(dates)) {
+    const v = d[k];
+    if (!v) {
+      if (req) e[k] = m.date;
+    } else if (!isFutureDate(v)) e[k] = m.dateFuture;
+  }
+  for (const k of required) if (!String(d[k] ?? "").trim()) e[k] = m.required;
+  return e;
+}
+
+/** Ô ngày: không cho chọn ngày đã qua (min = ngày mai). */
+export function DateInput({ className, ...props }) {
+  return (
+    <input
+      type="date"
+      min={minBookingDate()}
+      suppressHydrationWarning
+      className={cn(inputClass, className)}
+      {...props}
+    />
+  );
+}
+
+/** Ô điện thoại: chỉ nhận số, khoảng trắng và + ( ) - . */
+export function PhoneInput({ className, onChange, ...props }) {
+  return (
+    <input
+      type="tel"
+      inputMode="tel"
+      autoComplete="tel"
+      className={cn(inputClass, className)}
+      onChange={(e) => {
+        const clean = cleanPhone(e.target.value);
+        if (clean !== e.target.value) e.target.value = clean;
+        onChange?.(e);
+      }}
+      {...props}
+    />
+  );
+}
 
 export function Field({ label, required, hint, error, className, children, htmlFor }) {
   return (

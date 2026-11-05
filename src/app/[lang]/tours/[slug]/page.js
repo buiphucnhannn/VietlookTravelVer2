@@ -260,11 +260,27 @@ async function TourPageContent({ params }) {
               </span>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2 text-sm">
-            <Stars value={5} />
-            <span className="font-semibold text-ink">{c.ratingShort}</span>
-            <span className="text-muted">({c.reviewsN})</span>
-          </div>
+          {/* Đánh giá của CÔNG TY trên Tripadvisor (không phải đánh giá riêng từng tour) – ghi rõ & dẫn link */}
+          <a
+            href={siteConfig.social.tripadvisor}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group mt-4 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm"
+          >
+            <Stars value={siteConfig.tripadvisorRating.score} className="text-[#34E0A1]" />
+            <span className="font-semibold text-ink group-hover:underline">
+              {tr({ en: "Vietlook on Tripadvisor", zh: "Vietlook 猫途鹰评分" }, lang)}
+            </span>
+            <span className="text-muted">
+              {fill(
+                tr({ en: "{score}/5 · {n} reviews", zh: "{score}/5 · {n}条评价" }, lang),
+                {
+                  score: siteConfig.tripadvisorRating.score.toFixed(1),
+                  n: siteConfig.tripadvisorRating.reviews,
+                },
+              )}
+            </span>
+          </a>
           <a
             href="#book"
             className="mt-5 flex h-12 items-center justify-center rounded-md bg-sun-500 font-semibold text-white shadow-md transition hover:bg-sun-600"

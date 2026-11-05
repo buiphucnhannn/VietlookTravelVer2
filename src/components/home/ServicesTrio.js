@@ -6,8 +6,10 @@ import { lp } from "@/i18n/config";
 
 /**
  * 3 danh mục chính của web (yêu cầu khách 31/10, mục 2 + 9): rõ ràng, ẢNH THẬT, dễ bấm.
- * - Tour: thuyền Tam Cốc – Ninh Bình; Xe: MPV cửa lùa ghế thương gia (ảnh HD Pexels)
- *   Visa: nhân viên đón khách tại sân bay (ảnh từ vietlooktravel.com).
+ * ẢNH THẬT CỦA VIETLOOK (yêu cầu khách): Tour – thung lũng Bảo Lạc, Cao Bằng (ảnh tour web cũ vietlooktravel.com; bỏ ảnh du thuyền vì sản phẩm không còn);
+ * Xe – Kia Carnival thật của Vietlook cạnh hàng xe, giữ biển số (ảnh nét nhất trong kho rent-car);
+ * Visa/Fast-track – nhân viên cầm biển "VIETLOOK TRAVEL – WELCOME" tại sân bay.
+ * Ảnh đã cắt sẵn đúng khung 16:10 của thẻ và phóng to/làm nét (public/images/services/svc-*.webp).
  * - Cả thẻ là 1 liên kết lớn; nút hành động màu đỏ thương hiệu luôn hiển thị.
  */
 export default function ServicesTrio({ lang, dict }) {
@@ -17,22 +19,22 @@ export default function ServicesTrio({ lang, dict }) {
       key: "tours",
       icon: Map,
       href: `${lp(lang)}/tours`,
-      image: "/images/services/tam-coc-bich-dong.webp",
+      image: "/images/services/svc-tour-cao-bang.webp",
       position: "object-center",
     },
     {
       key: "car",
       icon: Car,
       href: `${lp(lang)}/car-rental`,
-      image: "/images/cars/luxury-v3a.webp",
-      position: "object-[50%_60%]",
+      image: "/images/services/svc-car-vietlook-carnival.webp",
+      position: "object-center",
     },
     {
       key: "visa",
       icon: Stamp,
       href: `${lp(lang)}/visa-fast-track`,
-      image: "/images/services/airport-pick-up-one-way.webp",
-      position: "object-center",
+      image: "/images/services/svc-visa-welcome.webp",
+      position: "object-[50%_30%]",
     },
   ];
 

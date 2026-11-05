@@ -1,11 +1,29 @@
 // Thông tin doanh nghiệp – lấy từ hồ sơ khách hàng & website hiện tại vietlooktravel.com
+function siteUrl() {
+  const strip = (u) => u.replace(/\/+$/, "");
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit) return strip(explicit.startsWith("http") ? explicit : `https://${explicit}`);
+  const vercel =
+    process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercel) return `https://${strip(vercel)}`;
+  return process.env.NODE_ENV === "production"
+    ? "https://vietlooktravel.vercel.app"
+    : "http://localhost:3000";
+}
+
+const MAP_QUERY = "58 Ngõ 159 Quyết Thắng, Yên Nghĩa, Hà Nội, Việt Nam";
+
 export const siteConfig = {
   name: "Vietlook Travel",
   legalName: "Vietlook Travel and Trading Company Limited",
   legalNameVi: "Công ty TNHH Du lịch và Thương mại Vietlook",
   // Mã số doanh nghiệp (masothue.com) & giấy phép lữ hành quốc tế (Cục Du lịch Quốc gia VN, cấp lại 23/01/2026)
   legal: { businessNo: "0104189511", licenceNo: "01-176/2022/CDLQGVN-GP LHQT" },
-  url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+  // Domain gốc cho canonical / hreflang / og / sitemap / robots / JSON-LD.
+  // Ưu tiên biến NEXT_PUBLIC_SITE_URL (domain chính thức); trên Vercel tự lấy domain production
+  // của dự án; chỉ khi chạy dev ở máy mới dùng localhost.
+  url: siteUrl(),
   since: 2009,
   contact: {
     hotline: "+84 98 339 3588",
@@ -41,9 +59,11 @@ export const siteConfig = {
     zalo: "https://zalo.me/84983393588",
     wechatId: "+84983393588",
   },
+  // Bản đồ ghim ĐÚNG địa chỉ văn phòng ghi trên web (58 ngõ 159 Quyết Thắng, Yên Nghĩa).
+  // Trước đây nhúng theo CID hồ sơ Google cũ (01 LK20 KĐT Văn Khê) → lệch với địa chỉ chữ.
+  // Khi khách cập nhật Google Business Profile sang địa chỉ mới có thể quay lại nhúng theo CID.
   maps: {
-    link: "https://maps.app.goo.gl/ar5pqAHXgeW42U7W9",
-    // Nhúng theo mã địa điểm (CID) của doanh nghiệp trên Google → hiện thẻ tên công ty, đánh giá, chỉ đường
-    embed: "https://maps.google.com/maps?cid=12890319484623913190&z=17&hl=en&output=embed",
+    link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(MAP_QUERY)}`,
+    embed: `https://maps.google.com/maps?q=${encodeURIComponent(MAP_QUERY)}&z=17&hl=en&output=embed`,
   },
 };
