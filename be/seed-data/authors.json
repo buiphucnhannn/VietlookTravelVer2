@@ -1,0 +1,23 @@
+[
+  {
+    "slug": "vietlook-team",
+    "name": {
+      "en": "Vietlook Travel Team",
+      "zh": "Vietlook 旅行团队",
+      "vi": "Đội ngũ Vietlook Travel"
+    },
+    "role": {
+      "en": "Local travel experts, Hanoi",
+      "zh": "河内本地旅行专家",
+      "vi": "Chuyên gia du lịch địa phương, Hà Nội"
+    },
+    "bio": {
+      "en": "Our Hanoi-based planners and guides have been designing trips across Vietnam since 2009. Every guide is written from first-hand experience on the ground.",
+      "zh": "我们驻河内的行程规划师与导游自2009年起为客人设计越南之旅，每一篇攻略都来自亲身实地经验。",
+      "vi": "Đội ngũ chuyên viên lập kế hoạch và hướng dẫn viên tại Hà Nội của chúng tôi đã thiết kế hành trình khắp Việt Nam từ năm 2009. Mỗi bài cẩm nang đều được viết từ trải nghiệm thực tế tại điểm đến."
+    },
+    "avatar": "/images/logo/vietlook-icon.png",
+    "order": 0,
+    "isActive": true
+  }
+]

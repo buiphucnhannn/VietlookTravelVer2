@@ -1,0 +1,218 @@
+import { MAX_THEMES, REGION_VALUES } from "../constants/content.js";
+import {
+  articleRepository,
+  authorRepository,
+  carAreaRepository,
+  carRepository,
+  categoryRepository,
+  destinationRepository,
+  fastTrackRepository,
+  pageRepository,
+  themeRepository,
+  tourRepository,
+  visaTypeRepository,
+} from "../repositories/content.repository.js";
+import { ApiError } from "../utils/ApiError.js";
+import { cleanHtml } from "../utils/sanitize.js";
+import { createContentService } from "./content.service.js";
+
+const LANGS = ["en", "zh", "vi"];
+const mapLangs = (obj, fn) => Object.fromEntries(LANGS.map((l) => [l, fn(obj?.[l] ?? "", l)]));
+
+/** Đổi slug → giữ slug cũ để website chuyển hướng 301 (giữ SEO, link đã chia sẻ) */
+function withOldSlugs(data, prev) {
+  if (!prev || prev.slug === data.slug) return { ...data, oldSlugs: prev?.oldSlugs ?? [] };
+  const old = new Set([...(prev.oldSlugs ?? []), prev.slug]);
+  old.delete(data.slug);
+  return { ...data, oldSlugs: [...old].slice(-20) };
+}
+
+/* ---------- Tour ---------- */
+
+export async function prepareTour(data, prev) {
+  // điểm đến / chủ đề phải có thật; miền (regions) suy ra từ điểm đến
+  const dests = data.destinations.length
+    ? await destinationRepository.findByIdents(data.destinations, { select: "slug region" })
+    : [];
+  const known = new Set(dests.map((d) => d.slug));
+  const missing = data.destinations.filter((s) => !known.has(s));
+  if (missing.length) throw ApiError.badRequest(`Điểm đến không tồn tại: ${missing.join(", ")}`);
+  if (data.themes.length) {
+    const themes = await themeRepository.findByIdents(data.themes, { select: "slug" });
+    const t = new Set(themes.map((x) => x.slug));
+    const bad = data.themes.filter((s) => !t.has(s));
+    if (bad.length) throw ApiError.badRequest(`Chủ đề không tồn tại: ${bad.join(", ")}`);
+  }
+  if (data.originalPrice != null && data.price != null && data.originalPrice <= data.price)
+    data.originalPrice = null; // giá gạch phải cao hơn giá bán
+  const regionOf = Object.fromEntries(dests.map((d) => [d.slug, d.region]));
+  const regions = [...new Set(data.destinations.map((s) => regionOf[s]))].filter((r) =>
+    REGION_VALUES.includes(r),
+  );
+
+  const content = mapLangs(data.content, (c) => ({
+    ...c,
+    itinerary: (c.itinerary ?? []).map((d) => ({ ...d, html: cleanHtml(d.html) })),
+    faqs: (c.faqs ?? []).map((f) => ({ ...f, a: cleanHtml(f.a) })),
+  }));
+  if (!content.en.title) throw ApiError.badRequest("Vui lòng nhập tên tour (tiếng Anh)");
+  return withOldSlugs({ ...data, regions, content }, prev);
+}
+
+export const tourService = createContentService({
+  repo: tourRepository,
+  label: "tour",
+  searchFields: ["content.en.title", "content.zh.title", "content.vi.title", "code"],
+  defaultSort: "rank",
+  prepare: prepareTour,
+  filters: (q) => ({
+    ...(q.region && { regions: q.region }),
+    ...(q.destination && { destinations: q.destination }),
+    ...(q.theme && { themes: q.theme }),
+    ...(q.featured === "featured" && { featured: true }),
+    ...(q.featured === "long" && { featuredLong: true }),
+  }),
+});
+
+/* ---------- Điểm đến / chủ đề ---------- */
+
+export const destinationService = createContentService({
+  repo: destinationRepository,
+  label: "điểm đến",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+  filters: (q) => (q.region ? { region: q.region } : {}),
+  afterUpdate: async (next, prev) => {
+    if (next.slug !== prev.slug)
+      await tourRepository.renameRef("destinations", prev.slug, next.slug);
+    if (next.slug !== prev.slug)
+      await articleRepository.renameRef("destination", prev.slug, next.slug);
+  },
+  beforeRemove: async (doc) => {
+    const n = await tourRepository.countUsing("destinations", doc.slug);
+    if (n)
+      throw ApiError.conflict(
+        `Điểm đến đang gắn với ${n} tour — hãy ẩn điểm đến hoặc bỏ gắn khỏi các tour trước khi xoá`,
+      );
+  },
+});
+
+export const themeService = createContentService({
+  repo: themeRepository,
+  label: "chủ đề",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+  beforeCreate: async () => {
+    if ((await themeRepository.count()) >= MAX_THEMES)
+      throw ApiError.badRequest(`Tối đa ${MAX_THEMES} chủ đề — hãy sửa hoặc xoá chủ đề cũ`);
+  },
+  afterUpdate: async (next, prev) => {
+    if (next.slug !== prev.slug) await tourRepository.renameRef("themes", prev.slug, next.slug);
+  },
+  beforeRemove: async (doc) => {
+    await tourRepository.pullRef("themes", doc.slug); // tour vẫn còn, chỉ bỏ gắn chủ đề
+  },
+});
+
+/* ---------- Bài viết / chuyên mục / tác giả ---------- */
+
+export function prepareArticle(data, prev) {
+  if (!data.title.en) throw ApiError.badRequest("Vui lòng nhập tiêu đề (tiếng Anh)");
+  return withOldSlugs({ ...data, body: mapLangs(data.body, (h) => cleanHtml(h)) }, prev);
+}
+
+export const articleService = createContentService({
+  repo: articleRepository,
+  label: "bài viết",
+  searchFields: ["title.en", "title.zh", "title.vi"],
+  defaultSort: "newest",
+  prepare: prepareArticle,
+  filters: (q) => (q.category ? { category: q.category } : {}),
+});
+// danh sách bài viết mới nhất trước theo ngày đăng
+articleService.list = (
+  (list) => (query) =>
+    list({ sort: "newest", ...query })
+)(articleService.list);
+
+export const categoryService = createContentService({
+  repo: categoryRepository,
+  label: "chuyên mục",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+  afterUpdate: async (next, prev) => {
+    if (next.slug !== prev.slug)
+      await articleRepository.renameRef("category", prev.slug, next.slug);
+  },
+  beforeRemove: async (doc) => {
+    const n = await articleRepository.countUsing("category", doc.slug);
+    if (n)
+      throw ApiError.conflict(
+        `Chuyên mục đang có ${n} bài viết — chuyển bài sang chuyên mục khác trước`,
+      );
+  },
+});
+
+export const authorService = createContentService({
+  repo: authorRepository,
+  label: "tác giả",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+  afterUpdate: async (next, prev) => {
+    if (next.slug !== prev.slug) await articleRepository.renameRef("author", prev.slug, next.slug);
+  },
+  beforeRemove: async (doc) => {
+    const n = await articleRepository.countUsing("author", doc.slug);
+    if (n)
+      throw ApiError.conflict(`Tác giả đang có ${n} bài viết — đổi tác giả của các bài đó trước`);
+  },
+});
+
+/* ---------- Dịch vụ ---------- */
+
+export const carService = createContentService({
+  repo: carRepository,
+  label: "loại xe",
+  idField: "key",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+});
+
+export const carAreaService = createContentService({
+  repo: carAreaRepository,
+  label: "khu vực phục vụ",
+  idField: "key",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+});
+
+export const visaTypeService = createContentService({
+  repo: visaTypeRepository,
+  label: "loại visa",
+  idField: "key",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+});
+
+export const fastTrackService = createContentService({
+  repo: fastTrackRepository,
+  label: "gói fast-track",
+  idField: "key",
+  searchFields: ["name.en", "name.zh", "name.vi"],
+  filters: (q) => (q.group ? { group: q.group } : {}),
+});
+
+/* ---------- Trang giới thiệu & chính sách ---------- */
+
+export const pageService = {
+  async list() {
+    return pageRepository.find({}, { sort: { key: 1 } });
+  },
+
+  async get(key) {
+    const page = await pageRepository.findByIdent(key);
+    if (!page) throw ApiError.notFound("Không tìm thấy trang");
+    return page;
+  },
+
+  async save(key, data) {
+    return pageRepository.upsertByIdent(key, {
+      ...data,
+      key,
+      body: mapLangs(data.body, (h) => cleanHtml(h)),
+    });
+  },
+};

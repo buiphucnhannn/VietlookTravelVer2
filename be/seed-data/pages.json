@@ -1,0 +1,171 @@
+[
+  {
+    "key": "about",
+    "title": {
+      "en": "About Vietlook Travel",
+      "zh": "关于 Vietlook Travel",
+      "vi": "Về Vietlook Travel"
+    },
+    "subtitle": {},
+    "body": {},
+    "image": "",
+    "data": {
+      "story": {
+        "en": [
+          "Established in 2009 in Hanoi (formerly known as A Thai Travel), Vietlook Travel has grown into a trusted Vietnam tour operator focusing on private tours, tailor-made journeys and transport services for travellers from all over the world.",
+          "Besides private programmes, we run daily shared tours across the country – Hanoi city tours, Ninh Binh, Halong Bay and Sapa in the North; Da Nang, the Coconut Forest, Hoi An and Ba Na Hills in the Centre; Ho Chi Minh City, Cu Chi and the Mekong Delta in the South.",
+          "Our guides speak English, Chinese, French, German, Spanish, Japanese and Korean. We listen carefully to every guest to craft a holiday filled with exciting experiences – the kind of trip people tell their friends and family about again and again."
+        ],
+        "zh": [
+          "Vietlook Travel 于2009年在河内成立（前身为 A Thai Travel），现已成为值得信赖的越南地接社，专注于为世界各地游客提供私人团、定制行程与交通服务。",
+          "除私人行程外，我们还在全国运营每日拼团线路——北部的河内城市游、宁平、下龙湾与沙坝；中部的岘港、椰林、会安与巴拿山；南部的胡志明市、古芝地道与湄公河三角洲。",
+          "我们的导游可使用英语、中文、法语、德语、西班牙语、日语与韩语。我们认真倾听每一位客人，打造充满惊喜的假期——让客人一次又一次向亲友讲述的旅程。"
+        ],
+        "vi": [
+          "Thành lập năm 2009 tại Hà Nội (tiền thân là A Thai Travel), Vietlook Travel đã phát triển thành một công ty lữ hành inbound đáng tin cậy tại Việt Nam, chuyên tour riêng, hành trình thiết kế riêng và dịch vụ vận chuyển cho du khách từ khắp nơi trên thế giới.",
+          "Bên cạnh các chương trình riêng, chúng tôi tổ chức tour ghép hằng ngày trên khắp cả nước – city tour Hà Nội, Ninh Bình, Vịnh Hạ Long và Sa Pa ở miền Bắc; Đà Nẵng, rừng dừa Bảy Mẫu, Hội An và Bà Nà Hills ở miền Trung; TP. Hồ Chí Minh, Củ Chi và Đồng bằng sông Cửu Long ở miền Nam.",
+          "Hướng dẫn viên của chúng tôi sử dụng tiếng Anh, tiếng Trung, tiếng Pháp, tiếng Đức, tiếng Tây Ban Nha, tiếng Nhật và tiếng Hàn. Chúng tôi lắng nghe từng vị khách để tạo nên kỳ nghỉ tràn đầy trải nghiệm thú vị – chuyến đi mà du khách sẽ kể lại với bạn bè, người thân hết lần này đến lần khác."
+        ]
+      },
+      "vision": {
+        "en": "To become Asia's best travel company offering high-quality tailor-made holidays within Asia and beyond.",
+        "zh": "成为亚洲最好的旅游公司，提供高品质的亚洲及全球定制假期。",
+        "vi": "Trở thành công ty du lịch hàng đầu châu Á, mang đến những kỳ nghỉ thiết kế riêng chất lượng cao tại châu Á và trên toàn thế giới."
+      },
+      "mission": {
+        "en": "Create unique, personalised holidays for discerning travellers from around the world.",
+        "zh": "为来自世界各地的挑剔旅客打造独特的个性化假期。",
+        "vi": "Kiến tạo những kỳ nghỉ độc đáo, mang dấu ấn riêng cho những du khách tinh tế từ khắp nơi trên thế giới."
+      },
+      "values": [
+        {
+          "title": {
+            "en": "Pioneer service",
+            "zh": "先锋服务",
+            "vi": "Dịch vụ tiên phong"
+          },
+          "text": {
+            "en": "Speed, attention to detail, quality focus and guest-centred operations – heartfelt service from the start.",
+            "zh": "快速响应、关注细节、专注品质、以客为本——从一开始就用心服务。",
+            "vi": "Nhanh chóng, chú trọng từng chi tiết, tập trung vào chất lượng và lấy khách hàng làm trung tâm – phục vụ tận tâm ngay từ đầu."
+          }
+        },
+        {
+          "title": {
+            "en": "Business of humanity",
+            "zh": "人本经营",
+            "vi": "Kinh doanh nhân văn"
+          },
+          "text": {
+            "en": "We promote human-centred values that benefit our guests, our team and our country.",
+            "zh": "我们倡导以人为本的价值观，惠及客人、团队与国家。",
+            "vi": "Chúng tôi lan tỏa những giá trị lấy con người làm trung tâm, mang lại lợi ích cho khách hàng, đội ngũ và đất nước."
+          }
+        },
+        {
+          "title": {
+            "en": "Wow experiences",
+            "zh": "惊喜体验",
+            "vi": "Trải nghiệm “Wow”"
+          },
+          "text": {
+            "en": "Local gurus and on-site specialists creating memorable moments for our guests every day.",
+            "zh": "本地达人与现场专家，每天为客人创造难忘时刻。",
+            "vi": "Chuyên gia bản địa và đội ngũ tại điểm đến tạo nên những khoảnh khắc đáng nhớ cho khách mỗi ngày."
+          }
+        }
+      ],
+      "people": {
+        "en": ["Integrity", "Proactivity", "Responsibility", "Creativity", "Happiness"],
+        "zh": ["诚信", "主动", "责任", "创新", "快乐"],
+        "vi": ["Chính trực", "Chủ động", "Trách nhiệm", "Sáng tạo", "Hạnh phúc"]
+      },
+      "languages": ["English", "中文", "Français", "Deutsch", "Español", "日本語", "한국어"]
+    },
+    "isActive": true
+  },
+  {
+    "key": "payment",
+    "title": {
+      "en": "Payment & refund",
+      "zh": "付款与退款",
+      "vi": "Thanh toán & hoàn tiền"
+    },
+    "subtitle": {
+      "en": "How to pay for your trip – international card online or bank transfer – and how refunds are made.",
+      "zh": "如何支付行程费用——在线国际银行卡或银行转账——以及退款方式。",
+      "vi": "Cách thanh toán chuyến đi – bằng thẻ quốc tế trực tuyến hoặc chuyển khoản ngân hàng – và cách thức hoàn tiền."
+    },
+    "body": {
+      "en": "<p>After you send a booking request, our team confirms availability and sends you a written confirmation with the final price in USD. You only pay once you have agreed to that confirmation.</p><h2>How to pay</h2><ul><li><strong>International card online</strong> – Visa, Mastercard and JCB through the secure 9Pay payment gateway on this website.</li><li><strong>Bank transfer</strong> – to the company account of Vietlook Travel and Trading Company Limited stated on your confirmation. Please only transfer to the account shown on your latest confirmation.</li><li><strong>In person</strong> – at our office in Hanoi.</li></ul><h2>Deposit and balance</h2><p>The deposit and the due date for the balance are stated on your written confirmation and depend on the services booked (hotels, cruises, flights).</p><h2>Refunds</h2><ul><li>Refunds are made to the original payment method – card refunds via the 9Pay gateway, transfers back to the sending account.</li><li>The refundable amount follows our cancellation & change policy and the conditions on your confirmation.</li><li>Bank and card fees charged by third parties may be deducted.</li></ul><h2>Travel agents (B2B)</h2><p>Partner agencies receive net-rate confirmations and invoice-based payment terms agreed in the partnership contract.</p>",
+      "zh": "<p>您提交预订需求后，我们会先确认资源，并以美元发送含最终价格的书面确认。您确认后才需付款。</p><h2>付款方式</h2><ul><li><strong>在线国际银行卡</strong>——通过本网站安全的 9Pay 支付网关使用 Visa、Mastercard、JCB 付款。</li><li><strong>银行转账</strong>——转入确认单所列 Vietlook Travel and Trading Company Limited 公司账户。请仅转账至最新确认单上的账户。</li><li><strong>线下付款</strong>——在河内办公室支付。</li></ul><h2>定金与尾款</h2><p>定金金额及尾款支付期限以书面确认单为准，视所订服务（酒店、游轮、机票）而定。</p><h2>退款</h2><ul><li>退款将原路退回——银行卡经 9Pay 网关退回，转账退回至汇款账户。</li><li>可退金额依据取消与变更政策及确认单条款。</li><li>第三方收取的银行或刷卡手续费可能会被扣除。</li></ul><h2>同业伙伴（B2B）</h2><p>合作旅行社享受净价确认，并按合作协议约定的账期结算。</p>",
+      "vi": "<p>Sau khi bạn gửi yêu cầu đặt dịch vụ, đội ngũ của chúng tôi sẽ kiểm tra tình trạng chỗ và gửi xác nhận bằng văn bản kèm giá cuối cùng bằng USD. Bạn chỉ thanh toán sau khi đã đồng ý với xác nhận đó.</p><h2>Hình thức thanh toán</h2><ul><li><strong>Thẻ quốc tế trực tuyến</strong> – Visa, Mastercard và JCB qua cổng thanh toán bảo mật 9Pay trên website này.</li><li><strong>Chuyển khoản ngân hàng</strong> – vào tài khoản công ty Vietlook Travel and Trading Company Limited ghi trên xác nhận của bạn. Vui lòng chỉ chuyển khoản vào tài khoản ghi trên xác nhận mới nhất.</li><li><strong>Trực tiếp</strong> – tại văn phòng của chúng tôi ở Hà Nội.</li></ul><h2>Đặt cọc và thanh toán phần còn lại</h2><p>Số tiền đặt cọc và hạn thanh toán phần còn lại được ghi trên xác nhận bằng văn bản và tùy thuộc vào dịch vụ đã đặt (khách sạn, du thuyền, vé máy bay).</p><h2>Hoàn tiền</h2><ul><li>Tiền hoàn được trả về phương thức thanh toán ban đầu – hoàn qua cổng 9Pay đối với thẻ, chuyển khoản lại tài khoản đã chuyển đối với chuyển khoản.</li><li>Số tiền được hoàn tuân theo chính sách hủy & thay đổi và các điều kiện trên xác nhận của bạn.</li><li>Phí ngân hàng và phí thẻ do bên thứ ba thu có thể được khấu trừ.</li></ul><h2>Đại lý du lịch (B2B)</h2><p>Các đại lý đối tác nhận xác nhận theo giá net và áp dụng điều khoản thanh toán theo hóa đơn như thỏa thuận trong hợp đồng hợp tác.</p>"
+    },
+    "image": "/images/tours/hd/hcm-tour-2-1.jpg",
+    "data": {},
+    "isActive": true
+  },
+  {
+    "key": "cancellation",
+    "title": {
+      "en": "Cancellation & changes",
+      "zh": "取消与变更",
+      "vi": "Hủy & thay đổi"
+    },
+    "subtitle": {
+      "en": "How to cancel or change your booking – and what happens with weather or force majeure.",
+      "zh": "如何取消或变更预订，以及天气或不可抗力情况下的处理方式。",
+      "vi": "Cách hủy hoặc thay đổi đặt chỗ – và cách xử lý khi gặp thời tiết xấu hoặc sự kiện bất khả kháng."
+    },
+    "body": {
+      "en": "<p>We understand plans change. Every booking has its own cancellation conditions, written on your confirmation before you pay – cruises, flights and peak-season hotels often have stricter supplier rules.</p><h2>How to cancel or change</h2><ul><li>Send your request in writing by email, WhatsApp, Zalo or WeChat, quoting your booking code.</li><li>We reply with the confirmed cancellation or change and any amount refundable or payable.</li><li>Date or itinerary changes are subject to availability and supplier conditions.</li></ul><h2>Refund levels</h2><p>The refundable amount depends on how many days before departure you cancel and on the conditions stated in your written confirmation. Refunds are paid as described in our payment & refund policy.</p><h2>Airport fast-track</h2><ul><li>Prices do not include the government visa fee.</li><li>If guests do not fly or do not meet our staff at the name sign, a 100% surcharge applies unless the service was cancelled in advance.</li></ul><h2>Force majeure</h2><p>If weather (typhoons, closure of Halong Bay) or the authorities cancel a service, we offer an alternative or refund the unused part.</p>",
+      "zh": "<p>我们理解计划会有变化。每笔预订的取消条件均在付款前写明于确认单——游轮、机票与旺季酒店通常适用更严格的供应商规定。</p><h2>如何取消或变更</h2><ul><li>请通过邮件、WhatsApp、Zalo 或微信以书面形式提出，并注明预订编号。</li><li>我们将回复确认取消或变更结果，以及可退或需补的金额。</li><li>变更日期或行程视资源及供应商条件而定。</li></ul><h2>退款标准</h2><p>可退金额取决于您在出发前多少天取消，以及书面确认单中的条件。退款方式详见付款与退款政策。</p><h2>机场快速通关</h2><ul><li>价格不含政府签证费。</li><li>如旅客未搭乘航班或未与举牌人员会合，且未提前取消，将收取 100% 费用。</li></ul><h2>不可抗力</h2><p>如因天气（台风、下龙湾封航）或政府原因取消服务，我们将提供替代方案或退还未使用部分。</p>",
+      "vi": "<p>Chúng tôi hiểu rằng kế hoạch có thể thay đổi. Mỗi đặt chỗ có điều kiện hủy riêng, được ghi rõ trên xác nhận trước khi bạn thanh toán – du thuyền, vé máy bay và khách sạn mùa cao điểm thường có quy định nghiêm ngặt hơn từ nhà cung cấp.</p><h2>Cách hủy hoặc thay đổi</h2><ul><li>Gửi yêu cầu bằng văn bản qua email, WhatsApp, Zalo hoặc WeChat, kèm mã đặt chỗ của bạn.</li><li>Chúng tôi sẽ phản hồi xác nhận việc hủy hoặc thay đổi cùng số tiền được hoàn hoặc cần thanh toán thêm.</li><li>Việc thay đổi ngày hoặc lịch trình tùy thuộc vào tình trạng chỗ và điều kiện của nhà cung cấp.</li></ul><h2>Mức hoàn tiền</h2><p>Số tiền được hoàn phụ thuộc vào số ngày trước ngày khởi hành mà bạn hủy và các điều kiện ghi trên xác nhận bằng văn bản. Tiền hoàn được thanh toán theo chính sách thanh toán & hoàn tiền của chúng tôi.</p><h2>Fast-track sân bay</h2><ul><li>Giá chưa bao gồm lệ phí visa nộp cho cơ quan nhà nước.</li><li>Nếu khách không bay hoặc không gặp nhân viên của chúng tôi tại điểm cầm biển tên, phụ thu 100% sẽ được áp dụng trừ khi dịch vụ đã được hủy trước.</li></ul><h2>Bất khả kháng</h2><p>Nếu dịch vụ bị hủy do thời tiết (bão, đóng cửa Vịnh Hạ Long) hoặc theo yêu cầu của cơ quan chức năng, chúng tôi sẽ đề xuất phương án thay thế hoặc hoàn lại phần dịch vụ chưa sử dụng.</p>"
+    },
+    "image": "/images/tours/v2/halong-bay-5041966.jpg",
+    "data": {},
+    "isActive": true
+  },
+  {
+    "key": "terms",
+    "title": {
+      "en": "Terms of use",
+      "zh": "使用条款",
+      "vi": "Điều khoản sử dụng"
+    },
+    "subtitle": {
+      "en": "The conditions for using this website and booking services with Vietlook Travel.",
+      "zh": "使用本网站及向 Vietlook Travel 预订服务的条件。",
+      "vi": "Các điều kiện khi sử dụng website này và đặt dịch vụ với Vietlook Travel."
+    },
+    "body": {
+      "en": "<p>By using vietlooktravel.com or sending us a booking request you agree to the terms below. Please read them together with our payment, cancellation and privacy policies.</p><h2>Our services</h2><ul><li>Vietlook Travel and Trading Company Limited is a licensed Vietnamese tour operator providing tours, car hire with driver, visa support and airport fast-track services.</li><li>All prices are quoted in US dollars per person unless stated otherwise and are confirmed in writing before any payment.</li><li>Itineraries may be adjusted for weather, safety or local conditions; we always offer an equivalent alternative.</li></ul><h2>Bookings and travel documents</h2><ul><li>A booking is confirmed only after you receive our written confirmation and pay the deposit stated in it.</li><li>You are responsible for a valid passport (6 months validity), visas, travel insurance and health requirements.</li><li>Government visa fees are not included in our service fees unless clearly stated.</li></ul><h2>Website content</h2><ul><li>Texts, photos and videos on this website belong to Vietlook Travel or are used under free, royalty-free licences. They may not be reused without permission.</li><li>We do our best to keep information accurate but cannot guarantee that third-party details (flight times, opening hours) are always up to date.</li></ul><h2>Governing law</h2><p>These terms are governed by the laws of Vietnam. Any dispute will first be resolved by friendly negotiation with our customer-care team.</p>",
+      "zh": "<p>使用 vietlooktravel.com 或向我们提交预订需求，即表示您同意以下条款。请结合我们的付款、取消与隐私政策一并阅读。</p><h2>我们的服务</h2><ul><li>Vietlook Travel and Trading Company Limited 是持牌越南旅行社，提供旅游线路、含司机包车、签证协助及机场快速通关服务。</li><li>除另有说明外，所有价格均以美元按人报价，并在付款前以书面形式确认。</li><li>行程可能因天气、安全或当地情况调整；我们始终提供同等替代方案。</li></ul><h2>预订与旅行证件</h2><ul><li>仅在您收到我们的书面确认并支付其中注明的定金后，预订方才生效。</li><li>您需自行确保护照有效（6 个月以上）、签证、旅行保险及健康要求。</li><li>除明确说明外，我们的服务费不含政府签证费。</li></ul><h2>网站内容</h2><ul><li>本网站的文字、照片和视频归 Vietlook Travel 所有或依据免版税的免费许可使用。未经许可不得转载。</li><li>我们尽力保证信息准确，但无法保证第三方信息（航班时间、营业时间）始终最新。</li></ul><h2>适用法律</h2><p>本条款受越南法律管辖。任何争议将首先通过与客服团队友好协商解决。</p>",
+      "vi": "<p>Khi sử dụng vietlooktravel.com hoặc gửi yêu cầu đặt dịch vụ cho chúng tôi, bạn đồng ý với các điều khoản dưới đây. Vui lòng đọc kèm các chính sách thanh toán, hủy và bảo mật của chúng tôi.</p><h2>Dịch vụ của chúng tôi</h2><ul><li>Vietlook Travel and Trading Company Limited là công ty lữ hành Việt Nam được cấp phép, cung cấp tour du lịch, thuê xe riêng kèm tài xế, hỗ trợ visa và dịch vụ fast-track sân bay.</li><li>Trừ khi có ghi chú khác, mọi mức giá được báo bằng đô la Mỹ cho mỗi khách và được xác nhận bằng văn bản trước khi thanh toán.</li><li>Lịch trình có thể được điều chỉnh do thời tiết, an toàn hoặc điều kiện địa phương; chúng tôi luôn đề xuất phương án thay thế tương đương.</li></ul><h2>Đặt chỗ và giấy tờ du lịch</h2><ul><li>Đặt chỗ chỉ được xác nhận sau khi bạn nhận được xác nhận bằng văn bản của chúng tôi và thanh toán khoản đặt cọc ghi trong đó.</li><li>Bạn chịu trách nhiệm về hộ chiếu còn hiệu lực (tối thiểu 6 tháng), visa, bảo hiểm du lịch và các yêu cầu về sức khỏe.</li><li>Lệ phí visa nộp cho cơ quan nhà nước không bao gồm trong phí dịch vụ của chúng tôi, trừ khi được ghi rõ.</li></ul><h2>Nội dung website</h2><ul><li>Văn bản, hình ảnh và video trên website này thuộc sở hữu của Vietlook Travel hoặc được sử dụng theo giấy phép miễn phí bản quyền. Không được sử dụng lại khi chưa có sự cho phép.</li><li>Chúng tôi cố gắng đảm bảo thông tin chính xác nhưng không thể cam kết thông tin của bên thứ ba (giờ bay, giờ mở cửa) luôn được cập nhật.</li></ul><h2>Luật áp dụng</h2><p>Các điều khoản này chịu sự điều chỉnh của pháp luật Việt Nam. Mọi tranh chấp trước hết sẽ được giải quyết bằng thương lượng thiện chí với bộ phận chăm sóc khách hàng của chúng tôi.</p>"
+    },
+    "image": "/images/tours/v2/hoi-an-92090.jpg",
+    "data": {},
+    "isActive": true
+  },
+  {
+    "key": "privacy",
+    "title": {
+      "en": "Privacy policy",
+      "zh": "隐私政策",
+      "vi": "Chính sách bảo mật"
+    },
+    "subtitle": {
+      "en": "What personal data we collect, how we use it to arrange your trip and how we keep it safe.",
+      "zh": "我们收集哪些个人信息、如何用于安排您的行程，以及如何保障信息安全。",
+      "vi": "Chúng tôi thu thập những dữ liệu cá nhân nào, sử dụng chúng để sắp xếp chuyến đi của bạn ra sao và bảo vệ chúng như thế nào."
+    },
+    "body": {
+      "en": "<p>Vietlook Travel respects your privacy. This policy explains what we collect and how we use it.</p><h2>Information we collect</h2><ul><li>Contact details you send via our forms: name, email, phone/WhatsApp/WeChat, nationality.</li><li>Trip details: dates, number of travellers, children's ages, flight numbers and special requests.</li><li>Passport details only when needed for visas, flights, cruises or hotel registration.</li></ul><h2>How we use it</h2><p>Only to answer your enquiry, arrange and operate your services, and send booking confirmations. We share necessary details with hotels, cruises, airlines and immigration services that deliver your trip – never for marketing by third parties.</p><h2>Security & retention</h2><p>Requests are stored in our protected management system and kept only as long as needed for your booking and legal obligations.</p><h2>Your rights</h2><p>Email us at any time to access, correct or delete your personal data.</p>",
+      "zh": "<p>Vietlook Travel 尊重您的隐私。本政策说明我们收集哪些信息以及如何使用。</p><h2>我们收集的信息</h2><ul><li>您通过表单提交的联系方式：姓名、邮箱、电话/WhatsApp/微信、国籍。</li><li>行程信息：日期、人数、儿童年龄、航班号与特殊要求。</li><li>仅在办理签证、机票、游轮或酒店登记时需要护照信息。</li></ul><h2>信息用途</h2><p>仅用于回复您的咨询、安排与执行服务、发送预订确认。我们只向提供服务的酒店、游轮、航空公司与出入境服务方提供必要信息——绝不用于第三方营销。</p><h2>安全与保存</h2><p>需求信息保存在受保护的管理系统中，仅在预订及法律义务所需期间保留。</p><h2>您的权利</h2><p>您可随时发邮件要求查询、更正或删除个人数据。</p>",
+      "vi": "<p>Vietlook Travel tôn trọng quyền riêng tư của bạn. Chính sách này giải thích những thông tin chúng tôi thu thập và cách chúng tôi sử dụng.</p><h2>Thông tin chúng tôi thu thập</h2><ul><li>Thông tin liên hệ bạn gửi qua biểu mẫu: họ tên, email, điện thoại/WhatsApp/WeChat, quốc tịch.</li><li>Thông tin chuyến đi: ngày đi, số lượng khách, độ tuổi trẻ em, số hiệu chuyến bay và yêu cầu đặc biệt.</li><li>Thông tin hộ chiếu chỉ khi cần thiết cho visa, vé máy bay, du thuyền hoặc đăng ký khách sạn.</li></ul><h2>Cách chúng tôi sử dụng</h2><p>Chỉ để trả lời yêu cầu của bạn, sắp xếp và thực hiện dịch vụ, cũng như gửi xác nhận đặt chỗ. Chúng tôi chỉ chia sẻ những thông tin cần thiết với khách sạn, du thuyền, hãng hàng không và đơn vị xuất nhập cảnh trực tiếp phục vụ chuyến đi – không bao giờ cho mục đích tiếp thị của bên thứ ba.</p><h2>Bảo mật & lưu trữ</h2><p>Yêu cầu được lưu trong hệ thống quản lý được bảo vệ và chỉ lưu giữ trong thời gian cần thiết cho việc đặt chỗ và các nghĩa vụ pháp lý.</p><h2>Quyền của bạn</h2><p>Bạn có thể gửi email cho chúng tôi bất cứ lúc nào để truy cập, chỉnh sửa hoặc xóa dữ liệu cá nhân.</p>"
+    },
+    "image": "/images/tours/v2/hanoi-32123175.jpg",
+    "data": {},
+    "isActive": true
+  }
+]

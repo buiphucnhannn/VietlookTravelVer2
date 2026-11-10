@@ -1,0 +1,86 @@
+[
+  {
+    "key": "hanoi",
+    "name": {
+      "en": "Hanoi",
+      "zh": "河内",
+      "vi": "Hà Nội"
+    },
+    "airport": "Noi Bai (HAN)",
+    "image": "/images/tours/v2/hanoi-17177476.jpg",
+    "order": 0,
+    "isActive": true
+  },
+  {
+    "key": "da-nang",
+    "name": {
+      "en": "Da Nang",
+      "zh": "岘港",
+      "vi": "Đà Nẵng"
+    },
+    "airport": "Da Nang (DAD)",
+    "image": "/images/tours/v2/da-nang-15747058.jpg",
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "key": "nha-trang",
+    "name": {
+      "en": "Nha Trang",
+      "zh": "芽庄",
+      "vi": "Nha Trang"
+    },
+    "airport": "Cam Ranh (CXR)",
+    "image": "/images/tours/hd/nha-trang-da-lat-mui-ne-ho-chi-minh-city.jpg",
+    "order": 2,
+    "isActive": true
+  },
+  {
+    "key": "dalat",
+    "name": {
+      "en": "Dalat",
+      "zh": "大叻",
+      "vi": "Đà Lạt"
+    },
+    "airport": "Lien Khuong (DLI)",
+    "image": "/images/tours/v2/dalat-31017723.jpg",
+    "order": 3,
+    "isActive": true
+  },
+  {
+    "key": "mui-ne",
+    "name": {
+      "en": "Mui Ne",
+      "zh": "美奈",
+      "vi": "Mũi Né"
+    },
+    "airport": "Phan Thiet",
+    "image": "/images/tours/v2/mui-ne-31412412.jpg",
+    "order": 4,
+    "isActive": true
+  },
+  {
+    "key": "ho-chi-minh-city",
+    "name": {
+      "en": "Ho Chi Minh City",
+      "zh": "胡志明市",
+      "vi": "TP. Hồ Chí Minh"
+    },
+    "airport": "Tan Son Nhat (SGN)",
+    "image": "/images/tours/v2/ho-chi-minh-city-18883378.jpg",
+    "order": 5,
+    "isActive": true
+  },
+  {
+    "key": "phu-quoc",
+    "name": {
+      "en": "Phu Quoc",
+      "zh": "富国岛",
+      "vi": "Phú Quốc"
+    },
+    "airport": "Phu Quoc (PQC)",
+    "image": "/images/tours/v2/phu-quoc-c250.jpg",
+    "order": 6,
+    "isActive": true
+  }
+]

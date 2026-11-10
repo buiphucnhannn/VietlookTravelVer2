@@ -1,0 +1,104 @@
+[
+  {
+    "slug": "destinations",
+    "name": {
+      "en": "Destinations",
+      "zh": "目的地攻略",
+      "vi": "Điểm đến"
+    },
+    "description": {
+      "en": "In-depth guides to Vietnam's regions, cities and hidden corners.",
+      "zh": "越南各地区、城市与小众角落的深度攻略。",
+      "vi": "Cẩm nang chuyên sâu về các vùng miền, thành phố và những góc khuất ít người biết của Việt Nam."
+    },
+    "group": "",
+    "icon": "",
+    "order": 0,
+    "isActive": true
+  },
+  {
+    "slug": "need-to-know",
+    "name": {
+      "en": "Need to know",
+      "zh": "出行须知",
+      "vi": "Cần biết trước chuyến đi"
+    },
+    "description": {
+      "en": "Visa, money, SIM cards, safety and practical tips before you go.",
+      "zh": "签证、货币、电话卡、安全与出发前的实用贴士。",
+      "vi": "Visa, tiền tệ, SIM điện thoại, an toàn và mẹo thực tế trước khi lên đường."
+    },
+    "group": "",
+    "icon": "",
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "slug": "vietnam-by-month",
+    "name": {
+      "en": "Vietnam by month",
+      "zh": "越南月份指南",
+      "vi": "Việt Nam theo tháng"
+    },
+    "description": {
+      "en": "Weather, festivals and where to go in every month of the year.",
+      "zh": "全年每个月的天气、节庆与推荐目的地。",
+      "vi": "Thời tiết, lễ hội và nên đi đâu trong từng tháng của năm."
+    },
+    "group": "",
+    "icon": "",
+    "order": 2,
+    "isActive": true
+  },
+  {
+    "slug": "getting-around",
+    "name": {
+      "en": "Getting around",
+      "zh": "交通出行",
+      "vi": "Di chuyển"
+    },
+    "description": {
+      "en": "Flights, trains, buses, private cars and the best routes between destinations.",
+      "zh": "航班、火车、巴士、包车与目的地之间的最佳路线。",
+      "vi": "Máy bay, tàu hỏa, xe khách, xe riêng và những tuyến đường tốt nhất giữa các điểm đến."
+    },
+    "group": "",
+    "icon": "",
+    "order": 3,
+    "isActive": true
+  },
+  {
+    "slug": "food-culture",
+    "name": {
+      "en": "Food & culture",
+      "zh": "美食与文化",
+      "vi": "Ẩm thực & văn hóa"
+    },
+    "description": {
+      "en": "Vietnamese cuisine, traditions, festivals and local etiquette.",
+      "zh": "越南美食、传统、节庆与当地礼仪。",
+      "vi": "Ẩm thực Việt Nam, truyền thống, lễ hội và phép lịch sự địa phương."
+    },
+    "group": "",
+    "icon": "",
+    "order": 4,
+    "isActive": true
+  },
+  {
+    "slug": "travel-news",
+    "name": {
+      "en": "Travel news",
+      "zh": "旅游资讯",
+      "vi": "Tin du lịch"
+    },
+    "description": {
+      "en": "Latest Vietnam travel updates, new tours and company news from the Vietlook Travel team in Hanoi.",
+      "zh": "来自河内 Vietlook Travel 团队的越南旅游最新资讯、新线路与公司动态。",
+      "vi": "Cập nhật du lịch Việt Nam mới nhất, tour mới và tin tức công ty từ đội ngũ Vietlook Travel tại Hà Nội."
+    },
+    "group": "",
+    "icon": "",
+    "order": 5,
+    "isActive": true
+  }
+]

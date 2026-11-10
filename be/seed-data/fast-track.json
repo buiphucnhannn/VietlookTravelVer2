@@ -1,0 +1,377 @@
+[
+  {
+    "key": "arr-fast-track",
+    "group": "arrival",
+    "name": {
+      "en": "Arrival Fast-track",
+      "zh": "入境快速通关",
+      "vi": "Fast-track nhập cảnh"
+    },
+    "desc": {
+      "en": "Meet & greet, then escort to the priority immigration lane (lane 4).",
+      "zh": "接机迎接，并陪同前往优先入境通道（4号通道）。",
+      "vi": "Đón khách và dẫn tới làn nhập cảnh ưu tiên (làn số 4)."
+    },
+    "prices": {
+      "SGN": 15,
+      "HAN": 10,
+      "DAD": 8,
+      "CXR": 13,
+      "PQC": 14
+    },
+    "popular": true,
+    "vip": false,
+    "order": 0,
+    "isActive": true
+  },
+  {
+    "key": "arr-diplomatic",
+    "group": "arrival",
+    "name": {
+      "en": "Fast-track – Diplomatic lane",
+      "zh": "快速通关 – 外交通道",
+      "vi": "Fast-track – Làn ngoại giao"
+    },
+    "desc": {
+      "en": "Meet & greet, then escort to the diplomatic immigration lane.",
+      "zh": "接机迎接，并陪同前往外交入境通道。",
+      "vi": "Đón khách và dẫn tới làn nhập cảnh ngoại giao."
+    },
+    "prices": {
+      "SGN": 42,
+      "HAN": 17,
+      "DAD": 17,
+      "CXR": 19,
+      "PQC": 22
+    },
+    "popular": false,
+    "vip": false,
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "key": "arr-vip",
+    "group": "arrival",
+    "name": {
+      "en": "Fast-track – VIP lane",
+      "zh": "快速通关 – VIP 通道",
+      "vi": "Fast-track – Làn VIP"
+    },
+    "desc": {
+      "en": "Meet & greet, then escort through the priority lane with no queuing.",
+      "zh": "接机迎接，陪同走优先通道，无需排队。",
+      "vi": "Đón khách và dẫn qua làn ưu tiên, không phải xếp hàng."
+    },
+    "prices": {
+      "SGN": 57,
+      "HAN": 27,
+      "DAD": 27,
+      "CXR": 32,
+      "PQC": 27
+    },
+    "popular": false,
+    "vip": true,
+    "order": 2,
+    "isActive": true
+  },
+  {
+    "key": "arr-voa",
+    "group": "arrival",
+    "name": {
+      "en": "Visa on arrival + Fast-track",
+      "zh": "落地签 + 快速通关",
+      "vi": "Visa tại cửa khẩu + Fast-track"
+    },
+    "desc": {
+      "en": "Fast visa-on-arrival stamping, then escort to the priority immigration lane (lane 4).",
+      "zh": "快速办理落地签盖章，并陪同前往优先入境通道（4号通道）。",
+      "vi": "Dán visa tại cửa khẩu nhanh, sau đó dẫn tới làn nhập cảnh ưu tiên (làn số 4)."
+    },
+    "prices": {
+      "SGN": 20,
+      "HAN": 10,
+      "DAD": 8,
+      "CXR": 13,
+      "PQC": 14
+    },
+    "popular": false,
+    "vip": false,
+    "order": 3,
+    "isActive": true
+  },
+  {
+    "key": "arr-voa-diplomatic",
+    "group": "arrival",
+    "name": {
+      "en": "Visa on arrival + Diplomatic lane",
+      "zh": "落地签 + 外交通道",
+      "vi": "Visa tại cửa khẩu + Làn ngoại giao"
+    },
+    "desc": {
+      "en": "Fast visa-on-arrival stamping, then escort to the diplomatic immigration lane.",
+      "zh": "快速办理落地签盖章，并陪同前往外交入境通道。",
+      "vi": "Dán visa tại cửa khẩu nhanh, sau đó dẫn tới làn nhập cảnh ngoại giao."
+    },
+    "prices": {
+      "SGN": 47,
+      "HAN": 17,
+      "DAD": 17,
+      "CXR": 19,
+      "PQC": 22
+    },
+    "popular": false,
+    "vip": false,
+    "order": 4,
+    "isActive": true
+  },
+  {
+    "key": "arr-voa-vip",
+    "group": "arrival",
+    "name": {
+      "en": "Visa on arrival + VIP lane",
+      "zh": "落地签 + VIP 通道",
+      "vi": "Visa tại cửa khẩu + Làn VIP"
+    },
+    "desc": {
+      "en": "Fast visa-on-arrival stamping, then the no-queue VIP immigration lane.",
+      "zh": "快速办理落地签盖章，随后走免排队 VIP 入境通道。",
+      "vi": "Dán visa tại cửa khẩu nhanh, sau đó qua làn nhập cảnh VIP không xếp hàng."
+    },
+    "prices": {
+      "SGN": 62,
+      "HAN": 27,
+      "DAD": 27,
+      "CXR": 32,
+      "PQC": 27
+    },
+    "popular": false,
+    "vip": true,
+    "order": 5,
+    "isActive": true
+  },
+  {
+    "key": "arr-voa-only",
+    "group": "arrival",
+    "name": {
+      "en": "Visa on arrival only (no priority lane)",
+      "zh": "仅落地签（不含优先通道）",
+      "vi": "Chỉ visa tại cửa khẩu (không gồm làn ưu tiên)"
+    },
+    "desc": {
+      "en": "Meet & greet and visa stamping; guests then pass immigration in the regular lane.",
+      "zh": "接机并办理落地签，旅客随后经普通通道入境。",
+      "vi": "Đón khách và dán visa; sau đó khách làm thủ tục nhập cảnh tại làn thông thường."
+    },
+    "prices": {
+      "SGN": 14,
+      "HAN": null,
+      "DAD": null,
+      "CXR": null,
+      "PQC": null
+    },
+    "popular": false,
+    "vip": false,
+    "order": 6,
+    "isActive": true
+  },
+  {
+    "key": "dep-priority",
+    "group": "departure",
+    "name": {
+      "en": "Departure Fast-track",
+      "zh": "离境快速通关",
+      "vi": "Fast-track xuất cảnh"
+    },
+    "desc": {
+      "en": "Meet at the airport, then escort to the priority emigration lane (lane 4).",
+      "zh": "机场会合，并陪同前往优先出境通道（4号通道）。",
+      "vi": "Gặp khách tại sân bay và dẫn tới làn xuất cảnh ưu tiên (làn số 4)."
+    },
+    "prices": {
+      "SGN": 19,
+      "HAN": 12,
+      "DAD": 12,
+      "CXR": 22,
+      "PQC": 22
+    },
+    "popular": true,
+    "vip": false,
+    "order": 0,
+    "isActive": true
+  },
+  {
+    "key": "dep-priority-security",
+    "group": "departure",
+    "name": {
+      "en": "Departure Fast-track + Security screening",
+      "zh": "离境快速通关 + 优先安检",
+      "vi": "Fast-track xuất cảnh + Soi chiếu an ninh"
+    },
+    "desc": {
+      "en": "Priority emigration lane plus priority security screening.",
+      "zh": "优先出境通道并享优先安检。",
+      "vi": "Làn xuất cảnh ưu tiên kèm soi chiếu an ninh ưu tiên."
+    },
+    "prices": {
+      "SGN": 25,
+      "HAN": 22,
+      "DAD": 22,
+      "CXR": 25,
+      "PQC": null
+    },
+    "popular": false,
+    "vip": false,
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "key": "dep-checkin",
+    "group": "departure",
+    "name": {
+      "en": "Priority check-in (add-on)",
+      "zh": "优先值机（附加服务）",
+      "vi": "Check-in ưu tiên (dịch vụ thêm)"
+    },
+    "desc": {
+      "en": "Check-in at a dedicated counter without queuing. At CXR only for flights to Russia.",
+      "zh": "专属柜台免排队值机。金兰机场（CXR）仅限飞往俄罗斯的航班。",
+      "vi": "Làm thủ tục tại quầy riêng, không xếp hàng. Tại sân bay Cam Ranh (CXR) chỉ áp dụng cho chuyến bay đi Nga."
+    },
+    "prices": {
+      "SGN": null,
+      "HAN": 17,
+      "DAD": 17,
+      "CXR": 15,
+      "PQC": null
+    },
+    "popular": false,
+    "vip": false,
+    "order": 2,
+    "isActive": true
+  },
+  {
+    "key": "dep-vip",
+    "group": "departure",
+    "name": {
+      "en": "Departure VIP lane",
+      "zh": "离境 VIP 通道",
+      "vi": "Làn VIP xuất cảnh"
+    },
+    "desc": {
+      "en": "Meet at the airport and pass emigration with no queuing.",
+      "zh": "机场会合，免排队办理出境。",
+      "vi": "Gặp khách tại sân bay và làm thủ tục xuất cảnh không xếp hàng."
+    },
+    "prices": {
+      "SGN": 62,
+      "HAN": 32,
+      "DAD": 32,
+      "CXR": null,
+      "PQC": null
+    },
+    "popular": false,
+    "vip": true,
+    "order": 3,
+    "isActive": true
+  },
+  {
+    "key": "dep-vip-security",
+    "group": "departure",
+    "name": {
+      "en": "Departure VIP lane + Security screening",
+      "zh": "离境 VIP 通道 + 优先安检",
+      "vi": "Làn VIP xuất cảnh + Soi chiếu an ninh"
+    },
+    "desc": {
+      "en": "No-queue emigration lane plus priority security screening.",
+      "zh": "免排队出境通道并享优先安检。",
+      "vi": "Làn xuất cảnh không xếp hàng kèm soi chiếu an ninh ưu tiên."
+    },
+    "prices": {
+      "SGN": 70,
+      "HAN": 42,
+      "DAD": 42,
+      "CXR": null,
+      "PQC": null
+    },
+    "popular": false,
+    "vip": true,
+    "order": 4,
+    "isActive": true
+  },
+  {
+    "key": "add-night",
+    "group": "addon",
+    "name": {
+      "en": "Night surcharge (23:00 – 06:00)",
+      "zh": "夜间附加费（23:00–06:00）",
+      "vi": "Phụ phí ban đêm (23:00 – 06:00)"
+    },
+    "desc": {
+      "en": "For flights arriving or departing between 23:00 and 06:00. Charged in USD.",
+      "zh": "适用于 23:00–06:00 抵达或起飞的航班，按美元计费。",
+      "vi": "Áp dụng cho chuyến bay đến hoặc khởi hành từ 23:00 đến 06:00. Tính bằng USD."
+    },
+    "prices": {
+      "SGN": 6,
+      "HAN": 6,
+      "DAD": 6,
+      "CXR": 5,
+      "PQC": 5
+    },
+    "popular": false,
+    "vip": false,
+    "order": 0,
+    "isActive": true
+  },
+  {
+    "key": "add-porter",
+    "group": "addon",
+    "name": {
+      "en": "Porter service",
+      "zh": "行李员服务",
+      "vi": "Dịch vụ khuân vác hành lý"
+    },
+    "desc": {
+      "en": "Luggage assistance inside the terminal.",
+      "zh": "航站楼内协助搬运行李。",
+      "vi": "Hỗ trợ hành lý bên trong nhà ga."
+    },
+    "prices": {
+      "SGN": 6,
+      "HAN": 6,
+      "DAD": 6,
+      "CXR": null,
+      "PQC": null
+    },
+    "popular": false,
+    "vip": false,
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "key": "add-porter-plus",
+    "group": "addon",
+    "name": {
+      "en": "Porter + Security screening + Escort out",
+      "zh": "行李员 + 安检协助 + 送出航站楼",
+      "vi": "Khuân vác + Soi chiếu an ninh + Tiễn ra ngoài"
+    },
+    "desc": {
+      "en": "Luggage assistance, help through screening and escort out of the terminal.",
+      "zh": "协助搬运行李、通过安检并陪同走出航站楼。",
+      "vi": "Hỗ trợ hành lý, qua soi chiếu an ninh và dẫn khách ra khỏi nhà ga."
+    },
+    "prices": {
+      "SGN": 12,
+      "HAN": 12,
+      "DAD": 12,
+      "CXR": null,
+      "PQC": null
+    },
+    "popular": false,
+    "vip": false,
+    "order": 2,
+    "isActive": true
+  }
+]

@@ -1,0 +1,122 @@
+[
+  {
+    "key": "evisa-single",
+    "name": {
+      "en": "E-visa – single entry",
+      "zh": "电子签证 – 单次入境",
+      "vi": "E-visa – nhập cảnh một lần"
+    },
+    "stay": {
+      "en": "Up to 90 days",
+      "zh": "最长90天",
+      "vi": "Tối đa 90 ngày"
+    },
+    "processing": {
+      "en": "3–5 working days",
+      "zh": "3–5个工作日",
+      "vi": "3–5 ngày làm việc"
+    },
+    "fee": {
+      "en": "Gov. fee $25 · service fee on request",
+      "zh": "政府费25美元 · 服务费请咨询",
+      "vi": "Phí chính phủ $25 · phí dịch vụ vui lòng liên hệ"
+    },
+    "note": {
+      "en": "For all nationalities. Apply online, enter at any international border gate.",
+      "zh": "适用所有国籍，在线申请，可从任一国际口岸入境。",
+      "vi": "Áp dụng cho mọi quốc tịch. Nộp hồ sơ trực tuyến, nhập cảnh qua bất kỳ cửa khẩu quốc tế nào."
+    },
+    "order": 0,
+    "isActive": true
+  },
+  {
+    "key": "evisa-multiple",
+    "name": {
+      "en": "E-visa – multiple entry",
+      "zh": "电子签证 – 多次入境",
+      "vi": "E-visa – nhập cảnh nhiều lần"
+    },
+    "stay": {
+      "en": "Up to 90 days",
+      "zh": "最长90天",
+      "vi": "Tối đa 90 ngày"
+    },
+    "processing": {
+      "en": "3–5 working days",
+      "zh": "3–5个工作日",
+      "vi": "3–5 ngày làm việc"
+    },
+    "fee": {
+      "en": "Gov. fee $50 · service fee on request",
+      "zh": "政府费50美元 · 服务费请咨询",
+      "vi": "Phí chính phủ $50 · phí dịch vụ vui lòng liên hệ"
+    },
+    "note": {
+      "en": "Ideal for trips combining Vietnam with Cambodia or Laos.",
+      "zh": "适合越南与柬埔寨、老挝联游。",
+      "vi": "Phù hợp cho hành trình kết hợp Việt Nam với Campuchia hoặc Lào."
+    },
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "key": "urgent",
+    "name": {
+      "en": "Urgent e-visa",
+      "zh": "加急电子签证",
+      "vi": "E-visa khẩn"
+    },
+    "stay": {
+      "en": "Up to 90 days",
+      "zh": "最长90天",
+      "vi": "Tối đa 90 ngày"
+    },
+    "processing": {
+      "en": "Faster than standard – ask us",
+      "zh": "加急办理，请咨询",
+      "vi": "Nhanh hơn thông thường – vui lòng liên hệ"
+    },
+    "fee": {
+      "en": "Gov. fee · urgent fee on request",
+      "zh": "政府费 · 加急费请咨询",
+      "vi": "Phí chính phủ · phí khẩn vui lòng liên hệ"
+    },
+    "note": {
+      "en": "When your flight is very soon – we follow up with immigration for you.",
+      "zh": "航班临近时使用——我们为您跟进出入境审批。",
+      "vi": "Dành cho khi chuyến bay đã cận ngày – chúng tôi theo dõi hồ sơ với cơ quan xuất nhập cảnh thay bạn."
+    },
+    "order": 2,
+    "isActive": true
+  },
+  {
+    "key": "exemption",
+    "name": {
+      "en": "Visa exemption check",
+      "zh": "免签资格核查",
+      "vi": "Kiểm tra miễn thị thực"
+    },
+    "stay": {
+      "en": "14–45 days (by nationality)",
+      "zh": "14–45天（视国籍）",
+      "vi": "14–45 ngày (tùy quốc tịch)"
+    },
+    "processing": {
+      "en": "Same day advice",
+      "zh": "当天答复",
+      "vi": "Tư vấn trong ngày"
+    },
+    "fee": {
+      "en": "Free advice",
+      "zh": "免费咨询",
+      "vi": "Tư vấn miễn phí"
+    },
+    "note": {
+      "en": "We confirm whether your passport is visa-free and how long you may stay.",
+      "zh": "我们为您确认护照是否免签及可停留天数。",
+      "vi": "Chúng tôi xác nhận hộ chiếu của bạn có được miễn thị thực không và được lưu trú bao lâu."
+    },
+    "order": 3,
+    "isActive": true
+  }
+]

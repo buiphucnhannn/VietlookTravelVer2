@@ -1,0 +1,50 @@
+# =============================================================================
+# fe/ — Next.js website (quy tắc chung xem ../.gitignore)
+# =============================================================================
+
+# ----- Dependencies -----
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ----- Next.js -----
+/.next/
+/.next-*/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# ----- Biến môi trường -----
+# Commit .env.example (mẫu), KHÔNG commit .env.local / .env.production (chứa key thật)
+.env
+.env.*
+!.env.example
+
+# ----- Vercel -----
+.vercel
+
+# ----- Test -----
+/coverage
+/test-results
+/playwright-report
+
+# ----- Debug / logs -----
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# ----- Bí mật / chứng chỉ -----
+*.pem
+*.key
+
+# ----- Misc -----
+.DS_Store
+Thumbs.db

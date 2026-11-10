@@ -1,0 +1,135 @@
+import { auditService } from "../services/audit.service.js";
+import { enquiryService } from "../services/enquiry.service.js";
+import { pageService } from "../services/modules.service.js";
+import { publicService } from "../services/public.service.js";
+import { settingsService } from "../services/settings.service.js";
+import { noContent, ok } from "../utils/response.js";
+
+/** Dữ liệu công khai cho website */
+export const publicController = {
+  tours: async (_req, res) => ok(res, await publicService.tours()),
+  tour: async (req, res) => ok(res, await publicService.tour(req.validated.params.slug)),
+  destinations: async (_req, res) => ok(res, await publicService.destinations()),
+  themes: async (_req, res) => ok(res, await publicService.themes()),
+  articles: async (_req, res) => ok(res, await publicService.articles()),
+  article: async (req, res) => ok(res, await publicService.article(req.validated.params.slug)),
+  taxonomy: async (_req, res) => ok(res, await publicService.taxonomy()),
+  services: async (_req, res) => ok(res, await publicService.services()),
+  pages: async (_req, res) => ok(res, await publicService.pages()),
+  home: async (_req, res) => ok(res, await publicService.home()),
+  slugs: async (_req, res) => ok(res, await publicService.slugs()),
+  site: async (_req, res) => ok(res, { tracking: await settingsService.getTracking() }),
+
+  /** Khách gửi form (đặt tour, thiết kế tour, xe, visa, liên hệ, đối tác) */
+  async submitEnquiry(req, res) {
+    const data = req.validated.body;
+    // Honeypot: bot điền ô ẩn → giả vờ thành công, không lưu
+    if (data.honeypot) return ok(res, { code: "VL-RQ000000-0000" });
+    const result = await enquiryService.createPublic(data, {
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+    req.log?.info(
+      { event: "enquiry.create", code: result.code, type: data.type },
+      `[enquiry] ${result.code}`,
+    );
+    res.status(201).json({ success: true, data: result });
+  },
+};
+
+/** Đơn đặt tour + yêu cầu từ form (CMS) */
+export const enquiryController = {
+  async list(req, res) {
+    const { items, meta } = await enquiryService.list(req.validated.query);
+    ok(res, items, meta);
+  },
+  stats: async (_req, res) => ok(res, await enquiryService.stats()),
+  get: async (req, res) => ok(res, await enquiryService.get(req.validated.params.id)),
+  byCode: async (req, res) => ok(res, await enquiryService.findByCode(req.validated.params.code)),
+
+  async update(req, res) {
+    const doc = await enquiryService.update(req.validated.params.id, req.validated.body);
+    auditService.record(req, "enquiry.update", {
+      target: { type: "enquiry", id: doc.code },
+      meta: req.validated.body,
+    });
+    ok(res, doc);
+  },
+
+  async addNote(req, res) {
+    const doc = await enquiryService.addNote(
+      req.validated.params.id,
+      req.validated.body.text,
+      req.user,
+    );
+    auditService.record(req, "enquiry.note", { target: { type: "enquiry", id: doc.code } });
+    ok(res, doc);
+  },
+
+  async removeNote(req, res) {
+    const { id, noteId } = req.validated.params;
+    ok(res, await enquiryService.removeNote(id, noteId));
+  },
+
+  async resendEmail(req, res) {
+    const status = await enquiryService.resendEmail(req.validated.params.id);
+    auditService.record(req, "enquiry.resend_email", {
+      target: { type: "enquiry", id: req.validated.params.id },
+    });
+    ok(res, status);
+  },
+
+  async remove(req, res) {
+    const doc = await enquiryService.remove(req.validated.params.id);
+    auditService.record(req, "enquiry.delete", { target: { type: "enquiry", id: doc.code } });
+    noContent(res);
+  },
+};
+
+/** Trang chủ, trang nội dung, cài đặt (CMS) */
+export const settingsController = {
+  getHome: async (_req, res) => ok(res, await settingsService.getHome()),
+  async saveHome(req, res) {
+    const data = await settingsService.saveHome(req.validated.body, req.user);
+    auditService.record(req, "settings.home");
+    ok(res, data);
+  },
+
+  pages: async (_req, res) => ok(res, await pageService.list()),
+  page: async (req, res) => ok(res, await pageService.get(req.validated.params.key)),
+  async savePage(req, res) {
+    const { key } = req.validated.params;
+    const data = await pageService.save(key, req.validated.body);
+    auditService.record(req, "page.update", { target: { type: "page", id: key } });
+    ok(res, data);
+  },
+
+  getNotifications: async (_req, res) => ok(res, await settingsService.getNotifications()),
+  async saveNotifications(req, res) {
+    const data = await settingsService.saveNotifications(req.validated.body, req.user);
+    auditService.record(req, "settings.notifications", { meta: { count: data.recipients.length } });
+    ok(res, data);
+  },
+  async testEmail(req, res) {
+    const r = await enquiryService.sendTest();
+    auditService.record(req, "settings.test_email");
+    ok(res, r);
+  },
+
+  getTracking: async (_req, res) => ok(res, await settingsService.getTracking()),
+  async saveTracking(req, res) {
+    const data = await settingsService.saveTracking(req.validated.body, req.user);
+    auditService.record(req, "settings.tracking");
+    ok(res, data);
+  },
+
+  getPayment: async (_req, res) => ok(res, await settingsService.getPayment()),
+  async savePayment(req, res) {
+    const data = await settingsService.savePayment(req.validated.body, req.user);
+    // không ghi key vào nhật ký
+    auditService.record(req, "settings.payment", {
+      meta: { enabled: data.enabled, environment: data.environment },
+    });
+    ok(res, data);
+  },
+};

@@ -1,0 +1,17 @@
+# Chuẩn hoá xuống dòng LF trong repo (máy Windows vẫn checkout được bình thường)
+* text=auto eol=lf
+
+# File nhị phân — không đụng tới
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.gif binary
+*.ico binary
+*.mp4 binary
+*.webm binary
+*.pdf binary
+*.docx binary
+*.woff binary
+*.woff2 binary

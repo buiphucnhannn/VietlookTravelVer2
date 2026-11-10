@@ -1,0 +1,178 @@
+[
+  {
+    "slug": "luxury",
+    "name": {
+      "en": "Luxury",
+      "zh": "奢华之旅",
+      "vi": "Cao cấp"
+    },
+    "tagline": {
+      "en": "5-star stays, private guides",
+      "zh": "五星住宿 · 私人导游",
+      "vi": "Lưu trú 5 sao, hướng dẫn viên riêng"
+    },
+    "intro": {
+      "en": "Boutique cruises, five-star resorts, private transfers and dedicated guides. Our luxury journeys take care of every detail so you simply enjoy Vietnam at its finest.",
+      "zh": "精品游轮、五星度假村、专车接送与专属导游——每一个细节都为您安排妥当，尽享越南最美的一面。",
+      "vi": "Du thuyền boutique, khu nghỉ dưỡng 5 sao, xe đưa đón riêng và hướng dẫn viên tận tâm. Hành trình cao cấp của chúng tôi chăm chút từng chi tiết để bạn chỉ việc tận hưởng Việt Nam ở những gì đẹp nhất."
+    },
+    "image": "/images/tours/hd/emperor-cruises.jpg",
+    "banner": "/images/tours/hd/tourdulichnhatranggiare.jpg",
+    "order": 0,
+    "isActive": true
+  },
+  {
+    "slug": "hand-picked",
+    "name": {
+      "en": "Hand-picked",
+      "zh": "精选线路",
+      "vi": "Tuyển chọn"
+    },
+    "tagline": {
+      "en": "Our team's favourite routes",
+      "zh": "团队私藏路线",
+      "vi": "Những tuyến yêu thích của đội ngũ"
+    },
+    "intro": {
+      "en": "The itineraries our local team recommends most – balanced routes that combine Vietnam's icons with authentic local moments.",
+      "zh": "本地团队最推荐的行程——将越南经典景点与地道当地体验完美结合。",
+      "vi": "Những lịch trình được đội ngũ địa phương của chúng tôi giới thiệu nhiều nhất – cân bằng giữa các điểm đến biểu tượng của Việt Nam và những khoảnh khắc bản địa chân thực."
+    },
+    "image": "/images/tours/v2/hoi-an-746921.jpg",
+    "banner": "/images/tours/v2/hoi-an-746921.jpg",
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "slug": "culture",
+    "name": {
+      "en": "Culture",
+      "zh": "文化体验",
+      "vi": "Văn hóa"
+    },
+    "tagline": {
+      "en": "Crafts, heritage & people",
+      "zh": "手工艺 · 遗产 · 人文",
+      "vi": "Làng nghề, di sản & con người"
+    },
+    "intro": {
+      "en": "Make a conical hat with artisans, cook with a local family, cycle through craft villages and meet the ethnic communities of the highlands.",
+      "zh": "与匠人一起制作斗笠、跟当地家庭学做菜、骑行穿越手工艺村，走近高原少数民族。",
+      "vi": "Làm nón lá cùng nghệ nhân, nấu ăn với gia đình địa phương, đạp xe qua các làng nghề và gặp gỡ cộng đồng dân tộc vùng cao."
+    },
+    "image": "/images/tours/v2/hue-20676995.jpg",
+    "banner": "/images/tours/v2/vietnam-12674100.jpg",
+    "order": 2,
+    "isActive": true
+  },
+  {
+    "slug": "family",
+    "name": {
+      "en": "Family",
+      "zh": "亲子家庭",
+      "vi": "Gia đình"
+    },
+    "tagline": {
+      "en": "Easy pace, fun for all ages",
+      "zh": "节奏轻松 · 老少皆宜",
+      "vi": "Nhịp độ nhẹ nhàng, vui cho mọi lứa tuổi"
+    },
+    "intro": {
+      "en": "Kid-friendly hotels, short transfers and hands-on activities – basket boats, safari parks and beach days the whole family will love.",
+      "zh": "亲子友好酒店、短途交通与互动体验——簸箕船、野生动物园与海滩，全家都会喜欢。",
+      "vi": "Khách sạn thân thiện với trẻ em, quãng di chuyển ngắn và hoạt động trải nghiệm – thuyền thúng, vườn thú safari và những ngày biển mà cả gia đình đều yêu thích."
+    },
+    "image": "/images/tours/v2/phu-quoc-2163224.jpg",
+    "banner": "/images/tours/v2/phu-quoc-26742974.jpg",
+    "order": 3,
+    "isActive": true
+  },
+  {
+    "slug": "honeymoon",
+    "name": {
+      "en": "Honeymoon",
+      "zh": "蜜月浪漫",
+      "vi": "Trăng mật"
+    },
+    "tagline": {
+      "en": "Romantic escapes for two",
+      "zh": "两人世界的浪漫之旅",
+      "vi": "Kỳ nghỉ lãng mạn cho hai người"
+    },
+    "intro": {
+      "en": "Sunset cruises, private beach dinners and island villas. Celebrate together with a journey designed only for the two of you.",
+      "zh": "日落游船、私人海滩晚餐与海岛别墅——专为你们二人设计的庆祝之旅。",
+      "vi": "Du thuyền ngắm hoàng hôn, bữa tối riêng trên bãi biển và biệt thự trên đảo. Cùng nhau kỷ niệm với hành trình được thiết kế chỉ dành cho hai bạn."
+    },
+    "image": "/images/tours/hd/glaming.jpg",
+    "banner": "/images/tours/v2/hanoi-33946371.jpg",
+    "order": 4,
+    "isActive": true
+  },
+  {
+    "slug": "classic",
+    "name": {
+      "en": "Classic",
+      "zh": "经典路线",
+      "vi": "Kinh điển"
+    },
+    "tagline": {
+      "en": "Vietnam's must-see icons",
+      "zh": "越南必游经典",
+      "vi": "Những điểm đến không thể bỏ lỡ"
+    },
+    "intro": {
+      "en": "First time in Vietnam? Hanoi, Halong Bay, Hoi An, Saigon and the Mekong – the timeless highlights from North to South.",
+      "zh": "第一次来越南？河内、下龙湾、会安、西贡与湄公河——由北到南的永恒经典。",
+      "vi": "Lần đầu đến Việt Nam? Hà Nội, Vịnh Hạ Long, Hội An, Sài Gòn và miền Tây sông nước – những điểm nhấn kinh điển từ Bắc vào Nam."
+    },
+    "image": "/images/tours/hd/ha-long.jpg",
+    "banner": "/images/tours/v2/halong-bay-1018475.jpg",
+    "order": 5,
+    "isActive": true
+  },
+  {
+    "slug": "photography",
+    "name": {
+      "en": "Photography",
+      "zh": "摄影之旅",
+      "vi": "Nhiếp ảnh"
+    },
+    "tagline": {
+      "en": "Golden hours & epic views",
+      "zh": "黄金时刻 · 壮美风光",
+      "vi": "Giờ vàng & khung cảnh hùng vĩ"
+    },
+    "intro": {
+      "en": "Timed for the best light: terraced rice fields, lotus lakes, misty mountains and fishing villages at dawn.",
+      "zh": "追逐最佳光线：梯田、荷花湖、云雾山峦与清晨的渔村。",
+      "vi": "Canh đúng thời điểm ánh sáng đẹp nhất: ruộng bậc thang, đầm sen, núi non mờ sương và làng chài lúc bình minh."
+    },
+    "image": "/images/tours/v2/ninh-binh-c46.jpg",
+    "banner": "/images/tours/hd/hoang-su-phi-ha-giang.jpg",
+    "order": 6,
+    "isActive": true
+  },
+  {
+    "slug": "tailor-made",
+    "name": {
+      "en": "Tailor-made",
+      "zh": "私人定制",
+      "vi": "Thiết kế riêng"
+    },
+    "tagline": {
+      "en": "Designed around you",
+      "zh": "为您量身打造",
+      "vi": "Thiết kế theo bạn"
+    },
+    "intro": {
+      "en": "Your dates, your pace, your hotel class (3–5★) and budget. Tell us what you love and we design a private itinerary just for you.",
+      "zh": "按照您的日期、节奏、酒店等级（3–5星）与预算——告诉我们您的喜好，我们为您定制专属私人行程。",
+      "vi": "Ngày đi, nhịp độ, hạng khách sạn (3–5★) và ngân sách do bạn chọn. Hãy cho chúng tôi biết sở thích, chúng tôi sẽ thiết kế lịch trình riêng dành cho bạn."
+    },
+    "image": "/images/tours/v2/sapa-235925.jpg",
+    "banner": "/images/tours/hd/du-lich-tay-bac.jpg",
+    "order": 7,
+    "isActive": true
+  }
+]

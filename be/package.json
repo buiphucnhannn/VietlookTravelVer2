@@ -1,0 +1,48 @@
+{
+  "name": "vietlook-travel-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vietlook Travel — REST API (Express + MongoDB + Cloudinary)",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "secret": "node scripts/secret.js",
+    "test": "node --import ./tests/setup.js --test \"tests/**/*.test.js\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "images:upload": "node --env-file-if-exists=.env scripts/upload-site-images.js",
+    "seed": "node --env-file-if-exists=.env src/scripts/seed-content.js",
+    "admin:reset": "node --env-file-if-exists=.env src/scripts/reset-admin.js"
+  },
+  "dependencies": {
+    "cloudinary": "^2.11.0",
+    "compression": "^1.8.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.11.4",
+    "multer": "^2.5.0",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "sanitize-html": "^2.18.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.1.4"
+  }
+}

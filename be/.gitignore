@@ -1,0 +1,48 @@
+# =============================================================================
+# be/ — Express API (quy tắc chung xem ../.gitignore)
+# =============================================================================
+
+# ----- Dependencies -----
+/node_modules
+
+# ----- Biến môi trường -----
+# Commit .env.example (mẫu), KHÔNG commit .env (MongoDB URI, Cloudinary secret, JWT secret...)
+.env
+.env.*
+!.env.example
+
+# ----- Build output (nếu sau này dùng bundler / TypeScript) -----
+/dist
+/build
+*.tsbuildinfo
+
+# ----- Upload / file tạm (multer dùng bộ nhớ, phòng khi đổi sang lưu đĩa) -----
+/uploads
+/tmp
+
+# ----- Logs / PM2 -----
+/logs
+*.log
+npm-debug.log*
+pids
+*.pid
+*.seed
+*.pid.lock
+.pm2/
+
+# ----- Test -----
+/coverage
+/.nyc_output
+
+# ----- Bí mật / chứng chỉ / bản sao lưu DB -----
+*.pem
+*.key
+service-account*.json
+*.bson
+*.archive
+/backups
+/dump
+
+# ----- Misc -----
+.DS_Store
+Thumbs.db

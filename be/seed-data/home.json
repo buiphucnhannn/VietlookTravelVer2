@@ -1,0 +1,122 @@
+{
+  "banner": {
+    "eyebrow": {
+      "en": "Vietnam Tour Operator & DMC",
+      "zh": "越南本地地接社",
+      "vi": "Công ty lữ hành & DMC Việt Nam"
+    },
+    "titleTop": {
+      "en": "Discover",
+      "zh": "探索",
+      "vi": "Khám phá"
+    },
+    "titleMain": {
+      "en": "Vietnam",
+      "zh": "越南",
+      "vi": "Việt Nam"
+    },
+    "description": {
+      "en": "From misty rice terraces in the north to lantern‑lit old towns and sun‑soaked southern islands – journeys shaped by locals who know every road, every season and every hidden corner of Vietnam.",
+      "zh": "从北部云雾缭绕的梯田，到灯笼点亮的古镇，再到阳光明媚的南方海岛——由熟悉每条道路、每个季节和每处秘境的本地团队，为您打造难忘的越南之旅。",
+      "vi": "Từ những thửa ruộng bậc thang mờ sương miền Bắc đến phố cổ lung linh đèn lồng và những hòn đảo ngập nắng phương Nam – hành trình được thiết kế bởi người bản địa am hiểu từng cung đường, từng mùa và từng góc khuất của Việt Nam."
+    },
+    "descriptionShort": {
+      "en": "Rice terraces, lantern-lit old towns and tropical islands – journeys shaped by locals who know Vietnam.",
+      "zh": "从云雾梯田到灯笼古镇与热带海岛——由最懂越南的本地团队为您打造旅程。",
+      "vi": "Ruộng bậc thang, phố cổ đèn lồng và đảo nhiệt đới – hành trình do người bản địa am hiểu Việt Nam thiết kế."
+    },
+    "slides": [
+      {
+        "video": "/videos/vl2-halong.mp4",
+        "videoMobile": "/videos/vl2-halong-m.mp4",
+        "poster": "/videos/vl2-halong.webp",
+        "posterMobile": "/videos/vl2-halong-m.webp",
+        "caption": {
+          "en": "Ha Long Bay",
+          "zh": "下龙湾",
+          "vi": "Vịnh Hạ Long"
+        }
+      },
+      {
+        "video": "/videos/vl2-heritage.mp4",
+        "videoMobile": "/videos/vl2-heritage-m.mp4",
+        "poster": "/videos/vl2-heritage.webp",
+        "posterMobile": "/videos/vl2-heritage-m.webp",
+        "caption": {
+          "en": "Ha Long Bay & Hanoi heritage",
+          "zh": "下龙湾 · 河内古迹",
+          "vi": "Vịnh Hạ Long & di sản Hà Nội"
+        }
+      },
+      {
+        "video": "/videos/vl2-mountains.mp4",
+        "videoMobile": "/videos/vl2-mountains-m.mp4",
+        "poster": "/videos/vl2-mountains.webp",
+        "posterMobile": "/videos/vl2-mountains-m.webp",
+        "caption": {
+          "en": "Mountains at sunset",
+          "zh": "山间日落",
+          "vi": "Hoàng hôn trên núi"
+        }
+      },
+      {
+        "video": "/videos/vl2-golden-bridge.mp4",
+        "videoMobile": "/videos/vl2-golden-bridge-m.mp4",
+        "poster": "/videos/vl2-golden-bridge.webp",
+        "posterMobile": "/videos/vl2-golden-bridge-m.webp",
+        "caption": {
+          "en": "Golden Bridge, Da Nang",
+          "zh": "岘港金桥",
+          "vi": "Cầu Vàng, Đà Nẵng"
+        }
+      }
+    ]
+  },
+  "featuredTours": [
+    "ha-long-ninh-binh-da-nang-hoi-an-10-days-9-nights-tour",
+    "hanoi-ha-long-sapa-da-nang-ho-chi-minh",
+    "hanoi-ha-long-ninh-binh-da-nang-phu-quoc",
+    "ha-long-da-nang-9-days-8-nights-tour",
+    "ha-long-ninh-binh-sapa-8-days-7-nights-tour",
+    "da-nang-phu-quoc-tour-8-days-7-nights",
+    "nha-trang-da-lat-mui-ne-mekong-delta-ho-chi-minh",
+    "nha-trang-da-lat-mui-ne-ho-chi-minh-city"
+  ],
+  "longTours": [
+    "nha-trang-da-lat-mui-ne-mekong-delta-ho-chi-minh",
+    "ha-long-ninh-binh-sapa-8-days-7-nights-tour",
+    "da-nang-phu-quoc-tour-8-days-7-nights",
+    "ha-long-da-nang-9-days-8-nights-tour",
+    "northern-vietnam-tour-9-days-8-nights",
+    "ha-long-ninh-binh-da-nang-hoi-an-10-days-9-nights-tour",
+    "hanoi-ha-long-sapa-da-nang-ho-chi-minh",
+    "hanoi-ha-long-ninh-binh-da-nang-phu-quoc",
+    "hanoi-ha-long-ninh-binh-da-nang-ho-chi-minh",
+    "northwest-arc-tour-12-days-11-nights",
+    "splendours-of-vietnam-pristine-beach",
+    "classic-vietnam-ho-chi-minh-city-to-hanoi",
+    "13-days-12-nights-vietnamese-food-tour",
+    "northwest-eastern-inter-line-tour-13-days-12-nights",
+    "vietnam-luxury-tour",
+    "vietnam-tour-13-days-12-nights",
+    "vietnam-a-special-honeymoon",
+    "vietnam-tour-15-days-14-nights",
+    "vietnam-vacation-tour-16-days-15-nights",
+    "vietnam-heritage-discovery-tour-16-days-15-nights",
+    "vietnam-tour-18-days-17-nights",
+    "vietnam-family-adventure",
+    "vietnam-tour-22-days-21-nights",
+    "vietnam-tour-30-days-29-nights"
+  ],
+  "homeThemes": [
+    "luxury",
+    "hand-picked",
+    "culture",
+    "family",
+    "honeymoon",
+    "classic",
+    "photography",
+    "tailor-made"
+  ],
+  "featuredDestinations": ["da-nang", "phu-quoc", "halong-bay", "hanoi", "ho-chi-minh-city"]
+}

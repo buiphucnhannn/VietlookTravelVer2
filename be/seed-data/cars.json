@@ -1,0 +1,273 @@
+[
+  {
+    "key": "sedan",
+    "seats": 4,
+    "pax": 3,
+    "luggage": 2,
+    "name": {
+      "en": "Sedan",
+      "zh": "轿车",
+      "vi": "Sedan"
+    },
+    "tagline": {
+      "en": "Comfort for 1–3 travellers",
+      "zh": "1–3人舒适出行",
+      "vi": "Thoải mái cho 1–3 khách"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/sedan-v3a.webp", "/images/cars/sedan-v3b.webp"],
+    "models": ["Toyota Vios", "Hyundai Accent", "Honda City", "Mazda 3", "Honda Civic"],
+    "ideal": {
+      "en": ["Airport transfers", "Business trips", "City tours"],
+      "zh": ["机场接送", "商务出行", "城市观光"],
+      "vi": ["Đưa đón sân bay", "Công tác", "Tham quan thành phố"]
+    },
+    "priceKey": "sedan",
+    "accent": "#1780c1",
+    "order": 0,
+    "isActive": true,
+    "vip": false
+  },
+  {
+    "key": "suv",
+    "seats": 7,
+    "pax": 5,
+    "luggage": 4,
+    "name": {
+      "en": "SUV / Crossover",
+      "zh": "SUV / 跨界车",
+      "vi": "SUV / Crossover"
+    },
+    "tagline": {
+      "en": "Space & power for long roads",
+      "zh": "长途出行空间与动力兼备",
+      "vi": "Rộng rãi & mạnh mẽ cho đường dài"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/suv-u1.webp", "/images/cars/suv-u2.webp"],
+    "models": [
+      "Hyundai Santa Fe",
+      "Toyota Fortuner",
+      "Mitsubishi Xpander",
+      "Ford Everest",
+      "Toyota Innova",
+      "VinFast VF9"
+    ],
+    "ideal": {
+      "en": ["Families", "Mountain roads", "Intercity transfers"],
+      "zh": ["家庭出行", "山区道路", "城际接送"],
+      "vi": ["Gia đình", "Đường đèo núi", "Di chuyển liên tỉnh"]
+    },
+    "priceKey": "suv",
+    "accent": "#0f6aa6",
+    "order": 1,
+    "isActive": true,
+    "vip": false
+  },
+  {
+    "key": "minivan",
+    "seats": 7,
+    "pax": 7,
+    "luggage": 5,
+    "name": {
+      "en": "Minivan / MPV",
+      "zh": "MPV 商务车",
+      "vi": "Minivan / MPV"
+    },
+    "tagline": {
+      "en": "Flexible seats for small groups",
+      "zh": "灵活座椅，适合小团体",
+      "vi": "Ghế linh hoạt cho nhóm nhỏ"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/minivan-1.webp", "/images/cars/minivan-2.webp"],
+    "models": ["Toyota Innova", "Mitsubishi Xpander", "Suzuki Ertiga", "Toyota Avanza / Veloz"],
+    "ideal": {
+      "en": ["Small groups", "Resort transfers", "Multi-day trips"],
+      "zh": ["小团体", "度假村接送", "多日行程"],
+      "vi": ["Nhóm nhỏ", "Đưa đón resort", "Hành trình nhiều ngày"]
+    },
+    "priceKey": "minivan",
+    "accent": "#0d5687",
+    "order": 2,
+    "isActive": true,
+    "vip": false
+  },
+  {
+    "key": "luxury",
+    "seats": 7,
+    "pax": 7,
+    "luggage": 5,
+    "name": {
+      "en": "Luxury MPV",
+      "zh": "豪华MPV",
+      "vi": "MPV hạng sang"
+    },
+    "tagline": {
+      "en": "VIP captain seats & electric doors",
+      "zh": "VIP航空座椅与电动侧门",
+      "vi": "Ghế thương gia VIP & cửa trượt điện"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/luxury-v3a.webp", "/images/cars/luxury-2.webp"],
+    "models": ["Kia Carnival", "Kia Sedona", "Toyota Granvia"],
+    "ideal": {
+      "en": ["VIP guests", "Honeymooners", "Executive transfers"],
+      "zh": ["VIP贵宾", "蜜月夫妇", "高管接送"],
+      "vi": ["Khách VIP", "Cặp đôi trăng mật", "Đưa đón lãnh đạo"]
+    },
+    "priceKey": "luxury",
+    "accent": "#b0201b",
+    "order": 3,
+    "isActive": true,
+    "vip": true
+  },
+  {
+    "key": "limo9",
+    "seats": 9,
+    "pax": 9,
+    "luggage": 7,
+    "name": {
+      "en": "Limousine Van 9–11",
+      "zh": "豪华商务车 9–11座",
+      "vi": "Xe Limousine 9–11 chỗ"
+    },
+    "tagline": {
+      "en": "Lounge seats, ambient lights, Wi-Fi",
+      "zh": "沙发座椅、氛围灯与Wi-Fi",
+      "vi": "Ghế ngả thư giãn, đèn trang trí, Wi-Fi"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/limo-1.webp", "/images/cars/limo-v3b.webp"],
+    "models": ["DCar Limousine", "Auto Kingdom", "Ford Tourneo", "Hyundai Starex"],
+    "ideal": {
+      "en": ["Halong & Sapa trips", "Corporate guests", "Families with seniors"],
+      "zh": ["下龙与沙坝之旅", "企业贵宾", "带长者的家庭"],
+      "vi": ["Chuyến đi Hạ Long & Sa Pa", "Khách doanh nghiệp", "Gia đình có người cao tuổi"]
+    },
+    "priceKey": "limo9",
+    "accent": "#7a4b14",
+    "order": 4,
+    "isActive": true,
+    "vip": true
+  },
+  {
+    "key": "van16",
+    "seats": 16,
+    "pax": 14,
+    "luggage": 12,
+    "name": {
+      "en": "16-seat Van",
+      "zh": "16座中巴",
+      "vi": "Xe 16 chỗ"
+    },
+    "tagline": {
+      "en": "The go-to for mid-size groups",
+      "zh": "中型团队首选",
+      "vi": "Lựa chọn hàng đầu cho đoàn vừa"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/van16-1.webp", "/images/cars/van16-2.webp"],
+    "models": ["Ford Transit", "Hyundai Solati", "Toyota Hiace"],
+    "ideal": {
+      "en": ["Group tours", "Team outings", "Airport groups"],
+      "zh": ["团队游", "公司出游", "机场团队接送"],
+      "vi": ["Tour đoàn", "Du lịch công ty", "Đưa đón đoàn tại sân bay"]
+    },
+    "priceKey": "van16",
+    "accent": "#0f4870",
+    "order": 5,
+    "isActive": true,
+    "vip": false
+  },
+  {
+    "key": "coach29",
+    "seats": 29,
+    "pax": 25,
+    "luggage": 20,
+    "name": {
+      "en": "29-seat Coach",
+      "zh": "29座大巴",
+      "vi": "Xe 29 chỗ"
+    },
+    "tagline": {
+      "en": "Comfortable mini-coach for groups",
+      "zh": "舒适中型大巴",
+      "vi": "Xe khách cỡ trung tiện nghi cho đoàn"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/coach29-u1.webp", "/images/cars/coach29-u2.webp"],
+    "models": ["Toyota Coaster", "Hyundai County", "Thaco Meadow"],
+    "ideal": {
+      "en": ["School & study tours", "Incentive groups", "Weddings"],
+      "zh": ["研学团", "奖励旅游", "婚礼用车"],
+      "vi": ["Tour học sinh & học tập", "Đoàn du lịch khen thưởng", "Xe cưới"]
+    },
+    "priceKey": "coach29",
+    "accent": "#1780c1",
+    "order": 6,
+    "isActive": true,
+    "vip": false
+  },
+  {
+    "key": "coach45",
+    "seats": 45,
+    "pax": 40,
+    "luggage": 40,
+    "name": {
+      "en": "45-seat Coach",
+      "zh": "45座大巴",
+      "vi": "Xe 45 chỗ"
+    },
+    "tagline": {
+      "en": "Full-size coach for big events",
+      "zh": "大型活动全尺寸大巴",
+      "vi": "Xe khách cỡ lớn cho sự kiện đông người"
+    },
+    "description": {
+      "en": "",
+      "zh": "",
+      "vi": ""
+    },
+    "images": ["/images/cars/coach45-u1.webp", "/images/cars/coach45-u2.webp"],
+    "models": ["Hyundai Universe", "Thaco"],
+    "ideal": {
+      "en": ["MICE & conferences", "Large tour groups", "Event shuttles"],
+      "zh": ["会奖与会议", "大型旅游团", "活动接驳"],
+      "vi": ["MICE & hội nghị", "Đoàn du lịch lớn", "Xe đưa đón sự kiện"]
+    },
+    "priceKey": "coach45",
+    "accent": "#ee3b35",
+    "order": 7,
+    "isActive": true,
+    "vip": false
+  }
+]

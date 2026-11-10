@@ -1,41 +1,84 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# =============================================================================
+# Vietlook Travel — .gitignore dùng chung cho cả repo (fe/ + be/)
+# Quy tắc riêng từng phần nằm ở fe/.gitignore và be/.gitignore
+# =============================================================================
 
-# dependencies
-/node_modules
-/.pnp
+# ----- Dependencies -----
+node_modules/
+.pnp
 .pnp.*
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.npm/
 
-# testing
-/coverage
+# ----- Biến môi trường (KHÔNG BAO GIỜ commit key thật) -----
+.env
+.env.*
+!.env.example
+!.env.*.example
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
+# ----- Bí mật / chứng chỉ -----
 *.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+credentials*.json
+service-account*.json
 
-# debug
+# ----- Logs -----
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# ----- Test / coverage -----
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
 
-# vercel
-.vercel
-
-# typescript
+# ----- Build output -----
+dist/
+build/
+out/
+.cache/
+.turbo/
 *.tsbuildinfo
-next-env.d.ts
+
+# ----- Hệ điều hành -----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ----- Editor / IDE -----
+.idea/
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.sublime-project
+*.sublime-workspace
+
+# ----- File tạm -----
+tmp/
+temp/
+*.tmp
+*.bak
+~$*
