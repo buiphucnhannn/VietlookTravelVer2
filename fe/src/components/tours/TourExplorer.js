@@ -257,6 +257,7 @@ export default function TourExplorer({
                 typing.current = setTimeout(() => v !== f.q && update({ q: v }), 500);
               }}
               placeholder={t.searchPlaceholder}
+              aria-label={t.searchPlaceholder}
               className="h-12 w-full min-w-0 bg-transparent text-sm focus:outline-none lg:w-56"
             />
           </form>

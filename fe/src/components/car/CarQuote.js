@@ -466,7 +466,9 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
     const v = { ...validate(d, lang, { email: "either" }), ...carDateErrors(payload, lang) };
     setErrs(v);
     if (Object.keys(v).length) return;
-    await submit({ ...payload, ...d, summary }, formRef.current);
+    // Backend chỉ nhận giá trị đơn (chữ/số/mảng) → tóm tắt chuyến gửi dạng một dòng chữ
+    const text = [...rows, [t.total, summary.price]].map(([k, v]) => `${k}: ${v}`).join(" · ");
+    await submit({ ...payload, ...d, summary: text }, formRef.current);
   };
 
   const rows = [

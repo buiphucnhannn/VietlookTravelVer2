@@ -112,7 +112,7 @@ const en = {
     adults: "Adults",
     children: "Children",
     child: "Child",
-    age: "age",
+    age: "yrs",
     duration: "Duration",
     destinations: "Destinations",
     themes: "Themes",
@@ -927,7 +927,8 @@ const en = {
     articles: "articles",
     noResults: "No articles found.",
     loadMore: "Load more articles",
-    translationPending: "",
+    translationPending:
+      "The English version of this article is on its way — showing the original for now.",
     relatedTours: "Tours you may like",
     ebookTitle: "Need help planning?",
     ebookText: "Get a free tailor-made itinerary from our local experts.",
@@ -1101,7 +1102,7 @@ const en = {
   },
   thanks: {
     title: "Thank you – we have your request",
-    text: "Our local travel team will review it and reply with a tailored proposal and fixed price, usually within a few hours.",
+    text: "Our local travel team will check availability and reply with confirmation and the final price, usually within a few hours.",
     step1: "We reply by email or WhatsApp within 24 hours (often much sooner).",
     step2: "Need it faster? Message us with your request code.",
     whatsapp: "Chat on WhatsApp",

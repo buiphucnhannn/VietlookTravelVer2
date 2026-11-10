@@ -17,14 +17,14 @@ export default function StickyTabs({ tabs, cta }) {
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (visible[0]) setActive(visible[0].target.id);
       },
-      { rootMargin: "-120px 0px -55% 0px" },
+      { rootMargin: "-170px 0px -55% 0px" },
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, [tabs]);
 
   return (
-    <div className="border-y border-border bg-brand-50/95">
+    <div className="z-30 border-y border-border bg-brand-50/95 backdrop-blur lg:sticky lg:top-[108px]">
       <div className="mx-auto flex w-full max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-10">
         <nav className="-mb-px flex flex-1 scrollbar-none gap-1 overflow-x-auto">
           {tabs.map((t) => (

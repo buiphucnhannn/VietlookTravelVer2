@@ -57,6 +57,28 @@ class ContentRepository extends BaseRepository {
       .lean();
   }
 
+  /**
+   * Tìm theo đường dẫn hiện tại, không có thì theo đường dẫn cũ (oldSlugs — tour / bài viết).
+   * Ưu tiên khớp đường dẫn hiện tại: 1 đường dẫn có thể vừa là slug của mục A vừa là slug cũ của mục B.
+   */
+  async findBySlugOrOld(slug) {
+    return (
+      (await this.model.findOne({ slug }).lean()) ??
+      this.model.findOne({ oldSlugs: slug }).sort({ updatedAt: -1 }).lean()
+    );
+  }
+
+  /**
+   * Đường dẫn vừa được dùng làm slug của 1 mục → gỡ khỏi danh sách slug cũ của các mục khác
+   * (nếu không, website có thể chuyển hướng 301 nhầm sang mục cũ).
+   */
+  releaseOldSlug(slug, exceptId) {
+    return this.model.updateMany(
+      { oldSlugs: slug, _id: trusted({ $ne: exceptId }) },
+      { $pull: { oldSlugs: slug } },
+    );
+  }
+
   /** Cập nhật thứ tự hiển thị hàng loạt: [{ id, order }] */
   async reorder(items) {
     if (!items.length) return;
@@ -71,10 +93,6 @@ class ContentRepository extends BaseRepository {
 class TourRepository extends ContentRepository {
   constructor() {
     super(Tour);
-  }
-
-  findBySlugOrOld(slug) {
-    return this.model.findOne({ $or: [{ slug }, { oldSlugs: slug }] }).lean();
   }
 
   /** Tour đang bán dùng điểm đến / chủ đề này (chặn xoá điểm đến đang được dùng) */
@@ -95,10 +113,6 @@ class TourRepository extends ContentRepository {
 class ArticleRepository extends ContentRepository {
   constructor() {
     super(Article);
-  }
-
-  findBySlugOrOld(slug) {
-    return this.model.findOne({ $or: [{ slug }, { oldSlugs: slug }] }).lean();
   }
 
   countUsing(field, value) {
@@ -150,8 +164,8 @@ class EnquiryRepository extends BaseRepository {
     return this.model.updateOne({ _id: id }, { $set: { emailStatus } });
   }
 
-  recentSince(date) {
-    return this.model.countDocuments({ createdAt: trusted({ $gte: date }) });
+  recentSince(date, extra = {}) {
+    return this.model.countDocuments({ ...extra, createdAt: trusted({ $gte: date }) });
   }
 }
 

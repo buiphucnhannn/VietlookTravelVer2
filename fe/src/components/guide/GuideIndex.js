@@ -26,7 +26,7 @@ export default async function GuideIndex({ lang, dict, category }) {
       <BrushHero
         title={title}
         subtitle={category ? tr(category.description, lang) : g.intro}
-        images={inCat.map((p) => p.image)}
+        images={inCat.map((p) => p.image).filter(Boolean)}
         breadcrumbs={[
           { label: "Vietlook", href: href(lang) },
           ...(category ? [{ label: g.title, href: `${lp(lang)}/travel-guide` }] : []),

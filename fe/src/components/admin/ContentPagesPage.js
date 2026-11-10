@@ -29,7 +29,7 @@ import {
   ABOUT_VISION_TITLE,
 } from "@/data/about";
 import { useMutation } from "./hooks";
-import { AutoTranslate } from "./translate";
+import { AutoTranslate, useAutoFill } from "./translate";
 import { SeoFields } from "./ArticleEditor";
 import { AboutBody, MiniHero, MiniSite, PolicyBody } from "./pages/canvas";
 import {
@@ -40,12 +40,15 @@ import {
   LoadingBlock,
   Notice,
   PageHeader,
+  DEFAULT_LANG,
   Toggle,
+  anyLang,
   filledOf,
   fmtDateTime,
   useUi,
   useUnsavedGuard,
 } from "./ui";
+import { ReadOnlyArea, usePermission } from "./permissions";
 
 const TAGS = ["pages"];
 const BASE = `${ADMIN_BASE}/pages`;
@@ -326,7 +329,7 @@ function PageCard({ page, doc, wide }) {
               wide && "md:text-2xl",
             )}
           >
-            {doc?.title?.vi || doc?.title?.en || page.label}
+            {anyLang(doc?.title, "vi") || page.label}
           </span>
         </span>
         <span className="absolute top-3 right-3">
@@ -366,7 +369,7 @@ function PageCard({ page, doc, wide }) {
               title={
                 filled[l.key]
                   ? `Đã có bản ${l.label}`
-                  : `Chưa có bản ${l.label} — website hiện bản tiếng Anh`
+                  : `Chưa có bản ${l.label} — sẽ tự dịch khi lưu`
               }
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
@@ -450,9 +453,10 @@ function PageCanvas({ page, initial, all = [], defaults }) {
   const { toast, confirm } = useUi();
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const [seoOpen, setSeoOpen] = useState(false);
   const { run, busy } = useMutation(TAGS);
+  const autoFill = useAutoFill();
   const set = useCallback((patch) => setD((x) => ({ ...x, ...patch })), []);
   const setData = useCallback(
     (patch) => setD((x) => ({ ...x, data: { ...x.data, ...patch } })),
@@ -464,21 +468,34 @@ function PageCanvas({ page, initial, all = [], defaults }) {
     [d, saved, isAbout],
   );
   useUnsavedGuard(dirty);
+  const { canEdit } = usePermission("pages"); // chỉ xem → bản xem trước chỉ đọc, không có nút Lưu
 
   const save = useCallback(async () => {
-    if (!d.title.en.trim()) {
-      setLang("en");
-      return toast("Vui lòng nhập tiêu đề trang bằng tiếng Anh trước khi lưu", "error");
-    }
+    if (!canEdit) return;
+    if (!anyLang(d.title))
+      return toast.error("Vui lòng nhập tiêu đề trang ở ít nhất một ngôn ngữ.", {
+        title: "Chưa lưu được",
+      });
+    // ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết rồi mới lưu
+    const { value: v, failed } = await autoFill.fill(d, { lang });
+    if (v !== d) setD(v);
+    const url = `/settings/pages/${page.key}`;
     const r = await run(
-      () => api(`/settings/pages/${page.key}`, { method: "PUT", body: toPayload(d, isAbout) }),
+      () => api(url, { method: "PUT", body: toPayload(v, isAbout) }),
       `Đã lưu trang ${page.label}`,
     );
     if (!r?.data) return;
     const next = fromDoc(r.data, isAbout, defaults);
     setSaved(next);
     setD(next);
-  }, [d, isAbout, defaults, page, run, toast]);
+    if (failed)
+      autoFill.offerRetry(async (t) => {
+        const r2 = await api(url, { method: "PUT", body: toPayload(t, isAbout) });
+        const again = fromDoc(r2.data, isAbout, defaults);
+        setSaved(again);
+        setD(again);
+      });
+  }, [d, isAbout, defaults, page, run, toast, canEdit, autoFill, lang]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -520,7 +537,7 @@ function PageCanvas({ page, initial, all = [], defaults }) {
       href,
       icon: p.icon,
       active,
-      title: title?.[lang] || title?.en || p.label,
+      title: anyLang(title, lang) || p.label,
       image: active ? "" : (other?.image ?? ""),
       onClick: leaveTo(href),
     };
@@ -546,7 +563,7 @@ function PageCanvas({ page, initial, all = [], defaults }) {
         {page.label}
       </h1>
       <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
-        Bấm vào dòng chữ bất kỳ bên dưới để sửa.
+        {canEdit ? "Bấm vào dòng chữ bất kỳ bên dưới để sửa." : "Bạn đang ở chế độ chỉ xem."}
         {saved.updatedAt && ` Lưu lần cuối ${fmtDateTime(saved.updatedAt)}.`}
       </p>
 
@@ -555,72 +572,79 @@ function PageCanvas({ page, initial, all = [], defaults }) {
         <Toggle
           checked={d.isActive}
           onChange={(isActive) => set({ isActive })}
+          disabled={!canEdit}
           label="Hiện trên website"
           hint={d.isActive ? "Khách xem được trang này" : "Trang đang ẩn với khách"}
         />
         {/* Dịch tự động nằm ngay bên trái các tab ngôn ngữ, cùng hàng, cùng chiều cao */}
         <div className="flex max-w-full items-center gap-2">
-          <AutoTranslate
-            lang={lang}
-            value={d}
-            onChange={setD}
-            className="h-9 rounded-full px-3 sm:px-3.5"
-          />
+          {canEdit && (
+            <AutoTranslate
+              lang={lang}
+              value={d}
+              onChange={setD}
+              className="h-9 rounded-full px-3 sm:px-3.5"
+            />
+          )}
           <LangTabs value={lang} onChange={setLang} filled={filledOf(d.title)} />
         </div>
       </div>
 
-      <div className="mt-3">
-        <MiniSite name={page.label}>
-          <MiniHero
-            d={d}
-            lang={lang}
-            set={set}
-            fallbackImage={isAbout ? ABOUT_HERO_IMAGES[0] : ""}
-            extraImages={isAbout ? ABOUT_HERO_IMAGES.slice(1) : policies.map((p) => p.image)}
-          />
-          {isAbout ? (
-            <AboutBody data={d.data} lang={lang} setData={setData} />
-          ) : (
-            <PolicyBody d={d} lang={lang} set={set} menu={policies} />
-          )}
-        </MiniSite>
-      </div>
-
-      {/* Hiển thị trên Google: thu gọn sẵn */}
-      <section className="mt-6 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
-        <button
-          type="button"
-          aria-expanded={seoOpen}
-          onClick={() => setSeoOpen((v) => !v)}
-          className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 sm:px-5"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
-            <Search className="size-[18px]" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-bold text-slate-900">Hiển thị trên Google</span>
-            <span className="block text-xs leading-relaxed text-slate-500">
-              Tiêu đề và mô tả khách nhìn thấy khi tìm ra trang này. Không bắt buộc.
-            </span>
-          </span>
-          <ChevronDown
-            className={cn("size-5 shrink-0 text-slate-400 transition", seoOpen && "rotate-180")}
-          />
-        </button>
-        {seoOpen && (
-          <div className="border-t border-slate-100 p-4 sm:p-5">
-            <SeoFields
-              value={d.seo}
-              onChange={(seo) => set({ seo })}
+      <ReadOnlyArea readOnly={!canEdit} notice={false}>
+        <div className="mt-3">
+          <MiniSite name={page.label}>
+            <MiniHero
+              d={d}
               lang={lang}
-              fallbackTitle={d.title[lang] || d.title.en}
-              fallbackDescription={d.subtitle[lang] || d.subtitle.en}
-              path={page.url.slice(1)}
+              set={set}
+              fallbackImage={isAbout ? ABOUT_HERO_IMAGES[0] : ""}
+              extraImages={isAbout ? ABOUT_HERO_IMAGES.slice(1) : policies.map((p) => p.image)}
             />
-          </div>
-        )}
-      </section>
+            {isAbout ? (
+              <AboutBody data={d.data} lang={lang} setData={setData} />
+            ) : (
+              <PolicyBody d={d} lang={lang} set={set} menu={policies} />
+            )}
+          </MiniSite>
+        </div>
+
+        {/* Hiển thị trên Google: thu gọn sẵn */}
+        <section className="mt-6 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
+          <button
+            type="button"
+            aria-expanded={seoOpen}
+            onClick={() => setSeoOpen((v) => !v)}
+            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 sm:px-5"
+          >
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+              <Search className="size-[18px]" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-bold text-slate-900">
+                Hiển thị trên Google
+              </span>
+              <span className="block text-xs leading-relaxed text-slate-500">
+                Tiêu đề và mô tả khách nhìn thấy khi tìm ra trang này. Không bắt buộc.
+              </span>
+            </span>
+            <ChevronDown
+              className={cn("size-5 shrink-0 text-slate-400 transition", seoOpen && "rotate-180")}
+            />
+          </button>
+          {seoOpen && (
+            <div className="border-t border-slate-100 p-4 sm:p-5">
+              <SeoFields
+                value={d.seo}
+                onChange={(seo) => set({ seo })}
+                lang={lang}
+                fallbackTitle={anyLang(d.title, lang)}
+                fallbackDescription={anyLang(d.subtitle, lang)}
+                path={page.url.slice(1)}
+              />
+            </div>
+          )}
+        </section>
+      </ReadOnlyArea>
 
       {/* Thanh lưu */}
       <div className="sticky bottom-0 z-30 mt-6 -mb-2 pb-2">
@@ -651,20 +675,26 @@ function PageCanvas({ page, initial, all = [], defaults }) {
               <ExternalLink className="size-4" />
               <span className="hidden sm:inline">Xem trên website</span>
             </a>
-            {dirty && (
+            {dirty && canEdit && (
               <Button variant="ghost" className="px-3" onClick={discard}>
-                Bỏ<span className="hidden sm:inline"> thay đổi</span>
+                <span>
+                  Bỏ<span className="hidden sm:inline"> thay đổi</span>
+                </span>
               </Button>
             )}
-            <Button
-              icon={Save}
-              className="px-4 sm:px-5"
-              onClick={save}
-              loading={busy}
-              disabled={!dirty}
-            >
-              Lưu<span className="hidden sm:inline"> thay đổi</span>
-            </Button>
+            {canEdit && (
+              <Button
+                icon={Save}
+                className="px-4 sm:px-5"
+                onClick={save}
+                loading={busy || autoFill.busy}
+                disabled={!dirty}
+              >
+                <span>
+                  Lưu<span className="hidden sm:inline"> thay đổi</span>
+                </span>
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -25,7 +25,7 @@ const enquirySchema = new Schema(
   {
     code: { type: String, required: true, unique: true }, // mã yêu cầu: VL-BK260512-7QX2
     type: { type: String, enum: ENQUIRY_TYPE_VALUES, required: true, index: true },
-    status: { type: String, enum: ENQUIRY_STATUS, default: "new", index: true },
+    status: { type: String, enum: ENQUIRY_STATUS, default: "new" }, // index: { status, createdAt } bên dưới
     paymentStatus: { type: String, enum: ["unpaid", "paid"], default: "unpaid" },
 
     name: { type: String, trim: true, required: true, maxlength: 120 },
@@ -69,6 +69,8 @@ const enquirySchema = new Schema(
 
 enquirySchema.index({ createdAt: -1 });
 enquirySchema.index({ type: 1, status: 1, createdAt: -1 });
+// Tab "Yêu cầu từ form" lọc theo trạng thái (không theo 1 loại cố định), mới nhất trước
+enquirySchema.index({ status: 1, createdAt: -1 });
 
 export const Enquiry = model("Enquiry", enquirySchema);
 

@@ -28,15 +28,37 @@ export function hotelClasses(tour) {
 const tierPrice = (tier, hotelClass) =>
   (hotelClass === 5 ? tier.price5 : hotelClass === 4 ? tier.price4 : tier.price) || null;
 
+/** Khoảng cách từ số khách tới 1 bậc giá (0 = nằm trong bậc) */
+const paxGap = (t, pax) =>
+  pax < (t.minPax ?? 1) ? (t.minPax ?? 1) - pax : pax > (t.maxPax ?? Infinity) ? pax - t.maxPax : 0;
+
+/**
+ * Giá / người lớn theo bảng giá. Thiếu ô giá đúng chỗ → lấy ô GẦN NHẤT thay vì rơi về giá "từ" (có thể
+ * rẻ hơn cả 3★):
+ *   1. đúng bậc số khách + đúng hạng
+ *   2. cùng hạng ở bậc số khách gần nhất (vd. 2 khách 5★ chưa có giá → giá 5★ của bậc 4–5 khách)
+ *   3. hạng gần nhất trong bậc số khách gần nhất (ưu tiên hạng thấp hơn)
+ *   4. không có bảng giá → giá bán `price`
+ * Số khách nằm ngoài mọi bậc (1 khách, hoặc đông hơn bậc cuối) → dùng bậc gần nhất.
+ */
 export function unitPrice(tour, pax, hotelClass) {
-  const tiers = tour?.pricing?.groupTiers ?? [];
-  const classes = hotelClasses(tour);
-  // hạng khách chọn không có giá → hạng thấp nhất có giá
-  const cls = classes.includes(hotelClass) ? hotelClass : (classes[0] ?? 3);
-  const tier = tiers.find(
-    (t) => pax >= (t.minPax ?? 1) && pax <= (t.maxPax ?? Infinity) && tierPrice(t, cls) > 0,
+  const tiers = (tour?.pricing?.groupTiers ?? []).filter((t) =>
+    [3, 4, 5].some((c) => tierPrice(t, c) > 0),
   );
-  return (tier && tierPrice(tier, cls)) ?? tour?.price ?? null;
+  if (!tiers.length) return tour?.price ?? null;
+  const classes = hotelClasses(tour);
+  const cls = classes.includes(hotelClass) ? hotelClass : (classes[0] ?? 3);
+  const byGap = [...tiers].sort((a, b) => paxGap(a, pax) - paxGap(b, pax));
+  const sameClass = byGap.find((t) => tierPrice(t, cls) > 0);
+  if (sameClass && paxGap(sameClass, pax) === paxGap(byGap[0], pax))
+    return tierPrice(sameClass, cls);
+  if (sameClass) return tierPrice(sameClass, cls);
+  const order = [cls, cls - 1, cls + 1, cls - 2, cls + 2].filter((c) => c >= 3 && c <= 5);
+  for (const c of order) {
+    const p = tierPrice(byGap[0], c);
+    if (p > 0) return p;
+  }
+  return tour?.price ?? null;
 }
 
 export function childPercent(tour, age) {

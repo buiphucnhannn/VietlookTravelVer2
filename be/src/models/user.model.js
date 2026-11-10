@@ -1,4 +1,5 @@
 import { Schema, model } from "mongoose";
+import { MODULES } from "../constants/permissions.js";
 import { ROLES, ROLE_VALUES } from "../constants/roles.js";
 import { toJSONOptions } from "./shared.schema.js";
 
@@ -9,6 +10,13 @@ import { toJSONOptions } from "./shared.schema.js";
  * - failedLoginCount + lockUntil: nhập sai nhiều lần → tạm khoá (LOGIN_MAX_ATTEMPTS, LOGIN_LOCK_MINUTES).
  */
 const HIDDEN = ["passwordHash", "tokenVersion", "failedLoginCount"];
+
+const permissionsSchema = new Schema(
+  Object.fromEntries(
+    Object.entries(MODULES).map(([m, levels]) => [m, { type: String, enum: levels }]),
+  ),
+  { _id: false },
+);
 
 const userSchema = new Schema(
   {
@@ -25,6 +33,9 @@ const userSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 100 },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLE_VALUES, default: ROLES.EDITOR },
+    // Quyền từng mục cho nhân viên (admin bỏ qua). Chưa có (tài khoản cũ) → quyền mặc định cũ,
+    // tính lúc đọc trong constants/permissions.js (effectivePermissions) — không cần chuyển dữ liệu.
+    permissions: { type: permissionsSchema, default: undefined },
     isActive: { type: Boolean, default: true },
     // (cũ) managedByEnv — đã bỏ; giữ khai báo để dọn dữ liệu cũ
     managedByEnv: { type: Boolean },

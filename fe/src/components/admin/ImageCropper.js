@@ -10,7 +10,7 @@
  *   …  {crop.dialog}                                        // đặt 1 lần trong JSX
  *
  * - Ảnh lệch khung (> 3%) → tự mở hộp cắt; vừa khung → tải thẳng (ảnh quá lớn thì thu nhỏ, giữ chất lượng).
- * - Nhiều ảnh → cắt lần lượt ("Ảnh 2/5"), có "Bỏ qua ảnh này" / "Dùng nguyên ảnh".
+ * - Ảnh lệch khung BẮT BUỘC chọn vùng (không có "dùng nguyên ảnh"). Nhiều ảnh → cắt lần lượt ("Ảnh 2/5"), có "Bỏ qua ảnh này".
  * - Ảnh từ link: backend lưu về Cloudinary trước (trình duyệt không gọi tới link lạ), sau đó mới đọc bản
  *   Cloudinary (có CORS) để cắt; cắt xong tải bản mới lên rồi xoá bản vừa nhập.
  * - Ảnh ra luôn vẽ từ ẢNH GỐC đủ độ phân giải (đúng chiều EXIF), thu nhỏ từng nửa / phóng to từng bước ≤ 2×,
@@ -581,7 +581,7 @@ function CropDialog({ job, spec, onDecide }) {
       title={job?.auto ? "Chọn phần ảnh muốn hiện" : "Cắt lại ảnh"}
       description={
         job?.auto
-          ? "Ảnh chưa vừa khung của vị trí này. Kéo ảnh để chọn phần muốn giữ."
+          ? "Ảnh khác tỉ lệ với vị trí này — kéo ảnh để chọn phần sẽ hiện trên website."
           : "Kéo ảnh để chọn lại phần muốn hiện."
       }
       footer={
@@ -597,15 +597,6 @@ function CropDialog({ job, spec, onDecide }) {
               disabled={busy}
             >
               Bỏ qua ảnh này
-            </Button>
-          )}
-          {job?.auto && (
-            <Button
-              variant="secondary"
-              onClick={() => onDecide({ type: "original" })}
-              disabled={busy}
-            >
-              Dùng nguyên ảnh
             </Button>
           )}
           <Button icon={Check} onClick={() => confirmRef.current?.()} loading={busy}>
@@ -660,7 +651,14 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
   // Vùng chọn nhỏ hơn bề ngang khuyến nghị nhiều → nhắc nhẹ
   const swap = rotation % 180 !== 0;
   const chosenW = area ? (area.width / 100) * (swap ? job.natural.h : job.natural.w) : Infinity;
-  const small = chosenW < outSize(spec, ratio).w * 0.8;
+  const need = outSize(spec, ratio).w;
+  const small = chosenW < need * 0.8;
+  // đã ở mức nhỏ nhất mà vẫn thiếu → do ảnh gốc nhỏ; còn phóng to thì do phóng to quá tay
+  const blurHint = !small
+    ? ""
+    : zoom <= 1.02
+      ? `Ảnh gốc hơi nhỏ cho vị trí này nên trên website có thể hơi mờ. Nếu có, nên dùng ảnh rộng từ ${need}px trở lên.`
+      : "Đang phóng to nhiều nên ảnh có thể bị mờ — kéo thanh trượt sang trái một chút.";
 
   useEffect(() => {
     confirmRef.current = () =>
@@ -771,10 +769,9 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
             <p className="flex items-center gap-1.5 font-semibold text-slate-700">
               <ImageIcon className="size-3.5" /> Ảnh sẽ hiện như thế này
             </p>
-            <p>Lăn chuột, chụm hai ngón tay hoặc kéo thanh trượt để phóng to.</p>
-            {small && (
+            {blurHint && (
               <p className="rounded-lg bg-amber-50 px-2.5 py-2 text-amber-800 ring-1 ring-amber-100">
-                Vùng chọn hơi nhỏ, ảnh có thể kém nét — thử thu nhỏ khung.
+                {blurHint}
               </p>
             )}
           </div>

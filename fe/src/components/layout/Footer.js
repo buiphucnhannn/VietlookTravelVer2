@@ -215,10 +215,10 @@ export default function Footer({ lang, dict }) {
         <Container className="relative grid gap-8 pt-7 pb-20 sm:grid-cols-2 sm:pb-16 lg:grid-cols-4">
           {columns.map((col) => (
             <div key={col.title}>
-              <h3 className="relative mb-3 pb-2 text-base font-bold tracking-wide text-brand-700 uppercase after:absolute after:bottom-0 after:left-0 after:h-[3px] after:w-8 after:rounded-full after:bg-sun-500">
+              <h3 className="relative mb-5 pb-2.5 text-base font-bold tracking-wide text-brand-700 uppercase after:absolute after:bottom-0 after:left-0 after:h-[3px] after:w-8 after:rounded-full after:bg-sun-500">
                 {col.title}
               </h3>
-              <ul className="space-y-1.5">
+              <ul className="space-y-3 leading-snug">
                 {col.links.map((l) => (
                   <li key={l.href + l.label}>
                     <Link href={l.href} className="transition-colors hover:text-sun-600">
@@ -230,10 +230,10 @@ export default function Footer({ lang, dict }) {
             </div>
           ))}
           <div>
-            <h3 className="relative mb-3 pb-2 text-base font-bold tracking-wide text-brand-700 uppercase after:absolute after:bottom-0 after:left-0 after:h-[3px] after:w-8 after:rounded-full after:bg-sun-500">
+            <h3 className="relative mb-5 pb-2.5 text-base font-bold tracking-wide text-brand-700 uppercase after:absolute after:bottom-0 after:left-0 after:h-[3px] after:w-8 after:rounded-full after:bg-sun-500">
               {f.contact}
             </h3>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-4 text-sm leading-relaxed">
               <li className="flex gap-3">
                 <MapPin className="mt-0.5 size-4 shrink-0 text-sun-500" />
                 <span>{tr(contact.address, lang)}</span>

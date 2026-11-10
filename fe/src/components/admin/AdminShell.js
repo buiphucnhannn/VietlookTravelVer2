@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "@/components/admin/Link";
 import { usePathname, useRouter } from "next/navigation";
@@ -25,15 +25,20 @@ import {
   Tags,
   Users,
   X,
+  History,
 } from "lucide-react";
 import { ADMIN_BASE, ADMIN_LOGIN } from "@/config/urls.mjs";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { AdminProviders, useUi } from "./ui";
+import { AdminProviders, LoadingBlock, useUi } from "./ui";
+import { CurrentUserProvider, ModuleScope, NoAccess, canUser, moduleForPath } from "./permissions";
 
 const A = (p = "") => `${ADMIN_BASE}${p}`;
 
-/** Menu CMS theo nhóm. count: số việc cần xử lý (đơn / yêu cầu mới). adminOnly: chỉ tài khoản admin. */
+/**
+ * Menu CMS theo nhóm. count: số việc cần xử lý (đơn / yêu cầu mới).
+ * Mục nào hiện tuỳ quyền của tài khoản (permissions.js → moduleForPath): Cài đặt, Tài khoản chỉ admin.
+ */
 const NAV = [
   { group: null, items: [{ href: A(), label: "Tổng quan", Icon: LayoutDashboard }] },
   {
@@ -70,9 +75,9 @@ const NAV = [
   {
     group: "Hệ thống",
     items: [
-      { href: A("/settings"), label: "Cài đặt", Icon: Settings, adminOnly: true },
-      { href: A("/users"), label: "Tài khoản quản trị", Icon: Users, adminOnly: true },
-      { href: A("/audit-log"), label: "Nhật ký thao tác", Icon: KeyRound, adminOnly: true },
+      { href: A("/settings"), label: "Cài đặt", Icon: Settings },
+      { href: A("/users"), label: "Tài khoản quản trị", Icon: Users },
+      { href: A("/audit-log"), label: "Nhật ký thao tác", Icon: History },
       { href: A("/change-password"), label: "Đổi mật khẩu", Icon: KeyRound },
     ],
   },
@@ -104,16 +109,21 @@ function NavLinks({ user, todo, onNavigate }) {
 
 function NavList({ user, todo, onNavigate, pathname = "" }) {
   return NAV.map((g, gi) => {
-    const items = g.items.filter((i) => !i.adminOnly || user?.role === "admin");
+    // chưa tải xong tài khoản → chỉ hiện mục ai cũng vào được (không nháy mục không có quyền)
+    const items = g.items.filter((i) => {
+      const m = moduleForPath(i.href);
+      return !m || canUser(user, m, "view");
+    });
     if (!items.length) return null;
     return (
-      <div key={gi} className="mb-3.5 last:mb-0">
+      <div key={gi} className="mb-5 last:mb-0">
         {g.group && (
-          <p className="mb-1 px-3 text-[10px] font-semibold tracking-[0.2em] text-white/35 uppercase">
+          <p className="mb-2 flex items-center gap-2 px-3 text-[11px] font-semibold tracking-[0.2em] text-white/40 uppercase">
             {g.group}
+            <span className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
           </p>
         )}
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           {items.map(({ href, label, Icon, count }) => {
             const active = isActive(pathname, href);
             return (
@@ -124,21 +134,33 @@ function NavList({ user, todo, onNavigate, pathname = "" }) {
                 ref={active ? (el) => void el?.scrollIntoView({ block: "nearest" }) : undefined}
                 onClick={(e) => guardLeave(e) && onNavigate?.()}
                 className={cn(
-                  "group flex items-center gap-3 rounded-xl px-3 py-[7px] text-[13.5px] font-medium transition",
+                  "group relative flex items-center gap-3.5 rounded-xl py-2 pr-3 pl-1.5 text-[14.5px] transition-all duration-200",
                   active
-                    ? "bg-white text-brand-900 shadow-sm"
-                    : "text-white/70 hover:bg-white/8 hover:text-white",
+                    ? "bg-gradient-to-r from-white/[0.16] to-white/[0.04] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                    : "font-medium text-white/65 hover:bg-white/[0.06] hover:text-white",
                 )}
               >
-                <Icon
+                {/* vạch vàng đánh dấu trang đang mở */}
+                <span
+                  aria-hidden="true"
                   className={cn(
-                    "size-[18px]",
-                    active ? "text-sun-500" : "text-white/50 group-hover:text-white/80",
+                    "absolute top-2 bottom-2 -left-4 w-1 rounded-r-full bg-sun-500 transition-opacity",
+                    active ? "opacity-100" : "opacity-0",
                   )}
                 />
+                <span
+                  className={cn(
+                    "grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors",
+                    active
+                      ? "bg-sun-500 text-white shadow-[0_6px_16px_-6px_rgba(239,68,68,0.7)]"
+                      : "bg-white/[0.06] text-white/60 group-hover:bg-white/10 group-hover:text-white",
+                  )}
+                >
+                  <Icon className="size-[18px]" />
+                </span>
                 <span className="flex-1 truncate">{label}</span>
                 {count && todo[count] > 0 && (
-                  <span className="min-w-5 rounded-full bg-sun-500 px-1.5 text-center text-[11px] leading-5 font-bold text-white">
+                  <span className="min-w-5 rounded-full bg-sun-500 px-1.5 text-center text-[11px] leading-5 font-bold text-white shadow-sm ring-2 ring-brand-950">
                     {todo[count]}
                   </span>
                 )}
@@ -171,20 +193,28 @@ function Shell({ children }) {
   const [leaving, setLeaving] = useState(false);
   const [todo, setTodo] = useState({});
 
+  // Tài khoản + quyền: tải lại mỗi lần chuyển trang → quyền admin vừa đổi có hiệu lực không cần đăng nhập lại
+  const loadMe = useCallback(
+    (first) =>
+      api("/auth/me")
+        .then((r) => setUser(r.data.user))
+        .catch(() => first && router.replace(ADMIN_LOGIN)),
+    [router],
+  );
   useEffect(() => {
-    api("/auth/me")
-      .then((r) => setUser(r.data.user))
-      .catch(() => router.replace(ADMIN_LOGIN));
-  }, [router]);
+    loadMe(true);
+  }, [loadMe]);
 
+  const canSeeEnquiries = canUser(user, "bookings") || canUser(user, "requests");
   // Số đơn / yêu cầu mới (trạng thái "Mới") — tải lại khi đổi trang hoặc khi trang khác báo đã xử lý
   const loadTodo = useCallback(() => {
+    if (!canSeeEnquiries) return; // không được xem đơn → menu đã ẩn 2 mục này
     api("/enquiries/stats")
       .then((r) =>
         setTodo({ bookings: r.data.bookings?.new ?? 0, requests: r.data.requests?.new ?? 0 }),
       )
       .catch(() => {});
-  }, []);
+  }, [canSeeEnquiries]);
   useEffect(() => {
     loadTodo();
     window.addEventListener(TODO_EVENT, loadTodo);
@@ -254,6 +284,7 @@ function Shell({ children }) {
           <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-white shadow-[0_8px_22px_-8px_rgba(0,0,0,0.6)] ring-2 ring-amber-brand/70 transition-transform duration-500 group-hover:rotate-6">
             <Image
               src="/images/logo/vietlook-icon.png"
+              unoptimized
               alt=""
               width={210}
               height={210}
@@ -264,30 +295,31 @@ function Shell({ children }) {
           <span className="min-w-0">
             <Image
               src="/images/logo/vietlook-wordmark.png"
+              unoptimized
               alt="Vietlook Travel"
               width={527}
               height={59}
               priority
               className="h-auto w-[150px] brightness-0 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)] invert"
             />
-            <span className="mt-1.5 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.24em] text-sun-400 uppercase">
-              <span className="size-1.5 rounded-full bg-sun-400" /> Trang quản trị
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/[0.08] px-2 py-0.5 text-[9.5px] font-semibold tracking-[0.2em] text-amber-brand uppercase ring-1 ring-white/10">
+              <span className="size-1.5 rounded-full bg-amber-brand" /> Trang quản trị
             </span>
           </span>
         </Link>
       </div>
-      <div className="mx-5 h-px bg-gradient-to-r from-white/15 via-white/10 to-transparent" />
+      <div className="mx-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
       {/* Menu: ẩn thanh cuộn, mờ dần 2 đầu khi danh sách dài */}
-      <nav className="flex-1 [scrollbar-width:none] overflow-y-auto [mask-image:linear-gradient(to_bottom,transparent,black_14px,black_calc(100%-18px),transparent)] px-3 pt-4 pb-10 [&::-webkit-scrollbar]:hidden">
+      <nav className="flex-1 [scrollbar-width:none] overflow-y-auto [mask-image:linear-gradient(to_bottom,transparent,black_14px,black_calc(100%-18px),transparent)] px-4 pt-4 pb-10 [&::-webkit-scrollbar]:hidden [@media(max-height:960px)]:pt-3 [@media(max-height:960px)]:pb-6">
         <Suspense fallback={<NavList user={user} todo={todo} />}>
           <NavLinks user={user} todo={todo} onNavigate={() => setOpen(false)} />
         </Suspense>
       </nav>
 
       {/* Tài khoản: 1 dòng gọn — avatar, tên, nút mở website + đăng xuất */}
-      <div className="mx-3 mb-3 flex items-center gap-3 rounded-2xl bg-white/[0.06] p-2.5 ring-1 ring-white/10">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-sun-400 to-sun-600 text-sm font-bold text-white shadow-sm">
+      <div className="mx-3 mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-br from-white/[0.09] to-white/[0.03] p-2.5 ring-1 ring-white/10 backdrop-blur">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-sun-400 to-sun-600 text-sm font-bold text-white shadow-[0_6px_16px_-6px_rgba(239,68,68,0.8)] ring-2 ring-white/15">
           {user ? initials : <Loader2 className="size-4 animate-spin" />}
         </span>
         <span
@@ -299,7 +331,7 @@ function Shell({ children }) {
           </span>
           <span className="flex items-center gap-1 text-[11px] text-white/50">
             {user && <span className="size-1.5 rounded-full bg-emerald-400" />}
-            {user ? (user.role === "admin" ? "Quản trị viên" : "Biên tập viên") : ""}
+            {user ? (user.role === "admin" ? "Quản trị viên" : "Nhân viên") : ""}
           </span>
         </span>
         <a
@@ -327,8 +359,8 @@ function Shell({ children }) {
   );
 
   return (
-    <div className="min-h-svh lg:grid lg:grid-cols-[264px_1fr]">
-      <aside className="sticky top-0 hidden h-svh bg-brand-950 bg-[radial-gradient(circle_at_20%_0%,rgba(23,128,193,0.35),transparent_55%)] lg:block">
+    <div className="min-h-svh lg:grid lg:grid-cols-[272px_1fr]">
+      <aside className="sticky top-0 hidden h-svh border-r border-white/5 bg-brand-950 bg-[radial-gradient(120%_60%_at_0%_0%,rgba(23,128,193,0.38),transparent_60%),radial-gradient(90%_50%_at_100%_100%,rgba(239,68,68,0.10),transparent_60%)] lg:block">
         {sidebar}
       </aside>
 
@@ -337,6 +369,7 @@ function Shell({ children }) {
           <span className="grid size-10 place-items-center rounded-full bg-white ring-2 ring-amber-brand/70">
             <Image
               src="/images/logo/vietlook-icon.png"
+              unoptimized
               alt=""
               width={210}
               height={210}
@@ -345,6 +378,7 @@ function Shell({ children }) {
           </span>
           <Image
             src="/images/logo/vietlook-wordmark.png"
+            unoptimized
             alt="Vietlook Travel"
             width={527}
             height={59}
@@ -375,7 +409,7 @@ function Shell({ children }) {
         />
         <aside
           className={cn(
-            "absolute inset-y-0 left-0 w-[284px] bg-brand-950 transition-transform duration-300 ease-out",
+            "absolute inset-y-0 left-0 w-[288px] bg-brand-950 bg-[radial-gradient(120%_60%_at_0%_0%,rgba(23,128,193,0.38),transparent_60%),radial-gradient(90%_50%_at_100%_100%,rgba(239,68,68,0.10),transparent_60%)] transition-transform duration-300 ease-out",
             open ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -392,8 +426,41 @@ function Shell({ children }) {
       </div>
 
       <main className="min-w-0 px-4 py-6 [overflow-wrap:anywhere] sm:px-8 lg:px-10 lg:py-9">
-        <div className="mx-auto max-w-[1440px]">{children}</div>
+        <div className="mx-auto max-w-[1440px]">
+          <CurrentUserProvider user={user}>
+            <Suspense fallback={<LoadingBlock />}>
+              <AccessGuard user={user} onNavigate={loadMe}>
+                {children}
+              </AccessGuard>
+            </Suspense>
+          </CurrentUserProvider>
+        </div>
       </main>
     </div>
+  );
+}
+
+/**
+ * Chặn mở thẳng đường dẫn của mục chưa được cấp quyền → trang báo thân thiện (không chuyển hướng, không vòng lặp).
+ * Chờ tải xong tài khoản mới HIỆN nội dung trang (nút sửa / xoá đã đúng theo quyền khi hiện ra).
+ */
+function AccessGuard({ user, onNavigate, children }) {
+  const pathname = usePathname();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    onNavigate?.();
+  }, [pathname, onNavigate]);
+  const mod = moduleForPath(pathname);
+  if (user && mod && !canUser(user, mod, "view")) return <NoAccess />;
+  // Chưa tải xong tài khoản: vẫn dựng trang nhưng ẩn đi (không đổi cấu trúc → không dựng lại khi hiện)
+  return (
+    <ModuleScope module={mod === "admin" ? null : mod}>
+      {!user && <LoadingBlock />}
+      <div hidden={!user}>{children}</div>
+    </ModuleScope>
   );
 }

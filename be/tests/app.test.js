@@ -29,6 +29,38 @@ describe("app — khung & bảo mật", () => {
     assert.ok(res.headers["x-request-id"]);
   });
 
+  it("đăng nhập nhanh (demo) mặc định TẮT: báo tắt + POST → 404", async () => {
+    const status = await request(app).get("/api/v1/auth/demo");
+    assert.equal(status.status, 200);
+    assert.equal(status.body.data.enabled, false);
+    const res = await request(app)
+      .post("/api/v1/auth/demo-login")
+      .set("X-Requested-With", "fetch")
+      .send({});
+    assert.equal(res.status, 404);
+    assert.equal(res.headers["set-cookie"], undefined);
+  });
+
+  it("nhật ký thao tác: kiểm tra tham số tìm kiếm", async () => {
+    const { listAuditLogsQuery } = await import("../src/validators/audit-log.validator.js");
+    const okQ = listAuditLogsQuery.parse({
+      q: "VL-BK",
+      actions: "auth.login,tour.update",
+      from: "2026-11-01",
+      to: "2026-11-10",
+    });
+    assert.deepEqual(okQ.actions, ["auth.login", "tour.update"]);
+    assert.equal(listAuditLogsQuery.safeParse({ actions: "auth.login,$where" }).success, false);
+    assert.equal(listAuditLogsQuery.safeParse({ from: "10/11/2026" }).success, false);
+    assert.equal(listAuditLogsQuery.safeParse({ q: "x".repeat(101) }).success, false);
+  });
+
+  it("chữ khách gõ: bỏ thẻ HTML, giữ dấu so sánh", async () => {
+    const { plainText } = await import("../src/validators/common.validator.js");
+    assert.equal(plainText(200).parse("Hi <b>Thanks!</b><script>x</script>"), "Hi Thanks!x");
+    assert.equal(plainText(200).parse("trẻ < 5 tuổi và > 2 tuổi"), "trẻ < 5 tuổi và > 2 tuổi");
+  });
+
   it("POST thiếu X-Requested-With → 403 CSRF_REJECTED", async () => {
     const res = await request(app).post("/api/v1/auth/login").send({});
     assert.equal(res.status, 403);

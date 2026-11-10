@@ -4,7 +4,11 @@ import {
   publicController,
   settingsController,
 } from "../controllers/site.controller.js";
-import { requireAdmin, requireStaff } from "../middlewares/auth.middleware.js";
+import { requireAdmin, requirePermission, requireStaff } from "../middlewares/auth.middleware.js";
+import {
+  requireEnquiryAccess,
+  requireEnquiryList,
+} from "../middlewares/enquiry-access.middleware.js";
 import { requireCaptcha } from "../middlewares/captcha.middleware.js";
 import { publicFormLimiter } from "../middlewares/rate-limit.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
@@ -22,6 +26,7 @@ import {
   trackingSettingsSchema,
 } from "../validators/content.validator.js";
 import { lookupCodeParam, publicEnquirySchema } from "../validators/enquiry.validator.js";
+import { formLang, formMessage, localizeFormDetails } from "../utils/form-messages.js";
 import { z } from "zod";
 
 const slugParam = validate({ params: z.object({ slug }) });
@@ -43,68 +48,106 @@ publicRoutes.get("/site", publicController.site);
 
 /* ---------- /enquiries — khách gửi form; CMS quản lý ---------- */
 export const enquiryRoutes = Router();
+// Lỗi dữ liệu form công khai → câu dễ hiểu theo ngôn ngữ khách (website hiện thẳng cho khách)
+const validateEnquiry = (req, res, next) =>
+  validate({ body: publicEnquirySchema })(req, res, (err) => {
+    if (!err) return next();
+    const lang = formLang(req);
+    err.message = formMessage(lang, "invalid");
+    err.details = localizeFormDetails(err.details, lang);
+    next(err);
+  });
+
 // Form công khai: giới hạn tần suất → captcha → kiểm tra dữ liệu
 enquiryRoutes.post(
   "/",
   publicFormLimiter,
   requireCaptcha,
-  validate({ body: publicEnquirySchema }),
+  validateEnquiry,
   publicController.submitEnquiry,
 );
-enquiryRoutes.get("/", requireStaff, validate({ query: enquiryListQuery }), enquiryController.list);
-enquiryRoutes.get("/stats", requireStaff, enquiryController.stats);
+// CMS: quyền theo nhóm đơn — "Đơn đặt tour" (bookings) / "Yêu cầu từ form" (requests).
+// Theo :id → tra loại đơn rồi kiểm tra đúng nhóm (nhóm không được xem → 404, không lộ đơn tồn tại).
+// Xem = xem; đổi trạng thái / ghi chú / gửi lại email = sửa; xoá đơn = toàn quyền.
+enquiryRoutes.get(
+  "/",
+  requireStaff,
+  validate({ query: enquiryListQuery }),
+  requireEnquiryList,
+  enquiryController.list,
+);
+enquiryRoutes.get("/stats", requireStaff, requireEnquiryList, enquiryController.stats);
 enquiryRoutes.get(
   "/code/:code",
   requireStaff,
+  requireEnquiryList,
   validate({ params: lookupCodeParam }),
   enquiryController.byCode,
 );
-enquiryRoutes.get("/:id", requireStaff, validate({ params: idParam }), enquiryController.get);
+enquiryRoutes.get(
+  "/:id",
+  requireStaff,
+  validate({ params: idParam }),
+  requireEnquiryAccess("view"),
+  enquiryController.get,
+);
 enquiryRoutes.patch(
   "/:id",
   requireStaff,
   validate({ params: idParam, body: enquiryUpdateSchema }),
+  requireEnquiryAccess("edit"),
   enquiryController.update,
 );
 enquiryRoutes.post(
   "/:id/notes",
   requireStaff,
   validate({ params: idParam, body: noteSchema }),
+  requireEnquiryAccess("edit"),
   enquiryController.addNote,
 );
 enquiryRoutes.delete(
   "/:id/notes/:noteId",
   requireStaff,
   validate({ params: noteParam }),
+  requireEnquiryAccess("edit"),
   enquiryController.removeNote,
 );
 enquiryRoutes.post(
   "/:id/resend-email",
   requireStaff,
   validate({ params: idParam }),
+  requireEnquiryAccess("edit"),
   enquiryController.resendEmail,
 );
-enquiryRoutes.delete("/:id", requireAdmin, validate({ params: idParam }), enquiryController.remove);
+enquiryRoutes.delete(
+  "/:id",
+  requireStaff,
+  validate({ params: idParam }),
+  requireEnquiryAccess("full"),
+  enquiryController.remove,
+);
 
-/* ---------- /settings — trang chủ, trang nội dung (staff); email, 9Pay (admin) ---------- */
+/* ---------- /settings — trang chủ, trang nội dung (theo quyền); email, 9Pay, mã đo lường (chỉ admin) ---------- */
 export const settingsRoutes = Router();
-settingsRoutes.get("/home", requireStaff, settingsController.getHome);
+const home = (level) => [requireStaff, requirePermission("home", level)];
+const pages = (level) => [requireStaff, requirePermission("pages", level)];
+settingsRoutes.get("/home", home("view"), settingsController.getHome);
 settingsRoutes.put(
   "/home",
-  requireStaff,
+  home("edit"),
   validate({ body: homeSettingsSchema }),
   settingsController.saveHome,
 );
-settingsRoutes.get("/pages", requireStaff, settingsController.pages);
+settingsRoutes.get("/pages", pages("view"), settingsController.pages);
 settingsRoutes.get(
   "/pages/:key",
-  requireStaff,
+  pages("view"),
   validate({ params: pageKeyParam }),
   settingsController.page,
 );
 settingsRoutes.put(
   "/pages/:key",
-  requireStaff,
+  pages("edit"),
   validate({ params: pageKeyParam, body: pageSchema }),
   settingsController.savePage,
 );
@@ -115,7 +158,6 @@ settingsRoutes.put(
   validate({ body: notificationSettingsSchema }),
   settingsController.saveNotifications,
 );
-settingsRoutes.post("/notifications/test", requireAdmin, settingsController.testEmail);
 settingsRoutes.get("/tracking", requireAdmin, settingsController.getTracking);
 settingsRoutes.put(
   "/tracking",

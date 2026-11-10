@@ -25,7 +25,7 @@ import TourGallery from "@/components/tours/TourGallery";
 import StickyTabs from "@/components/tours/StickyTabs";
 import BookingWidget from "@/components/tours/BookingWidget";
 import StickySide from "@/components/ui/StickySide";
-import PriceTable from "@/components/tours/PriceTable";
+import PriceTable, { PricingGrid, hasStructuredPricing } from "@/components/tours/PriceTable";
 import MobileBookBar from "@/components/tours/MobileBookBar";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { parseVideo } from "@/lib/video";
@@ -107,6 +107,16 @@ const TOUR_L = {
   D: { en: "Dinner", zh: "晚餐", vi: "Tối" },
   overnight: { en: "Overnight", zh: "住宿", vi: "Nghỉ đêm" },
   every: { en: "Every", zh: "每", vi: "Thứ" },
+  groupDaily: {
+    en: "Shared group tour – join on any day.",
+    zh: "拼团游——每天均可加入。",
+    vi: "Tour ghép đoàn – khởi hành mỗi ngày.",
+  },
+  fixedNote: {
+    en: "Pick one of these departures when you book – a private start date is available on request.",
+    zh: "预订时请选择以上出发日期；如需其他日期可单独咨询。",
+    vi: "Chọn một ngày khởi hành ở trên khi đặt – muốn đi ngày khác vui lòng liên hệ.",
+  },
 };
 const WEEKDAY_LOCALE = { en: "en-GB", zh: "zh-CN", vi: "vi-VN" };
 /** 0 = Chủ nhật … 6 = Thứ bảy → tên thứ theo ngôn ngữ */
@@ -133,11 +143,12 @@ async function TourPageContent({ params }) {
         : `1 ${c.day}`
       : `${tour.days} ${c.days} / ${tour.nights} ${c.nights}`;
 
+  const structured = hasStructuredPricing(tour.pricing);
   const tabs = [
     { id: "overview", label: t.overview },
     tx.itinerary.length > 0 && { id: "itinerary", label: t.itinerary },
     { id: "included", label: t.included },
-    tx.priceTables.length > 0 && { id: "prices", label: t.pricing },
+    (tx.priceTables.length > 0 || structured) && { id: "prices", label: t.pricing },
     { id: "departures", label: t.departures },
     { id: "faq", label: t.faqTitle },
     { id: "reviews", label: t.reviewsTitle },
@@ -444,7 +455,31 @@ async function TourPageContent({ params }) {
                           </span>
                           <span className="-mt-2 text-lg leading-none font-bold">{d.day}</span>
                         </span>
-                        <span className="flex-1 font-semibold text-ink">{d.title}</span>
+                        <span className="flex-1">
+                          <span className="block font-semibold text-ink">{d.title}</span>
+                          {(d.meals?.length > 0 || d.overnight) && (
+                            <span className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
+                              {d.meals?.length > 0 && (
+                                <span
+                                  className="flex items-center gap-1.5"
+                                  title={tr(TOUR_L.meals, lang)}
+                                >
+                                  <Utensils className="size-3.5 text-brand-600" />
+                                  {d.meals.map((m) => tr(TOUR_L[m], lang)).join(" · ")}
+                                </span>
+                              )}
+                              {d.overnight && (
+                                <span
+                                  className="flex items-center gap-1.5"
+                                  title={tr(TOUR_L.overnight, lang)}
+                                >
+                                  <BedDouble className="size-3.5 text-brand-600" />
+                                  {d.overnight}
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </span>
                         <span className="grid size-8 place-items-center rounded-full bg-surface text-lg text-brand-600 transition group-open:rotate-45">
                           +
                         </span>
@@ -454,28 +489,6 @@ async function TourPageContent({ params }) {
                           className="prose-guide border-t border-border px-5 pt-1 pb-5 text-base sm:px-6"
                           dangerouslySetInnerHTML={{ __html: d.html }}
                         />
-                      )}
-                      {(d.meals?.length > 0 || d.overnight) && (
-                        <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border px-5 py-3 text-sm text-muted sm:px-6">
-                          {d.meals?.length > 0 && (
-                            <span className="flex items-center gap-2">
-                              <Utensils className="size-4 text-brand-600" />
-                              <span className="font-semibold text-ink">
-                                {tr(TOUR_L.meals, lang)}:
-                              </span>
-                              {d.meals.map((m) => tr(TOUR_L[m], lang)).join(" · ")}
-                            </span>
-                          )}
-                          {d.overnight && (
-                            <span className="flex items-center gap-2">
-                              <BedDouble className="size-4 text-brand-600" />
-                              <span className="font-semibold text-ink">
-                                {tr(TOUR_L.overnight, lang)}:
-                              </span>
-                              {d.overnight}
-                            </span>
-                          )}
-                        </div>
                       )}
                     </details>
                   ))}
@@ -534,13 +547,14 @@ async function TourPageContent({ params }) {
               )}
             </Card>
 
-            {tx.priceTables.length > 0 && (
+            {(tx.priceTables.length > 0 || structured) && (
               <Card id="prices" eyebrow={t.pricing} title={t.pricing}>
                 <div className="space-y-6">
+                  {structured && <PricingGrid pricing={tour.pricing} lang={lang} />}
                   {tx.priceTables.map((tb, i) => (
                     <PriceTable key={i} table={tb} />
                   ))}
-                  <p className="text-sm text-muted">{t.holidaySurcharge}</p>
+                  {!structured && <p className="text-sm text-muted">{t.holidaySurcharge}</p>}
                 </div>
               </Card>
             )}
@@ -557,7 +571,13 @@ async function TourPageContent({ params }) {
                           ? weekly.join(" · ")
                           : t.dailyDeparture}
                     </span>
-                    <span className="text-sm text-muted">{t.departureCardNote}</span>
+                    <span className="text-sm text-muted">
+                      {upcoming.length || weekly.length
+                        ? tr(TOUR_L.fixedNote, lang)
+                        : tour.tourType === "group"
+                          ? tr(TOUR_L.groupDaily, lang)
+                          : t.departureCardNote}
+                    </span>
                   </span>
                 </span>
                 <a href="#book" className="font-semibold text-sun-500 hover:underline">
@@ -652,7 +672,10 @@ async function TourPageContent({ params }) {
 
           {/* Khối đặt tour dính bên phải */}
           <div id="book" className="scroll-mt-36">
-            <StickySide className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border xl:p-6 short:p-5">
+            <StickySide
+              offset={176}
+              className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border xl:p-6 short:p-5"
+            >
               <h2 className="mb-3.5 text-xl font-bold tracking-tight text-ink">{t.bookTitle}</h2>
               <BookingWidget
                 lang={lang}

@@ -33,7 +33,7 @@ import { priceLineVi } from "@/lib/pricing-labels";
 import { useMutation, useOptions } from "./hooks";
 import RichText from "./RichText";
 import { DragHandle, Sortable } from "./Sortable";
-import { AutoTranslate } from "./translate";
+import { AutoTranslate, pickSource, slugSource, useAutoFill } from "./translate";
 import {
   Badge,
   Button,
@@ -50,7 +50,9 @@ import {
   Select,
   StringList,
   Textarea,
+  DEFAULT_LANG,
   Toggle,
+  anyLang,
   VideoHelp,
   VideoListField,
   filledOf,
@@ -61,6 +63,7 @@ import {
 } from "./ui";
 import { canonicalVideo, parseVideo } from "@/lib/video";
 import { REGIONS } from "./DestinationsPage";
+import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
 
 const PATH = "/admin/tours";
 const TAGS = ["tours"];
@@ -362,8 +365,8 @@ export function toTourPayload(t) {
 
 /** Kiểm tra nhanh trước khi gửi → câu báo lỗi đầu tiên (hoặc null) */
 function validate(p) {
-  if (!p.content.en.title)
-    return "Vui lòng nhập tên tour tiếng Anh (mục Thông tin chung, chọn ngôn ngữ EN).";
+  if (!LANG_KEYS.some((l) => p.content[l].title))
+    return "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục Thông tin chung).";
   if (!p.slug) return "Vui lòng nhập đường dẫn trang (mục Tuỳ chọn thêm).";
   if (!SLUG_RX.test(p.slug))
     return "Đường dẫn trang chỉ gồm chữ thường không dấu, số và dấu gạch ngang.";
@@ -391,9 +394,14 @@ const fmtDay = (d) =>
     ? `${d.slice(3)}/${d.slice(0, 2)} hằng năm`
     : `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
-/** Gợi ý trong ô trống của bản dịch: cho biết website sẽ dùng bản tiếng Anh */
-const phOf = (isEn, v, fallback) =>
-  !isEn && v ? `Để trống sẽ dùng bản tiếng Anh: ${v.slice(0, 70)}` : fallback;
+/** Chữ của trường `key` ở một ngôn ngữ KHÁC đã có (để gợi ý trong ô đang trống) */
+const otherText = (t, lang, key) =>
+  LANG_KEYS.filter((l) => l !== lang)
+    .map((l) => t.content[l]?.[key])
+    .find((v) => typeof v === "string" && v.trim()) ?? "";
+
+/** Gợi ý trong ô trống: ngôn ngữ khác đã có chữ → khi lưu sẽ tự dịch sang ô này */
+const phOf = (v, fallback) => (v ? `(trống — sẽ tự dịch khi lưu) ${v.slice(0, 70)}` : fallback);
 
 /** memo theo danh sách trường của tour (t) + so sánh nông các prop khác */
 const memoOn = (Comp, keys) =>
@@ -463,6 +471,20 @@ function rekeyTranslated(content, from) {
   );
 }
 
+/** Tên tour của 3 ngôn ngữ → { en, zh, vi } */
+const titlesOf = (t) => Object.fromEntries(LANG_KEYS.map((l) => [l, t.content[l]?.title ?? ""]));
+
+/** Gộp bản dịch (dữ liệu từ translationSource đã dịch) vào tour; chưa có đường dẫn thì tạo từ tên */
+function withTranslation(tour, translated, from) {
+  const next = {
+    ...tour,
+    content: rekeyTranslated(translated.content, from),
+    seo: translated.seo,
+  };
+  if (!next.slug) next.slug = slugify(slugSource(titlesOf(next))).slice(0, 120);
+  return next;
+}
+
 /* =========================================================================
  * Trang soạn tour
  * ========================================================================= */
@@ -475,7 +497,7 @@ const SECTIONS = [
   { id: "bao-gom", label: "4. Bao gồm / Không", icon: ListChecks },
   { id: "hoi-dap", label: "5. Câu hỏi thường gặp", icon: CircleHelp },
   { id: "anh", label: "6. Ảnh & video", icon: ImageIcon },
-  { id: "tuy-chon", label: "Tuỳ chọn thêm", icon: SlidersHorizontal, extra: true },
+  { id: "tuy-chon", label: "Hiển thị & thông tin phụ", icon: SlidersHorizontal, extra: true },
   { id: "danh-gia", label: "Đánh giá", icon: Star, extra: true },
   { id: "google", label: "Hiển thị trên Google", icon: SearchIcon, extra: true },
 ];
@@ -523,21 +545,20 @@ export default function TourEditor({ id }) {
   const setContent = useCallback((lang, patch) => {
     setT((x) => {
       const next = { ...x, content: { ...x.content, [lang]: { ...x.content[lang], ...patch } } };
-      if (lang === "en" && "title" in patch && !slugTouched.current)
-        next.slug = slugify(patch.title).slice(0, 120);
+      if ("title" in patch && !slugTouched.current)
+        next.slug = slugify(slugSource(titlesOf(next))).slice(0, 120);
       return next;
     });
     setDirty(true);
   }, []);
 
-  /** Nhận kết quả “Dịch tự động”: thay phần chữ 3 ngôn ngữ; tour mới chưa có đường dẫn thì tạo từ tên tiếng Anh */
+  /** Nhận kết quả “Dịch tự động”: thay phần chữ 3 ngôn ngữ; tour mới chưa có đường dẫn thì tạo từ tên */
   const applyTranslation = useCallback((next, from) => {
-    setT((x) => {
-      const out = { ...x, content: rekeyTranslated(next.content, from), seo: next.seo };
-      if (!slugTouched.current && !x.slug && out.content.en.title)
-        out.slug = slugify(out.content.en.title).slice(0, 120);
-      return out;
-    });
+    setT((x) =>
+      slugTouched.current && !x.slug
+        ? { ...x, content: rekeyTranslated(next.content, from), seo: next.seo }
+        : withTranslation(x, next, from),
+    );
     setDirty(true);
   }, []);
 
@@ -569,7 +590,9 @@ export default function TourEditor({ id }) {
     value: x.slug,
     label: locText(x.name) || x.slug,
   }));
+  const { canEdit } = usePermission("tours");
 
+  if (isNew && !canEdit) return <NoAccess />;
   if (loadError)
     return (
       <div className="space-y-4">
@@ -631,15 +654,34 @@ function EditorBody({
 }) {
   const router = useRouter();
   // một ngôn ngữ đang soạn dùng chung cho mọi mục có nội dung 3 thứ tiếng
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const { toast } = useUi();
   const { run, busy } = useMutation(TAGS);
+  const autoFill = useAutoFill();
+  const { canEdit } = usePermission("tours"); // chỉ xem → form chỉ đọc, không có nút Lưu
+
+  /** Ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết (tab đang chọn nếu có chữ) */
+  const fillLanguages = async (tour) => {
+    const from = pickSource(tour.content, lang, TRANSLATE_SKIP);
+    const r = await autoFill.fill(translationSource(tour, from), {
+      lang: from,
+      skipKeys: TRANSLATE_SKIP,
+    });
+    if (!r.filled.length) return { tour, failed: r.failed, from };
+    return { tour: withTranslation(tour, r.value, from), failed: r.failed, from };
+  };
 
   const save = async () => {
-    if (busy) return;
-    const body = toTourPayload(t);
+    if (busy || autoFill.busy || !canEdit) return;
+    if (!anyLang(titlesOf(t)))
+      return toast.error("Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục Thông tin chung).", {
+        title: "Chưa lưu được",
+      });
+    const { tour, failed, from } = await fillLanguages(t);
+    if (tour !== t) set({ content: tour.content, seo: tour.seo, slug: tour.slug });
+    const body = toTourPayload(tour);
     const problem = validate(body);
-    if (problem) return toast(problem, "error");
+    if (problem) return toast.error(problem, { title: "Chưa lưu được" });
     const r = await run(
       () =>
         isNew
@@ -650,6 +692,14 @@ function EditorBody({
     if (!r?.data) return;
     setDirty(false);
     onSaved(r.data);
+    if (failed)
+      autoFill.offerRetry(async (tr) => {
+        const next = withTranslation(tour, tr, from);
+        await api(`${PATH}/${r.data.id}`, { method: "PUT", body: toTourPayload(next) });
+        if (isNew) return; // đã chuyển sang trang sửa → trang tự tải lại khi mở lần sau
+        set({ content: next.content, seo: next.seo });
+        setDirty(false);
+      });
     if (isNew) {
       // tắt cảnh báo rời trang trước khi chuyển sang trang sửa
       window.__vlHasUnsaved = () => false;
@@ -692,14 +742,16 @@ function EditorBody({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <TourTranslate
-              t={t}
-              lang={lang}
-              onTranslated={onTranslated}
-              size="md"
-              variant="secondary"
-              className="hidden rounded-xl px-4 sm:inline-flex"
-            />
+            {canEdit && (
+              <TourTranslate
+                t={t}
+                lang={lang}
+                onTranslated={onTranslated}
+                size="md"
+                variant="secondary"
+                className="hidden rounded-xl px-4 sm:inline-flex"
+              />
+            )}
             {!isNew && savedSlug && (
               <a
                 href={`/tours/${savedSlug}`}
@@ -716,9 +768,16 @@ function EditorBody({
                 <span className="hidden sm:inline">Xem trên website</span>
               </a>
             )}
-            <Button icon={Save} onClick={save} loading={busy} title="Lưu (Ctrl + S)">
-              {isNew ? "Tạo tour" : "Lưu"}
-            </Button>
+            {canEdit && (
+              <Button
+                icon={Save}
+                onClick={save}
+                loading={busy || autoFill.busy}
+                title="Lưu (Ctrl + S)"
+              >
+                {isNew ? "Tạo tour" : "Lưu"}
+              </Button>
+            )}
           </div>
         </div>
         <nav className="-mx-1 mt-3 flex [scrollbar-width:none] gap-1 overflow-x-auto pb-0.5 lg:hidden">
@@ -757,64 +816,68 @@ function EditorBody({
         </nav>
 
         <div className="min-w-0 space-y-6">
-          <GeneralSection
-            t={t}
-            set={set}
-            setContent={setContent}
-            lang={lang}
-            setLang={setLang}
-            onTranslated={onTranslated}
-            destinations={destinations}
-            themes={themes}
-          />
-          <ItinerarySection
-            t={t}
-            setContent={setContent}
-            setDayMeals={setDayMeals}
-            lang={lang}
-            setLang={setLang}
-            onTranslated={onTranslated}
-          />
-          <PricingSection t={t} set={set} />
-          <IncludesSection
-            t={t}
-            setContent={setContent}
-            lang={lang}
-            setLang={setLang}
-            onTranslated={onTranslated}
-          />
-          <FaqSection
-            t={t}
-            setContent={setContent}
-            lang={lang}
-            setLang={setLang}
-            onTranslated={onTranslated}
-          />
-          <MediaSection t={t} set={set} />
+          <ReadOnlyArea readOnly={!canEdit} className="space-y-6">
+            <GeneralSection
+              t={t}
+              set={set}
+              setContent={setContent}
+              lang={lang}
+              setLang={setLang}
+              onTranslated={onTranslated}
+              destinations={destinations}
+              themes={themes}
+            />
+            <ItinerarySection
+              t={t}
+              setContent={setContent}
+              setDayMeals={setDayMeals}
+              lang={lang}
+              setLang={setLang}
+              onTranslated={onTranslated}
+            />
+            <PricingSection t={t} set={set} />
+            <IncludesSection
+              t={t}
+              setContent={setContent}
+              lang={lang}
+              setLang={setLang}
+              onTranslated={onTranslated}
+            />
+            <FaqSection
+              t={t}
+              setContent={setContent}
+              lang={lang}
+              setLang={setLang}
+              onTranslated={onTranslated}
+            />
+            <MediaSection t={t} set={set} />
 
-          <div className="pt-4">
-            <p className="text-sm font-bold text-slate-500">Tuỳ chọn thêm</p>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Các mục dưới đây không có trong mẫu thông tin tour — chỉ điền khi cần.
-            </p>
-          </div>
-          <ExtrasSection
-            t={t}
-            set={set}
-            setSlug={setSlug}
-            setContent={setContent}
-            isNew={isNew}
-            lang={lang}
-            setLang={setLang}
-            onTranslated={onTranslated}
-          />
-          <ReviewsSection t={t} set={set} />
-          <SeoSection t={t} set={set} lang={lang} setLang={setLang} onTranslated={onTranslated} />
-          <div className="flex justify-end">
-            <Button icon={Save} onClick={save} loading={busy}>
-              {isNew ? "Tạo tour" : "Lưu thay đổi"}
-            </Button>
-          </div>
+            <div className="pt-4">
+              <p className="text-sm font-bold text-slate-500">Tuỳ chọn thêm</p>
+              <p className="mt-0.5 text-xs text-slate-400">
+                Các mục dưới đây không có trong mẫu thông tin tour — chỉ điền khi cần.
+              </p>
+            </div>
+            <ExtrasSection
+              t={t}
+              set={set}
+              setSlug={setSlug}
+              setContent={setContent}
+              isNew={isNew}
+              lang={lang}
+              setLang={setLang}
+              onTranslated={onTranslated}
+            />
+            <ReviewsSection t={t} set={set} />
+            <SeoSection t={t} set={set} lang={lang} setLang={setLang} onTranslated={onTranslated} />
+          </ReadOnlyArea>
+          {canEdit && (
+            <div className="flex justify-end">
+              <Button icon={Save} onClick={save} loading={busy || autoFill.busy}>
+                {isNew ? "Tạo tour" : "Lưu thay đổi"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -954,8 +1017,7 @@ const GeneralSection = memoOn(
     themes,
   }) {
     const c = t.content[lang];
-    const en = t.content.en;
-    const isEn = lang === "en";
+    const hasOther = LANG_KEYS.some((l) => l !== lang && t.content[l].title);
     const known = new Set(destinations.map((d) => d.value));
     const unknown = destinations.length ? t.destinations.filter((s) => !known.has(s)) : [];
     const knownThemes = new Set(themes.map((x) => x.value));
@@ -973,28 +1035,28 @@ const GeneralSection = memoOn(
       <Section
         id="thong-tin"
         title="1. Thông tin chung"
-        description="Tên tour và mô tả ngắn nhập theo từng ngôn ngữ — tiếng Anh là bắt buộc."
+        description="Viết bằng ngôn ngữ nào cũng được — khi lưu, các ngôn ngữ còn trống tự được dịch."
         actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
       >
         <div className="space-y-5">
-          {!isEn && !c.title && (
-            <Notice tone="warn">
-              Bản {langLabel(lang)} chưa có nội dung — khách xem ngôn ngữ này sẽ thấy bản tiếng Anh.
+          {hasOther && !c.title && (
+            <Notice>
+              Bản {langLabel(lang)} còn trống — khi lưu sẽ tự dịch từ ngôn ngữ đã viết.
             </Notice>
           )}
           <Field
             label={
               <span className="flex w-full items-center justify-between gap-2">
-                {isEn ? "Tên tour (tiếng Anh)" : `Tên tour (${langLabel(lang)})`}
+                {`Tên tour (${langLabel(lang)})`}
                 <Counter n={c.title.length} max={250} />
               </span>
             }
-            required={isEn}
+            required
           >
             <Input
               value={c.title}
               maxLength={250}
-              placeholder={phOf(isEn, en.title, "VD: Hanoi – Halong Bay 3 Days")}
+              placeholder={phOf(otherText(t, lang, "title"), "VD: Hà Nội – Vịnh Hạ Long 3 ngày")}
               onChange={(e) => setContent(lang, { title: e.target.value })}
             />
           </Field>
@@ -1119,7 +1181,7 @@ const GeneralSection = memoOn(
               value={c.summary}
               rows={4}
               maxLength={3000}
-              placeholder={phOf(isEn, en.summary)}
+              placeholder={phOf(otherText(t, lang, "summary"))}
               onChange={(e) => setContent(lang, { summary: e.target.value })}
             />
           </Field>
@@ -1149,6 +1211,10 @@ const GeneralSection = memoOn(
 const ItinerarySection = memoOn(
   function ItinerarySection({ t, setContent, setDayMeals, lang, setLang, onTranslated }) {
     const setL = useCallback((patch) => setContent(lang, patch), [lang, setContent]);
+    // bản ngôn ngữ khác có nhiều ngày nhất → dùng làm khung (số ngày, bữa ăn) cho bản đang soạn
+    const ref = LANG_KEYS.filter((l) => l !== lang).sort(
+      (a, b) => t.content[b].itinerary.length - t.content[a].itinerary.length,
+    )[0];
     return (
       <Section
         id="lich-trinh"
@@ -1161,7 +1227,8 @@ const ItinerarySection = memoOn(
           value={t.content[lang].itinerary}
           onChange={setL}
           onMeals={setDayMeals}
-          enDays={lang === "en" ? null : t.content.en.itinerary}
+          enDays={t.content[ref].itinerary}
+          refName={langLabel(ref)}
         />
       </Section>
     );
@@ -1469,7 +1536,7 @@ const PricingSection = memoOn(
                 <button
                   type="button"
                   onClick={() => setP({ childRates: DEFAULT_CHILD_RATES.map((x) => ({ ...x })) })}
-                  className="mt-2 block text-xs font-semibold text-brand-700 hover:underline"
+                  className="mt-2 block text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600"
                 >
                   Điền sẵn mức thông dụng để sửa
                 </button>
@@ -1700,7 +1767,7 @@ const MediaSection = memoOn(
               <div className="space-y-3">
                 <VideoListField value={t.videos} onChange={(videos) => set({ videos })} max={10} />
                 <details className="group/help">
-                  <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline [&::-webkit-details-marker]:hidden">
+                  <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600 [&::-webkit-details-marker]:hidden">
                     Cách lấy link video YouTube / Google Drive
                   </summary>
                   <div className="mt-2">
@@ -1774,7 +1841,13 @@ function ItemTools({ i, onRemove, open, onToggle }) {
   );
 }
 
-const ItineraryEditor = memo(function ItineraryEditor({ value, onChange, onMeals, enDays }) {
+const ItineraryEditor = memo(function ItineraryEditor({
+  value,
+  onChange,
+  onMeals,
+  enDays,
+  refName,
+}) {
   const { confirm } = useUi();
   const [open, setOpen] = useState(() => new Set(value.length <= 2 ? value.map((d) => d._k) : []));
   const emit = (itinerary) => onChange({ itinerary });
@@ -1793,7 +1866,7 @@ const ItineraryEditor = memo(function ItineraryEditor({ value, onChange, onMeals
       day: last ? intOr(last.day, value.length) + 1 : 1,
       title: "",
       html: "",
-      // bản dịch: lấy sẵn bữa ăn của ngày tương ứng bên bản tiếng Anh
+      // lấy sẵn bữa ăn của ngày tương ứng bên bản ngôn ngữ khác
       meals: cleanMeals(enDays?.[value.length]?.meals),
       overnight: "",
     };
@@ -1850,11 +1923,11 @@ const ItineraryEditor = memo(function ItineraryEditor({ value, onChange, onMeals
       )}
       {!value.length && enDays?.length > 0 && (
         <Notice className="mb-3">
-          Bản tiếng Anh có {enDays.length} ngày.{" "}
+          Bản {refName} có {enDays.length} ngày.{" "}
           <button type="button" onClick={copyFrame} className="font-semibold underline">
-            Tạo sẵn {enDays.length} ngày giống bản tiếng Anh
+            Tạo sẵn {enDays.length} ngày giống bản {refName}
           </button>{" "}
-          để dịch từng ngày.
+          để viết từng ngày (hoặc để trống — khi lưu sẽ tự dịch).
         </Notice>
       )}
       {!value.length && !enDays?.length && (
@@ -1889,7 +1962,7 @@ const ItineraryEditor = memo(function ItineraryEditor({ value, onChange, onMeals
                   value={d.title}
                   maxLength={300}
                   placeholder={
-                    enDay?.title ? `Tiếng Anh: ${enDay.title}` : "Tiêu đề, VD: Hanoi – Halong Bay"
+                    enDay?.title ? `${refName}: ${enDay.title}` : "Tiêu đề, VD: Hanoi – Halong Bay"
                   }
                   aria-label="Tiêu đề"
                   onChange={(e) => setDay(i, { title: e.target.value })}
@@ -2196,8 +2269,6 @@ const FaqEditor = memo(function FaqEditor({ value, onChange }) {
 const ExtrasSection = memoOn(
   function ExtrasSection({ t, set, setSlug, setContent, isNew, lang, setLang, onTranslated }) {
     const c = t.content[lang];
-    const en = t.content.en;
-    const isEn = lang === "en";
     const setL = useCallback((patch) => setContent(lang, patch), [lang, setContent]);
     // bảng giá dạng chữ kiểu cũ: chỉ hiện khi tour đã có sẵn
     const hasOldTables = LANG_KEYS.some((l) => t.content[l].priceTables.length > 0);
@@ -2205,7 +2276,7 @@ const ExtrasSection = memoOn(
     return (
       <Section
         id="tuy-chon"
-        title="Tuỳ chọn thêm"
+        title="Hiển thị & thông tin phụ"
         description="Cài đặt hiển thị và các nội dung bổ sung của tour."
         actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
       >
@@ -2223,7 +2294,7 @@ const ExtrasSection = memoOn(
               required
               hint={
                 isNew
-                  ? "Tự tạo từ tên tour tiếng Anh, có thể sửa."
+                  ? "Tự tạo từ tên tour, có thể sửa."
                   : "Khi đổi, đường dẫn cũ vẫn tự chuyển sang trang mới."
               }
             >
@@ -2309,7 +2380,7 @@ const ExtrasSection = memoOn(
                 value={c.childPolicy}
                 rows={4}
                 maxLength={5000}
-                placeholder={phOf(isEn, en.childPolicy)}
+                placeholder={phOf(otherText(t, lang, "childPolicy"))}
                 onChange={(e) => setL({ childPolicy: e.target.value })}
               />
             </Field>
@@ -2318,7 +2389,7 @@ const ExtrasSection = memoOn(
                 value={c.notes}
                 rows={4}
                 maxLength={10000}
-                placeholder={phOf(isEn, en.notes)}
+                placeholder={phOf(otherText(t, lang, "notes"))}
                 onChange={(e) => setL({ notes: e.target.value })}
               />
             </Field>
@@ -2449,11 +2520,11 @@ const SeoSection = memoOn(
   function SeoSection({ t, set, lang, setLang, onTranslated }) {
     const s = t.seo[lang];
     const c = t.content[lang];
-    const en = t.content.en;
+    const other = { title: otherText(t, lang, "title"), summary: otherText(t, lang, "summary") };
     const setS = (patch) =>
       set((x) => ({ seo: { ...x.seo, [lang]: { ...x.seo[lang], ...patch } } }));
-    const shownTitle = s.title || c.title || en.title || "Tên tour";
-    const shownDesc = (s.description || c.summary || en.summary || "").slice(0, 160);
+    const shownTitle = s.title || c.title || other.title || "Tên tour";
+    const shownDesc = (s.description || c.summary || other.summary || "").slice(0, 160);
     const filled = filledOf(
       Object.fromEntries(LANG_KEYS.map((l) => [l, t.seo[l].title || t.seo[l].description])),
     );
@@ -2484,7 +2555,7 @@ const SeoSection = memoOn(
             <Input
               value={s.title}
               maxLength={200}
-              placeholder={c.title || en.title}
+              placeholder={c.title || other.title}
               onChange={(e) => setS({ title: e.target.value })}
             />
           </Field>
@@ -2499,7 +2570,7 @@ const SeoSection = memoOn(
               value={s.description}
               rows={3}
               maxLength={500}
-              placeholder={(c.summary || en.summary).slice(0, 160)}
+              placeholder={(c.summary || other.summary).slice(0, 160)}
               onChange={(e) => setS({ description: e.target.value })}
             />
           </Field>

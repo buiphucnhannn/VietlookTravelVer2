@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Languages } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -169,6 +169,181 @@ export async function translateTree(value, from, { overwrite = false, skipKeys =
   return { value: next, count };
 }
 
+/* -------------------------------------------------------------------------
+ * TỰ DỊCH KHI LƯU — nhân viên chỉ cần viết 1 ngôn ngữ bất kỳ.
+ * ------------------------------------------------------------------------- */
+
+const textLen = (v) =>
+  typeof v === "string"
+    ? v.replace(/<[^>]*>/g, "").trim().length
+    : Array.isArray(v)
+      ? v.reduce((n, x) => n + textLen(x), 0)
+      : isPlain(v)
+        ? Object.values(v).reduce((n, x) => n + textLen(x), 0)
+        : 0;
+
+/** Lượng chữ của từng ngôn ngữ trong mọi ô 3 ngôn ngữ của `value` → { en, zh, vi } */
+function measure(value, skip) {
+  const out = { en: 0, zh: 0, vi: 0 };
+  const go = (node, key) => {
+    if (key && skip.has(key)) return;
+    if (isLocalized(node)) {
+      for (const l of LANG_KEYS) out[l] += textLen(node[l]);
+      return;
+    }
+    if (Array.isArray(node)) node.forEach((x) => go(x, null));
+    else if (isPlain(node)) Object.entries(node).forEach(([k, v]) => go(v, k));
+  };
+  go(value, null);
+  return out;
+}
+
+/**
+ * Điền các ngôn ngữ còn trống bằng bản dịch (KHÔNG ghi đè chữ đã có).
+ * Nguồn dịch: ngôn ngữ `prefer` (tab đang chọn) nếu có chữ, rồi tới ngôn ngữ có nhiều chữ nhất…
+ * — nên ô nào chỉ có ở 1 ngôn ngữ bất kỳ cũng được dịch sang 2 ngôn ngữ kia.
+ * Trả { value, filled: ["en", "zh"] (ngôn ngữ vừa được điền), count }.
+ */
+export async function fillMissingLanguages(value, { prefer, skipKeys = [] } = {}) {
+  const skip = new Set([...SKIP_KEYS, ...skipKeys]);
+  const size = measure(value, skip);
+  const sources = [...LANG_KEYS]
+    .filter((l) => size[l] > 0)
+    .sort((a, b) => (b === prefer) - (a === prefer) || size[b] - size[a]);
+  let next = value;
+  let count = 0;
+  const filled = new Set();
+  let errors = 0;
+  for (const from of sources) {
+    for (const target of LANG_KEYS.filter((l) => l !== from)) {
+      const ctx = { jobs: [], overwrite: false, skip };
+      const planned = walk(next, null, from, target, ctx);
+      if (!ctx.jobs.length) continue;
+      let done;
+      try {
+        done = await translateTexts(from, target, ctx.jobs);
+      } catch {
+        // 1 ngôn ngữ lỗi → vẫn giữ phần đã dịch được của ngôn ngữ kia
+        errors++;
+        continue;
+      }
+      next = fill(planned, done);
+      count += ctx.jobs.length;
+      filled.add(target);
+    }
+  }
+  if (errors && !count) throw new Error("translate failed");
+  return {
+    value: next,
+    filled: LANG_KEYS.filter((l) => filled.has(l)),
+    count,
+    partial: errors > 0,
+  };
+}
+
+/** Ngôn ngữ nguồn để tự dịch: `prefer` (tab đang chọn) nếu đã có chữ, không thì ngôn ngữ nhiều chữ nhất */
+export function pickSource(value, prefer, skipKeys = []) {
+  const size = measure(value, new Set([...SKIP_KEYS, ...skipKeys]));
+  if (prefer && size[prefer] > 0) return prefer;
+  return [...LANG_KEYS].sort((a, b) => size[b] - size[a])[0];
+}
+
+/** Còn ô nào trống ở 1 ngôn ngữ trong khi ngôn ngữ khác đã có chữ (tức là cần dịch) không */
+export function needsFill(value, skipKeys = []) {
+  const skip = new Set([...SKIP_KEYS, ...skipKeys]);
+  return LANG_KEYS.some((from) =>
+    LANG_KEYS.some((target) => {
+      if (from === target) return false;
+      const ctx = { jobs: [], overwrite: false, skip };
+      walk(value, null, from, target, ctx);
+      return ctx.jobs.length > 0;
+    }),
+  );
+}
+
+const namesOf = (langs) => langs.map((l) => LANG_NAME[l]).join(" và ");
+
+/**
+ * Dùng trong nút Lưu của mọi form nhiều ngôn ngữ:
+ *
+ *   const autoFill = useAutoFill();
+ *   const { value, failed } = await autoFill.fill(form, { lang, skipKeys });   // trước khi lưu
+ *   …lưu `value`…
+ *   if (failed) autoFill.offerRetry((translated) => lưuLại(translated));       // sau khi lưu
+ *
+ * - Còn ô trống ở ngôn ngữ nào → tự dịch từ ngôn ngữ đã có rồi mới lưu, báo 1 thông báo.
+ * - Dịch lỗi (dịch vụ bận) → vẫn lưu phần đã nhập; `offerRetry` hiện thông báo có nút "Dịch lại".
+ * `busy` = đang dịch (cho nút Lưu hiện trạng thái chờ).
+ */
+export function useAutoFill() {
+  const { toast } = useUi();
+  const [busy, setBusy] = useState(false);
+  const last = useRef(null);
+
+  const fillFn = useCallback(
+    async (value, { lang, skipKeys } = {}) => {
+      last.current = { value, lang, skipKeys };
+      if (!needsFill(value, skipKeys)) return { value, failed: false, filled: [] };
+      setBusy(true);
+      const t = toast.loading("Đang tự dịch sang các ngôn ngữ còn trống…");
+      try {
+        const r = await fillMissingLanguages(value, { prefer: lang, skipKeys });
+        if (r.filled.length)
+          t.success("Hãy xem lại bản dịch khi rảnh.", {
+            title: `Đã tự dịch sang ${namesOf(r.filled)}`,
+          });
+        else t.dismiss();
+        last.current = { value: r.value, lang, skipKeys };
+        return { value: r.value, failed: !!r.partial, filled: r.filled };
+      } catch {
+        t.dismiss();
+        return { value, failed: true, filled: [] };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [toast],
+  );
+
+  /** Sau khi đã lưu bản chưa dịch: báo lỗi dịch + nút "Dịch lại" (dịch xong gọi persist(bảnĐãDịch)) */
+  const offerRetry = useCallback(
+    (persist) => {
+      const ctx = last.current;
+      const retry = async () => {
+        const t = toast.loading("Đang dịch lại…");
+        try {
+          const r = await fillMissingLanguages(ctx.value, {
+            prefer: ctx.lang,
+            skipKeys: ctx.skipKeys,
+          });
+          await persist(r.value);
+          t.success("Hãy xem lại bản dịch khi rảnh.", {
+            title: r.filled.length ? `Đã dịch và lưu ${namesOf(r.filled)}` : "Đã lưu",
+          });
+        } catch {
+          t.warning("Dịch vụ dịch vẫn đang bận — hãy thử lại sau ít phút.", {
+            title: "Chưa dịch được",
+            action: { label: "Dịch lại", onClick: retry },
+          });
+        }
+      };
+      toast.warning(
+        "Đã lưu phần bạn nhập. Các ngôn ngữ còn trống chưa được dịch vì dịch vụ đang bận.",
+        {
+          title: "Chưa tự dịch được",
+          action: persist ? { label: "Dịch lại", onClick: retry } : null,
+        },
+      );
+    },
+    [toast],
+  );
+
+  return { fill: fillFn, offerRetry, busy };
+}
+
+/** Tạo đường dẫn (slug) từ tên: ưu tiên bản tiếng Anh, rồi tiếng Việt (bỏ dấu). Tiếng Trung không tạo được. */
+export const slugSource = (loc) => loc?.en?.trim() || loc?.vi?.trim() || "";
+
 /** Nút "Dịch tự động" — đặt cạnh tab ngôn ngữ của form */
 export function AutoTranslate({
   lang,
@@ -199,13 +374,13 @@ export function AutoTranslate({
         );
       } else {
         onChange(next);
-        toast(
-          `Đã dịch sang ${others.map((l) => LANG_NAME[l.key]).join(" và ")}. Hãy xem lại rồi bấm Lưu.`,
-        );
+        toast.success("Hãy xem lại rồi bấm Lưu.", {
+          title: `Đã dịch sang ${others.map((l) => LANG_NAME[l.key]).join(" và ")}`,
+        });
       }
       setOpen(false);
     } catch (err) {
-      toast(errorMessage(err), "error");
+      toast.error(errorMessage(err), { title: "Chưa dịch được" });
     } finally {
       setBusy(false);
     }

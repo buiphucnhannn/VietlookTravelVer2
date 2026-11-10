@@ -76,6 +76,17 @@ const schema = z
     MAIL_FROM: z.string().trim().default("Vietlook Travel <onboarding@resend.dev>"),
     // Email nhận thông báo mặc định khi CMS chưa cài (Cài đặt → Email nhận thông báo)
     NOTIFY_EMAIL: z.string().trim().toLowerCase().default(""),
+    // CHỈ dùng khi phát triển / thử nghiệm: có giá trị → MỌI email (cho công ty lẫn cho khách) chỉ gửi tới địa chỉ này
+    // (người nhận thật ghi trong tiêu đề + dải cảnh báo đầu email). Production: để trống.
+    MAIL_REDIRECT_TO: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .default("")
+      .refine(
+        (v) => !v || /^[^\s@,]+@[^\s@.,]+(\.[^\s@.,]+)+$/.test(v),
+        "must be one email address",
+      ),
     // Địa chỉ website (link trong email, nút "Mở trong CMS")
     PUBLIC_SITE_URL: z.string().trim().default("https://vietlooktravel.vercel.app"),
 
@@ -88,6 +99,9 @@ const schema = z
       .refine((v) => !v || /^[a-z0-9._@-]{3,64}$/.test(v), "3-64 chars: a-z 0-9 . _ - @"),
     ADMIN_PASSWORD: z.string().default(""),
     ADMIN_NAME: z.string().trim().max(100).default("Quản trị viên"),
+
+    // Nút "Đăng nhập nhanh" ở trang đăng nhập — CHỈ bật cho bản demo (vào thẳng tài khoản ADMIN_USERNAME)
+    DEMO_LOGIN: z.enum(["true", "false"]).default("false"),
   })
   .superRefine((e, ctx) => {
     const need = (cond, path, message) =>
@@ -174,6 +188,7 @@ export const env = Object.freeze({
     resendKey: e.RESEND_API_KEY,
     from: e.MAIL_FROM,
     notifyFallback: e.NOTIFY_EMAIL,
+    redirectTo: e.MAIL_REDIRECT_TO,
     enabled: Boolean(e.RESEND_API_KEY),
   },
   siteUrl: e.PUBLIC_SITE_URL.replace(/\/+$/, ""),
@@ -183,4 +198,5 @@ export const env = Object.freeze({
     name: e.ADMIN_NAME,
     enabled: Boolean(e.ADMIN_USERNAME && e.ADMIN_PASSWORD),
   },
+  demoLogin: e.DEMO_LOGIN === "true" && Boolean(e.ADMIN_USERNAME),
 });

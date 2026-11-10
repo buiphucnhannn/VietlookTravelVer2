@@ -38,7 +38,7 @@ export class ApiError extends Error {
   static unauthorized(message = "Vui lòng đăng nhập", code = "UNAUTHENTICATED") {
     return new ApiError(401, message, { code });
   }
-  static forbidden(message = "Bạn không có quyền thực hiện thao tác này", code = "FORBIDDEN") {
+  static forbidden(message = "Bạn chưa có quyền thực hiện thao tác này", code = "FORBIDDEN") {
     return new ApiError(403, message, { code });
   }
   static notFound(message = "Không tìm thấy") {

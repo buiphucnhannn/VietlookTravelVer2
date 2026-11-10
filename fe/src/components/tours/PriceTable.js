@@ -102,3 +102,160 @@ export default function PriceTable({ table }) {
     </div>
   );
 }
+
+/* ───────── Bảng giá nhập trong CMS (theo "Mẫu thông tin tour") ───────── */
+
+const PL = {
+  group: { en: "Group size", zh: "人数", vi: "Số khách" },
+  pax: { en: "pax", zh: "人", vi: "khách" },
+  perPerson: { en: "Price per person (USD)", zh: "每人价格（美元）", vi: "Giá mỗi khách (USD)" },
+  hotel: { en: "{n}★ hotel", zh: "{n}星酒店", vi: "KS {n} sao" },
+  price: { en: "Price", zh: "价格", vi: "Giá" },
+  children: { en: "Children", zh: "儿童价格", vi: "Giá trẻ em" },
+  age: { en: "{a} years", zh: "{a}岁", vi: "{a} tuổi" },
+  free: { en: "Free", zh: "免费", vi: "Miễn phí" },
+  ofAdult: { en: "{p}% of adult price", zh: "成人价的{p}%", vi: "{p}% giá người lớn" },
+  surcharges: { en: "Supplements", zh: "附加费用", vi: "Phụ thu" },
+  single: { en: "Single room supplement", zh: "单房差", vi: "Phụ thu phòng đơn" },
+  holiday: {
+    en: "Holiday surcharge (Tet / peak dates)",
+    zh: "节假日附加费（春节/旺季）",
+    vi: "Phụ thu lễ Tết / cao điểm",
+  },
+  perPax: { en: "per person", zh: "/人", vi: "/khách" },
+  ofTour: { en: "{p}% of the tour price", zh: "团费的{p}%", vi: "{p}% giá tour" },
+};
+const pl = (k, lang, vars = {}) =>
+  Object.entries(vars).reduce((s, [v, x]) => s.replace(`{${v}}`, x), PL[k][lang] ?? PL[k].en);
+const usd = (n) => `$${Number(n).toLocaleString("en-US")}`;
+const range = (a, b) => (b == null || b >= 99 ? `${a}+` : a === b ? `${a}` : `${a}–${b}`);
+
+/** Tour có bảng giá có cấu trúc (nhập trong CMS) để hiển thị không */
+export const hasStructuredPricing = (p) =>
+  !!(
+    p?.groupTiers?.some((t) => t.price > 0 || t.price4 > 0 || t.price5 > 0) ||
+    p?.childRates?.length ||
+    p?.singleSupplement > 0 ||
+    p?.holidaySurcharge > 0 ||
+    p?.holidayPercent > 0
+  );
+
+/** Bảng giá theo số khách × hạng khách sạn, giá trẻ em theo tuổi, phụ thu (phòng đơn, lễ Tết) */
+export function PricingGrid({ pricing, lang }) {
+  const tiers = (pricing?.groupTiers ?? []).filter(
+    (t) => t.price > 0 || t.price4 > 0 || t.price5 > 0,
+  );
+  const cols = [
+    ["price", 3],
+    ["price4", 4],
+    ["price5", 5],
+  ].filter(([k]) => tiers.some((t) => t[k] > 0));
+  const multi = cols.length > 1 || cols.some(([k]) => k !== "price");
+  const kids = pricing?.childRates ?? [];
+  const extras = [
+    pricing?.singleSupplement > 0 && [
+      pl("single", lang),
+      `${usd(pricing.singleSupplement)} ${pl("perPax", lang)}`,
+    ],
+    (pricing?.holidaySurcharge > 0 || pricing?.holidayPercent > 0) && [
+      pl("holiday", lang),
+      [
+        pricing.holidaySurcharge > 0 && `${usd(pricing.holidaySurcharge)} ${pl("perPax", lang)}`,
+        pricing.holidayPercent > 0 && pl("ofTour", lang, { p: pricing.holidayPercent }),
+      ]
+        .filter(Boolean)
+        .join(" + "),
+    ],
+  ].filter(Boolean);
+  const th = "px-3 py-3 font-semibold sm:px-4";
+  return (
+    <div className="space-y-6">
+      {tiers.length > 0 && (
+        <div className="overflow-x-auto rounded-xl ring-1 ring-border">
+          <p className="bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white">
+            {pl("perPerson", lang)}
+          </p>
+          <table className="w-full text-sm">
+            <thead className="bg-brand-50 text-brand-800">
+              <tr>
+                <th scope="col" className={`${th} text-left`}>
+                  {pl("group", lang)}
+                </th>
+                {cols.map(([k, n]) => (
+                  <th key={k} scope="col" className={`${th} text-right`}>
+                    {multi ? pl("hotel", lang, { n }) : pl("price", lang)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tiers.map((t, i) => (
+                <tr key={i} className="border-t border-border">
+                  <th
+                    scope="row"
+                    className="px-3 py-3 text-left font-medium whitespace-nowrap text-ink sm:px-4"
+                  >
+                    {range(t.minPax ?? 1, t.maxPax)} {pl("pax", lang)}
+                  </th>
+                  {cols.map(([k]) => (
+                    <td
+                      key={k}
+                      className="px-3 py-3 text-right font-semibold whitespace-nowrap text-sun-600 sm:px-4"
+                    >
+                      {t[k] > 0 ? usd(t[k]) : "–"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {(kids.length > 0 || extras.length > 0) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {kids.length > 0 && (
+            <div className="rounded-xl bg-surface p-4 text-sm">
+              <p className="mb-2 font-bold text-ink">{pl("children", lang)}</p>
+              <ul className="space-y-1.5 text-ink/80">
+                {kids.map((r, i) => (
+                  <li key={i} className="flex justify-between gap-3">
+                    <span>{pl("age", lang, { a: range(r.minAge ?? 0, r.maxAge) })}</span>
+                    <b className="text-right text-ink">
+                      {r.percent > 0 ? pl("ofAdult", lang, { p: r.percent }) : pl("free", lang)}
+                    </b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {extras.length > 0 && (
+            <div className="rounded-xl bg-surface p-4 text-sm">
+              <p className="mb-2 font-bold text-ink">{pl("surcharges", lang)}</p>
+              <ul className="space-y-1.5 text-ink/80">
+                {extras.map(([label, value]) => (
+                  <li key={label} className="flex justify-between gap-3">
+                    <span>{label}</span>
+                    <b className="text-right text-ink">{value}</b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Tóm tắt giá trẻ em theo bảng trong CMS (gợi ý dưới ô chọn tuổi khi đặt tour) */
+export function childRatesSummary(rates, lang) {
+  if (!rates?.length) return null;
+  return rates
+    .map(
+      (r) =>
+        `${pl("age", lang, { a: range(r.minAge ?? 0, r.maxAge) })}: ${
+          r.percent > 0 ? `${r.percent}%` : pl("free", lang)
+        }`,
+    )
+    .join(" · ");
+}

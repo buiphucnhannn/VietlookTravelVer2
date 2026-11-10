@@ -3,7 +3,7 @@ import PageSkeleton from "@/components/ui/PageSkeleton";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
-import { locales, tr } from "@/i18n/config";
+import { href, locales, lp, tr } from "@/i18n/config";
 import { pageMetadata, notFoundMetadata } from "@/lib/seo";
 import { Container } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
@@ -42,10 +42,10 @@ async function GuideAuthorPageContent({ params }) {
       <BrushHero
         title={tr(author.name, lang)}
         subtitle={tr(author.role, lang)}
-        images={posts.map((p) => p.image)}
+        images={posts.map((p) => p.image).filter(Boolean)}
         breadcrumbs={[
-          { label: "Vietlook", href: "/" + lang },
-          { label: dict.guide.title, href: "/" + lang + "/travel-guide" },
+          { label: "Vietlook", href: href(lang) },
+          { label: dict.guide.title, href: `${lp(lang)}/travel-guide` },
           { label: tr(author.name, lang) },
         ]}
       >

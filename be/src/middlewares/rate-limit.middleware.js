@@ -1,10 +1,12 @@
 import rateLimit from "express-rate-limit";
 import { auditService } from "../services/audit.service.js";
 import { ApiError } from "../utils/ApiError.js";
+import { formLang, formMessage } from "../utils/form-messages.js";
 
 /**
  * Bọc express-rate-limit: trả lỗi JSON chuẩn 429 kèm Retry-After / retryAfter (giây).
  * Bộ đếm lưu trong bộ nhớ (đủ cho 1 server; chạy nhiều instance → dùng store Redis).
+ * `message`: chuỗi, hoặc hàm (req) => chuỗi (câu theo ngôn ngữ khách cho form công khai).
  */
 export function limiter({ message = "Bạn thao tác quá nhanh, vui lòng thử lại sau", ...options }) {
   return rateLimit({
@@ -20,7 +22,7 @@ export function limiter({ message = "Bạn thao tác quá nhanh, vui lòng thử
         ),
       );
       auditService.security(req, "security.rate_limited", { retryAfter });
-      const err = new ApiError(429, message);
+      const err = new ApiError(429, typeof message === "function" ? message(req) : message);
       err.retryAfter = retryAfter;
       next(err);
     },
@@ -31,5 +33,5 @@ export function limiter({ message = "Bạn thao tác quá nhanh, vui lòng thử
 export const publicFormLimiter = limiter({
   windowMs: 10 * 60 * 1000,
   limit: 10,
-  message: "Bạn gửi quá nhiều yêu cầu, vui lòng thử lại sau ít phút",
+  message: (req) => formMessage(formLang(req), "tooMany"), // khách nước ngoài → câu theo ngôn ngữ trang
 });

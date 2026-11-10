@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Poppins } from "next/font/google";
+import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 
-const poppins = Poppins({
-  subsets: ["latin", "latin-ext"],
+const siteFont = Be_Vietnam_Pro({
+  subsets: ["latin", "latin-ext", "vietnamese"],
   weight: ["400", "600", "800"],
-  variable: "--font-poppins",
+  variable: "--font-be-vietnam",
 });
 
 export const metadata = {
@@ -16,7 +16,7 @@ export const metadata = {
 
 export default function GlobalNotFound() {
   return (
-    <html lang="en" className={poppins.variable}>
+    <html lang="en" className={siteFont.variable}>
       <body className="font-sans">
         <main className="relative grid min-h-screen place-items-center overflow-hidden bg-brand-950 px-6 text-center text-white">
           <Image
@@ -36,7 +36,9 @@ export default function GlobalNotFound() {
             />
             <p className="mt-6 text-8xl font-extrabold tracking-tighter">404</p>
             <h1 className="mt-2 text-2xl font-semibold">
-              Page not found · 页面不存在 · Không tìm thấy trang
+              <span className="whitespace-nowrap">Page not found</span> ·{" "}
+              <span className="whitespace-nowrap">页面不存在</span> ·{" "}
+              <span className="whitespace-nowrap">Không tìm thấy trang</span>
             </h1>
             <div className="mt-8 flex justify-center gap-3">
               <Link href="/" className="rounded-md bg-sun-500 px-6 py-3 font-semibold">

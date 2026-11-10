@@ -55,7 +55,8 @@ export async function prepareTour(data, prev) {
     itinerary: (c.itinerary ?? []).map((d) => ({ ...d, html: cleanHtml(d.html) })),
     faqs: (c.faqs ?? []).map((f) => ({ ...f, a: cleanHtml(f.a) })),
   }));
-  if (!content.en.title) throw ApiError.badRequest("Vui lòng nhập tên tour (tiếng Anh)");
+  if (!LANGS.some((l) => content[l].title?.trim()))
+    throw ApiError.badRequest("Vui lòng nhập tên tour ở ít nhất một ngôn ngữ");
   return withOldSlugs({ ...data, regions, content }, prev);
 }
 
@@ -65,6 +66,10 @@ export const tourService = createContentService({
   searchFields: ["content.en.title", "content.zh.title", "content.vi.title", "code"],
   defaultSort: "rank",
   prepare: prepareTour,
+  trackOldSlugs: true,
+  // danh sách tour trong CMS (tới 200 tour / lần) không cần lịch trình, bảng giá, đánh giá… của 3 ngôn ngữ
+  listSelect:
+    "slug code days nights halfDay regions destinations themes cruise tourType price originalPrice image rank featured featuredLong departure isActive createdAt updatedAt content.en.title content.zh.title content.vi.title content.en.summary",
   filters: (q) => ({
     ...(q.region && { regions: q.region }),
     ...(q.destination && { destinations: q.destination }),
@@ -115,7 +120,8 @@ export const themeService = createContentService({
 /* ---------- Bài viết / chuyên mục / tác giả ---------- */
 
 export function prepareArticle(data, prev) {
-  if (!data.title.en) throw ApiError.badRequest("Vui lòng nhập tiêu đề (tiếng Anh)");
+  if (!LANGS.some((l) => data.title?.[l]?.trim()))
+    throw ApiError.badRequest("Vui lòng nhập tiêu đề ở ít nhất một ngôn ngữ");
   return withOldSlugs({ ...data, body: mapLangs(data.body, (h) => cleanHtml(h)) }, prev);
 }
 
@@ -125,6 +131,7 @@ export const articleService = createContentService({
   searchFields: ["title.en", "title.zh", "title.vi"],
   defaultSort: "newest",
   prepare: prepareArticle,
+  trackOldSlugs: true,
   filters: (q) => (q.category ? { category: q.category } : {}),
 });
 // danh sách bài viết mới nhất trước theo ngày đăng

@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, CreditCard, Eye, EyeOff, Mail, Save, Send } from "lucide-react";
+import { BarChart3, CreditCard, Eye, EyeOff, Mail, Save } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
-import { useMutation } from "./hooks";
+import { toastError, useMutation } from "./hooks";
 import {
-  Badge,
   Button,
   Card,
   Field,
@@ -13,7 +12,6 @@ import {
   LoadingBlock,
   Notice,
   PageHeader,
-  Select,
   StringList,
   Toggle,
   fmtDateTime,
@@ -64,15 +62,6 @@ function useSetting(path, toForm) {
   return { ...state, setForm, reload };
 }
 
-/** Tiêu đề thẻ: tên mục + nhãn tình trạng (đang bật / tắt) nằm ngay cạnh */
-function CardTitle({ badge, children }) {
-  return (
-    <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-      {children} {badge}
-    </span>
-  );
-}
-
 /** Chân thẻ: ghi chú bên trái, nút bên phải — giống nhau ở mọi mục */
 function CardFooter({ note, children }) {
   return (
@@ -109,7 +98,6 @@ const notificationsForm = (d) => ({
 
 const paymentForm = (d) => ({
   enabled: !!d.enabled,
-  environment: d.environment ?? "sandbox",
   merchantKey: d.merchantKey ?? "",
   accountName: d.accountName ?? "",
   secretKey: "",
@@ -129,7 +117,6 @@ function NotificationsCard() {
     "/settings/notifications",
     notificationsForm,
   );
-  const [testing, setTesting] = useState(false);
   const { run, busy } = useMutation([]);
   const { toast } = useUi();
 
@@ -156,37 +143,11 @@ function NotificationsCard() {
     if (r) reload();
   };
 
-  const test = async () => {
-    setTesting(true);
-    try {
-      const r = await api("/settings/notifications/test", { method: "POST" });
-      toast(
-        `Đã gửi email thử tới ${(r.data?.to ?? []).join(", ")}. Hãy kiểm tra hộp thư (cả mục Thư rác).`,
-      );
-    } catch (err) {
-      toast(err?.code === "MAIL_NOT_CONFIGURED" ? MAIL_OFF_TEXT : errorMessage(err), "error");
-    } finally {
-      setTesting(false);
-    }
-  };
-
   return (
     <Card
       icon={Mail}
-      title={
-        <CardTitle
-          badge={
-            data.mailConfigured ? (
-              <Badge tone="green">Đang bật</Badge>
-            ) : (
-              <Badge tone="red">Chưa bật</Badge>
-            )
-          }
-        >
-          Email nhận thông báo
-        </CardTitle>
-      }
-      description="Khi khách đặt tour hoặc gửi yêu cầu trên website, thông báo sẽ được gửi tới các email dưới đây."
+      title="Email thông báo đơn mới"
+      description="Mỗi khi khách đặt tour hoặc gửi yêu cầu trên website, hệ thống gửi thư báo ngay cho nhân viên và thư xác nhận cho khách."
     >
       {!data.mailConfigured && (
         <Notice tone="warn" className="mb-5">
@@ -196,12 +157,8 @@ function NotificationsCard() {
 
       <div className="grid gap-x-10 gap-y-6 lg:grid-cols-2">
         <Field
-          label={`Email người nhận (${cleaned.length}/10)`}
-          hint={
-            data.fallback
-              ? `Để trống thì thông báo gửi tới ${data.fallback}.`
-              : "Mỗi dòng 1 email, tối đa 10."
-          }
+          label={`Email nhân viên nhận thông báo (${cleaned.length}/10)`}
+          hint="Mỗi email một dòng, tối đa 10. Tất cả các email này đều nhận thư báo khi có đơn mới."
           error={invalid.length ? `Email chưa đúng: ${invalid.join(", ")}` : ""}
         >
           <StringList
@@ -214,8 +171,8 @@ function NotificationsCard() {
 
         <div className="space-y-6">
           <Field
-            label="Email nhận thư trả lời của khách"
-            hint="Khi khách bấm “Trả lời” trên email xác nhận, thư sẽ gửi về địa chỉ này. Có thể để trống."
+            label="Email nhận thư khách trả lời"
+            hint="Khách bấm “Trả lời” trong thư xác nhận thì thư được gửi về địa chỉ này. Để trống nếu không cần."
             error={badReply ? "Email chưa đúng" : ""}
           >
             <Input
@@ -231,21 +188,12 @@ function NotificationsCard() {
             checked={form.sendCustomerConfirmation}
             onChange={(sendCustomerConfirmation) => set({ sendCustomerConfirmation })}
             label="Gửi email xác nhận cho khách"
-            hint="Khách nhận email “Đã nhận yêu cầu” kèm mã đơn ngay sau khi gửi."
+            hint="Khách nhận thư “Đã nhận yêu cầu” kèm mã đơn ngay sau khi gửi."
           />
         </div>
       </div>
 
-      <CardFooter note="Email thử gửi tới danh sách đã lưu — hãy bấm Lưu trước khi gửi thử.">
-        <Button
-          variant="secondary"
-          icon={Send}
-          onClick={test}
-          loading={testing}
-          disabled={!data.mailConfigured}
-        >
-          Gửi email thử
-        </Button>
+      <CardFooter note="Bấm Lưu để áp dụng cho các đơn tiếp theo.">
         <Button icon={Save} onClick={save} loading={busy}>
           Lưu
         </Button>
@@ -261,7 +209,11 @@ function SecretInput({ label, isSet, masked, value, onChange }) {
   return (
     <Field
       label={label}
-      hint={isSet ? `Đã lưu (${masked || "••••"}). Để trống nếu không đổi.` : "Chưa nhập."}
+      hint={
+        isSet
+          ? `Đã lưu (${masked || "••••"}). Để trống nếu không đổi.`
+          : "Lấy trong trang quản lý của 9Pay."
+      }
     >
       <div className="relative">
         <Input
@@ -296,21 +248,19 @@ function PaymentCard() {
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   const save = async () => {
-    const switchingLive =
-      form.enabled && form.environment === "production" && data.environment !== "production";
-    if (switchingLive) {
+    const turningOn = form.enabled && !data.enabled;
+    if (turningOn) {
       const ok = await confirm({
-        title: "Chuyển sang chạy thật?",
+        title: "Bật thanh toán trực tuyến?",
         message:
-          "Từ giờ khách thanh toán trên website sẽ bị trừ tiền thật. Hãy kiểm tra kỹ các mã 9Pay trước khi lưu.",
-        confirmText: "Lưu và chạy thật",
+          "Từ giờ khách có thể thanh toán thật qua 9Pay ngay trên website. Hãy kiểm tra kỹ 3 mã 9Pay trước khi lưu.",
+        confirmText: "Lưu và bật",
         danger: true,
       });
       if (!ok) return;
     }
     const body = {
       enabled: form.enabled,
-      environment: form.environment,
       merchantKey: form.merchantKey.trim(),
       accountName: form.accountName.trim(),
       ...(form.secretKey.trim() && { secretKey: form.secretKey.trim() }),
@@ -326,70 +276,50 @@ function PaymentCard() {
   return (
     <Card
       icon={CreditCard}
-      title={
-        <CardTitle
-          badge={
-            data.enabled ? (
-              <Badge tone={data.environment === "production" ? "green" : "amber"}>
-                {data.environment === "production" ? "Đang bật · Chạy thật" : "Đang bật · Chạy thử"}
-              </Badge>
-            ) : (
-              <Badge>Đang tắt</Badge>
-            )
-          }
-        >
-          Thanh toán 9Pay
-        </CardTitle>
+      title="Thanh toán 9Pay"
+      description={
+        form.enabled
+          ? "Khách có thể thanh toán trực tuyến bằng thẻ khi đặt tour."
+          : "Đang tắt — khách chỉ gửi yêu cầu đặt tour, nhân viên liên hệ thanh toán sau."
       }
-      description="Tài khoản nhận tiền khi khách thanh toán trực tuyến."
+      actions={
+        <Toggle
+          checked={form.enabled}
+          onChange={(enabled) => set({ enabled })}
+          label={form.enabled ? "Đang bật" : "Bật thanh toán"}
+        />
+      }
     >
-      <div className="grid gap-x-10 gap-y-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <Toggle
-            checked={form.enabled}
-            onChange={(enabled) => set({ enabled })}
-            label="Bật thanh toán 9Pay"
-            hint="Khi tắt, khách chỉ gửi yêu cầu đặt tour; nhân viên liên hệ thanh toán sau."
+      <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+        <Field label="Tên tài khoản nhận tiền" hint="Để bạn dễ nhận biết tài khoản đang dùng.">
+          <Input
+            value={form.accountName}
+            onChange={(e) => set({ accountName: e.target.value })}
+            placeholder="CÔNG TY TNHH VIETLOOK TRAVEL"
           />
-          <Field label="Chế độ" hint="Chạy thử: không trừ tiền thật.">
-            <Select value={form.environment} onChange={(e) => set({ environment: e.target.value })}>
-              <option value="sandbox">Chạy thử</option>
-              <option value="production">Chạy thật</option>
-            </Select>
-          </Field>
-          <Field label="Tên tài khoản nhận tiền" hint="Chỉ để bạn dễ nhận biết.">
-            <Input
-              value={form.accountName}
-              onChange={(e) => set({ accountName: e.target.value })}
-              placeholder="CÔNG TY TNHH VIETLOOK TRAVEL"
-            />
-          </Field>
-        </div>
-
-        <div className="space-y-6">
-          <Field label="Merchant Key" hint="Ba mã ở cột này lấy trong trang quản lý của 9Pay.">
-            <Input
-              value={form.merchantKey}
-              onChange={(e) => set({ merchantKey: e.target.value })}
-              className="font-mono"
-              autoComplete="off"
-            />
-          </Field>
-          <SecretInput
-            label="Secret Key"
-            isSet={data.secretKeySet}
-            masked={data.secretKeyMasked}
-            value={form.secretKey}
-            onChange={(secretKey) => set({ secretKey })}
+        </Field>
+        <Field label="Merchant Key" hint="Mã cửa hàng trong trang quản lý của 9Pay.">
+          <Input
+            value={form.merchantKey}
+            onChange={(e) => set({ merchantKey: e.target.value })}
+            className="font-mono"
+            autoComplete="off"
           />
-          <SecretInput
-            label="Checksum Key"
-            isSet={data.checksumKeySet}
-            masked={data.checksumKeyMasked}
-            value={form.checksumKey}
-            onChange={(checksumKey) => set({ checksumKey })}
-          />
-        </div>
+        </Field>
+        <SecretInput
+          label="Secret Key"
+          isSet={data.secretKeySet}
+          masked={data.secretKeyMasked}
+          value={form.secretKey}
+          onChange={(secretKey) => set({ secretKey })}
+        />
+        <SecretInput
+          label="Checksum Key"
+          isSet={data.checksumKeySet}
+          masked={data.checksumKeyMasked}
+          value={form.checksumKey}
+          onChange={(checksumKey) => set({ checksumKey })}
+        />
       </div>
 
       {form.enabled && (!form.merchantKey.trim() || (!data.secretKeySet && !form.secretKey)) && (

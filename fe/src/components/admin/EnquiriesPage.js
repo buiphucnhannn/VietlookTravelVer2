@@ -20,10 +20,12 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { priceLineVi } from "@/lib/pricing-labels";
-import { useAdminList, useMutation } from "./hooks";
+import { toastError, useAdminList, useMutation } from "./hooks";
 import { TODO_EVENT } from "./AdminShell";
+import { usePermission } from "./permissions";
 import {
   Badge,
+  BusyArea,
   Button,
   Card,
   EmptyState,
@@ -173,6 +175,28 @@ const DETAIL_LABELS = {
   volume: "Lượng khách dự kiến",
   summary: "Tóm tắt",
   source: "Biết đến qua",
+  level: "Gói dịch vụ",
+  travellers: "Số khách",
+  flexible: "Ngày đi linh hoạt",
+  requests: "Yêu cầu riêng",
+  contactVia: "Muốn liên hệ qua",
+  payment: "Hình thức thanh toán",
+  from: "Điểm đi",
+  to: "Điểm đến",
+  returnTime: "Giờ về",
+  routeSlug: "Tuyến",
+  priceUSD: "Giá báo (USD)",
+};
+
+/** Giá trị dạng mã của form → chữ dễ hiểu */
+const DETAIL_VALUES = {
+  oneWay: "Một chiều",
+  roundTrip: "Khứ hồi",
+  cash: "Tiền mặt",
+  transfer: "Chuyển khoản",
+  card: "Thẻ",
+  none: "Không",
+  "on request": "Liên hệ báo giá",
 };
 const detailLabel = (k) =>
   DETAIL_LABELS[k] ??
@@ -185,8 +209,16 @@ const detailValue = (v) => {
   if (v == null || v === "") return "";
   if (Array.isArray(v)) return v.map(detailValue).filter(Boolean).join(", ");
   if (typeof v === "boolean") return v ? "Có" : "Không";
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
+  if (typeof v === "object") return Object.values(v).map(detailValue).filter(Boolean).join(" · ");
+  const s = String(v);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return fmtDay(s);
+  return DETAIL_VALUES[s] ?? s;
+};
+
+/** Số điện thoại → số dùng cho WhatsApp (số VN bắt đầu bằng 0 → thêm mã 84) */
+const waNumber = (phone) => {
+  const d = String(phone).replace(/\D/g, "").replace(/^00/, "");
+  return /^0\d{8,10}$/.test(d) ? `84${d.slice(1)}` : d;
 };
 
 /* =========================================================================
@@ -206,11 +238,11 @@ export default function EnquiriesPage({ kind = "bookings" }) {
     status: "",
     type: "",
     paymentStatus: "",
-    emailFailed: "",
     limit: 20,
   });
   const [stats, setStats] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Quyền ở mục này (Đơn đặt tour / Yêu cầu từ form): xem / sửa (trạng thái, ghi chú, email) / xoá
+  const perm = usePermission(kind);
   const [openId, setOpenId] = useState(null);
 
   // Số lượng theo trạng thái — tải lại mỗi khi có thao tác (useMutation phát TODO_EVENT)
@@ -224,12 +256,6 @@ export default function EnquiriesPage({ kind = "bookings" }) {
     window.addEventListener(TODO_EVENT, loadStats);
     return () => window.removeEventListener(TODO_EVENT, loadStats);
   }, [loadStats]);
-
-  useEffect(() => {
-    api("/auth/me")
-      .then((r) => setIsAdmin(r.data?.user?.role === "admin"))
-      .catch(() => {});
-  }, []);
 
   // Mở từ link trong email: ?code=VL-BK...
   useEffect(() => {
@@ -264,8 +290,15 @@ export default function EnquiriesPage({ kind = "bookings" }) {
           <Button
             variant="secondary"
             icon={RefreshCw}
-            onClick={() => list.reload()}
-            loading={list.loading && !!list.items.length}
+            onClick={() => {
+              loadStats();
+              list.refresh(
+                isBookings
+                  ? { unit: "đơn", fresh: "đơn mới" }
+                  : { unit: "yêu cầu", fresh: "yêu cầu mới" },
+              );
+            }}
+            loading={list.reloading}
           >
             Tải lại
           </Button>
@@ -274,40 +307,42 @@ export default function EnquiriesPage({ kind = "bookings" }) {
 
       <Card bodyClassName="p-0">
         {/* Trạng thái */}
-        <div className="-mb-px flex [scrollbar-width:none] gap-1.5 overflow-x-auto border-b border-slate-100 px-4 pt-4 pb-3">
-          <StatusChip
-            active={!q.status}
-            onClick={() => list.setQuery({ status: "" })}
-            label="Tất cả"
-            count={total}
-          />
-          {STATUSES.map((s) => (
+        <div className="[scrollbar-width:none] overflow-x-auto border-b border-slate-100 px-4 py-4">
+          <div className="mx-auto flex w-max gap-2">
             <StatusChip
-              key={s.value}
-              active={q.status === s.value}
-              onClick={() => list.setQuery({ status: s.value })}
-              label={s.label}
-              count={stats ? (stats[s.value] ?? 0) : null}
-              hot={s.value === "new"}
+              active={!q.status}
+              onClick={() => list.setQuery({ status: "" })}
+              label="Tất cả"
+              count={total}
             />
-          ))}
+            {STATUSES.map((s) => (
+              <StatusChip
+                key={s.value}
+                active={q.status === s.value}
+                onClick={() => list.setQuery({ status: s.value })}
+                label={s.label}
+                count={stats ? (stats[s.value] ?? 0) : null}
+                hot={s.value === "new"}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Bộ lọc */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4 sm:px-5">
+        <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:px-5">
           <SearchBox
             value={q.q}
             onChange={(v) => list.setQuery({ q: v })}
             placeholder={
               isBookings ? "Mã đơn, tên, email, SĐT, tên tour…" : "Mã, tên, email, số điện thoại…"
             }
-            className="min-w-56 flex-1"
+            className="w-full"
           />
           {isBookings ? (
             <Select
               value={q.paymentStatus}
               onChange={(e) => list.setQuery({ paymentStatus: e.target.value })}
-              className="w-full sm:w-56"
+              className="w-full"
             >
               <option value="">Mọi thanh toán</option>
               <option value="unpaid">Chưa thanh toán</option>
@@ -317,7 +352,7 @@ export default function EnquiriesPage({ kind = "bookings" }) {
             <Select
               value={q.type}
               onChange={(e) => list.setQuery({ type: e.target.value })}
-              className="w-full sm:w-56"
+              className="w-full"
             >
               <option value="">Tất cả loại yêu cầu</option>
               {REQUEST_TYPES.map((t) => (
@@ -327,20 +362,6 @@ export default function EnquiriesPage({ kind = "bookings" }) {
               ))}
             </Select>
           )}
-          <button
-            type="button"
-            onClick={() => list.setQuery({ emailFailed: q.emailFailed ? "" : "1" })}
-            aria-pressed={!!q.emailFailed}
-            className={cn(
-              "inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold ring-1 transition",
-              q.emailFailed
-                ? "ring-sun-200 bg-sun-50 text-sun-700"
-                : "bg-white text-slate-600 ring-slate-200 hover:text-slate-900",
-            )}
-          >
-            <MailWarning className="size-4" />
-            Chưa gửi được email
-          </button>
         </div>
 
         {list.error && (
@@ -357,15 +378,15 @@ export default function EnquiriesPage({ kind = "bookings" }) {
             text="Không có mục nào khớp bộ lọc hiện tại."
           />
         ) : (
-          <>
+          <BusyArea busy={list.loading}>
             {/* Máy tính: bảng */}
             <div className="hidden overflow-x-auto md:block">
               {/* cột chữ dài (khách hàng, tên tour) căn trái; các cột ngắn căn giữa cả tiêu đề lẫn nội dung */}
               <table className="w-full min-w-[820px] table-fixed text-center text-sm">
                 <colgroup>
-                  <col className="w-[15%]" />
-                  <col className={isBookings ? "w-[22%]" : "w-[27%]"} />
-                  <col className={isBookings ? "w-[27%]" : "w-[19%]"} />
+                  <col className="w-[17%]" />
+                  <col className={isBookings ? "w-[22%]" : "w-[25%]"} />
+                  <col className={isBookings ? "w-[25%]" : "w-[19%]"} />
                   <col className="w-[11%]" />
                   <col className={isBookings ? "w-[13%]" : "w-[14%]"} />
                   <col className={isBookings ? "w-[12%]" : "w-[14%]"} />
@@ -392,12 +413,12 @@ export default function EnquiriesPage({ kind = "bookings" }) {
                         e.status === "new" && "bg-sun-50/30",
                       )}
                     >
-                      <td className="px-4 py-3.5">
+                      <td className="px-2 py-3.5">
                         <span className="flex items-center justify-center gap-1.5">
                           {e.status === "new" && (
                             <span className="size-2 shrink-0 rounded-full bg-sun-500" />
                           )}
-                          <span className="truncate font-mono text-xs font-semibold text-slate-800">
+                          <span className="font-mono text-xs font-semibold whitespace-nowrap text-slate-800">
                             {e.code}
                           </span>
                           {emailFailed(e) && (
@@ -496,7 +517,7 @@ export default function EnquiriesPage({ kind = "bookings" }) {
                 </li>
               ))}
             </ul>
-          </>
+          </BusyArea>
         )}
         <Pagination
           meta={list.meta}
@@ -509,7 +530,8 @@ export default function EnquiriesPage({ kind = "bookings" }) {
         <EnquiryDetail
           key={openId}
           id={openId}
-          isAdmin={isAdmin}
+          canEdit={perm.canEdit}
+          canDelete={perm.canDelete}
           onClose={close}
           onChanged={onChanged}
           onDeleted={() => {
@@ -557,7 +579,7 @@ function StatusChip({ active, onClick, label, count, hot }) {
  * Chi tiết đơn / yêu cầu
  * ========================================================================= */
 
-function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
+function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }) {
   const { toast, confirm } = useUi();
   const { run, busy } = useMutation([]);
   const [item, setItem] = useState(null);
@@ -602,7 +624,11 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
   };
 
   const patch = async (body, msg) =>
-    settle(await run(() => api(`${PATH}/${id}`, { method: "PATCH", body }), msg));
+    settle(
+      await run(() => api(`${PATH}/${id}`, { method: "PATCH", body }), msg, {
+        retry: () => patch(body, msg),
+      }),
+    );
 
   const addNote = async () => {
     const text = note.trim();
@@ -640,16 +666,17 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
       const doc = await refresh();
       if (doc) {
         onChanged(doc);
-        if (emailFailed(doc)) toast("Vẫn chưa gửi được email, vui lòng thử lại sau.", "error");
+        if (emailFailed(doc))
+          toast.warning("Hộp thư nhận có thể đang lỗi hoặc đầy. Vui lòng thử lại sau ít phút.", {
+            title: "Vẫn chưa gửi được email",
+            action: { label: "Thử lại", onClick: resend },
+          });
         else toast("Đã gửi lại email");
       }
     } catch (err) {
-      toast(
-        err?.code === "MAIL_NOT_CONFIGURED" || err?.status === 503
-          ? MAIL_OFF_TEXT
-          : errorMessage(err),
-        "error",
-      );
+      if (err?.code === "MAIL_NOT_CONFIGURED" || err?.status === 503)
+        toast.error(MAIL_OFF_TEXT, { title: "Chưa gửi được email" });
+      else toastError(toast, err, { title: "Chưa gửi được email", retry: resend });
       refresh();
     } finally {
       setResending(false);
@@ -664,7 +691,8 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
       danger: true,
     });
     if (!ok) return;
-    if (await run(() => api(`${PATH}/${id}`, { method: "DELETE" }), "Đã xoá")) onDeleted();
+    if (await run(() => api(`${PATH}/${id}`, { method: "DELETE" }), `Đã xoá ${item.code}`))
+      onDeleted();
   };
 
   const isBooking = item?.type === "booking";
@@ -680,7 +708,7 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
       footer={
         item && (
           <>
-            {isAdmin && (
+            {canDelete && (
               <Button
                 variant="danger"
                 icon={Trash2}
@@ -721,7 +749,7 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
                 </span>
                 <Select
                   value={item.status}
-                  disabled={busy}
+                  disabled={busy || !canEdit}
                   onChange={(e) =>
                     patch(
                       { status: e.target.value },
@@ -736,20 +764,27 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
                   ))}
                 </Select>
               </label>
-              <div className="flex items-end pb-2">
-                <Toggle
-                  checked={item.paymentStatus === "paid"}
-                  disabled={busy}
-                  onChange={(paid) =>
-                    patch(
-                      { paymentStatus: paid ? "paid" : "unpaid" },
-                      paid ? "Đã đánh dấu đã thanh toán" : "Đã đánh dấu chưa thanh toán",
-                    )
-                  }
-                  label={item.paymentStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
-                  hint="Bật khi khách đã chuyển tiền"
-                />
-              </div>
+              {/* Thanh toán chỉ áp dụng cho đơn đặt tour; yêu cầu báo giá (xe, visa…) chưa có tiền để đánh dấu */}
+              {item.type !== "booking" ? (
+                <p className="flex items-end pb-2.5 text-[13px] leading-snug text-slate-500">
+                  Chuyển trạng thái sau khi đã liên hệ hoặc gửi báo giá cho khách.
+                </p>
+              ) : (
+                <div className="flex items-end pb-2">
+                  <Toggle
+                    checked={item.paymentStatus === "paid"}
+                    disabled={busy || !canEdit}
+                    onChange={(paid) =>
+                      patch(
+                        { paymentStatus: paid ? "paid" : "unpaid" },
+                        paid ? "Đã đánh dấu đã thanh toán" : "Đã đánh dấu chưa thanh toán",
+                      )
+                    }
+                    label={item.paymentStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
+                    hint="Bật khi khách đã chuyển tiền"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -770,7 +805,7 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
                 >
                   <CopyBtn value={item.phone} label="số điện thoại" />
                   <a
-                    href={`https://wa.me/${item.phone.replace(/\D/g, "").replace(/^00/, "")}`}
+                    href={`https://wa.me/${waNumber(item.phone)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex h-7 items-center gap-1 rounded-lg bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
@@ -862,23 +897,25 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
               <EmailState label="Gửi khách" value={item.emailStatus?.customer} />
               <EmailState label="Gửi công ty" value={item.emailStatus?.company} />
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={Send}
-                loading={resending}
-                onClick={resend}
-                className="ml-auto"
-              >
-                Gửi lại email
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Send}
+                  loading={resending}
+                  onClick={resend}
+                  className="ml-auto"
+                >
+                  Gửi lại email
+                </Button>
+              )}
             </div>
             {emailFailed(item) && (
               <Notice tone="warn" className="mt-3">
                 {item.emailStatus?.customer === "failed"
                   ? "Chưa gửi được email cho khách."
                   : "Chưa gửi được email thông báo cho công ty."}{" "}
-                Bấm &ldquo;Gửi lại email&rdquo; để thử lại.
+                {canEdit && <>Bấm &ldquo;Gửi lại email&rdquo; để thử lại.</>}
               </Notice>
             )}
           </Section>
@@ -901,38 +938,46 @@ function EnquiryDetail({ id, isAdmin, onClose, onChanged, onDeleted }) {
                         {n.by || "—"} · {fmtDateTime(n.at)}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeNote(n)}
-                      aria-label="Xoá ghi chú"
-                      className="grid size-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white hover:text-sun-600"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => removeNote(n)}
+                        aria-label="Xoá ghi chú"
+                        className="grid size-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white hover:text-sun-600"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            <Textarea
-              rows={2}
-              value={note}
-              maxLength={2000}
-              onChange={(e) => setNote(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) addNote();
-              }}
-              placeholder="VD: Đã gọi khách, hẹn gửi lịch trình chi tiết ngày mai…"
-            />
-            <div className="mt-2 flex justify-end">
-              <Button
-                size="sm"
-                onClick={addNote}
-                disabled={!note.trim()}
-                loading={busy && !!note.trim()}
-              >
-                Thêm ghi chú
-              </Button>
-            </div>
+            {canEdit ? (
+              <>
+                <Textarea
+                  rows={2}
+                  value={note}
+                  maxLength={2000}
+                  onChange={(e) => setNote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) addNote();
+                  }}
+                  placeholder="VD: Đã gọi khách, hẹn gửi lịch trình chi tiết ngày mai…"
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={addNote}
+                    disabled={!note.trim()}
+                    loading={busy && !!note.trim()}
+                  >
+                    Thêm ghi chú
+                  </Button>
+                </div>
+              </>
+            ) : (
+              !item.notes?.length && <p className="text-sm text-slate-400">Chưa có ghi chú.</p>
+            )}
           </Section>
         </div>
       )}
@@ -972,7 +1017,7 @@ function ContactRow({ icon: Icon, href, text, children }) {
     <div className="flex flex-wrap items-center gap-2">
       <a
         href={href}
-        className="inline-flex min-w-0 items-center gap-2 text-sm font-medium text-brand-700 hover:underline"
+        className="inline-flex min-w-0 items-center gap-2 text-sm font-medium text-brand-700 transition-colors hover:text-sun-600"
       >
         <Icon className="size-4 shrink-0 text-slate-400" />
         <span className="truncate">{text}</span>

@@ -698,7 +698,7 @@ const vi = {
       { value: "4–45", label: "chỗ mỗi xe" },
       { value: "6", label: "sân bay lớn phục vụ" },
       { value: "34", label: "tỉnh & thành phố" },
-      { value: "24/7", label: "hotline & chat" },
+      { value: "24/7", label: "tổng đài & chat hỗ trợ" },
     ],
     fleetTitle: "Chọn xe của bạn",
     fleetSubtitle:
@@ -936,7 +936,7 @@ const vi = {
     noResults: "Không tìm thấy bài viết nào.",
     loadMore: "Xem thêm bài viết",
     translationPending:
-      "Bản tiếng Việt của bài viết này đang được biên dịch, tạm thời hiển thị bản gốc tiếng Anh.",
+      "Bản tiếng Việt của bài viết này đang được biên dịch, tạm thời hiển thị bản gốc.",
     relatedTours: "Tour có thể bạn thích",
     ebookTitle: "Cần hỗ trợ lên kế hoạch?",
     ebookText: "Nhận lịch trình thiết kế riêng miễn phí từ chuyên gia bản địa.",
@@ -1110,7 +1110,7 @@ const vi = {
   },
   thanks: {
     title: "Cảm ơn bạn – chúng tôi đã nhận được yêu cầu",
-    text: "Đội ngũ du lịch bản địa sẽ xem xét và phản hồi với đề xuất thiết kế riêng cùng giá cố định, thường chỉ trong vài giờ.",
+    text: "Đội ngũ du lịch bản địa sẽ kiểm tra và phản hồi kèm xác nhận cùng giá chính thức, thường chỉ trong vài giờ.",
     step1: "Chúng tôi phản hồi qua email hoặc WhatsApp trong vòng 24 giờ (thường sớm hơn nhiều).",
     step2: "Cần nhanh hơn? Hãy nhắn cho chúng tôi kèm mã yêu cầu của bạn.",
     whatsapp: "Chat qua WhatsApp",

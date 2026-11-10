@@ -35,6 +35,8 @@ router.post(
   validate({ body: loginSchema }),
   authController.login,
 );
+router.get("/demo", refreshLimiter, authController.demoStatus);
+router.post("/demo-login", globalLoginLimiter, ipLimiter, authController.demoLogin);
 router.post("/refresh", refreshLimiter, authController.refresh);
 router.get("/resume", refreshLimiter, authController.resume);
 // Không bắt buộc access token: hết hạn rồi bấm Đăng xuất vẫn thu hồi phiên + xoá cookie

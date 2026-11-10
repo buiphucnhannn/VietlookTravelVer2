@@ -14,7 +14,7 @@ export async function generateMetadata({ params }) {
     lang,
     path: "/plan-your-trip",
     title: dict.home.plannerTitle,
-    description: dict.home.plannerSubtitle,
+    description: `${dict.home.plannerSubtitle} ${dict.home.customPoints.slice(0, 3).join(" · ")}`,
     image: "/images/tours/v2/sapa-235925.jpg",
   });
 }

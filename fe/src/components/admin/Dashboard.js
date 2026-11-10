@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "@/components/admin/Link";
 import {
   ArrowRight,
   CalendarCheck,
+  Cog,
   History,
   Home,
   Inbox,
@@ -14,14 +15,20 @@ import {
   Newspaper,
   PenLine,
   Plus,
+  RefreshCw,
+  ShieldAlert,
   TrendingUp,
+  UserRound,
 } from "lucide-react";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { TODO_EVENT } from "./AdminShell";
-import { Card, EmptyState, Spinner, fmtDateTime } from "./ui";
+import { toastError } from "./hooks";
+import { Button, Card, EmptyState, Spinner, fmtDateTime, useUi } from "./ui";
+import { canUser, useCurrentUser } from "./permissions";
 import { StatusBadge, TypeBadge, emailFailed, fmtDay, fmtMoney, paxText } from "./EnquiriesPage";
+import { LogSentence, actorText } from "./AuditLogPage";
 
 const A = (p = "") => `${ADMIN_BASE}${p}`;
 
@@ -45,117 +52,169 @@ const greeting = () => {
         : "Chào buổi tối";
 };
 
+// perm: [mục, mức] cần có mới hiện lối tắt ("admin" = chỉ quản trị viên)
 const QUICK_LINKS = [
-  { href: A("/tours/new"), label: "Thêm tour", text: "Tạo tour mới", Icon: Plus },
-  { href: A("/articles/new"), label: "Viết bài", text: "Bài cẩm nang du lịch", Icon: PenLine },
-  { href: A("/home"), label: "Sửa trang chủ", text: "Banner, mục nổi bật", Icon: Home },
-  { href: A("/settings"), label: "Cài đặt email", text: "Người nhận thông báo", Icon: Mail },
+  {
+    href: A("/tours/new"),
+    label: "Thêm tour",
+    text: "Tạo tour mới",
+    Icon: Plus,
+    perm: ["tours", "edit"],
+  },
+  {
+    href: A("/articles/new"),
+    label: "Viết bài",
+    text: "Bài cẩm nang du lịch",
+    Icon: PenLine,
+    perm: ["articles", "edit"],
+  },
+  {
+    href: A("/home"),
+    label: "Sửa trang chủ",
+    text: "Banner, mục nổi bật",
+    Icon: Home,
+    perm: ["home", "edit"],
+  },
+  {
+    href: A("/settings"),
+    label: "Cài đặt email",
+    text: "Người nhận thông báo",
+    Icon: Mail,
+    perm: ["admin", "view"],
+  },
 ];
 
-/** Nhật ký: "tour.update" → "Sửa tour" */
-const ENTITY = {
-  tour: "tour",
-  destination: "điểm đến",
-  theme: "chủ đề tour",
-  article: "bài viết",
-  category: "chuyên mục",
-  author: "tác giả",
-  page: "trang",
-  car: "loại xe",
-  car_area: "khu vực xe",
-  visa_type: "loại visa",
-  fast_track: "gói fast-track",
-  vehicle: "xe",
-  zone: "khu vực",
-  visa: "dịch vụ visa",
-  enquiry: "đơn / yêu cầu",
-  user: "tài khoản",
-  media: "ảnh",
-};
-const VERB = {
-  create: "Thêm",
-  update: "Sửa",
-  delete: "Xoá",
-  show: "Hiện",
-  hide: "Ẩn",
-  reorder: "Sắp xếp",
-  note: "Ghi chú",
-  resend_email: "Gửi lại email",
-  upload: "Tải lên",
-  unlock: "Mở khoá",
-  password_reset: "Đặt lại mật khẩu",
-};
-const SPECIAL = {
-  "auth.login": "Đăng nhập",
-  "auth.login_failed": "Đăng nhập sai mật khẩu",
-  "auth.locked": "Bị tạm khoá đăng nhập",
-  "auth.password_change": "Đổi mật khẩu",
-  "settings.home": "Sửa trang chủ",
-  "settings.notifications": "Sửa cài đặt email",
-  "settings.payment": "Sửa cài đặt thanh toán",
-  "settings.test_email": "Gửi email thử",
-  "settings.tracking": "Sửa mã đo lường",
-  "media.from_url": "Thêm ảnh từ link",
-  "media.drive_video": "Thêm video từ Google Drive",
-};
-const actionLabel = (a = "") => {
-  if (SPECIAL[a]) return SPECIAL[a];
-  const [ent, ...rest] = a.split(".");
-  const verb = VERB[rest.join(".")];
-  return verb && ENTITY[ent] ? `${verb} ${ENTITY[ent]}` : a;
-};
-
-/** Tên dễ đọc của thứ vừa được thao tác (đường dẫn trang, mã đơn); không hiện mã nội bộ */
-const targetName = (l) => {
-  if (l.meta?.slug) return l.meta.slug;
-  const id = l.target?.id;
-  const readable = l.target?.type === "enquiry" || l.target?.type === "page";
-  return readable && id && !/^[0-9a-f]{24}$/i.test(id) ? id : "";
+const STAT_COLS = {
+  1: "grid-cols-1", // nhân viên chỉ được xem 1 mục → thẻ trải hết hàng, không để trống nửa phải
+  3: "lg:grid-cols-3",
+  4: "lg:grid-cols-4",
+  5: "lg:grid-cols-5",
+  6: "lg:grid-cols-3 xl:grid-cols-6",
 };
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
+  const user = useCurrentUser();
+  // Chỉ hiện số liệu / lối tắt của mục tài khoản được xem
+  const can = (m, l = "view") => canUser(user, m, l);
+  const seeBookings = can("bookings");
+  const seeRequests = can("requests");
+  const seeAudit = can("audit");
+  const seeTotals = ["tours", "articles", "destinations"].filter((k) => can(k));
+  const totalsKey = seeTotals.join(",");
   const [stats, setStats] = useState(null);
   const [totals, setTotals] = useState({});
   const [bookings, setBookings] = useState(null);
   const [requests, setRequests] = useState(null);
   const [logs, setLogs] = useState(null); // null = đang tải, false = không có quyền / lỗi
+  const [refreshing, setRefreshing] = useState(false);
+  const { toast } = useUi();
+
+  // Đơn + yêu cầu: lỗi thì giữ số liệu cũ (lần đầu → trống) và báo lỗi cho nút "Làm mới"
+  const loadEnquiries = useCallback(async () => {
+    const none = Promise.resolve({ data: seeBookings || seeRequests ? undefined : {} });
+    const [s, b, r] = await Promise.allSettled([
+      seeBookings || seeRequests ? api("/enquiries/stats") : none,
+      seeBookings ? api("/enquiries?kind=bookings&limit=6") : Promise.resolve({ data: [] }),
+      seeRequests ? api("/enquiries?kind=requests&limit=6") : Promise.resolve({ data: [] }),
+    ]);
+    const ok = (x) => x.status === "fulfilled";
+    setStats((v) => (ok(s) ? s.value.data : (v ?? {})));
+    setBookings((v) => (ok(b) ? b.value.data : (v ?? [])));
+    setRequests((v) => (ok(r) ? r.value.data : (v ?? [])));
+    const failed = [s, b, r].find((x) => !ok(x));
+    if (failed) throw failed.reason;
+    return s.value.data;
+  }, [seeBookings, seeRequests]);
+
+  const loadOthers = useCallback(
+    () =>
+      Promise.all([
+        ...(totalsKey ? totalsKey.split(",") : []).map((key) =>
+          api(`/admin/${key}?limit=1`)
+            .then((r) => setTotals((t) => ({ ...t, [key]: r.meta?.total ?? r.data?.length ?? 0 })))
+            .catch(() => setTotals((t) => ({ ...t, [key]: t[key] ?? "—" }))),
+        ),
+        seeAudit
+          ? api("/audit-logs?limit=8")
+              .then((r) => setLogs(r.data ?? []))
+              .catch(() => setLogs((v) => v || false))
+          : Promise.resolve().then(() => setLogs(false)),
+      ]),
+    [totalsKey, seeAudit],
+  );
 
   useEffect(() => {
-    api("/auth/me")
-      .then((r) => setUser(r.data.user))
-      .catch(() => {});
+    const onTodo = () => loadEnquiries().catch(() => {});
+    onTodo();
+    loadOthers();
+    window.addEventListener(TODO_EVENT, onTodo);
+    return () => window.removeEventListener(TODO_EVENT, onTodo);
+  }, [loadEnquiries, loadOthers]);
 
-    const loadEnquiries = () => {
-      api("/enquiries/stats")
-        .then((r) => setStats(r.data))
-        .catch(() => setStats({}));
-      api("/enquiries?kind=bookings&limit=6")
-        .then((r) => setBookings(r.data))
-        .catch(() => setBookings([]));
-      api("/enquiries?kind=requests&limit=6")
-        .then((r) => setRequests(r.data))
-        .catch(() => setRequests([]));
-    };
-    loadEnquiries();
-    window.addEventListener(TODO_EVENT, loadEnquiries);
-
-    for (const key of ["tours", "articles", "destinations"]) {
-      api(`/admin/${key}?limit=1`)
-        .then((r) => setTotals((t) => ({ ...t, [key]: r.meta?.total ?? r.data?.length ?? 0 })))
-        .catch(() => setTotals((t) => ({ ...t, [key]: "—" })));
+  const waiting = (s) => (s?.bookings?.new ?? 0) + (s?.requests?.new ?? 0);
+  const refresh = async () => {
+    const before = waiting(stats);
+    setRefreshing(true);
+    try {
+      const [s] = await Promise.all([loadEnquiries(), loadOthers()]);
+      const after = waiting(s);
+      if (after > before)
+        toast.success("Số liệu đã được cập nhật", {
+          title: `Có ${after - before} đơn / yêu cầu mới`,
+        });
+      else
+        toast.success(
+          after
+            ? `Đã cập nhật số liệu — ${after} việc đang chờ xử lý`
+            : "Đã cập nhật số liệu — không có việc mới",
+        );
+    } catch (err) {
+      toastError(toast, err, { title: "Chưa cập nhật được số liệu", retry: refresh });
+    } finally {
+      setRefreshing(false);
     }
-
-    api("/audit-logs?limit=8")
-      .then((r) => setLogs(r.data ?? []))
-      .catch(() => setLogs(false));
-
-    return () => window.removeEventListener(TODO_EVENT, loadEnquiries);
-  }, []);
+  };
 
   // Đã tải xong thống kê mà chưa có đơn ở trạng thái "Mới" → 0 (không hiện khung chờ mãi)
   const newBookings = stats ? (stats.bookings?.new ?? 0) : undefined;
   const newRequests = stats ? (stats.requests?.new ?? 0) : undefined;
+
+  const quickLinks = QUICK_LINKS.filter((q) => can(...q.perm));
+  const statCards = [
+    seeBookings && {
+      href: A("/bookings"),
+      label: "Đơn đặt mới",
+      value: newBookings,
+      Icon: CalendarCheck,
+      hot: true,
+    },
+    seeRequests && {
+      href: A("/requests"),
+      label: "Yêu cầu mới",
+      value: newRequests,
+      Icon: Inbox,
+      hot: true,
+    },
+    (seeBookings || seeRequests) && {
+      label: "7 ngày qua",
+      sub: seeBookings && seeRequests ? "đơn + yêu cầu" : seeBookings ? "đơn đặt tour" : "yêu cầu",
+      value: stats?.last7Days,
+      Icon: TrendingUp,
+    },
+    can("tours") && { href: A("/tours"), label: "Tour", value: totals.tours, Icon: MapIcon },
+    can("articles") && {
+      href: A("/articles"),
+      label: "Bài viết",
+      value: totals.articles,
+      Icon: Newspaper,
+    },
+    can("destinations") && {
+      href: A("/destinations"),
+      label: "Điểm đến",
+      value: totals.destinations,
+      Icon: MapPin,
+    },
+  ].filter(Boolean);
 
   return (
     <>
@@ -194,10 +253,26 @@ export default function Dashboard() {
               )}
             </span>
             <span>
-              {newBookings || newRequests ? (
+              {!seeBookings && !seeRequests ? (
+                "Chúc một ngày làm việc hiệu quả!"
+              ) : newBookings || newRequests ? (
                 <>
-                  Bạn có <b className="text-slate-900">{newBookings ?? 0} đơn đặt tour</b> và{" "}
-                  <b className="text-slate-900">{newRequests ?? 0} yêu cầu</b> mới đang chờ xử lý.
+                  Bạn có{" "}
+                  {[
+                    seeBookings && (
+                      <b key="b" className="text-slate-900">
+                        {newBookings ?? 0} đơn đặt tour
+                      </b>
+                    ),
+                    seeRequests && (
+                      <b key="r" className="text-slate-900">
+                        {newRequests ?? 0} yêu cầu
+                      </b>
+                    ),
+                  ]
+                    .filter(Boolean)
+                    .flatMap((x, i) => (i ? [" và ", x] : [x]))}{" "}
+                  mới đang chờ xử lý.
                 </>
               ) : stats ? (
                 "Không có đơn hay yêu cầu mới nào đang chờ. Chúc một ngày làm việc hiệu quả!"
@@ -208,6 +283,16 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            icon={RefreshCw}
+            loading={refreshing}
+            onClick={refresh}
+            aria-label="Làm mới số liệu"
+            title="Làm mới số liệu"
+          >
+            Làm mới
+          </Button>
           {newBookings || newRequests ? (
             <Link
               href={A(newBookings ? "/bookings" : "/requests")}
@@ -216,93 +301,103 @@ export default function Dashboard() {
               Xử lý ngay <ArrowRight className="size-4" />
             </Link>
           ) : null}
-          <Link
-            href={A("/tours/new")}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:ring-slate-300"
-          >
-            <Plus className="size-4" /> Thêm tour
-          </Link>
+          {can("tours", "edit") && (
+            <Link
+              href={A("/tours/new")}
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:ring-slate-300"
+            >
+              <Plus className="size-4" /> Thêm tour
+            </Link>
+          )}
         </div>
       </header>
 
       {/* Số liệu */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard
-          href={A("/bookings")}
-          label="Đơn đặt mới"
-          value={newBookings}
-          Icon={CalendarCheck}
-          hot
-        />
-        <StatCard href={A("/requests")} label="Yêu cầu mới" value={newRequests} Icon={Inbox} hot />
-        <StatCard
-          label="7 ngày qua"
-          sub="đơn + yêu cầu"
-          value={stats?.last7Days}
-          Icon={TrendingUp}
-        />
-        <StatCard href={A("/tours")} label="Tour" value={totals.tours} Icon={MapIcon} />
-        <StatCard href={A("/articles")} label="Bài viết" value={totals.articles} Icon={Newspaper} />
-        <StatCard
-          href={A("/destinations")}
-          label="Điểm đến"
-          value={totals.destinations}
-          Icon={MapPin}
-        />
-      </div>
+      {statCards.length > 0 && (
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-3 sm:gap-4",
+            // số cột theo số thẻ được xem → hàng luôn đầy, không lẻ thẻ
+            STAT_COLS[statCards.length],
+          )}
+        >
+          {statCards.map((c) => (
+            <StatCard key={c.label} {...c} />
+          ))}
+        </div>
+      )}
 
-      {/* Đơn + yêu cầu mới nhất */}
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <LatestCard
-          title="Đơn đặt tour mới nhất"
-          base={A("/bookings")}
-          items={bookings}
-          empty="Chưa có đơn đặt tour"
-          Icon={CalendarCheck}
-          render={(e) => (
-            <>
-              <p className="line-clamp-1 text-xs text-slate-600">{e.tour?.title || "—"}</p>
-              <p className="text-[11px] text-slate-400">
-                {[fmtDay(e.departureDate), paxText(e)].filter(Boolean).join(" · ")}
-              </p>
-            </>
-          )}
-        />
-        <LatestCard
-          title="Yêu cầu mới nhất"
-          base={A("/requests")}
-          items={requests}
-          empty="Chưa có yêu cầu nào"
-          Icon={Inbox}
-          render={(e) => (
-            <div className="mt-0.5">
-              <TypeBadge type={e.type} />
-            </div>
-          )}
-        />
+      {/* Đơn + yêu cầu mới nhất (chỉ nhóm được xem) */}
+      <div
+        className={cn(
+          "mt-6 grid gap-6",
+          seeBookings && seeRequests && "xl:grid-cols-2",
+          !seeBookings && !seeRequests && "hidden",
+        )}
+      >
+        {seeBookings && (
+          <LatestCard
+            title="Đơn đặt tour mới nhất"
+            base={A("/bookings")}
+            items={bookings}
+            empty="Chưa có đơn đặt tour"
+            Icon={CalendarCheck}
+            render={(e) => (
+              <>
+                <p className="line-clamp-1 text-xs text-slate-600">{e.tour?.title || "—"}</p>
+                <p className="text-[11px] text-slate-400">
+                  {[fmtDay(e.departureDate), paxText(e)].filter(Boolean).join(" · ")}
+                </p>
+              </>
+            )}
+          />
+        )}
+        {seeRequests && (
+          <LatestCard
+            title="Yêu cầu mới nhất"
+            base={A("/requests")}
+            items={requests}
+            empty="Chưa có yêu cầu nào"
+            Icon={Inbox}
+            render={(e) => (
+              <div className="mt-0.5">
+                <TypeBadge type={e.type} />
+              </div>
+            )}
+          />
+        )}
       </div>
 
       {/* Lối tắt + nhật ký */}
       <div className="mt-6 space-y-6">
-        <Card title="Lối tắt" bodyClassName="p-3 sm:p-4">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {QUICK_LINKS.map(({ href, label, text, Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="group flex items-center gap-3 rounded-xl p-3 ring-1 ring-slate-100 transition hover:bg-brand-50/60 hover:ring-brand-200"
-              >
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 transition group-hover:bg-brand-700 group-hover:text-white">
-                  <Icon className="size-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-900">{label}</span>
-                  <span className="block truncate text-xs text-slate-500">{text}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </Card>
+        {quickLinks.length > 0 && (
+          <Card title="Lối tắt" bodyClassName="p-3 sm:p-4">
+            <div
+              className={cn(
+                "grid gap-2 sm:grid-cols-2",
+                quickLinks.length === 3
+                  ? "xl:grid-cols-3"
+                  : quickLinks.length >= 4 && "xl:grid-cols-4",
+              )}
+            >
+              {quickLinks.map(({ href, label, text, Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="group flex items-center gap-3 rounded-xl p-3 ring-1 ring-slate-100 transition hover:bg-brand-50/60 hover:ring-brand-200"
+                >
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 transition group-hover:bg-brand-700 group-hover:text-white">
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-900">{label}</span>
+                    <span className="block truncate text-xs text-slate-500">{text}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {logs !== false && (
           <Card
@@ -310,7 +405,7 @@ export default function Dashboard() {
             actions={
               <Link
                 href={A("/audit-log")}
-                className="text-xs font-semibold text-brand-700 hover:underline"
+                className="text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600"
               >
                 Xem tất cả
               </Link>
@@ -325,30 +420,51 @@ export default function Dashboard() {
               <EmptyState icon={History} title="Chưa có hoạt động" />
             ) : (
               <ul className="px-5 pb-2 lg:columns-2 lg:gap-x-12">
-                {logs.map((l) => (
-                  <li
-                    key={l.id}
-                    className="flex break-inside-avoid items-center gap-3 border-b border-slate-100 py-2.5"
-                  >
-                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-                      {(l.actorName || "?").charAt(0).toUpperCase()}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-slate-800">
-                        <span className="font-semibold">{l.actorName || "Hệ thống"}</span>{" "}
-                        <span className="text-slate-600">
-                          {actionLabel(l.action).toLowerCase()}
-                        </span>
-                        {targetName(l) && (
-                          <span className="ml-1 text-xs text-slate-500">{targetName(l)}</span>
+                {logs.map((l) => {
+                  const stranger = !l.actorName && /^auth\.(login_failed|locked)$/.test(l.action);
+                  const NoName = stranger
+                    ? ShieldAlert
+                    : l.action === "enquiry.create"
+                      ? UserRound
+                      : Cog;
+                  return (
+                    <li
+                      key={l.id}
+                      className="flex break-inside-avoid items-center gap-3 border-b border-slate-100 py-2.5"
+                    >
+                      <span
+                        className={cn(
+                          "grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold",
+                          l.actorName
+                            ? "bg-brand-50 text-brand-700"
+                            : stranger
+                              ? "bg-sun-50 text-sun-600"
+                              : "bg-slate-100 text-slate-500",
                         )}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-[11px] text-slate-400">
-                      {fmtDateTime(l.createdAt)}
-                    </span>
-                  </li>
-                ))}
+                        aria-hidden
+                      >
+                        {l.actorName ? (
+                          l.actorName.charAt(0).toUpperCase()
+                        ) : (
+                          <NoName className="size-4" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <LogSentence
+                          log={l}
+                          className="line-clamp-2 text-sm leading-relaxed break-words text-slate-700"
+                        />
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          <span className={cn("font-semibold", stranger && "text-sun-700")}>
+                            {actorText(l)}
+                          </span>
+                          <span className="text-slate-300"> · </span>
+                          <span className="tabular-nums">{fmtDateTime(l.createdAt)}</span>
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
@@ -407,7 +523,7 @@ function LatestCard({ title, base, items, empty, Icon, render }) {
       actions={
         <Link
           href={base}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600"
         >
           Xem tất cả <ArrowRight className="size-3.5" />
         </Link>

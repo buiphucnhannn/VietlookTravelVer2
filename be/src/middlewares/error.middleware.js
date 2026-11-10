@@ -27,13 +27,13 @@ export function errorHandler(err, req, res, _next) {
       Object.values(err.errors).map((e) => ({ field: e.path, message: e.message })),
     );
   } else if (err instanceof mongoose.Error.CastError) {
-    error = ApiError.badRequest("Dữ liệu không hợp lệ (mã / định dạng sai)");
+    error = ApiError.badRequest("Dữ liệu không hợp lệ, vui lòng tải lại trang rồi thử lại");
   } else if (err?.code === 11000) {
     error = ApiError.conflict("Dữ liệu bị trùng với mục đã có");
   } else if (err instanceof multer.MulterError) {
     error = ApiError.badRequest(MULTER_MESSAGES[err.code] ?? "File tải lên không hợp lệ");
   } else if (err?.type === "entity.parse.failed") {
-    error = ApiError.badRequest("Dữ liệu gửi lên không đúng định dạng JSON");
+    error = ApiError.badRequest("Dữ liệu gửi lên không hợp lệ, vui lòng tải lại trang rồi thử lại");
   } else if (err?.type === "entity.too.large") {
     error = new ApiError(413, "Dữ liệu gửi lên quá lớn");
   }

@@ -742,7 +742,7 @@ const zh = {
     articles: "篇文章",
     noResults: "没有找到文章。",
     loadMore: "加载更多文章",
-    translationPending: "本文中文版正在翻译中，暂时显示英文原文。",
+    translationPending: "本文中文版正在翻译中，暂时显示原文。",
     relatedTours: "推荐线路",
     ebookTitle: "需要规划帮助？",
     ebookText: "本地专家为您免费定制行程。",
@@ -882,7 +882,7 @@ const zh = {
   },
   thanks: {
     title: "感谢您，我们已收到需求",
-    text: "本地旅行团队将尽快审阅，并回复定制方案与确定价格，通常在几小时内。",
+    text: "本地旅行团队将尽快核实，并回复确认信息与最终价格，通常在几小时内。",
     step1: "我们将在 24 小时内通过邮件或 WhatsApp 回复（通常更快）。",
     step2: "需要更快？请附上需求编号联系我们。",
     whatsapp: "WhatsApp 咨询",

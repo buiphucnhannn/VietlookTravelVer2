@@ -80,7 +80,9 @@ async function DestinationPageContent({ params }) {
             ? fill(dict.destination.regionTours, { name })
             : lang === "vi"
               ? `Tour ${name}`
-              : `${name} ${lang === "zh" ? "线路" : "Tours"}`
+              : lang === "zh"
+                ? `${name}线路`
+                : `${name} Tours`
         }
         text={tr(item.intro, lang)}
         images={[item.hero || item.image, item.image, ...tours.flatMap((x) => x.gallery)]}

@@ -43,8 +43,20 @@ const MAX_VALUES = 12;
 const MAX_STATS = 8;
 const emptyLoc = () => ({ en: "", zh: "", vi: "" });
 
-/** Chữ gợi ý cho ô đang trống: bản tiếng Anh (website sẽ hiện bản này) hoặc lời nhắc */
-const hintOf = (lang, english, fallback) => (lang !== "en" && english?.trim() ? english : fallback);
+/** Chữ gợi ý cho ô đang trống: chữ của ngôn ngữ khác đã có (khi lưu sẽ tự dịch sang) hoặc lời nhắc */
+const hintOf = (lang, loc, fallback) => otherOf(loc, lang) || fallback;
+/** Chữ đầu tiên có nội dung ở ngôn ngữ KHÁC `lang` (thứ tự en → vi → zh) */
+const otherOf = (loc, lang) =>
+  ["en", "vi", "zh"]
+    .filter((l) => l !== lang)
+    .map((l) => loc?.[l])
+    .find((v) => typeof v === "string" && v.trim()) ?? "";
+/** Danh sách của ngôn ngữ KHÁC `lang` có nhiều dòng nhất */
+const otherList = (list, lang) =>
+  ["en", "vi", "zh"]
+    .filter((l) => l !== lang)
+    .map((l) => list?.[l] ?? [])
+    .sort((a, b) => b.length - a.length)[0] ?? [];
 
 /**
  * Dòng chữ sửa tại chỗ: trong suốt, tự cao theo nội dung, viền nét đứt khi rê chuột / đang gõ.
@@ -100,7 +112,7 @@ function LocText({ value, onChange, lang, hint, ...props }) {
       {...props}
       value={value?.[lang] ?? ""}
       onChange={(v) => onChange({ ...emptyLoc(), ...value, [lang]: v })}
-      placeholder={hintOf(lang, value?.en, hint)}
+      placeholder={hintOf(lang, value, hint)}
     />
   );
 }
@@ -311,7 +323,7 @@ export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
         <p className="mb-4 flex max-w-full items-center gap-1.5 text-xs font-medium text-white/80 drop-shadow">
           Vietlook
           <ChevronRight className="size-3.5 shrink-0" />
-          <span className="truncate text-white">{d.title[lang] || d.title.en}</span>
+          <span className="truncate text-white">{d.title[lang] || otherOf(d.title, lang)}</span>
         </p>
         <h2 className="brush max-w-full text-3xl font-extrabold tracking-tight drop-shadow-md [--brush-color:var(--color-clay-600)] sm:text-5xl">
           <InlineText
@@ -321,7 +333,7 @@ export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
             label="Tiêu đề trang"
             value={d.title[lang]}
             onChange={(v) => set({ title: { ...d.title, [lang]: v } })}
-            placeholder={hintOf(lang, d.title.en, "Tiêu đề trang")}
+            placeholder={hintOf(lang, d.title, "Tiêu đề trang")}
             className="leading-tight"
           />
         </h2>
@@ -330,7 +342,7 @@ export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
           label="Dòng mô tả dưới tiêu đề"
           value={d.subtitle[lang]}
           onChange={(v) => set({ subtitle: { ...d.subtitle, [lang]: v } })}
-          placeholder={hintOf(lang, d.subtitle.en, "Thêm một dòng mô tả ngắn")}
+          placeholder={hintOf(lang, d.subtitle, "Thêm một dòng mô tả ngắn")}
           className="mt-4 max-w-3xl text-base font-semibold drop-shadow-md sm:text-lg"
         />
       </div>
@@ -377,7 +389,7 @@ const POLICY_LABEL = {
  * trang đó; `onClick` hỏi lại nếu còn thay đổi chưa lưu)
  */
 export function PolicyBody({ d, lang, set, menu = [] }) {
-  const toc = tocOf(d.body[lang] || d.body.en);
+  const toc = tocOf(d.body[lang] || otherOf(d.body, lang));
   return (
     <div className="grid gap-6 px-3 py-6 sm:px-6 sm:py-8 xl:grid-cols-[250px_minmax(0,1fr)] xl:gap-8 xl:px-8 xl:py-10 2xl:grid-cols-[250px_minmax(0,1fr)_240px]">
       {/* Menu chính sách */}
@@ -425,8 +437,8 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
           folder="pages"
           minHeight={360}
           placeholder={
-            lang !== "en" && d.body.en?.trim()
-              ? `Chưa có bản ${LANG_NAME[lang]} nên website đang hiện bản tiếng Anh. Bấm vào đây để viết…`
+            otherOf(d.body, lang)
+              ? `Chưa có bản ${LANG_NAME[lang]} — khi lưu sẽ tự dịch từ ngôn ngữ đã viết. Bấm vào đây để tự viết…`
               : "Bấm vào đây để viết nội dung…"
           }
         />
@@ -461,11 +473,11 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
  * câu chuyện + 4 ảnh · tầm nhìn – sứ mệnh – giá trị · vì sao chọn Vietlook · video + con số · đánh giá
  * ========================================================================= */
 
-/** Danh sách theo ngôn ngữ: nếu ngôn ngữ này chưa có gì → hiện các ô trống gợi ý bằng bản tiếng Anh */
+/** Danh sách theo ngôn ngữ: nếu ngôn ngữ này chưa có gì → hiện các ô trống theo số dòng của ngôn ngữ khác */
 const rowsOf = (list, lang) => {
   const own = list[lang] ?? [];
   if (own.length) return own;
-  const english = lang === "en" ? [] : (list.en ?? []);
+  const english = otherList(list, lang);
   return english.length ? english.map(() => "") : [""];
 };
 
@@ -503,7 +515,7 @@ function StorySection({ data, lang, setData, loc }) {
   const [focusAt, setFocusAt] = useState(-1);
   const story = rowsOf(data.story, lang);
   const setStory = (next) => setData({ story: { ...data.story, [lang]: next } });
-  const english = lang === "en" ? [] : (data.story.en ?? []);
+  const english = otherList(data.story, lang);
 
   return (
     <section className={SECTION}>
@@ -756,7 +768,7 @@ function ValuesSection({ data, lang, setData, loc }) {
           dark
           name="Phẩm chất"
           value={people}
-          placeholders={lang === "en" ? [] : data.people.en}
+          placeholders={otherList(data.people, lang)}
           onChange={(next) => setData({ people: { ...data.people, [lang]: next } })}
           addLabel="Thêm phẩm chất"
           newHint="VD: Tận tâm"
@@ -994,7 +1006,7 @@ function NumbersSection({ data, lang, setData, loc }) {
         <div className="space-y-3">
           <VideoField value={data.video} onChange={(v) => setData({ video: v })} />
           <details className="group/help">
-            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline [&::-webkit-details-marker]:hidden">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600 [&::-webkit-details-marker]:hidden">
               Cách lấy link video
             </summary>
             <div className="mt-2">

@@ -122,14 +122,14 @@ export default function Hero({ lang, dict, banner, regions, destinations }) {
           {copy.eyebrow}
         </p>
         <h1 className="mt-[clamp(0.35rem,1.2svh,1rem)] animate-fade-up [animation-delay:120ms]">
-          <span className="block text-[clamp(1.6rem,4.6svh,3.75rem)] leading-none font-extrabold tracking-[-0.04em] drop-shadow-lg">
+          <span className="block pb-[clamp(0.15rem,0.8svh,0.5rem)] text-[clamp(1.6rem,4.6svh,3.75rem)] leading-[1.15] font-extrabold tracking-[-0.03em] drop-shadow-lg">
             {copy.titleTop}
-          </span>
-          <span className="block text-[clamp(3rem,min(13.5svh,21vw),9rem)] leading-[0.95] font-extrabold tracking-[-0.06em] drop-shadow-xl">
+          </span>{" "}
+          <span className="block pb-[0.2em] text-[clamp(3rem,min(13.5svh,21vw),9rem)] leading-[1.05] font-extrabold tracking-[-0.05em] drop-shadow-xl">
             {copy.titleMain}
           </span>
         </h1>
-        <p className="mt-[clamp(0.6rem,1.8svh,1.25rem)] max-w-2xl animate-fade-up text-[0.88rem] leading-snug text-white/90 [animation-delay:220ms] sm:text-[clamp(1rem,2.2svh,1.125rem)] sm:leading-normal [@media(max-height:620px)]:hidden">
+        <p className="mt-[clamp(0.4rem,1.2svh,0.9rem)] max-w-2xl animate-fade-up text-[0.88rem] leading-snug text-white/90 [animation-delay:220ms] sm:text-[clamp(1rem,2.2svh,1.125rem)] sm:leading-normal [@media(max-height:620px)]:hidden">
           <span className="sm:hidden">{copy.descriptionShort || copy.description}</span>
           <span className="hidden sm:inline">{copy.description}</span>
         </p>

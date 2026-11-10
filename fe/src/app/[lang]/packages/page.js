@@ -41,6 +41,8 @@ function PackageRow({ tour, lang, dict, getDestination }) {
     <article className="grid gap-6 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-border sm:grid-cols-[220px_1fr] sm:p-8">
       <Link
         href={url}
+        tabIndex={-1}
+        aria-hidden="true"
         className="relative block aspect-[4/3] overflow-hidden rounded-xl sm:aspect-square"
       >
         <Image
@@ -84,16 +86,14 @@ function PackageRow({ tour, lang, dict, getDestination }) {
               <Eye className="size-4" /> {dict.packages.quickView}
             </summary>
             <ol className="mt-3 space-y-1.5 border-l-2 border-brand-100 pl-4">
-              {(tour.route?.[lang]?.length ? tour.route[lang] : (tour.route?.en ?? [])).map(
-                (r, i) => (
-                  <li key={i}>
-                    <strong className="text-brand-600">
-                      {c.day} {i + 1}:
-                    </strong>{" "}
-                    {r}
-                  </li>
-                ),
-              )}
+              {(tr(tour.route, lang) || []).map((r, i) => (
+                <li key={i}>
+                  <strong className="text-brand-600">
+                    {c.day} {i + 1}:
+                  </strong>{" "}
+                  {r}
+                </li>
+              ))}
             </ol>
           </details>
           <Button href={url} variant="primary" className="ml-auto">

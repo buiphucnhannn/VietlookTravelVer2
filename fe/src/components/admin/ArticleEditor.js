@@ -9,7 +9,7 @@ import { cn, slugify } from "@/lib/utils";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { useMutation, useOptions } from "./hooks";
 import RichText from "./RichText";
-import { AutoTranslate } from "./translate";
+import { AutoTranslate, slugSource, useAutoFill } from "./translate";
 import {
   Button,
   Card,
@@ -23,12 +23,15 @@ import {
   PageHeader,
   Select,
   Textarea,
+  DEFAULT_LANG,
   Toggle,
+  anyLang,
   filledOf,
   locText,
   useUi,
   useUnsavedGuard,
 } from "./ui";
+import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
 
 const PATH = "/admin/articles";
 const TAGS = ["articles"];
@@ -122,6 +125,7 @@ export default function ArticleEditor({ id }) {
       alive = false;
     };
   }, [id, isNew]);
+  const { canEdit } = usePermission("articles");
 
   const back = (
     <Link
@@ -133,6 +137,7 @@ export default function ArticleEditor({ id }) {
     </Link>
   );
 
+  if (isNew && !canEdit) return <NoAccess />;
   if (state.loading) return <LoadingBlock text="Đang tải bài viết…" />;
   if (!state.doc)
     return (
@@ -150,10 +155,11 @@ function EditorForm({ initial, back }) {
   const isNew = !initial.id;
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial); // bản đã lưu gần nhất (so sánh để biết có thay đổi)
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const [errors, setErrors] = useState({});
   const { run, busy } = useMutation(TAGS);
+  const autoFill = useAutoFill();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
   const categories = useOptions("/admin/categories?limit=200&sort=order", (c) => ({
@@ -174,18 +180,35 @@ function EditorForm({ initial, back }) {
     [d, saved],
   );
   useUnsavedGuard(dirty);
+  const { canEdit } = usePermission("articles"); // chỉ xem → form chỉ đọc, không có thanh Lưu
 
   const save = useCallback(async () => {
+    if (!canEdit) return;
     const errs = {};
-    if (!d.title.en.trim()) errs.title = "Cần nhập tiêu đề tiếng Anh";
-    if (!d.slug.trim()) errs.slug = "Cần nhập đường dẫn trang";
+    if (!anyLang(d.title)) errs.title = "Nhập tiêu đề ở ít nhất một ngôn ngữ";
+    // ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết rồi mới lưu
+    const { value: tr, failed } = errs.title
+      ? { value: null, failed: false }
+      : await autoFill.fill(
+          { title: d.title, excerpt: d.excerpt, body: d.body, seo: d.seo },
+          { lang },
+        );
+    const v = tr ? { ...d, ...tr } : d;
+    if (tr) setD(v);
+    const slug = v.slug.trim() || (isNew ? slugify(slugSource(v.title)) : "");
+    if (!slug) errs.slug = "Cần nhập đường dẫn trang";
     setErrors(errs);
     if (Object.keys(errs).length) {
-      if (errs.title) setLang("en");
-      toast(Object.values(errs)[0], "error");
+      const n = Object.keys(errs).length;
+      toast.error(
+        n > 1
+          ? `Vui lòng kiểm tra ${n} ô được đánh dấu đỏ.`
+          : `${Object.values(errs)[0]} (ô được đánh dấu đỏ).`,
+        { title: "Chưa lưu được" },
+      );
       return;
     }
-    const body = toPayload(d);
+    const body = toPayload({ ...v, slug });
     const r = await run(
       () =>
         isNew
@@ -197,8 +220,18 @@ function EditorForm({ initial, back }) {
     const next = fromDoc(r.data);
     setSaved(next);
     setD(next);
+    if (failed)
+      autoFill.offerRetry(async (t) => {
+        const r2 = await api(`${PATH}/${r.data.id}`, {
+          method: "PUT",
+          body: toPayload({ ...next, ...t }),
+        });
+        const again = fromDoc(r2.data);
+        setSaved(again);
+        setD(again);
+      });
     if (isNew) router.replace(`${BASE}/${r.data.id}`);
-  }, [d, isNew, router, run, toast]);
+  }, [d, isNew, router, run, toast, canEdit, autoFill, lang]);
 
   // Ctrl/⌘ + S để lưu nhanh
   const saveRef = useRef(save);
@@ -236,7 +269,7 @@ function EditorForm({ initial, back }) {
   const isMonth = d.category === MONTH_CATEGORY;
 
   // Nút dịch + tab ngôn ngữ (đặt ở góc phải mỗi khung có nội dung 3 thứ tiếng).
-  // Chỉ đưa phần chữ cho nút dịch; bài mới chưa có đường dẫn thì tạo từ tiêu đề tiếng Anh vừa dịch.
+  // Chỉ đưa phần chữ cho nút dịch; bài mới chưa có đường dẫn thì tạo từ tiêu đề vừa dịch.
   const langBar = (
     <div className="flex items-center gap-2">
       <AutoTranslate
@@ -246,7 +279,9 @@ function EditorForm({ initial, back }) {
           setD((x) => ({
             ...x,
             ...next,
-            ...(!slugTouched && !x.slug && next.title.en && { slug: slugify(next.title.en) }),
+            ...(!slugTouched &&
+              !x.slug &&
+              slugSource(next.title) && { slug: slugify(slugSource(next.title)) }),
           }))
         }
         className="rounded-full"
@@ -265,221 +300,228 @@ function EditorForm({ initial, back }) {
     <div>
       <PageHeader
         back={<span onClickCapture={guardBack}>{back}</span>}
-        title={isNew ? "Viết bài mới" : "Sửa bài viết"}
+        title={isNew ? "Viết bài mới" : canEdit ? "Sửa bài viết" : "Xem bài viết"}
         description={
           isNew
-            ? "Nhập bản tiếng Anh trước (bắt buộc). Bản tiếng Trung / tiếng Việt có thể bổ sung sau."
+            ? "Viết bằng ngôn ngữ nào cũng được — khi lưu, các ngôn ngữ còn trống sẽ tự được dịch."
             : locText(saved.title)
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-6">
-          <Card
-            title="Nội dung"
-            description="Chấm xanh: đã nhập · chấm xám: dùng bản tiếng Anh"
-            actions={langBar}
-          >
-            <div className="space-y-5">
-              <Field
-                label="Tiêu đề"
-                required={lang === "en"}
-                error={lang === "en" ? errors.title : undefined}
-              >
-                <LocInput
-                  value={d.title}
-                  lang={lang}
-                  aria-invalid={lang === "en" && !!errors.title}
-                  placeholder="VD: 10 Best Things to Do in Hanoi"
-                  onChange={(title) =>
-                    set({
-                      title,
-                      ...(!slugTouched && lang === "en" && { slug: slugify(title.en) }),
-                    })
-                  }
-                />
-              </Field>
-              <Field label="Tóm tắt" hint="1–3 câu, hiện trên thẻ bài viết và đầu bài">
-                <LocInput
-                  value={d.excerpt}
-                  lang={lang}
-                  multiline
-                  rows={3}
-                  onChange={(excerpt) => set({ excerpt })}
-                />
-              </Field>
-              <Field label="Nội dung bài viết">
-                <RichText
-                  value={d.body[lang]}
-                  onChange={(html) => setD((x) => ({ ...x, body: { ...x.body, [lang]: html } }))}
-                  folder="articles"
-                  minHeight={420}
-                  placeholder={
-                    lang !== "en" && d.body.en
-                      ? "Để trống thì website hiển thị bản tiếng Anh"
-                      : "Nhập nội dung bài viết…"
-                  }
-                />
-              </Field>
-            </div>
-          </Card>
-
-          <Card
-            title="Hiển thị trên Google"
-            description="Để trống thì dùng tiêu đề và tóm tắt của bài."
-            actions={langBar}
-          >
-            <SeoFields
-              value={d.seo}
-              onChange={(seo) => set({ seo })}
-              lang={lang}
-              fallbackTitle={d.title[lang] || d.title.en}
-              fallbackDescription={d.excerpt[lang] || d.excerpt.en}
-              path={`travel-guide/${d.slug || "…"}`}
-            />
-          </Card>
-        </div>
-
-        <aside className="space-y-6">
-          <Card title="Xuất bản">
-            <div className="space-y-5">
-              <Toggle
-                checked={d.isActive}
-                onChange={(isActive) => set({ isActive })}
-                label="Hiện trên website"
-                hint={d.isActive ? "Khách xem được bài này" : "Bài đang ẩn, khách không thấy"}
-              />
-              <Field label="Ngày đăng" hint="Bài sắp xếp theo ngày đăng, mới nhất trước">
-                <Input
-                  type="date"
-                  value={d.publishedAt}
-                  onChange={(e) => set({ publishedAt: e.target.value })}
-                />
-              </Field>
-              <Field
-                label="Đường dẫn trang"
-                required
-                error={errors.slug}
-                hint={
-                  isNew
-                    ? "Phần cuối của địa chỉ trang, viết không dấu. Tự tạo từ tiêu đề tiếng Anh."
-                    : "Phần cuối của địa chỉ trang. Nếu đổi, địa chỉ cũ vẫn tự dẫn sang địa chỉ mới."
-                }
-              >
-                <Input
-                  value={d.slug}
-                  aria-invalid={!!errors.slug}
-                  className="font-mono text-[13px]"
-                  onChange={(e) => {
-                    setSlugTouched(true);
-                    set({ slug: slugify(e.target.value) });
-                  }}
-                />
-              </Field>
-              {!isNew && saved.slug && (
-                <a
-                  href={`/travel-guide/${saved.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:text-brand-800"
-                >
-                  <ExternalLink className="size-4" />
-                  Xem trên website
-                </a>
-              )}
-              {!isNew && !saved.isActive && (
-                <p className="text-xs text-slate-500">
-                  Bài đang ẩn nên khách chưa xem được trên website.
-                </p>
-              )}
-            </div>
-          </Card>
-
-          <Card title="Ảnh bìa">
-            <Field hint="Ảnh ngang 16:10, tối thiểu 1200px. Hiện ở thẻ bài viết và đầu bài.">
-              <ImageField
-                value={d.image}
-                onChange={(image) => set({ image })}
-                folder="articles"
-                crop={{ width: 1920 }}
-              />
-            </Field>
-          </Card>
-
-          <Card title="Phân loại">
-            <div className="space-y-5">
-              <Field label="Chuyên mục">
-                <OptionSelect
-                  value={d.category}
-                  onChange={(category) => set({ category })}
-                  options={categories}
-                  emptyLabel="— Không có chuyên mục —"
-                />
-              </Field>
-              {isMonth && (
-                <Field label="Tháng" hint="Bài thuộc mục “Việt Nam theo tháng”">
-                  <Select
-                    value={d.month ?? ""}
-                    onChange={(e) => set({ month: e.target.value ? Number(e.target.value) : null })}
-                  >
-                    <option value="">— Chọn tháng —</option>
-                    {MONTHS.map((m) => (
-                      <option key={m} value={m}>
-                        Tháng {m}
-                      </option>
-                    ))}
-                  </Select>
+      <ReadOnlyArea readOnly={!canEdit}>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 space-y-6">
+            <Card
+              title="Nội dung"
+              description="Chấm xanh: đã nhập · chấm xám: còn trống (tự dịch khi lưu)"
+              actions={langBar}
+            >
+              <div className="space-y-5">
+                <Field label="Tiêu đề" required error={errors.title}>
+                  <LocInput
+                    value={d.title}
+                    lang={lang}
+                    aria-invalid={!!errors.title}
+                    placeholder="VD: 10 điểm nên đến ở Hà Nội"
+                    onChange={(title) =>
+                      set({
+                        title,
+                        ...(!slugTouched && { slug: slugify(slugSource(title)) }),
+                      })
+                    }
+                  />
                 </Field>
-              )}
-              <Field label="Tác giả">
-                <OptionSelect
-                  value={d.author}
-                  onChange={(author) => set({ author })}
-                  options={authors}
-                  emptyLabel="— Không ghi tác giả —"
-                />
-              </Field>
-              <Field label="Điểm đến liên quan" hint="Bài sẽ hiện ở trang điểm đến này">
-                <OptionSelect
-                  value={d.destination}
-                  onChange={(destination) => set({ destination })}
-                  options={destinations}
-                  emptyLabel="— Không gắn điểm đến —"
-                />
-              </Field>
-            </div>
-          </Card>
-        </aside>
-      </div>
+                <Field label="Tóm tắt" hint="1–3 câu, hiện trên thẻ bài viết và đầu bài">
+                  <LocInput
+                    value={d.excerpt}
+                    lang={lang}
+                    multiline
+                    rows={3}
+                    onChange={(excerpt) => set({ excerpt })}
+                  />
+                </Field>
+                <Field label="Nội dung bài viết">
+                  <RichText
+                    value={d.body[lang]}
+                    onChange={(html) => setD((x) => ({ ...x, body: { ...x.body, [lang]: html } }))}
+                    folder="articles"
+                    minHeight={420}
+                    placeholder={
+                      ["en", "zh", "vi"].some((l) => l !== lang && d.body[l])
+                        ? "Để trống — sẽ tự dịch từ ngôn ngữ đã viết khi lưu"
+                        : "Nhập nội dung bài viết…"
+                    }
+                  />
+                </Field>
+              </div>
+            </Card>
 
-      <div className="sticky bottom-0 z-30 mt-6 -mb-2 pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_-4px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200 backdrop-blur sm:px-5">
-          <p
-            className={cn(
-              "flex items-center gap-2 text-sm",
-              dirty ? "font-semibold text-amber-700" : "text-slate-500",
-            )}
-          >
-            <span
-              className={cn("size-2 rounded-full", dirty ? "bg-amber-500" : "bg-emerald-500")}
-            />
-            {dirty ? "Có thay đổi chưa lưu" : isNew ? "Bài viết mới" : "Đã lưu mọi thay đổi"}
-            <span className="hidden text-xs font-normal text-slate-400 sm:inline">
-              · Ctrl + S để lưu
-            </span>
-          </p>
-          <div className="flex gap-2">
-            {dirty && !isNew && (
-              <Button variant="ghost" onClick={() => setD(saved)}>
-                Hoàn tác
+            <Card
+              title="Hiển thị trên Google"
+              description="Để trống thì dùng tiêu đề và tóm tắt của bài."
+              actions={langBar}
+            >
+              <SeoFields
+                value={d.seo}
+                onChange={(seo) => set({ seo })}
+                lang={lang}
+                fallbackTitle={anyLang(d.title, lang)}
+                fallbackDescription={anyLang(d.excerpt, lang)}
+                path={`travel-guide/${d.slug || "…"}`}
+              />
+            </Card>
+          </div>
+
+          <aside className="space-y-6">
+            <Card title="Xuất bản">
+              <div className="space-y-5">
+                <Toggle
+                  checked={d.isActive}
+                  onChange={(isActive) => set({ isActive })}
+                  label="Hiện trên website"
+                  hint={d.isActive ? "Khách xem được bài này" : "Bài đang ẩn, khách không thấy"}
+                />
+                <Field label="Ngày đăng" hint="Bài sắp xếp theo ngày đăng, mới nhất trước">
+                  <Input
+                    type="date"
+                    value={d.publishedAt}
+                    onChange={(e) => set({ publishedAt: e.target.value })}
+                  />
+                </Field>
+                <Field
+                  label="Đường dẫn trang"
+                  required
+                  error={errors.slug}
+                  hint={
+                    isNew
+                      ? "Phần cuối của địa chỉ trang, viết không dấu. Tự tạo từ tiêu đề."
+                      : "Phần cuối của địa chỉ trang. Nếu đổi, địa chỉ cũ vẫn tự dẫn sang địa chỉ mới."
+                  }
+                >
+                  <Input
+                    value={d.slug}
+                    aria-invalid={!!errors.slug}
+                    className="font-mono text-[13px]"
+                    onChange={(e) => {
+                      setSlugTouched(true);
+                      set({ slug: slugify(e.target.value) });
+                    }}
+                  />
+                </Field>
+                {!isNew && saved.slug && (
+                  <a
+                    href={`/travel-guide/${saved.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:text-brand-800"
+                  >
+                    <ExternalLink className="size-4" />
+                    Xem trên website
+                  </a>
+                )}
+                {!isNew && !saved.isActive && (
+                  <p className="text-xs text-slate-500">
+                    Bài đang ẩn nên khách chưa xem được trên website.
+                  </p>
+                )}
+              </div>
+            </Card>
+
+            <Card title="Ảnh bìa">
+              <Field hint="Ảnh ngang 16:10, tối thiểu 1200px. Hiện ở thẻ bài viết và đầu bài.">
+                <ImageField
+                  value={d.image}
+                  onChange={(image) => set({ image })}
+                  folder="articles"
+                  crop={{ width: 1920 }}
+                />
+              </Field>
+            </Card>
+
+            <Card title="Phân loại">
+              <div className="space-y-5">
+                <Field label="Chuyên mục">
+                  <OptionSelect
+                    value={d.category}
+                    onChange={(category) => set({ category })}
+                    options={categories}
+                    emptyLabel="— Không có chuyên mục —"
+                  />
+                </Field>
+                {isMonth && (
+                  <Field label="Tháng" hint="Bài thuộc mục “Việt Nam theo tháng”">
+                    <Select
+                      value={d.month ?? ""}
+                      onChange={(e) =>
+                        set({ month: e.target.value ? Number(e.target.value) : null })
+                      }
+                    >
+                      <option value="">— Chọn tháng —</option>
+                      {MONTHS.map((m) => (
+                        <option key={m} value={m}>
+                          Tháng {m}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+                <Field label="Tác giả">
+                  <OptionSelect
+                    value={d.author}
+                    onChange={(author) => set({ author })}
+                    options={authors}
+                    emptyLabel="— Không ghi tác giả —"
+                  />
+                </Field>
+                <Field label="Điểm đến liên quan" hint="Bài sẽ hiện ở trang điểm đến này">
+                  <OptionSelect
+                    value={d.destination}
+                    onChange={(destination) => set({ destination })}
+                    options={destinations}
+                    emptyLabel="— Không gắn điểm đến —"
+                  />
+                </Field>
+              </div>
+            </Card>
+          </aside>
+        </div>
+      </ReadOnlyArea>
+
+      {canEdit && (
+        <div className="sticky bottom-0 z-30 mt-6 -mb-2 pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_-4px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200 backdrop-blur sm:px-5">
+            <p
+              className={cn(
+                "flex items-center gap-2 text-sm",
+                dirty ? "font-semibold text-amber-700" : "text-slate-500",
+              )}
+            >
+              <span
+                className={cn("size-2 rounded-full", dirty ? "bg-amber-500" : "bg-emerald-500")}
+              />
+              {dirty ? "Có thay đổi chưa lưu" : isNew ? "Bài viết mới" : "Đã lưu mọi thay đổi"}
+              <span className="hidden text-xs font-normal text-slate-400 sm:inline">
+                · Ctrl + S để lưu
+              </span>
+            </p>
+            <div className="flex gap-2">
+              {dirty && !isNew && (
+                <Button variant="ghost" onClick={() => setD(saved)}>
+                  Hoàn tác
+                </Button>
+              )}
+              <Button
+                icon={Save}
+                onClick={save}
+                loading={busy || autoFill.busy}
+                disabled={!dirty && !isNew}
+              >
+                {isNew ? "Tạo bài viết" : "Lưu thay đổi"}
               </Button>
-            )}
-            <Button icon={Save} onClick={save} loading={busy} disabled={!dirty && !isNew}>
-              {isNew ? "Tạo bài viết" : "Lưu thay đổi"}
-            </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

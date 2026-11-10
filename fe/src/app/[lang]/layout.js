@@ -1,8 +1,7 @@
 import { Suspense } from "react";
-import { Be_Vietnam_Pro, Caveat, Patrick_Hand, Poppins } from "next/font/google";
+import { Be_Vietnam_Pro, Patrick_Hand } from "next/font/google";
 import Header, { HeaderStatic } from "@/components/layout/Header";
-import Script from "next/script";
-import { IMAGE_RETRY_SCRIPT } from "@/components/fx/ImageRetry";
+import ImageRetry from "@/components/fx/ImageRetry";
 import Footer from "@/components/layout/Footer";
 import FloatingContact from "@/components/layout/FloatingContact";
 import SmoothScroll from "@/components/fx/SmoothScroll";
@@ -16,36 +15,21 @@ import { href, locales, localeMeta, tr } from "@/i18n/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";
 import "../globals.css";
 
-const poppins = Poppins({
-  variable: "--font-poppins",
-  subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  display: "swap",
-});
-
-// Chữ viết tay cho các ghi chú kèm mũi tên (kiểu localvietnam.com)
-const caveat = Caveat({
-  variable: "--font-caveat",
-  subsets: ["latin"],
-  weight: ["500", "600"],
-  display: "swap",
-});
-
-// Tiếng Việt: Poppins/Caveat không có đủ chữ có dấu (ạ, ế, ộ…) → trang /vi dùng font hỗ trợ tiếng Việt
-// (xem :lang(vi) trong globals.css). preload: false → trang en/zh không tải các font này.
+// Font chính của toàn website (mọi ngôn ngữ): Be Vietnam Pro — thiết kế riêng cho tiếng Việt, đủ mọi dấu
+// (ạ, ế, ộ, ữ…). Tên địa danh có dấu (Hà Nội, Phú Quốc…) xuất hiện cả ở trang tiếng Anh/Trung nên không
+// dùng Poppins nữa (Poppins thiếu các chữ này → chữ bị lẫn font hệ thống, dấu lệch).
 const beVietnam = Be_Vietnam_Pro({
   variable: "--font-be-vietnam",
-  subsets: ["latin", "vietnamese"],
+  subsets: ["latin", "latin-ext", "vietnamese"],
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
-  preload: false,
 });
+// Chữ viết tay cho các ghi chú kèm mũi tên — Patrick Hand có đủ dấu tiếng Việt (Caveat thì không)
 const patrickHand = Patrick_Hand({
   variable: "--font-hand-vi",
-  subsets: ["latin", "vietnamese"],
+  subsets: ["latin", "latin-ext", "vietnamese"],
   weight: "400",
   display: "swap",
-  preload: false,
 });
 
 export function generateStaticParams() {
@@ -91,14 +75,12 @@ export default async function LangLayout({ children, params }) {
   return (
     <html
       lang={localeMeta[lang].hreflang}
-      className={`${poppins.variable} ${caveat.variable} ${beVietnam.variable} ${patrickHand.variable} antialiased`}
+      className={`${beVietnam.variable} ${patrickHand.variable} antialiased`}
     >
       <body className="flex min-h-screen flex-col font-sans">
         <Tracking tracking={tracking} />
         <JsonLd data={org} />
-        <Script id="vl-image-retry" strategy="beforeInteractive">
-          {IMAGE_RETRY_SCRIPT}
-        </Script>
+        <ImageRetry />
         <Suspense fallback={null}>
           <SmoothScroll />
         </Suspense>

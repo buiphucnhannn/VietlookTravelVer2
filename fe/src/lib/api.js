@@ -51,14 +51,21 @@ export function redirectToLogin() {
   return true;
 }
 
-export async function api(path, { body, headers, retry = true, timeout = 60_000, ...init } = {}) {
+/** Request bị huỷ có chủ đích (AbortController — vd. đã có lượt tìm kiếm mới hơn) → không báo lỗi */
+export const isAbort = (err) => err?.name === "AbortError";
+
+export async function api(
+  path,
+  { body, headers, retry = true, timeout = 60_000, signal, ...init } = {},
+) {
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  const timer = AbortSignal.timeout(timeout);
   let res;
   try {
     res = await fetch(`/api/v1${path}`, {
       credentials: "same-origin",
-      signal: AbortSignal.timeout(timeout),
       ...init,
+      signal: signal && AbortSignal.any ? AbortSignal.any([signal, timer]) : (signal ?? timer),
       headers: {
         ...HEADERS,
         ...(body !== undefined && !isForm && { "Content-Type": "application/json" }),
@@ -67,7 +74,8 @@ export async function api(path, { body, headers, retry = true, timeout = 60_000,
       body: body === undefined || isForm ? body : JSON.stringify(body),
     });
   } catch (err) {
-    if (err?.name === "TimeoutError")
+    if (signal?.aborted) throw err; // huỷ có chủ đích → nơi gọi bỏ qua (isAbort)
+    if (err?.name === "TimeoutError" || timer.aborted)
       throw new ApiError(0, {
         error: { code: "TIMEOUT", message: "Hệ thống phản hồi chậm, vui lòng thử lại" },
       });
@@ -76,6 +84,7 @@ export async function api(path, { body, headers, retry = true, timeout = 60_000,
 
   if (res.status === 204) return null;
   const data = await res.json().catch(() => null);
+  if (signal?.aborted) throw new DOMException("Đã huỷ", "AbortError");
   // Lỗi 5xx KHÔNG phải JSON của backend = Next không chuyển tiếp được (backend chưa chạy / đang khởi động lại)
   if (res.status >= 500 && !data?.error)
     throw new ApiError(res.status, {
@@ -87,7 +96,8 @@ export async function api(path, { body, headers, retry = true, timeout = 60_000,
 
   const isAuthCall = path.startsWith("/auth/");
   if (res.status === 401 && !isAuthCall && retry && SESSION_CODES.has(data?.error?.code)) {
-    if (await refreshSession()) return api(path, { body, headers, retry: false, timeout, ...init });
+    if (await refreshSession())
+      return api(path, { body, headers, retry: false, timeout, signal, ...init });
     if (redirectToLogin()) return new Promise(() => {}); // đang chuyển trang → không báo lỗi thừa
     throw new ApiError(401, {
       error: {
@@ -103,15 +113,25 @@ export async function api(path, { body, headers, retry = true, timeout = 60_000,
 
 /** Thông báo lỗi dễ hiểu cho người quản trị (kèm lỗi từng ô nếu có) */
 export function errorMessage(err) {
-  if (!(err instanceof ApiError)) return "Đã có lỗi xảy ra, vui lòng thử lại.";
+  if (!(err instanceof ApiError))
+    // lỗi tự viết bằng tiếng Việt trong trang quản trị (vd. "Chép video quá lâu…") thì giữ nguyên
+    return /[À-ỹđĐ]/.test(err?.message ?? "") ? err.message : "Đã có lỗi xảy ra, vui lòng thử lại.";
   if (err.code === "NETWORK_ERROR")
     return "Không kết nối được. Vui lòng kiểm tra mạng rồi thử lại.";
+  if (err.status === 403 && err.code === "FORBIDDEN")
+    return "Bạn chưa có quyền thực hiện thao tác này";
   if (err.status === 429)
     return `Thao tác quá nhanh, vui lòng thử lại sau ${Math.ceil((err.retryAfter ?? 60) / 60)} phút.`;
   if (err.status >= 500 && err.code === "INTERNAL_ERROR")
     return "Hệ thống đang bận, vui lòng thử lại sau ít phút.";
-  const first = err.details?.[0];
-  return first && err.status === 422
-    ? `${err.message} (${first.field.replace(/^body\./, "")}: ${first.message})`
-    : err.message;
+  if (err.status === 422) {
+    // Lời nhắc tiếng Việt của từng ô thì giữ; lời nhắc kỹ thuật (tiếng Anh, tên trường) → câu chung dễ hiểu
+    const first = err.details?.find((d) => /[À-ỹđĐ]/.test(d.message ?? ""))?.message;
+    return first || "Có thông tin chưa hợp lệ — vui lòng kiểm tra lại các ô đã nhập.";
+  }
+  return err.message;
 }
+
+/** Lỗi có thể tự hết khi thử lại (mất mạng, hệ thống chậm / đang khởi động lại) → nên kèm nút "Thử lại" */
+export const isRetryable = (err) =>
+  err instanceof ApiError && (err.status === 0 || err.status >= 500);

@@ -39,6 +39,7 @@ import {
   Spinner,
   VideoChip,
   VideoHelp,
+  anyLang,
   importDriveVideo,
   useUi,
 } from "../ui";
@@ -67,10 +68,10 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
   const cur = Math.min(sel, slides.length - 1);
   const slide = slides[cur];
 
-  /** Thuộc tính cho 1 ô chữ theo ngôn ngữ đang chọn (ô trống → hiện mờ bản tiếng Anh) */
+  /** Thuộc tính cho 1 ô chữ theo ngôn ngữ đang chọn (ô trống → hiện mờ chữ của ngôn ngữ khác) */
   const loc = (key, fallback) => ({
     value: banner[key][lang] ?? "",
-    placeholder: (lang !== "en" && banner[key].en) || fallback,
+    placeholder: anyLang({ ...banner[key], [lang]: "" }) || fallback,
     onChange: (v) => setBanner({ [key]: { ...banner[key], [lang]: v } }),
   });
 
@@ -85,7 +86,7 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
     setSel(Math.max(0, next.indexOf(slide))); // vẫn chọn đúng slide đang sửa
   };
   const removeSlide = async () => {
-    const hasContent = slide.video || slide.poster || slide.posterMobile || slide.caption.en;
+    const hasContent = slide.video || slide.poster || slide.posterMobile || anyLang(slide.caption);
     if (
       hasContent &&
       !(await confirm({
@@ -167,7 +168,7 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
             <InlineText
               value={slide.caption[lang] ?? ""}
               placeholder={
-                (lang !== "en" && slide.caption.en) || "Chú thích ảnh, ví dụ: Vịnh Hạ Long"
+                anyLang({ ...slide.caption, [lang]: "" }) || "Chú thích ảnh, ví dụ: Vịnh Hạ Long"
               }
               onChange={(v) => setSlide({ caption: { ...slide.caption, [lang]: v } })}
               label={`Chú thích của slide ${cur + 1}`}
@@ -277,7 +278,7 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
 
           <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-3">
             <details className="group/help min-w-0 flex-1 basis-72">
-              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline [&::-webkit-details-marker]:hidden">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600 [&::-webkit-details-marker]:hidden">
                 <HelpCircle className="size-3.5" /> Cách lấy link video YouTube / Google Drive
                 <ChevronDown className="size-3.5 transition group-open/help:rotate-180" />
               </summary>
@@ -385,13 +386,19 @@ function SlideVideo({ value, onChange }) {
   const importDrive = async (link) => {
     const token = ++job.current;
     setBusy(true);
+    const note = toast.loading("Đang chép video từ Google Drive… (có thể mất vài chục giây)");
     try {
       const video = await importDriveVideo(link);
-      if (token !== job.current) return; // người dùng đã dán link khác
+      if (token !== job.current) return note.dismiss(); // người dùng đã dán link khác
       onChange(video.url);
-      toast("Đã chép video từ Google Drive");
+      note.success("Đã chép video từ Google Drive");
     } catch (err) {
-      if (token === job.current) setFailed(errorMessage(err));
+      if (token !== job.current) return note.dismiss();
+      setFailed(errorMessage(err));
+      note.error(errorMessage(err), {
+        title: "Chưa chép được video",
+        action: { label: "Thử lại", onClick: () => importDrive(link) },
+      });
     } finally {
       if (token === job.current) setBusy(false);
     }

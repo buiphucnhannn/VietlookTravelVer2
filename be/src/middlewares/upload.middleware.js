@@ -16,5 +16,5 @@ export const uploadImages = multer({
   fileFilter: (_req, file, cb) =>
     ALLOWED.has(file.mimetype)
       ? cb(null, true)
-      : cb(ApiError.badRequest(`Định dạng không hỗ trợ: ${file.mimetype}`)),
+      : cb(ApiError.badRequest("Chỉ nhận ảnh JPG, PNG, WebP, AVIF hoặc GIF")),
 });

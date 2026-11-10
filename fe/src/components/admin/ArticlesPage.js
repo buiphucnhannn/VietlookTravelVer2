@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import Link from "@/components/admin/Link";
-import { Newspaper, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, Newspaper, Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { useAdminList, useMutation, useOptions } from "./hooks";
 import {
   Badge,
+  BusyArea,
   Button,
   Card,
   EmptyState,
@@ -22,20 +23,23 @@ import {
   useUi,
 } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
+import { usePermission } from "./permissions";
 
 const PATH = "/admin/articles";
 const TAGS = ["articles"];
 const BASE = `${ADMIN_BASE}/articles`;
 
-/** Ngôn ngữ còn thiếu (tiêu đề hoặc nội dung trống) — website sẽ dùng bản tiếng Anh */
+/** Ngôn ngữ còn thiếu (tiêu đề hoặc nội dung trống) — website tạm dùng ngôn ngữ khác đã có */
 const missingLangs = (a) =>
   [
-    { key: "zh", label: "中文" },
     { key: "vi", label: "VI" },
+    { key: "en", label: "EN" },
+    { key: "zh", label: "中文" },
   ].filter((l) => !a.title?.[l.key]?.trim() || !a.body?.[l.key]?.trim());
 
 export default function ArticlesPage() {
   const { confirm } = useUi();
+  const { canEdit, canDelete } = usePermission("articles");
   const list = useAdminList(PATH, { q: "", category: "", status: "", sort: "newest", limit: 15 });
   const categories = useOptions("/admin/categories?limit=200&sort=order", (c) => ({
     value: c.slug,
@@ -60,15 +64,17 @@ export default function ArticlesPage() {
     <>
       <PageHeader
         title="Bài viết"
-        description="Các bài cẩm nang du lịch trên website. Mỗi bài cần có bản tiếng Anh; bản tiếng Trung / tiếng Việt để trống sẽ dùng bản tiếng Anh."
+        description="Các bài cẩm nang du lịch trên website. Viết bằng một ngôn ngữ bất kỳ — khi lưu, các ngôn ngữ còn lại tự được dịch."
         actions={
-          <Link
-            href={`${BASE}/new`}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
-          >
-            <Plus className="size-4" />
-            Viết bài mới
-          </Link>
+          canEdit && (
+            <Link
+              href={`${BASE}/new`}
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
+            >
+              <Plus className="size-4" />
+              Viết bài mới
+            </Link>
+          )
         }
       />
 
@@ -131,69 +137,72 @@ export default function ArticlesPage() {
             }
           />
         ) : (
-          <ul
-            className={`divide-y divide-slate-100 transition-opacity ${list.loading ? "opacity-60" : ""}`}
-          >
-            {list.items.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center gap-4 px-4 py-3.5 sm:px-5">
-                <Link
-                  href={`${BASE}/${a.id}`}
-                  className="relative aspect-[4/3] w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100"
-                >
-                  {a.image && (
-                    <Image src={a.image} alt="" fill sizes="80px" className="object-cover" />
-                  )}
-                </Link>
-                <div className="min-w-0 flex-1 basis-56">
+          <BusyArea busy={list.loading}>
+            <ul className="divide-y divide-slate-100">
+              {list.items.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-4 px-4 py-3.5 sm:px-5">
                   <Link
                     href={`${BASE}/${a.id}`}
-                    className="line-clamp-2 font-semibold text-slate-900 hover:text-brand-700"
+                    className="relative aspect-[4/3] w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100"
                   >
-                    {locText(a.title) || "(Chưa có tiêu đề)"}
-                  </Link>
-                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    {a.category ? (
-                      <Badge tone="blue">{catLabel(a.category)}</Badge>
-                    ) : (
-                      <Badge>Chưa có chuyên mục</Badge>
+                    {a.image && (
+                      <Image src={a.image} alt="" fill sizes="80px" className="object-cover" />
                     )}
-                    <span>{fmtDate(a.publishedAt)}</span>
-                    {missingLangs(a).map((l) => (
-                      <Badge key={l.key} tone="amber">
-                        Thiếu bản {l.label}
-                      </Badge>
-                    ))}
-                  </p>
-                </div>
-                <VisibilityToggle
-                  path={PATH}
-                  item={a}
-                  tags={TAGS}
-                  onDone={(doc) =>
-                    list.setItems((xs) => xs.map((x) => (x.id === doc.id ? doc : x)))
-                  }
-                />
-                <div className="flex gap-1">
-                  <Link
-                    href={`${BASE}/${a.id}`}
-                    aria-label="Sửa"
-                    className="grid size-9 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    <Pencil className="size-4" />
                   </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(a)}
-                    aria-label="Xoá"
-                    className="text-sun-600"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                  <div className="min-w-0 flex-1 basis-56">
+                    <Link
+                      href={`${BASE}/${a.id}`}
+                      className="line-clamp-2 font-semibold text-slate-900 hover:text-brand-700"
+                    >
+                      {locText(a.title) || "(Chưa có tiêu đề)"}
+                    </Link>
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      {a.category ? (
+                        <Badge tone="blue">{catLabel(a.category)}</Badge>
+                      ) : (
+                        <Badge>Chưa có chuyên mục</Badge>
+                      )}
+                      <span>{fmtDate(a.publishedAt)}</span>
+                      {missingLangs(a).map((l) => (
+                        <Badge key={l.key} tone="amber">
+                          Thiếu bản {l.label}
+                        </Badge>
+                      ))}
+                    </p>
+                  </div>
+                  <VisibilityToggle
+                    path={PATH}
+                    item={a}
+                    tags={TAGS}
+                    onDone={(doc) =>
+                      list.setItems((xs) => xs.map((x) => (x.id === doc.id ? doc : x)))
+                    }
+                  />
+                  <div className="flex gap-1">
+                    <Link
+                      href={`${BASE}/${a.id}`}
+                      aria-label={canEdit ? "Sửa" : "Xem"}
+                      title={canEdit ? "Sửa" : "Xem"}
+                      className="grid size-9 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                    >
+                      {canEdit ? <Pencil className="size-4" /> : <Eye className="size-4" />}
+                    </Link>
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(a)}
+                        aria-label="Xoá"
+                        className="text-sun-600"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </BusyArea>
         )}
         <Pagination
           meta={list.meta}

@@ -19,6 +19,13 @@ const html = (max = 200_000) => z.string().max(max).default(""); // lọc thẻ 
 /** { en, zh, vi } */
 export const loc = (max = 500) =>
   z.object({ en: str(max), zh: str(max), vi: str(max) }).default({});
+/** Có chữ ở ít nhất một ngôn ngữ */
+export const hasAnyLang = (v) => ["en", "zh", "vi"].some((l) => String(v?.[l] ?? "").trim());
+/** { en, zh, vi } bắt buộc: nhập ở ÍT NHẤT MỘT ngôn ngữ (bất kỳ) — các ngôn ngữ còn trống CMS tự dịch */
+export const locRequired = (max = 500, message = "Vui lòng nhập tên ở ít nhất một ngôn ngữ") =>
+  z
+    .object({ en: str(max), zh: str(max), vi: str(max) }, { error: message })
+    .refine(hasAnyLang, { message });
 export const locHtml = () => z.object({ en: html(), zh: html(), vi: html() }).default({});
 const list = (max = 300, items = 100) => z.array(z.string().trim().max(max)).max(items).default([]);
 export const locList = () => z.object({ en: list(), zh: list(), vi: list() }).default({});
@@ -123,7 +130,7 @@ export const contentListQuery = pageQuery.extend({
 export const destinationSchema = z.object({
   slug,
   region: z.enum(REGION_VALUES),
-  name: loc(100),
+  name: locRequired(100),
   intro: loc(1000),
   highlights: z.array(loc(100)).max(12).default([]),
   image: media.default(""),
@@ -135,7 +142,7 @@ export const destinationSchema = z.object({
 
 export const themeSchema = z.object({
   slug,
-  name: loc(80),
+  name: locRequired(80),
   tagline: loc(160),
   intro: loc(1500),
   image: media.default(""),
@@ -209,7 +216,11 @@ export const tourSchema = z.object({
   departure: z.enum(["daily", "weekly", "on-request", "dates"]).default("daily"),
   departureDates: z.array(isoDate).max(200).default([]),
   departureDays: z.array(z.coerce.number().int().min(0).max(6)).max(7).default([]),
-  content: z.object({ en: tourLang, zh: tourLang, vi: tourLang }),
+  content: z
+    .object({ en: tourLang, zh: tourLang, vi: tourLang })
+    .refine((c) => hasAnyLang({ en: c.en?.title, zh: c.zh?.title, vi: c.vi?.title }), {
+      message: "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ",
+    }),
   pricing: z
     .object({
       groupTiers: z
@@ -267,7 +278,7 @@ export const tourSchema = z.object({
 
 export const articleSchema = z.object({
   slug,
-  title: loc(250),
+  title: locRequired(250, "Vui lòng nhập tiêu đề ở ít nhất một ngôn ngữ"),
   excerpt: loc(1000),
   body: locHtml(),
   image: media.default(""),
@@ -282,7 +293,7 @@ export const articleSchema = z.object({
 
 export const categorySchema = z.object({
   slug,
-  name: loc(100),
+  name: locRequired(100),
   description: loc(600),
   group: str(40),
   icon: str(40),
@@ -292,7 +303,7 @@ export const categorySchema = z.object({
 
 export const authorSchema = z.object({
   slug,
-  name: loc(100),
+  name: locRequired(100),
   role: loc(160),
   bio: loc(1500),
   avatar: media.default(""),
@@ -309,7 +320,7 @@ export const carSchema = z.object({
   seats: z.coerce.number().int().min(1).max(60),
   pax: z.coerce.number().int().min(1).max(60).default(1),
   luggage: z.coerce.number().int().min(0).max(60).default(0),
-  name: loc(100),
+  name: locRequired(100),
   tagline: loc(200),
   description: loc(1500),
   images: mediaList(12),
@@ -327,7 +338,7 @@ export const carSchema = z.object({
 
 export const carAreaSchema = z.object({
   key,
-  name: loc(100),
+  name: locRequired(100),
   airport: str(100),
   image: media.default(""),
   order,
@@ -336,7 +347,7 @@ export const carAreaSchema = z.object({
 
 export const visaTypeSchema = z.object({
   key,
-  name: loc(150),
+  name: locRequired(150),
   stay: loc(150),
   processing: loc(150),
   fee: loc(200),
@@ -348,7 +359,7 @@ export const visaTypeSchema = z.object({
 export const fastTrackSchema = z.object({
   key,
   group: z.enum(FAST_TRACK_GROUPS),
-  name: loc(150),
+  name: locRequired(150),
   desc: loc(600),
   prices: z.object(Object.fromEntries(AIRPORT_CODES.map((c) => [c, money]))).default({}),
   popular: z.boolean().default(false),
@@ -558,7 +569,7 @@ export const trackingSettingsSchema = z.object({
 export const paymentSettingsSchema = z.object({
   provider: z.literal("9pay").default("9pay"),
   enabled: z.boolean().default(false),
-  environment: z.enum(["sandbox", "production"]).default("sandbox"),
+  environment: z.literal("production").default("production"), // chỉ chạy thật
   merchantKey: str(200),
   // để trống = giữ nguyên secret đã lưu
   secretKey: z.string().trim().max(500).optional(),

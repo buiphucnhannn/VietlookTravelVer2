@@ -20,6 +20,8 @@ const SORTS = {
  *   afterUpdate(next, prev)   đồng bộ chỗ khác khi đổi slug…
  *   beforeRemove(doc)         chặn xoá khi đang được dùng
  *   filters(query)            điều kiện lọc riêng của trang danh sách
+ * Tuỳ chọn: listSelect (chỉ lấy các trường cần cho trang danh sách — nhẹ hơn),
+ *   trackOldSlugs (loại có slug cũ để chuyển hướng 301: tour, bài viết).
  */
 export function createContentService({
   repo,
@@ -27,6 +29,8 @@ export function createContentService({
   idField = "slug",
   searchFields = [],
   defaultSort = "order",
+  listSelect,
+  trackOldSlugs = false,
   prepare = (d) => d,
   beforeCreate,
   afterUpdate,
@@ -44,10 +48,14 @@ export function createContentService({
     if (other && String(other._id) !== String(exceptId))
       throw ApiError.conflict(
         idField === "slug"
-          ? `Đường dẫn (slug) "${value}" đã được dùng cho ${label} khác`
-          : `Mã "${value}" đã được dùng cho ${label} khác`,
+          ? `Đường dẫn "${value}" đã được dùng cho ${label} khác — hãy đổi đường dẫn`
+          : `Mã "${value}" đã được dùng cho ${label} khác — hãy đổi mã`,
       );
   }
+
+  /** Slug mới có thể đang nằm trong danh sách slug cũ của mục khác (tour / bài viết) → gỡ ra */
+  const releaseOldSlug = (doc) =>
+    trackOldSlugs && doc?.slug ? repo.releaseOldSlug(doc.slug, doc._id) : null;
 
   return {
     label,
@@ -62,7 +70,7 @@ export function createContentService({
         filter.$or = [{ [idField]: rx }, ...searchFields.map((f) => ({ [f]: rx }))];
       }
       const sort = SORTS[query.sort ?? defaultSort] ?? SORTS[defaultSort];
-      const { items, total } = await repo.paginate(filter, { ...page, sort });
+      const { items, total } = await repo.paginate(filter, { ...page, sort, select: listSelect });
       return { items, meta: buildPageMeta(page, total) };
     },
 
@@ -72,6 +80,7 @@ export function createContentService({
       await assertUnique(data[idField]);
       await beforeCreate?.(data);
       const doc = await repo.create(await prepare(data, null));
+      await releaseOldSlug(doc);
       return doc.toJSON();
     },
 
@@ -79,6 +88,7 @@ export function createContentService({
       const prev = await getOr404(id);
       if (data[idField] !== prev[idField]) await assertUnique(data[idField], id);
       const next = await repo.updateById(id, { $set: await prepare(data, prev) });
+      if (next.slug !== prev.slug) await releaseOldSlug(next);
       await afterUpdate?.(next, prev);
       return next;
     },

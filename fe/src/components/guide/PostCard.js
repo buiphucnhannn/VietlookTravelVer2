@@ -14,18 +14,25 @@ export default function PostCard({ post, lang, categoryName, className, large })
         className,
       )}
     >
-      <div className={cn("relative overflow-hidden", large ? "aspect-[16/10]" : "aspect-[16/11]")}>
-        <Image
-          src={post.image}
-          alt=""
-          fill
-          sizes={
-            large
-              ? "(min-width: 1024px) 50vw, 100vw"
-              : "(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-          }
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
-        />
+      <div
+        className={cn(
+          "relative overflow-hidden bg-gradient-to-br from-cream-100 to-sand-300/40",
+          large ? "aspect-[16/10]" : "aspect-[16/11]",
+        )}
+      >
+        {post.image && (
+          <Image
+            src={post.image}
+            alt=""
+            fill
+            sizes={
+              large
+                ? "(min-width: 1024px) 50vw, 100vw"
+                : "(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+            }
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        )}
         <span className="absolute top-3 left-3 flex flex-col items-center rounded-lg bg-white px-2.5 py-1 text-brand-700 shadow ring-1 ring-brand-100">
           <span className="text-lg leading-none font-bold">{new Date(post.date).getDate()}</span>
           <span className="text-[0.65rem] font-semibold uppercase">

@@ -10,14 +10,25 @@ export const localeMeta = {
 
 export const hasLocale = (value) => locales.includes(value);
 
-/** Lấy bản dịch từ object `{ en, zh, vi }`; thiếu bản dịch thì dùng tiếng Anh. */
+/** Thứ tự ngôn ngữ thay thế khi thiếu bản dịch: ngôn ngữ đang xem → en → vi → zh */
+export const fallbackLangs = (lang) => [...new Set([lang, "en", "vi", "zh"])];
+
+/** Giá trị coi như "chưa nhập" (chuỗi trống / chỉ có thẻ HTML rỗng, mảng rỗng) */
+export const isBlank = (v) =>
+  v == null ||
+  (typeof v === "string" && !v.replace(/<[^>]*>|&nbsp;/g, "").trim()) ||
+  (Array.isArray(v) && v.length === 0);
+
+/**
+ * Lấy bản dịch từ object `{ en, zh, vi }`; thiếu bản dịch thì dùng ngôn ngữ khác đã có
+ * (thứ tự en → vi → zh) để trang không bao giờ trống.
+ */
 export function tr(value, lang) {
   if (value == null) return "";
   if (typeof value === "string" || typeof value === "number") return value;
   if (Array.isArray(value)) return value;
-  const v = value[lang];
-  const empty = v == null || v === "" || (Array.isArray(v) && v.length === 0);
-  return empty ? (value[defaultLocale] ?? "") : v;
+  for (const l of fallbackLangs(lang)) if (!isBlank(value[l])) return value[l];
+  return value[lang] ?? value[defaultLocale] ?? "";
 }
 
 /**

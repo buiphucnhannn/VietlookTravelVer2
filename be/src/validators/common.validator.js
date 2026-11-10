@@ -31,8 +31,14 @@ export const plainText = (max) =>
   z
     .string()
     .max(max * 2)
-    // eslint-disable-next-line no-control-regex -- cố ý: tìm đúng các ký tự điều khiển để XOÁ
-    .transform((s) => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim())
+    .transform((s) =>
+      s
+        // eslint-disable-next-line no-control-regex -- cố ý: tìm đúng các ký tự điều khiển để XOÁ
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+        // khách gõ / dán thẻ HTML (<b>, <script>…) → bỏ thẻ, giữ chữ ("trẻ < 5 tuổi" vẫn giữ nguyên)
+        .replace(/<\/?[a-z][^<>]*>/gi, "")
+        .trim(),
+    )
     .pipe(z.string().max(max, `Tối đa ${max} ký tự`));
 
 /** Ô tìm kiếm (?q=) */
@@ -51,7 +57,10 @@ export const slug = z
   .trim()
   .toLowerCase()
   .max(120)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang");
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Đường dẫn chỉ gồm chữ thường không dấu, số và dấu gạch ngang",
+  );
 
 /** Ảnh đã upload (Cloudinary) — chỉ nhận https (chặn javascript:, data:, http:) */
 export const image = z.object({

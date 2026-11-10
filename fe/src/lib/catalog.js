@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { BACKEND_URL, backendHeaders } from "@/config/urls.mjs";
-import { tr } from "@/i18n/config";
+import { fallbackLangs, isBlank, tr } from "@/i18n/config";
 import { regions } from "@/data/regions";
 
 /**
@@ -125,11 +125,10 @@ export const getTracking = cache(async () => (await loadSite()).tracking ?? {});
 
 /* ---------- Chuẩn hoá ---------- */
 
-/** Chọn bản dịch: trường trống ở zh / vi → dùng bản en */
+/** Chọn bản dịch: trường trống → dùng ngôn ngữ khác đã có (en → vi → zh) */
 const pickLang = (obj, lang) => {
-  const v = obj?.[lang];
-  const empty = v == null || v === "" || (Array.isArray(v) && !v.length);
-  return empty ? obj?.en : v;
+  for (const l of fallbackLangs(lang)) if (!isBlank(obj?.[l])) return obj[l];
+  return obj?.[lang];
 };
 
 /** Tour (thẻ) → cấu trúc các component đang dùng */
@@ -372,27 +371,27 @@ export async function getTourOr404(slug) {
  * Lịch trình ghép theo từng ngày (ngày chưa dịch → tiếng Anh).
  */
 export function tourText(t, lang) {
-  const en = t.content?.en ?? {};
-  const loc = t.content?.[lang] ?? {};
-  const pick = (k) => {
-    const v = loc[k];
-    return v == null || v === "" || (Array.isArray(v) && !v.length) ? en[k] : v;
-  };
+  // ngôn ngữ đang xem trước, rồi en → vi → zh: trường nào trống thì lấy ở ngôn ngữ kế tiếp đã có
+  const order = fallbackLangs(lang).map((l) => t.content?.[l] ?? {});
+  const pick = (k) => order.map((c) => c[k]).find((v) => !isBlank(v));
+  // khung lịch trình: bản có nhiều ngày nhất (ưu tiên theo thứ tự trên khi bằng nhau)
+  const frame = order.reduce(
+    (best, c) => ((c.itinerary?.length ?? 0) > (best.itinerary?.length ?? 0) ? c : best),
+    order[0],
+  );
+  const dayOf = (i, k) => order.map((c) => c.itinerary?.[i]?.[k]).find((v) => !isBlank(v));
   return {
     title: pick("title") ?? "",
     summary: pick("summary") ?? "",
     route: pick("route") ?? [],
     highlights: pick("highlights") ?? [],
-    itinerary: (en.itinerary ?? []).map((d, i) => {
-      const x = loc.itinerary?.[i];
-      return {
-        ...d,
-        title: x?.title || d.title,
-        html: x?.html || d.html,
-        meals: d.meals?.length ? d.meals : (x?.meals ?? []),
-        overnight: x?.overnight || d.overnight || "",
-      };
-    }),
+    itinerary: (frame.itinerary ?? []).map((d, i) => ({
+      ...d,
+      title: dayOf(i, "title") ?? d.title ?? "",
+      html: dayOf(i, "html") ?? d.html ?? "",
+      meals: dayOf(i, "meals") ?? [],
+      overnight: dayOf(i, "overnight") ?? "",
+    })),
     included: pick("included") ?? [],
     excluded: pick("excluded") ?? [],
     childPolicy: pick("childPolicy"),

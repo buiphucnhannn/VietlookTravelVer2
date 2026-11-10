@@ -3,17 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, RotateCcw, Save } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { siteConfig } from "@/constants/site";
 import { defaultHomeCopy, fillCopy, stripCopy } from "@/components/home/copy";
 import { useMutation, useOptions } from "./hooks";
-import { AutoTranslate } from "./translate";
+import { AutoTranslate, useAutoFill } from "./translate";
 import {
   Badge,
   Button,
   LangTabs,
   LoadingBlock,
   Notice,
+  DEFAULT_LANG,
   PageHeader,
+  anyLang,
   filledOf,
   fmtUSD,
   locText,
@@ -45,6 +48,7 @@ import {
   ThemeTiles,
 } from "./home/Sections";
 import { CopyContext, EMPTY_SLIDE, L, validBannerVideo, validImage } from "./home/shared";
+import { ReadOnlyArea, usePermission } from "./permissions";
 
 const PATH = "/settings/home";
 const TAGS = ["settings"];
@@ -103,7 +107,9 @@ const toBody = (data, defs) => ({
 
 const mapTour = (t) => ({
   value: t.slug,
-  label: t.content?.en?.title || t.slug,
+  label:
+    anyLang(Object.fromEntries(["en", "zh", "vi"].map((l) => [l, t.content?.[l]?.title]))) ||
+    t.slug,
   sub: [t.days ? `${t.days} ngày` : "", t.price ? `từ ${fmtUSD(t.price)}` : ""]
     .filter(Boolean)
     .join(" · "),
@@ -111,7 +117,7 @@ const mapTour = (t) => ({
   price: t.price,
   priceText: fmtUSD(t.price),
   image: t.image,
-  summary: t.content?.en?.summary || "",
+  summary: t.content?.en?.summary || t.content?.vi?.summary || t.content?.zh?.summary || "",
   featured: !!t.featured,
   hidden: t.isActive === false,
 });
@@ -154,10 +160,12 @@ export default function HomeSettingsPage() {
   const [defs, setDefs] = useState(null);
   const [saved, setSaved] = useState("");
   const [loadError, setLoadError] = useState("");
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const [slideIndex, setSlideIndex] = useState(0);
   const { run, busy } = useMutation(TAGS);
+  const autoFill = useAutoFill();
   const { toast, confirm } = useUi();
+  const { canEdit } = usePermission("home"); // chỉ xem → khung chỉ đọc, không có thanh Lưu
 
   const tours = useOptions("/admin/tours?limit=200&sort=rank", mapTour);
   const themes = useOptions("/admin/themes?limit=50&sort=order", mapNamed);
@@ -207,15 +215,23 @@ export default function HomeSettingsPage() {
   const save = async () => {
     if (problems.length) {
       setSlideIndex(problems[0].slide);
-      toast(problems[0].message, "error");
+      toast.error(problems[0].message, { title: "Chưa lưu được" });
       return;
     }
-    const body = toBody(data, defs);
+    // ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết rồi mới lưu
+    const { value: body, failed } = await autoFill.fill(toBody(data, defs), { lang });
     const r = await run(() => api(PATH, { method: "PUT", body }), "Đã lưu trang chủ");
     if (r) {
       const n = normalize(r.data ?? body, defs);
       setData(n);
       setSaved(JSON.stringify(n));
+      if (failed)
+        autoFill.offerRetry(async (t) => {
+          const r2 = await api(PATH, { method: "PUT", body: t });
+          const again = normalize(r2?.data ?? t, defs);
+          setData(again);
+          setSaved(JSON.stringify(again));
+        });
     }
   };
 
@@ -247,13 +263,14 @@ export default function HomeSettingsPage() {
 
   const filled = filledOf(data.banner.titleMain);
   // Nút dịch + chọn ngôn ngữ: luôn đi cùng nhau, cùng hàng, cùng chiều cao
-  const langTools = (tabsClass) => (
+  // compact: thanh lưu trên điện thoại → ẩn nút dịch (đã có ở đầu bản xem trước) để vừa 1 hàng
+  const langTools = (tabsClass, compact) => (
     <div className="flex shrink-0 items-center gap-2">
       <AutoTranslate
         lang={lang}
         value={translatable}
         onChange={(next) => setData(normalize(next, defs))}
-        className="px-3 ring-1 ring-brand-200/70"
+        className={cn("px-3 ring-1 ring-brand-200/70", compact && "max-sm:hidden")}
         label={
           <>
             <span className="max-[430px]:hidden">Dịch tự động</span>
@@ -283,105 +300,122 @@ export default function HomeSettingsPage() {
       />
 
       {/* ----- Khung "trang web thu nhỏ" ----- */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_24px_48px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-100 px-3.5 py-2">
-          <span className="flex gap-1.5 max-sm:hidden" aria-hidden>
-            <span className="size-2.5 rounded-full bg-sun-400" />
-            <span className="size-2.5 rounded-full bg-amber-brand" />
-            <span className="size-2.5 rounded-full bg-emerald-400" />
-          </span>
-          <span className="min-w-0 flex-1 truncate rounded-full bg-white px-3 py-1 text-[11px] text-slate-500 ring-1 ring-slate-200 max-sm:hidden">
-            Trang chủ · đang sửa nội dung{" "}
-            <b className="text-slate-700">
-              {lang === "en" ? "tiếng Anh" : lang === "zh" ? "tiếng Trung" : "tiếng Việt"}
-            </b>
-          </span>
-          <div className="max-sm:flex max-sm:flex-1 max-sm:justify-between">
-            {langTools("bg-white")}
+      <ReadOnlyArea readOnly={!canEdit}>
+        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_24px_48px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-100 px-3.5 py-2">
+            <span className="flex gap-1.5 max-sm:hidden" aria-hidden>
+              <span className="size-2.5 rounded-full bg-sun-400" />
+              <span className="size-2.5 rounded-full bg-amber-brand" />
+              <span className="size-2.5 rounded-full bg-emerald-400" />
+            </span>
+            <span className="min-w-0 flex-1 truncate rounded-full bg-white px-3 py-1 text-[11px] text-slate-500 ring-1 ring-slate-200 max-sm:hidden">
+              Trang chủ · đang sửa nội dung{" "}
+              <b className="text-slate-700">
+                {lang === "en" ? "tiếng Anh" : lang === "zh" ? "tiếng Trung" : "tiếng Việt"}
+              </b>
+            </span>
+            <div className="max-sm:flex max-sm:flex-1 max-sm:justify-between">
+              {langTools("bg-white")}
+            </div>
           </div>
-        </div>
 
-        <MiniHero
-          banner={data.banner}
-          lang={lang}
-          setBanner={setBanner}
-          sel={slideIndex}
-          setSel={setSlideIndex}
-        />
-        <TrustSection />
-        <ServicesSection />
-        <FeaturedToursSection
-          options={tours}
-          value={data.featuredTours}
-          onChange={(featuredTours) => set({ featuredTours })}
-        />
-        <B2BSection />
-        <MapSection />
-        <DestinationTiles
-          options={destinations}
-          value={data.featuredDestinations}
-          onChange={(featuredDestinations) => set({ featuredDestinations })}
-        />
-        <StatsSection
-          values={data.statValues}
-          onValues={(statValues) => set({ statValues })}
-          auto={autoStats}
-        />
-        <LongToursSection
-          options={tours}
-          value={data.longTours}
-          onChange={(longTours) => set({ longTours })}
-        />
-        <StepsSection />
-        <ThemeTiles
-          options={themes}
-          value={data.homeThemes}
-          onChange={(homeThemes) => set({ homeThemes })}
-        />
-        <CustomTripSection lang={lang} />
-        <WhySection />
-        <PartnerStripSection />
-        <ProjectsSection />
-        <ReviewsSection />
-        <GuideSection />
-        <MonthsSection />
-        <PlannerSection />
-        <AboutSection />
-      </div>
+          <MiniHero
+            banner={data.banner}
+            lang={lang}
+            setBanner={setBanner}
+            sel={slideIndex}
+            setSel={setSlideIndex}
+          />
+          <TrustSection />
+          <ServicesSection />
+          <FeaturedToursSection
+            options={tours}
+            value={data.featuredTours}
+            onChange={(featuredTours) => set({ featuredTours })}
+          />
+          <B2BSection />
+          <MapSection />
+          <DestinationTiles
+            options={destinations}
+            value={data.featuredDestinations}
+            onChange={(featuredDestinations) => set({ featuredDestinations })}
+          />
+          <StatsSection
+            values={data.statValues}
+            onValues={(statValues) => set({ statValues })}
+            auto={autoStats}
+          />
+          <LongToursSection
+            options={tours}
+            value={data.longTours}
+            onChange={(longTours) => set({ longTours })}
+          />
+          <StepsSection />
+          <ThemeTiles
+            options={themes}
+            value={data.homeThemes}
+            onChange={(homeThemes) => set({ homeThemes })}
+          />
+          <CustomTripSection lang={lang} />
+          <WhySection />
+          <PartnerStripSection />
+          <ProjectsSection />
+          <ReviewsSection />
+          <GuideSection />
+          <MonthsSection />
+          <PlannerSection />
+          <AboutSection />
+        </div>
+      </ReadOnlyArea>
 
       <p className="mt-3 text-center text-xs text-slate-500">
         Ô nào để trống, website sẽ tự dùng câu có sẵn.
       </p>
 
       {/* ----- Thanh lưu ----- */}
-      <div className="sticky bottom-3 z-30 mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-white/95 px-3.5 py-2.5 shadow-[0_12px_40px_-12px_rgba(10,37,60,0.4)] ring-1 ring-slate-200 backdrop-blur sm:bottom-4 sm:px-4">
-        {langTools()}
-        <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
-          {problems.length ? (
-            <span className="flex min-w-0 items-center gap-1.5 font-medium text-sun-600">
-              <AlertTriangle className="size-4 shrink-0" />
-              <span className="line-clamp-2">{problems[0].message}</span>
-            </span>
-          ) : dirty ? (
-            <Badge tone="amber">Chưa lưu</Badge>
-          ) : (
-            <span className="flex items-center gap-1.5 text-slate-500">
-              <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
-              <span className="max-sm:hidden">Đã lưu mọi thay đổi</span>
-            </span>
-          )}
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          {dirty && (
-            <Button variant="ghost" size="sm" icon={RotateCcw} onClick={discard} disabled={busy}>
-              Hoàn tác
+      {canEdit && (
+        <div className="sticky bottom-3 z-30 mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-white/95 px-3.5 py-2.5 shadow-[0_12px_40px_-12px_rgba(10,37,60,0.4)] ring-1 ring-slate-200 backdrop-blur sm:bottom-4 sm:px-4">
+          {langTools(undefined, true)}
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2 text-xs",
+              !problems.length && "max-sm:hidden",
+            )}
+          >
+            {problems.length ? (
+              <span className="flex min-w-0 items-center gap-1.5 font-medium text-sun-600">
+                <AlertTriangle className="size-4 shrink-0" />
+                <span className="line-clamp-2">{problems[0].message}</span>
+              </span>
+            ) : dirty ? (
+              <Badge tone="amber">Chưa lưu</Badge>
+            ) : (
+              <span className="flex items-center gap-1.5 text-slate-500">
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+                <span className="max-sm:hidden">Đã lưu mọi thay đổi</span>
+              </span>
+            )}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {dirty && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={RotateCcw}
+                onClick={discard}
+                disabled={busy}
+                aria-label="Hoàn tác"
+              >
+                <span className="max-sm:hidden">Hoàn tác</span>
+              </Button>
+            )}
+            <Button icon={Save} onClick={save} loading={busy || autoFill.busy} disabled={!dirty}>
+              <span className="max-sm:hidden">Lưu thay đổi</span>
+              <span className="sm:hidden">Lưu</span>
             </Button>
-          )}
-          <Button icon={Save} onClick={save} loading={busy} disabled={!dirty}>
-            Lưu thay đổi
-          </Button>
+          </div>
         </div>
-      </div>
+      )}
     </CopyContext.Provider>
   );
 }

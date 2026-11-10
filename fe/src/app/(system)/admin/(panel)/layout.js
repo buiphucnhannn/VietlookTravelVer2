@@ -3,6 +3,10 @@ import { connection } from "next/server";
 import AdminShell from "@/components/admin/AdminShell";
 import { LoadingBlock } from "@/components/admin/ui";
 
+// Khu quản trị chỉ dành cho người đã đăng nhập, luôn dựng theo từng request (không dựng sẵn) → bỏ kiểm tra
+// "instant navigation" của Next cho cả nhánh /admin (tránh cảnh báo "dropped from rendering" trong lúc dev).
+export const instant = false;
+
 export const metadata = {
   title: { default: "Tổng quan", template: "%s – Quản trị | Vietlook Travel" },
 };

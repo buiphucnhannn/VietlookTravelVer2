@@ -12,6 +12,7 @@ import {
   Loader2,
   Lock,
   User,
+  Zap,
 } from "lucide-react";
 import { ADMIN_BASE, ADMIN_LOGIN } from "@/config/urls.mjs";
 import { ApiError, api } from "@/lib/api";
@@ -73,6 +74,17 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [capsLock, setCapsLock] = useState(false);
   const expired = params.get("expired") === "1";
+  // Bản demo: máy chủ bật DEMO_LOGIN → hiện nút "Đăng nhập nhanh" (không lộ mật khẩu ra trình duyệt)
+  const [demo, setDemo] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api("/auth/demo", { retry: false })
+      .then((r) => alive && setDemo(Boolean(r?.data?.enabled)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -95,6 +107,21 @@ export default function LoginForm() {
       setError(messageFor(err));
       setPassword(""); // xoá mật khẩu sai, giữ tên đăng nhập
       focusPassword.current = true;
+    }
+  };
+
+  const demoLogin = async () => {
+    if (status === "sending") return;
+    setStatus("sending");
+    setError("");
+    try {
+      await api("/auth/demo-login", { method: "POST", retry: false });
+      setStatus("done");
+      router.replace(safeNext(params.get("next")));
+      router.refresh();
+    } catch (err) {
+      setStatus("idle");
+      setError(messageFor(err));
     }
   };
 
@@ -220,6 +247,25 @@ export default function LoginForm() {
           {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
         </span>
       </button>
+
+      {demo && (
+        <div className="pt-1">
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" />
+            Bản dùng thử
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+          <button
+            type="button"
+            onClick={demoLogin}
+            disabled={busy}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-brand-800 ring-1 ring-slate-200 transition hover:bg-brand-50 hover:ring-brand-200 focus-visible:ring-4 focus-visible:ring-brand-100 focus-visible:outline-none disabled:opacity-60"
+          >
+            <Zap className="size-4 text-sun-500" />
+            Đăng nhập nhanh (không cần mật khẩu)
+          </button>
+        </div>
+      )}
     </form>
   );
 }

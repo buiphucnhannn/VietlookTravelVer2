@@ -1,7 +1,7 @@
 import BgImage from "@/components/ui/BgImage";
 import { AlertTriangle, CalendarDays, Clock3, FileCheck2, Info } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
-import { tr } from "@/i18n/config";
+import { href, tr } from "@/i18n/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";
 import { airportCodes, airports, visaFaq, visaNotes, visaProcesses, visaTerms } from "@/data/visa";
 import { getCatalog } from "@/lib/catalog";
@@ -77,7 +77,7 @@ export default async function VisaPage({ params }) {
           "/images/tours/v2/hanoi-34405373.jpg",
           "/images/tours/v2/ho-chi-minh-city-1018478.jpg",
         ]}
-        breadcrumbs={[{ label: "Vietlook", href: "/" + lang }, { label: v.title }]}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: v.title }]}
       >
         <p className="mt-3 text-lg font-bold text-amber-brand drop-shadow">{v.subtitle}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">

@@ -17,9 +17,11 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "emails:preview": "node --env-file-if-exists=.env scripts/preview-emails.js",
     "images:upload": "node --env-file-if-exists=.env scripts/upload-site-images.js",
     "seed": "node --env-file-if-exists=.env src/scripts/seed-content.js",
-    "admin:reset": "node --env-file-if-exists=.env src/scripts/reset-admin.js"
+    "admin:reset": "node --env-file-if-exists=.env src/scripts/reset-admin.js",
+    "i18n:fill-vi": "node --env-file-if-exists=.env src/scripts/fill-vietnamese.js"
   },
   "dependencies": {
     "cloudinary": "^2.11.0",

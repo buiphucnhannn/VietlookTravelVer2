@@ -1,4 +1,4 @@
-import { auditService } from "../services/audit.service.js";
+import { auditName, auditService } from "../services/audit.service.js";
 import { created, noContent, ok } from "../utils/response.js";
 
 /**
@@ -9,6 +9,8 @@ import { created, noContent, ok } from "../utils/response.js";
 export function createContentController(service, type) {
   const target = (doc) => ({ type, id: String(doc?._id ?? doc?.id ?? "") });
   const ident = (doc) => doc?.slug ?? doc?.key ?? "";
+  // nhật ký: đường dẫn (để tìm) + tên dễ đọc lúc thao tác (vẫn hiện được khi nội dung đã bị xoá)
+  const info = (doc) => ({ slug: ident(doc), name: auditName(doc) });
 
   return {
     async list(req, res) {
@@ -24,7 +26,7 @@ export function createContentController(service, type) {
       const doc = await service.create(req.validated.body);
       auditService.record(req, `${type}.create`, {
         target: target(doc),
-        meta: { slug: ident(doc) },
+        meta: info(doc),
       });
       created(res, doc);
     },
@@ -33,7 +35,7 @@ export function createContentController(service, type) {
       const doc = await service.update(req.validated.params.id, req.validated.body);
       auditService.record(req, `${type}.update`, {
         target: target(doc),
-        meta: { slug: ident(doc) },
+        meta: info(doc),
       });
       ok(res, doc);
     },
@@ -42,7 +44,7 @@ export function createContentController(service, type) {
       const doc = await service.setVisibility(req.validated.params.id, req.validated.body.isActive);
       auditService.record(req, `${type}.${doc.isActive ? "show" : "hide"}`, {
         target: target(doc),
-        meta: { slug: ident(doc) },
+        meta: info(doc),
       });
       ok(res, doc);
     },
@@ -51,7 +53,7 @@ export function createContentController(service, type) {
       const doc = await service.remove(req.validated.params.id);
       auditService.record(req, `${type}.delete`, {
         target: target(doc),
-        meta: { slug: ident(doc) },
+        meta: info(doc),
       });
       noContent(res);
     },

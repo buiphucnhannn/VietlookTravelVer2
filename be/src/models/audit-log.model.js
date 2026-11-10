@@ -9,9 +9,9 @@ const RETENTION_SECONDS = 365 * 24 * 60 * 60;
 
 const auditLogSchema = new Schema(
   {
-    actor: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    actor: { type: Schema.Types.ObjectId, ref: "User", default: null },
     actorName: { type: String, default: "" }, // tên đăng nhập lúc thao tác
-    action: { type: String, required: true, index: true }, // vd. "auth.login", "user.update", "media.delete"
+    action: { type: String, required: true }, // vd. "auth.login", "user.update", "media.delete"
     target: {
       type: { type: String, default: "" }, // vd. "user", "tour", "media"
       id: { type: String, default: "" },
@@ -28,5 +28,8 @@ const auditLogSchema = new Schema(
 
 // 1 index vừa để sắp xếp mới nhất trước, vừa để tự xoá bản ghi cũ
 auditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: RETENTION_SECONDS });
+// Lọc theo 1 người / 1 loại thao tác, mới nhất trước (trang Nhật ký) — thay cho index đơn trên actor / action
+auditLogSchema.index({ actor: 1, createdAt: -1 });
+auditLogSchema.index({ action: 1, createdAt: -1 });
 
 export const AuditLog = model("AuditLog", auditLogSchema);

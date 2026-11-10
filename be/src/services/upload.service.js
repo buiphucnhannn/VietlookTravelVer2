@@ -27,7 +27,10 @@ const ALLOWED_FORMATS = ["jpg", "jpeg", "png", "webp", "avif", "gif"];
 
 function ensureEnabled() {
   if (!env.cloudinary.enabled)
-    throw ApiError.unavailable("Chưa cấu hình Cloudinary", "CLOUDINARY_NOT_CONFIGURED");
+    throw ApiError.unavailable(
+      "Chức năng tải ảnh chưa được bật — vui lòng báo bộ phận kỹ thuật",
+      "CLOUDINARY_NOT_CONFIGURED",
+    );
 }
 
 const folderOf = (subfolder) => `${env.cloudinary.folder}/${subfolder}`;

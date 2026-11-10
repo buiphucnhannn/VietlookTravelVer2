@@ -5,6 +5,7 @@ import { ArrowLeft, CalendarDays, Info, ShieldCheck } from "lucide-react";
 import { cn, dateLocale, formatUSD } from "@/lib/utils";
 import { childPercent, hotelClasses, isHoliday, unitPrice } from "@/lib/pricing";
 import { tr } from "@/i18n/config";
+import { childRatesSummary } from "@/components/tours/PriceTable";
 import {
   Counter,
   Field,
@@ -54,6 +55,12 @@ function buildDepartures(today, days, fixedDates = [], weekdays = []) {
   return { minDate: min.toISOString().slice(0, 10), departures: list };
 }
 
+// Gợi ý chọn ngày khi tour khởi hành vào thứ cố định / ngày cố định (thay câu "khởi hành hằng ngày")
+const FIXED_NOTE = {
+  en: "Fixed departures – choose one of the next dates:",
+  zh: "固定日期出发——请选择以下日期：",
+  vi: "Khởi hành ngày cố định – chọn một trong các ngày sau:",
+};
 const HOTEL_LABEL = { en: "Hotel class", zh: "酒店星级", vi: "Hạng khách sạn" };
 const EXTRA_LABEL = {
   holiday: { en: "Holiday surcharge", zh: "节假日附加费", vi: "Phụ thu lễ Tết" },
@@ -205,7 +212,12 @@ export default function BookingWidget({ lang, tour, t, c }) {
           </Field>
           {departures.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-muted">{t.departureNote}</p>
+              <p className="mb-1.5 text-xs font-semibold text-muted">
+                {tour.departure === "dates" ||
+                (tour.departure === "weekly" && tour.departureDays?.length)
+                  ? tr(FIXED_NOTE, lang)
+                  : t.departureNote}
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {departures.map((d) => (
                   <button
@@ -269,7 +281,10 @@ export default function BookingWidget({ lang, tour, t, c }) {
             </Field>
           )}
           {ages.length > 0 && (
-            <Field label={t.childAges} hint={t.childPolicy}>
+            <Field
+              label={t.childAges}
+              hint={childRatesSummary(tour.pricing?.childRates, lang) || t.childPolicy}
+            >
               <div className="grid grid-cols-3 gap-2">
                 {ages.map((age, i) => (
                   <Select
@@ -281,9 +296,9 @@ export default function BookingWidget({ lang, tour, t, c }) {
                     }
                     className="h-10 px-3 text-sm"
                   >
-                    {Array.from({ length: 16 }, (_, k) => k + 1).map((k) => (
+                    {Array.from({ length: 17 }, (_, k) => k).map((k) => (
                       <option key={k} value={k}>
-                        {k} {c.age}
+                        {k || "< 1"} {c.age}
                       </option>
                     ))}
                   </Select>

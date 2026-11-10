@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Logo from "@/components/layout/Logo";
 import LoginForm from "./LoginForm";
 
@@ -61,21 +61,19 @@ export default function LoginPage() {
 
         <div className="w-full max-w-[420px]">
           <div className="flex flex-col items-center text-center">
-            <Image
-              src="/images/logo/vietlook-logo.png"
-              alt="Vietlook Travel"
-              width={180}
-              height={56}
-              priority
-              className="mb-8 h-11 w-auto lg:hidden"
-            />
-            <span className="grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-              <ShieldCheck className="size-6" />
+            {/* Biểu tượng thương hiệu (giống thanh bên trang quản trị): đĩa trắng, viền vàng nhạt */}
+            <span className="grid size-[72px] place-items-center rounded-full bg-white shadow-[0_12px_32px_-12px_rgba(15,23,42,0.35)] ring-4 ring-amber-brand/25">
+              <Image
+                src="/images/logo/vietlook-icon.png"
+                unoptimized
+                alt="Vietlook Travel"
+                width={210}
+                height={210}
+                priority
+                className="h-auto w-[52px]"
+              />
             </span>
-            <p className="mt-5 text-[11px] font-semibold tracking-[0.28em] text-sun-500 uppercase">
-              Khu vực bảo mật
-            </p>
-            <h1 className="mt-2 text-[30px] font-bold tracking-tight text-slate-900 sm:text-[36px]">
+            <h1 className="mt-6 text-[30px] font-bold tracking-tight text-slate-900 sm:text-[34px]">
               Đăng nhập quản trị
             </h1>
             <p className="mt-2 text-sm text-slate-500">

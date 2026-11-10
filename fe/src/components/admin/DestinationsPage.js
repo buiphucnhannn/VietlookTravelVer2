@@ -13,6 +13,7 @@ import {
   Lines,
   MediaCard,
   useRemove,
+  useEditVerb,
   useReorder,
 } from "./catalogShared";
 import { useAdminList, useMutation } from "./hooks";
@@ -32,11 +33,15 @@ import {
   Pagination,
   SearchBox,
   Select,
+  DEFAULT_LANG,
   Toggle,
+  anyLang,
   locText,
   usePaged,
   useUi,
 } from "./ui";
+import { usePermission } from "./permissions";
+import { slugSource, useAutoFill } from "./translate";
 
 const PATH = "/admin/destinations";
 // điểm đến thay đổi → trang điểm đến, menu, trang chủ, thẻ tour (tên điểm đến) đều đổi
@@ -88,6 +93,7 @@ const fold = (s) =>
     .replace(/đ/g, "d");
 
 export default function DestinationsPage() {
+  const { canEdit } = usePermission("destinations");
   const list = useAdminList(PATH, { limit: 200, sort: "order" });
   const [region, setRegion] = useState(REGIONS[0].value);
   const [q, setQ] = useState("");
@@ -155,9 +161,11 @@ export default function DestinationsPage() {
         title="Điểm đến"
         description="Điểm đến theo 3 miền Bắc – Trung – Nam. Hiện trên menu, trang chủ, bộ lọc tour và trang điểm đến. Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất kỳ."
         actions={
-          <Button icon={Plus} onClick={() => setEditing({ ...EMPTY, region })}>
-            Thêm điểm đến
-          </Button>
+          canEdit && (
+            <Button icon={Plus} onClick={() => setEditing({ ...EMPTY, region })}>
+              Thêm điểm đến
+            </Button>
+          )
         }
       />
 
@@ -233,9 +241,11 @@ export default function DestinationsPage() {
                 title={`Chưa có điểm đến ở ${regionLabel(region)}`}
                 text="Thêm điểm đến để gắn vào tour."
                 action={
-                  <Button icon={Plus} onClick={() => setEditing({ ...EMPTY, region })}>
-                    Thêm điểm đến
-                  </Button>
+                  canEdit && (
+                    <Button icon={Plus} onClick={() => setEditing({ ...EMPTY, region })}>
+                      Thêm điểm đến
+                    </Button>
+                  )
                 }
               />
             )
@@ -253,6 +263,7 @@ export default function DestinationsPage() {
               className={CARD_GRID}
               onReorder={sort.onPageReorder}
               highlight={sort.flash}
+              disabled={!canEdit}
             >
               {(d, i, drag) => renderCard(d, drag, sort.badge(d, i))}
             </Sortable>
@@ -281,22 +292,26 @@ export default function DestinationsPage() {
 }
 
 function DestinationEditor({ initial, all, onClose, onSaved }) {
+  const editVerb = useEditVerb();
   const isNew = !initial.id;
   const [d, setD] = useState({ ...EMPTY, ...initial });
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const [kw, setKw] = useState((initial.keywords ?? []).join(", "));
   const { run, busy } = useMutation(TAGS);
+  const autoFill = useAutoFill();
   const { toast } = useUi();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
   const save = async () => {
-    if (!d.name.en?.trim()) {
-      setLang("en");
-      return toast("Vui lòng nhập tên điểm đến bằng tiếng Anh", "error");
-    }
-    if (!d.slug) return toast("Vui lòng nhập đường dẫn trang", "error");
-    const body = toPayload(d);
+    if (!anyLang(d.name))
+      return toast("Vui lòng nhập tên điểm đến ở ít nhất một ngôn ngữ", "error");
+    const { value: v, failed } = await autoFill.fill(d, { lang });
+    if (v !== d) setD(v);
+    const slug = v.slug || slugify(slugSource(v.name));
+    if (!slug) return toast("Vui lòng nhập đường dẫn trang", "error");
+    if (slug !== v.slug) set({ slug });
+    const body = toPayload({ ...v, slug });
     // mới thêm / chuyển sang miền khác → xếp cuối miền đó
     if (isNew || d.region !== initial.region)
       body.order = all.filter((x) => x.region === d.region && x.id !== d.id).length + 1;
@@ -307,26 +322,34 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
           : api(`${PATH}/${d.id}`, { method: "PUT", body }),
       isNew ? "Đã thêm điểm đến" : "Đã lưu điểm đến",
     );
-    if (ok) onSaved(body);
+    if (!ok) return;
+    if (failed)
+      autoFill.offerRetry((t) =>
+        api(`${PATH}/${ok.data?.id ?? d.id}`, {
+          method: "PUT",
+          body: { ...toPayload({ ...t, slug }), order: body.order },
+        }),
+      );
+    onSaved(body);
   };
 
   return (
     <EditorModal
       size="xl"
-      title={isNew ? "Thêm điểm đến" : `Sửa: ${locText(initial.name)}`}
+      title={isNew ? "Thêm điểm đến" : `${editVerb}: ${locText(initial.name)}`}
       onClose={onClose}
       onSave={save}
-      busy={busy}
+      busy={busy || autoFill.busy}
     >
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
         <div className="space-y-4">
           <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
-          <Field label="Tên điểm đến" required={lang === "en"}>
+          <Field label="Tên điểm đến" required>
             <LocInput
               value={d.name}
               lang={lang}
               onChange={(name) =>
-                set({ name, ...(!slugTouched && lang === "en" && { slug: slugify(name.en) }) })
+                set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })
               }
             />
           </Field>

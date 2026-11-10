@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { FolderOpen, Pencil, Plus, Trash2, UserRound } from "lucide-react";
+import { Eye, FolderOpen, Pencil, Plus, Trash2, UserRound } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, slugify } from "@/lib/utils";
 import { useAdminList, useMutation } from "./hooks";
 import { DragHandle, PositionBadge, Sortable, usePagedSort } from "./Sortable";
-import { AutoTranslate } from "./translate";
+import { AutoTranslate, slugSource, useAutoFill } from "./translate";
 import {
   Badge,
   Button,
@@ -23,13 +23,16 @@ import {
   Notice,
   PageHeader,
   Pagination,
+  DEFAULT_LANG,
   Toggle,
+  anyLang,
   filledOf,
   locText,
   usePaged,
   useUi,
 } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
+import { ReadOnlyArea, usePermission } from "./permissions";
 
 // đổi chuyên mục / tác giả → menu cẩm nang, trang chuyên mục, trang tác giả và thẻ bài viết đều đổi
 const TAGS = ["taxonomy", "articles"];
@@ -97,11 +100,12 @@ const KINDS = {
 };
 
 export default function TaxonomyPage() {
+  const { canEdit } = usePermission("taxonomy");
   return (
     <>
       <PageHeader
         title="Chuyên mục & tác giả"
-        description="Phân loại bài viết trong cẩm nang du lịch. Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ."
+        description={`Phân loại bài viết trong cẩm nang du lịch.${canEdit ? " Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ." : ""}`}
       />
       <div className="grid gap-6 xl:grid-cols-2">
         <TaxonomyCard kind="category" />
@@ -113,6 +117,7 @@ export default function TaxonomyPage() {
 
 function TaxonomyCard({ kind }) {
   const cfg = KINDS[kind];
+  const { canEdit, canDelete } = usePermission("taxonomy");
   const { confirm } = useUi();
   const list = useAdminList(cfg.path, { limit: 200, sort: "order" });
   const [editing, setEditing] = useState(null);
@@ -131,6 +136,7 @@ function TaxonomyCard({ kind }) {
           body: { items: ordered.map((x) => ({ id: x.id, order: x.order })) },
         }),
       "Đã lưu thứ tự mới",
+      { retry: () => reorder(next) },
     );
     if (!ok) list.setItems(() => before);
   };
@@ -156,13 +162,15 @@ function TaxonomyCard({ kind }) {
       icon={cfg.icon}
       bodyClassName="p-0 sm:p-0"
       actions={
-        <Button
-          size="sm"
-          icon={Plus}
-          onClick={() => setEditing({ ...cfg.empty(), order: nextOrder })}
-        >
-          Thêm {cfg.noun}
-        </Button>
+        canEdit && (
+          <Button
+            size="sm"
+            icon={Plus}
+            onClick={() => setEditing({ ...cfg.empty(), order: nextOrder })}
+          >
+            Thêm {cfg.noun}
+          </Button>
+        )
       }
     >
       {list.error && (
@@ -181,6 +189,7 @@ function TaxonomyCard({ kind }) {
           onReorder={sort.onPageReorder}
           highlight={sort.flash}
           className="divide-y divide-slate-100"
+          disabled={!canEdit}
         >
           {(d, i, drag) => (
             <div
@@ -189,10 +198,12 @@ function TaxonomyCard({ kind }) {
                 drag.dragging && "ring-1 ring-brand-300",
               )}
             >
-              <span className="flex shrink-0 items-center gap-1">
-                <DragHandle {...drag.handle} />
-                <PositionBadge {...sort.badge(d, i)} />
-              </span>
+              {canEdit && (
+                <span className="flex shrink-0 items-center gap-1">
+                  <DragHandle {...drag.handle} />
+                  <PositionBadge {...sort.badge(d, i)} />
+                </span>
+              )}
               {kind === "author" && (
                 <span className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-50 text-brand-600">
                   {d.avatar ? (
@@ -224,18 +235,26 @@ function TaxonomyCard({ kind }) {
                     list.setItems((xs) => xs.map((x) => (x.id === doc.id ? doc : x)))
                   }
                 />
-                <Button variant="ghost" size="icon" onClick={() => setEditing(d)} aria-label="Sửa">
-                  <Pencil className="size-4" />
-                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => remove(d)}
-                  aria-label="Xoá"
-                  className="text-sun-600"
+                  onClick={() => setEditing(d)}
+                  aria-label={canEdit ? "Sửa" : "Xem"}
+                  title={canEdit ? "Sửa" : "Xem"}
                 >
-                  <Trash2 className="size-4" />
+                  {canEdit ? <Pencil className="size-4" /> : <Eye className="size-4" />}
                 </Button>
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => remove(d)}
+                    aria-label="Xoá"
+                    className="text-sun-600"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -271,19 +290,30 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
       if (base[k] && typeof base[k] === "object") merged[k] = { ...base[k], ...initial[k] };
     return merged;
   });
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const { toast } = useUi();
   const { run, busy } = useMutation(TAGS);
+  const autoFill = useAutoFill();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
+  const { canEdit } = usePermission("taxonomy");
 
   const save = async () => {
-    if (!d.name.en.trim()) {
-      setLang("en");
-      return toast("Cần nhập tên tiếng Anh", "error");
-    }
-    if (!d.slug) return toast("Cần nhập đường dẫn trang", "error");
-    const body = cfg.toPayload(d);
+    if (!anyLang(d.name)) return toast("Vui lòng nhập tên ở ít nhất một ngôn ngữ", "error");
+    // họ tên (không dịch) → ngôn ngữ còn trống dùng y nguyên tên đã nhập
+    const same = anyLang(d.name, lang);
+    const named = cfg.skipKeys.includes("name")
+      ? {
+          ...d,
+          name: Object.fromEntries(["en", "zh", "vi"].map((l) => [l, d.name?.[l]?.trim() || same])),
+        }
+      : d;
+    const { value: v, failed } = await autoFill.fill(named, { lang, skipKeys: cfg.skipKeys });
+    if (v !== d) setD(v);
+    const slug = v.slug || slugify(slugSource(v.name));
+    if (!slug) return toast("Cần nhập đường dẫn trang", "error");
+    if (slug !== v.slug) set({ slug });
+    const body = cfg.toPayload({ ...v, slug });
     const ok = await run(
       () =>
         isNew
@@ -291,7 +321,15 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
           : api(`${cfg.path}/${d.id}`, { method: "PUT", body }),
       isNew ? `Đã thêm ${cfg.noun}` : `Đã lưu ${cfg.noun}`,
     );
-    if (ok) onSaved();
+    if (!ok) return;
+    if (failed)
+      autoFill.offerRetry((t) =>
+        api(`${cfg.path}/${ok.data?.id ?? d.id}`, {
+          method: "PUT",
+          body: cfg.toPayload({ ...t, slug }),
+        }),
+      );
+    onSaved();
   };
 
   return (
@@ -299,119 +337,131 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
       open
       size="lg"
       onClose={onClose}
-      title={isNew ? `Thêm ${cfg.noun}` : `Sửa: ${locText(initial.name)}`}
+      title={isNew ? `Thêm ${cfg.noun}` : `${canEdit ? "Sửa" : "Xem"}: ${locText(initial.name)}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Huỷ
-          </Button>
-          <Button onClick={save} loading={busy}>
-            Lưu
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-700">Nội dung theo ngôn ngữ</p>
-          <div className="flex items-center gap-2">
-            <AutoTranslate
-              lang={lang}
-              value={d}
-              skipKeys={cfg.skipKeys}
-              onChange={(next) =>
-                setD({
-                  ...next,
-                  ...(!slugTouched &&
-                    !next.slug &&
-                    next.name.en && { slug: slugify(next.name.en) }),
-                })
-              }
-              className="rounded-full"
-              label={
-                <>
-                  <span className="sm:hidden">Dịch</span>
-                  <span className="hidden sm:inline">Dịch tự động</span>
-                </>
-              }
-            />
-            <LangTabs value={lang} onChange={setLang} filled={filledOf(d.name)} />
-          </div>
-        </div>
-        <Field label={kind === "author" ? "Họ tên" : "Tên chuyên mục"} required={lang === "en"}>
-          <LocInput
-            value={d.name}
-            lang={lang}
-            onChange={(name) =>
-              set({ name, ...(!slugTouched && lang === "en" && { slug: slugify(name.en) }) })
-            }
-          />
-        </Field>
-        <Field label="Đường dẫn trang" required hint="Phần cuối của địa chỉ trang, viết không dấu">
-          <Input
-            value={d.slug}
-            className="font-mono text-[13px]"
-            onChange={(e) => {
-              setSlugTouched(true);
-              set({ slug: slugify(e.target.value) });
-            }}
-          />
-        </Field>
-
-        {kind === "category" ? (
+        canEdit ? (
           <>
-            <Field label="Mô tả" hint="Hiện ở đầu trang chuyên mục">
-              <LocInput
-                value={d.description}
-                lang={lang}
-                multiline
-                rows={3}
-                onChange={(description) => set({ description })}
-              />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nhóm trên menu" hint="Vd: essentials, transport. Có thể để trống.">
-                <Input value={d.group} onChange={(e) => set({ group: e.target.value.trim() })} />
-              </Field>
-              <Field label="Biểu tượng" hint="Tên biểu tượng, vd: plane, map. Có thể để trống.">
-                <Input value={d.icon} onChange={(e) => set({ icon: e.target.value.trim() })} />
-              </Field>
-            </div>
+            <Button variant="secondary" onClick={onClose}>
+              Huỷ
+            </Button>
+            <Button onClick={save} loading={busy || autoFill.busy}>
+              Lưu
+            </Button>
           </>
         ) : (
-          <>
-            <Field label="Vai trò" hint="VD: Travel Writer, Tour Expert">
-              <LocInput value={d.role} lang={lang} onChange={(role) => set({ role })} />
-            </Field>
-            <Field label="Giới thiệu ngắn">
-              <LocInput
-                value={d.bio}
+          <Button variant="secondary" onClick={onClose}>
+            Đóng
+          </Button>
+        )
+      }
+    >
+      <ReadOnlyArea readOnly={!canEdit}>
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-slate-700">Nội dung theo ngôn ngữ</p>
+            <div className="flex items-center gap-2">
+              <AutoTranslate
                 lang={lang}
-                multiline
-                rows={4}
-                onChange={(bio) => set({ bio })}
+                value={d}
+                skipKeys={cfg.skipKeys}
+                onChange={(next) =>
+                  setD({
+                    ...next,
+                    ...(!slugTouched &&
+                      !next.slug &&
+                      slugSource(next.name) && { slug: slugify(slugSource(next.name)) }),
+                  })
+                }
+                className="rounded-full"
+                label={
+                  <>
+                    <span className="sm:hidden">Dịch</span>
+                    <span className="hidden sm:inline">Dịch tự động</span>
+                  </>
+                }
               />
-            </Field>
-            <Field label="Ảnh đại diện" hint="Ảnh vuông, tối thiểu 400px">
-              <div className="max-w-[180px]">
-                <ImageField
-                  value={d.avatar}
-                  onChange={(avatar) => set({ avatar })}
-                  folder="authors"
-                  aspect="aspect-square"
-                  crop={{ width: 400 }}
-                />
-              </div>
-            </Field>
-          </>
-        )}
+              <LangTabs value={lang} onChange={setLang} filled={filledOf(d.name)} />
+            </div>
+          </div>
+          <Field label={kind === "author" ? "Họ tên" : "Tên chuyên mục"} required>
+            <LocInput
+              value={d.name}
+              lang={lang}
+              onChange={(name) =>
+                set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })
+              }
+            />
+          </Field>
+          <Field
+            label="Đường dẫn trang"
+            required
+            hint="Phần cuối của địa chỉ trang, viết không dấu"
+          >
+            <Input
+              value={d.slug}
+              className="font-mono text-[13px]"
+              onChange={(e) => {
+                setSlugTouched(true);
+                set({ slug: slugify(e.target.value) });
+              }}
+            />
+          </Field>
 
-        <Toggle
-          checked={d.isActive}
-          onChange={(isActive) => set({ isActive })}
-          label="Hiện trên website"
-        />
-      </div>
+          {kind === "category" ? (
+            <>
+              <Field label="Mô tả" hint="Hiện ở đầu trang chuyên mục">
+                <LocInput
+                  value={d.description}
+                  lang={lang}
+                  multiline
+                  rows={3}
+                  onChange={(description) => set({ description })}
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Nhóm trên menu" hint="Vd: essentials, transport. Có thể để trống.">
+                  <Input value={d.group} onChange={(e) => set({ group: e.target.value.trim() })} />
+                </Field>
+                <Field label="Biểu tượng" hint="Tên biểu tượng, vd: plane, map. Có thể để trống.">
+                  <Input value={d.icon} onChange={(e) => set({ icon: e.target.value.trim() })} />
+                </Field>
+              </div>
+            </>
+          ) : (
+            <>
+              <Field label="Vai trò" hint="VD: Travel Writer, Tour Expert">
+                <LocInput value={d.role} lang={lang} onChange={(role) => set({ role })} />
+              </Field>
+              <Field label="Giới thiệu ngắn">
+                <LocInput
+                  value={d.bio}
+                  lang={lang}
+                  multiline
+                  rows={4}
+                  onChange={(bio) => set({ bio })}
+                />
+              </Field>
+              <Field label="Ảnh đại diện" hint="Ảnh vuông, tối thiểu 400px">
+                <div className="max-w-[180px]">
+                  <ImageField
+                    value={d.avatar}
+                    onChange={(avatar) => set({ avatar })}
+                    folder="authors"
+                    aspect="aspect-square"
+                    crop={{ width: 400 }}
+                  />
+                </div>
+              </Field>
+            </>
+          )}
+
+          <Toggle
+            checked={d.isActive}
+            onChange={(isActive) => set({ isActive })}
+            label="Hiện trên website"
+          />
+        </div>
+      </ReadOnlyArea>
     </Modal>
   );
 }

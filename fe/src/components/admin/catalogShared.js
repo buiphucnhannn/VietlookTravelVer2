@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { GripVertical, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, GripVertical, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useMutation } from "./hooks";
@@ -9,6 +9,7 @@ import { DragHandle, PositionBadge, Sortable } from "./Sortable";
 import { AutoTranslate } from "./translate";
 import { Button, Input, LangTabs, Modal, filledOf, locText, useUi } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
+import { ReadOnlyArea, usePermission } from "./permissions";
 
 /**
  * Phần dùng chung của 4 tab danh mục: Điểm đến, Chủ đề, Xe & khu vực, Visa & fast-track.
@@ -52,6 +53,7 @@ export function FormSection({ title, children, className }) {
 
 /** Popup tạo / sửa: nút Huỷ – Lưu luôn ở góc dưới phải */
 export function EditorModal({ title, size = "lg", onClose, onSave, busy, children }) {
+  const { canEdit } = usePermission(); // chỉ xem → form chỉ đọc, chỉ có nút Đóng
   return (
     <Modal
       open
@@ -59,17 +61,23 @@ export function EditorModal({ title, size = "lg", onClose, onSave, busy, childre
       onClose={onClose}
       title={title}
       footer={
-        <>
+        canEdit ? (
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              Huỷ
+            </Button>
+            <Button onClick={onSave} loading={busy}>
+              Lưu
+            </Button>
+          </>
+        ) : (
           <Button variant="secondary" onClick={onClose}>
-            Huỷ
+            Đóng
           </Button>
-          <Button onClick={onSave} loading={busy}>
-            Lưu
-          </Button>
-        </>
+        )
       }
     >
-      {children}
+      <ReadOnlyArea readOnly={!canEdit}>{children}</ReadOnlyArea>
     </Modal>
   );
 }
@@ -81,7 +89,7 @@ export function EditorModal({ title, size = "lg", onClose, onSave, busy, childre
  */
 export function useReorder(list, path, tags) {
   const { run } = useMutation(tags);
-  return async (ordered) => {
+  const reorder = async (ordered) => {
     const pos = new Map(ordered.map((x, k) => [x.id, k + 1]));
     list.setItems((xs) =>
       xs
@@ -94,10 +102,12 @@ export function useReorder(list, path, tags) {
           method: "PATCH",
           body: { items: ordered.map((x, k) => ({ id: x.id, order: k + 1 })) },
         }),
-      "Đã đổi thứ tự",
+      "Đã lưu thứ tự mới",
+      { retry: () => reorder(ordered) },
     );
     if (!ok) list.reload();
   };
+  return reorder;
 }
 
 /** Hỏi lại rồi xoá */
@@ -117,23 +127,37 @@ export function useRemove(path, label, tags, reload, note) {
 }
 
 /** Cụm thao tác của 1 mục: ẩn/hiện bên trái — sửa, xoá bên phải */
+/** Tiêu đề popup sửa: "Sửa" khi có quyền sửa, "Xem" khi chỉ được xem (mục của trang đang mở) */
+export function useEditVerb() {
+  return usePermission().canEdit ? "Sửa" : "Xem";
+}
+
 export function ItemActions({ path, item, tags, onDone, onEdit, onRemove, className }) {
+  const { canEdit, canDelete } = usePermission();
   return (
     <div className={cn("flex items-center justify-between gap-2", className)}>
       <VisibilityToggle path={path} item={item} tags={tags} onDone={onDone} />
       <div className="flex gap-0.5">
-        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Sửa">
-          <Pencil className="size-4" />
-        </Button>
         <Button
           variant="ghost"
           size="icon"
-          onClick={onRemove}
-          aria-label="Xoá"
-          className="text-sun-600"
+          onClick={onEdit}
+          aria-label={canEdit ? "Sửa" : "Xem"}
+          title={canEdit ? "Sửa" : "Xem"}
         >
-          <Trash2 className="size-4" />
+          {canEdit ? <Pencil className="size-4" /> : <Eye className="size-4" />}
         </Button>
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onRemove}
+            aria-label="Xoá"
+            className="text-sun-600"
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -145,8 +169,10 @@ export function ItemActions({ path, item, tags, onDone, onEdit, onRemove, classN
  * `position` = props của <PositionBadge> (sort.badge(item, i)) → hiện số thứ tự cạnh tay nắm,
  * bấm vào để chuyển tới vị trí bất kỳ (kể cả sang trang khác).
  */
-export function MediaCard({ image, drag, badges, children, actions, dimmed, position }) {
-  const canDrag = Boolean(drag?.handle && Object.keys(drag.handle).length);
+export function MediaCard({ image, drag, badges, children, actions, dimmed, position: pos }) {
+  const { canEdit } = usePermission();
+  const position = canEdit ? pos : undefined; // chỉ xem → không đổi vị trí
+  const canDrag = canEdit && Boolean(drag?.handle && Object.keys(drag.handle).length);
   return (
     <article
       className={cn(

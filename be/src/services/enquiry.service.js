@@ -1,12 +1,16 @@
 import { ENQUIRY_TYPES } from "../constants/content.js";
 import { logger } from "../config/logger.js";
-import { companyEmail, customerEmail, testEmail } from "../emails/templates.js";
+import { companyEmail, customerEmail } from "../emails/templates.js";
 import {
+  carRepository,
   counterRepository,
+  destinationRepository,
   enquiryRepository,
+  fastTrackRepository,
   tourRepository,
 } from "../repositories/content.repository.js";
 import { ApiError } from "../utils/ApiError.js";
+import { formMessage } from "../utils/form-messages.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
 import { estimatePrice } from "../utils/pricing.js";
 import { mailService } from "./mail.service.js";
@@ -36,17 +40,52 @@ async function nextCode(type) {
   return `VL-${ENQUIRY_TYPES[type]}${ymd}-${rand}${tail.padStart(2, ALPHABET[0])}`;
 }
 
+/**
+ * Tên hiển thị cho các mã trong form (loại xe, gói fast-track, điểm đến, tên tour theo ngôn ngữ)
+ * → email in chữ dễ hiểu thay vì mã. Lỗi tra cứu không chặn việc gửi email (email dùng chữ dự phòng).
+ */
+export async function emailLookups(e) {
+  const d = e.details ?? {};
+  const str = (v) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
+  const dests = Array.isArray(d.destinations) ? d.destinations.map(str).filter(Boolean) : [];
+  try {
+    const [car, pkg, places, tour] = await Promise.all([
+      str(d.vehicle) ? carRepository.findByIdent(str(d.vehicle), { select: "key name" }) : null,
+      str(d.level) ? fastTrackRepository.findByIdent(str(d.level), { select: "key name" }) : null,
+      dests.length ? destinationRepository.findByIdents(dests, { select: "slug name" }) : [],
+      e.tour?.slug
+        ? tourRepository.findByIdent(e.tour.slug, {
+            select: "slug content.en.title content.zh.title content.vi.title",
+          })
+        : null,
+    ]);
+    const titles = tour?.content
+      ? Object.fromEntries(["en", "zh", "vi"].map((l) => [l, tour.content[l]?.title ?? ""]))
+      : null;
+    return {
+      vehicle: car ? { [car.key]: car.name } : {},
+      level: pkg ? { [pkg.key]: pkg.name } : {},
+      destinations: Object.fromEntries((places ?? []).map((p) => [p.slug, p.name])),
+      ...(titles && { tourTitle: titles }),
+    };
+  } catch (err) {
+    logger.warn({ err }, "[enquiry] không tra được tên hiển thị cho email");
+    return {};
+  }
+}
+
 /** Gửi email (khách + doanh nghiệp) rồi lưu kết quả để CMS đánh dấu đơn chưa gửi được email */
 async function deliver(enquiry) {
   const settings = await settingsService.getNotifications();
   const recipients = await settingsService.recipients();
+  const lookups = await emailLookups(enquiry);
   const status = { customer: "skipped", company: "skipped", error: "" };
   const errors = [];
 
   const company = await mailService.send({
     to: recipients,
     replyTo: enquiry.email || undefined,
-    ...companyEmail(enquiry),
+    ...companyEmail(enquiry, lookups),
   });
   status.company = company.ok ? "sent" : company.skipped ? "skipped" : "failed";
   if (!company.ok) errors.push(`DN: ${company.error}`);
@@ -55,7 +94,7 @@ async function deliver(enquiry) {
     const customer = await mailService.send({
       to: enquiry.email,
       replyTo: settings.replyTo || recipients[0],
-      ...customerEmail(enquiry),
+      ...customerEmail(enquiry, lookups),
     });
     status.customer = customer.ok ? "sent" : customer.skipped ? "skipped" : "failed";
     if (!customer.ok) errors.push(`Khách: ${customer.error}`);
@@ -65,15 +104,28 @@ async function deliver(enquiry) {
   return status;
 }
 
+/** Chưa đặt RESEND_API_KEY — nhân viên chỉ thấy câu dễ hiểu (CMS dựa vào mã MAIL_NOT_CONFIGURED) */
+const mailOff = () =>
+  ApiError.unavailable(
+    "Chức năng gửi email chưa được bật — đơn vẫn lưu đầy đủ trong trang quản trị",
+    "MAIL_NOT_CONFIGURED",
+  );
+
 export const enquiryService = {
   /** Khách gửi form trên website. Lưu DB TRƯỚC, gửi email SAU (không chặn phản hồi). */
   async createPublic(data, meta) {
     let tour = null;
     let estimate = { currency: "USD", total: null, lines: [] };
     if (data.type === "booking") {
-      tour = await tourRepository.findByIdent(data.tourSlug);
-      if (!tour || !tour.isActive)
-        throw ApiError.badRequest("Tour không tồn tại hoặc đã ngừng bán");
+      // nhận cả đường dẫn cũ (khách mở trang tour trước khi CMS đổi đường dẫn)
+      tour = await tourRepository.findBySlugOrOld(data.tourSlug);
+      if (!tour || !tour.isActive) {
+        const message = formMessage(data.lang, "tourUnavailable"); // khách thấy câu này
+        throw new ApiError(400, message, {
+          code: "TOUR_UNAVAILABLE",
+          details: [{ field: "body.tourSlug", message }],
+        });
+      }
       // giá tạm tính tính lại ở máy chủ theo bảng giá trong CMS (không tin số trình duyệt gửi)
       estimate = {
         currency: "USD",
@@ -95,14 +147,22 @@ export const enquiryService = {
       nationality: data.nationality,
       message: data.notes || data.message,
       ...(tour && {
-        tour: { slug: tour.slug, code: tour.code, title: tour.content?.en?.title ?? tour.slug },
+        tour: {
+          slug: tour.slug,
+          code: tour.code,
+          title: ["en", "vi", "zh"].map((l) => tour.content?.[l]?.title).find(Boolean) || tour.slug,
+        },
         departureDate: data.departureDate,
         adults: data.adults ?? 1,
         childAges: data.childAges ?? [],
         hotelClass: data.hotelClass ?? null,
         estimate,
       }),
-      details: data.details,
+      // "children" là trường chung (đặt tour lưu theo tuổi trẻ em) → form khác (thiết kế tour) giữ số trẻ em trong details
+      details:
+        !tour && Number(data.children) > 0
+          ? { ...data.details, children: Number(data.children) }
+          : data.details,
       lang: data.lang,
       page: data.page,
       ip: meta.ip ?? "",
@@ -117,11 +177,13 @@ export const enquiryService = {
 
   /* ---------- CMS ---------- */
 
-  async list(query) {
+  /** kinds: nhóm tài khoản được xem ("bookings" / "requests") — chỉ được 1 nhóm → luôn lọc theo nhóm đó */
+  async list(query, kinds = ["bookings", "requests"]) {
     const page = getPagination(query, { defaultLimit: 30, maxLimit: 100 });
     const filter = {};
-    if (query.kind === "bookings") filter.type = "booking";
-    if (query.kind === "requests") filter.$nor = [{ type: "booking" }];
+    const kind = query.kind ?? (kinds.length === 1 ? kinds[0] : undefined);
+    if (kind === "bookings") filter.type = "booking";
+    if (kind === "requests") filter.$nor = [{ type: "booking" }];
     if (query.type) filter.type = query.type;
     if (query.status) filter.status = query.status;
     if (query.paymentStatus) filter.paymentStatus = query.paymentStatus;
@@ -179,11 +241,7 @@ export const enquiryService = {
   async resendEmail(id) {
     const e = await enquiryRepository.findById(id);
     if (!e) throw ApiError.notFound("Không tìm thấy đơn / yêu cầu");
-    if (!mailService.enabled)
-      throw ApiError.unavailable(
-        "Máy chủ chưa cấu hình gửi email (RESEND_API_KEY)",
-        "MAIL_NOT_CONFIGURED",
-      );
+    if (!mailService.enabled) throw mailOff();
     return deliver(e);
   },
 
@@ -193,26 +251,21 @@ export const enquiryService = {
     return e;
   },
 
-  async stats() {
+  /** Số liệu chỉ của các nhóm tài khoản được xem (nhóm còn lại không trả về) */
+  async stats(kinds = ["bookings", "requests"]) {
     const since = new Date(Date.now() - 7 * 24 * 3600_000);
+    const only =
+      kinds.length === 1
+        ? kinds[0] === "bookings"
+          ? { type: "booking" }
+          : { $nor: [{ type: "booking" }] }
+        : {};
     const [byKind, last7Days] = await Promise.all([
       enquiryRepository.stats(),
-      enquiryRepository.recentSince(since),
+      enquiryRepository.recentSince(since, only),
     ]);
-    return { ...byKind, last7Days };
-  },
-
-  /** Gửi email thử tới danh sách người nhận đang cài */
-  async sendTest() {
-    if (!mailService.enabled)
-      throw ApiError.unavailable(
-        "Máy chủ chưa cấu hình gửi email (RESEND_API_KEY)",
-        "MAIL_NOT_CONFIGURED",
-      );
-    const to = await settingsService.recipients();
-    if (!to.length) throw ApiError.badRequest("Chưa có email người nhận");
-    const r = await mailService.send({ to, ...testEmail() });
-    if (!r.ok) throw ApiError.unavailable(`Gửi thử thất bại: ${r.error}`, "MAIL_FAILED");
-    return { to };
+    const out = { last7Days };
+    for (const k of kinds) out[k] = byKind[k];
+    return out;
   },
 };

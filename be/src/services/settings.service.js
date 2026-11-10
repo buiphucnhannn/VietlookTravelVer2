@@ -92,7 +92,7 @@ export const settingsService = {
     return {
       provider: "9pay",
       enabled: Boolean(v.enabled),
-      environment: v.environment ?? "sandbox",
+      environment: "production",
       merchantKey: v.merchantKey ?? "",
       accountName: v.accountName ?? "",
       secretKeySet: Boolean(v.secretKey),
@@ -112,7 +112,7 @@ export const settingsService = {
     const next = {
       provider: "9pay",
       enabled: data.enabled,
-      environment: data.environment,
+      environment: "production",
       merchantKey: data.merchantKey,
       accountName: data.accountName,
       secretKey: data.secretKey ? encryptSecret(data.secretKey) : (prev.secretKey ?? ""),
@@ -132,7 +132,7 @@ export const settingsService = {
     const v = (await settingRepository.get(KEYS.payment)) ?? {};
     if (!v.enabled) return null;
     return {
-      environment: v.environment,
+      environment: "production",
       merchantKey: v.merchantKey,
       secretKey: decryptSecret(v.secretKey),
       checksumKey: decryptSecret(v.checksumKey),

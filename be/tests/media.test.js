@@ -293,8 +293,8 @@ describe("giá theo mẫu thông tin tour", async () => {
   it("hạng khách sạn có giá", () => assert.deepEqual(hotelClasses(tour), [3, 4, 5]));
   it("2 khách 4★", () =>
     assert.equal(estimatePrice(tour, { adults: 2, hotelClass: 4 }).total, 1040));
-  it("5★ không có ở bậc 2 khách → giá bán", () =>
-    assert.equal(estimatePrice(tour, { adults: 2, hotelClass: 5 }).total, 870));
+  it("5★ chưa có giá ở bậc 2 khách → giá 5★ của bậc gần nhất (không rơi về giá 'từ')", () =>
+    assert.equal(estimatePrice(tour, { adults: 2, hotelClass: 5 }).total, 1120));
   it("4 khách 5★ + bé 8 tuổi 75%", () =>
     assert.equal(
       estimatePrice(tour, { adults: 4, childAges: [8], hotelClass: 5 }).total,
@@ -305,6 +305,10 @@ describe("giá theo mẫu thông tin tour", async () => {
       estimatePrice(tour, { adults: 2, date: "2027-02-10", hotelClass: 3 }).total,
       920 + 138,
     ));
-  it("1 khách: giá bán + phòng đơn", () =>
-    assert.equal(estimatePrice(tour, { adults: 1 }).total, 555));
+  it("1 khách (chưa có bậc 1 khách): giá bậc gần nhất + phòng đơn", () =>
+    assert.equal(estimatePrice(tour, { adults: 1 }).total, 580));
+  it("đông hơn bậc cuối → giá bậc cuối", () =>
+    assert.equal(estimatePrice(tour, { adults: 8, hotelClass: 4 }).total, 480 * 8));
+  it("tour không có bảng giá → giá bán", () =>
+    assert.equal(estimatePrice({ price: 300 }, { adults: 2 }).total, 600));
 });

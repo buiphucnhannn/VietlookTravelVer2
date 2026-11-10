@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { uploadController } from "../controllers/upload.controller.js";
-import { requireStaff } from "../middlewares/auth.middleware.js";
+import { requireContentEditor, requireStaff } from "../middlewares/auth.middleware.js";
 import { limiter } from "../middlewares/rate-limit.middleware.js";
 import { uploadImages } from "../middlewares/upload.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
@@ -12,9 +12,9 @@ import {
   imageFromUrlSchema,
 } from "../validators/upload.validator.js";
 
-/** Ảnh (Cloudinary) — admin + editor */
+/** Ảnh (Cloudinary) — admin, hoặc nhân viên có quyền sửa ít nhất 1 mục nội dung website */
 const router = Router();
-router.use(requireStaff);
+router.use(requireStaff, requireContentEditor);
 router.use(limiter({ windowMs: 60 * 1000, limit: 60, message: "Tải ảnh quá nhanh, chờ 1 phút" }));
 
 // POST /api/v1/uploads/images?folder=tours   (multipart/form-data, field "files", tối đa 10 ảnh)

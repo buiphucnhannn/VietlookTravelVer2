@@ -4,12 +4,13 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "@/components/admin/Link";
 import { useRouter } from "next/navigation";
-import { Copy, Map as MapIcon, Pencil, Plus, Ship, Trash2 } from "lucide-react";
+import { Copy, Eye, Map as MapIcon, Pencil, Plus, Ship, Trash2 } from "lucide-react";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { api, ApiError } from "@/lib/api";
 import { useAdminList, useMutation, useOptions } from "./hooks";
 import {
   Badge,
+  BusyArea,
   Button,
   Card,
   EmptyState,
@@ -25,9 +26,13 @@ import {
 } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
 import { REGIONS } from "./DestinationsPage";
+import { usePermission } from "./permissions";
 
 const PATH = "/admin/tours";
 const TAGS = ["tours"];
+
+// Điện thoại: ô lọc 2 cột hẹp → bớt khoảng đệm để chữ không bị cắt
+const FILTER = "max-sm:bg-[right_10px_center] max-sm:pr-8 max-sm:pl-3";
 
 const SORTS = [
   { value: "rank", label: "Thứ tự hiển thị" },
@@ -52,6 +57,7 @@ export const durationText = (t) => {
 
 export default function ToursPage() {
   const router = useRouter();
+  const { canEdit, canDelete } = usePermission("tours");
   const { confirm } = useUi();
   const list = useAdminList(PATH, {
     q: "",
@@ -132,12 +138,14 @@ export default function ToursPage() {
         title="Tour"
         description="Thêm, sửa, ẩn hoặc nhân bản các tour đang có trên website."
         actions={
-          <Link
-            href={`${ADMIN_BASE}/tours/new`}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
-          >
-            <Plus className="size-4" /> Thêm tour
-          </Link>
+          canEdit && (
+            <Link
+              href={`${ADMIN_BASE}/tours/new`}
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
+            >
+              <Plus className="size-4" /> Thêm tour
+            </Link>
+          )
         }
       />
 
@@ -153,8 +161,9 @@ export default function ToursPage() {
               value={list.query.region}
               onChange={(e) => list.setQuery({ region: e.target.value, destination: "" })}
               aria-label="Miền"
+              className={FILTER}
             >
-              <option value="">Tất cả miền</option>
+              <option value="">Mọi miền</option>
               {REGIONS.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
@@ -165,8 +174,9 @@ export default function ToursPage() {
               value={list.query.destination}
               onChange={(e) => list.setQuery({ destination: e.target.value })}
               aria-label="Điểm đến"
+              className={FILTER}
             >
-              <option value="">Tất cả điểm đến</option>
+              <option value="">Mọi điểm đến</option>
               {destOptions.map((d) => (
                 <option key={d.value} value={d.value}>
                   {d.label}
@@ -177,8 +187,9 @@ export default function ToursPage() {
               value={list.query.theme}
               onChange={(e) => list.setQuery({ theme: e.target.value })}
               aria-label="Chủ đề"
+              className={FILTER}
             >
-              <option value="">Tất cả chủ đề</option>
+              <option value="">Mọi chủ đề</option>
               {themes.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -189,6 +200,7 @@ export default function ToursPage() {
               value={list.query.status}
               onChange={(e) => list.setQuery({ status: e.target.value })}
               aria-label="Trạng thái"
+              className={FILTER}
             >
               <option value="">Hiện & ẩn</option>
               <option value="active">Đang hiện</option>
@@ -198,6 +210,7 @@ export default function ToursPage() {
               value={list.query.featured}
               onChange={(e) => list.setQuery({ featured: e.target.value })}
               aria-label="Nổi bật"
+              className={`${FILTER} max-sm:col-span-2`}
             >
               <option value="">Mọi loại tour</option>
               <option value="featured">Tour nổi bật</option>
@@ -207,6 +220,7 @@ export default function ToursPage() {
               value={list.query.sort}
               onChange={(e) => list.setQuery({ sort: e.target.value })}
               aria-label="Sắp xếp"
+              className={`${FILTER} max-sm:col-span-2`}
             >
               {SORTS.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -240,107 +254,114 @@ export default function ToursPage() {
             }
           />
         ) : (
-          <ul
-            className={`divide-y divide-slate-100 transition-opacity ${list.loading ? "opacity-60" : ""}`}
-          >
-            {list.items.map((t) => {
-              const href = `${ADMIN_BASE}/tours/${t.id}`;
-              const strike = t.originalPrice > (t.price ?? 0) ? t.originalPrice : null;
-              return (
-                <li
-                  key={t.id}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5"
-                >
-                  <Link
-                    href={href}
-                    className="relative aspect-[4/3] w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:w-24"
+          <BusyArea busy={list.loading}>
+            <ul className="divide-y divide-slate-100">
+              {list.items.map((t) => {
+                const href = `${ADMIN_BASE}/tours/${t.id}`;
+                const strike = t.originalPrice > (t.price ?? 0) ? t.originalPrice : null;
+                return (
+                  <li
+                    key={t.id}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5"
                   >
-                    {t.image && (
-                      <Image src={t.image} alt="" fill sizes="96px" className="object-cover" />
-                    )}
-                  </Link>
-                  <div className="min-w-0 flex-1 basis-56">
                     <Link
                       href={href}
-                      className="line-clamp-2 font-semibold text-slate-900 hover:text-brand-700"
+                      className="relative aspect-[4/3] w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:w-24"
                     >
-                      {tourTitle(t)}
+                      {t.image && (
+                        <Image src={t.image} alt="" fill sizes="96px" className="object-cover" />
+                      )}
                     </Link>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500">
-                      {t.code && (
-                        <span className="font-mono font-semibold text-slate-600">{t.code}</span>
-                      )}
-                      {durationText(t) && <span>{durationText(t)}</span>}
-                      {t.tourType && (
-                        <span>{t.tourType === "group" ? "Tour ghép" : "Tour riêng"}</span>
-                      )}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {t.featured && <Badge tone="blue">Nổi bật</Badge>}
-                      {t.featuredLong && <Badge tone="violet">Dài ngày</Badge>}
-                      {t.cruise && (
-                        <Badge tone="gray">
-                          <Ship className="size-3" /> Du thuyền
-                        </Badge>
-                      )}
-                      {!t.content?.zh?.title && <Badge tone="amber">Chưa có tiếng Trung</Badge>}
-                      {!t.content?.vi?.title && <Badge tone="amber">Chưa có tiếng Việt</Badge>}
-                      {!t.image && <Badge tone="red">Chưa có ảnh</Badge>}
+                    <div className="min-w-0 flex-1 basis-40 sm:basis-56">
+                      <Link
+                        href={href}
+                        className="line-clamp-2 font-semibold text-slate-900 hover:text-brand-700"
+                      >
+                        {tourTitle(t)}
+                      </Link>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500">
+                        {t.code && (
+                          <span className="font-mono font-semibold text-slate-600">{t.code}</span>
+                        )}
+                        {durationText(t) && <span>{durationText(t)}</span>}
+                        {t.tourType && (
+                          <span>{t.tourType === "group" ? "Tour ghép" : "Tour riêng"}</span>
+                        )}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {t.featured && <Badge tone="blue">Nổi bật</Badge>}
+                        {t.featuredLong && <Badge tone="violet">Dài ngày</Badge>}
+                        {t.cruise && (
+                          <Badge tone="gray">
+                            <Ship className="size-3" /> Du thuyền
+                          </Badge>
+                        )}
+                        {!t.content?.zh?.title && <Badge tone="amber">Chưa có tiếng Trung</Badge>}
+                        {!t.content?.vi?.title && <Badge tone="amber">Chưa có tiếng Việt</Badge>}
+                        {!t.image && <Badge tone="red">Chưa có ảnh</Badge>}
+                      </div>
                     </div>
-                  </div>
-                  <div className="w-24 text-right">
-                    <p className="font-bold text-slate-900">
-                      {t.price ? fmtUSD(t.price) : "Liên hệ"}
-                    </p>
-                    {strike && (
-                      <p className="text-xs text-slate-400 line-through">{fmtUSD(strike)}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <VisibilityToggle
-                      path={PATH}
-                      item={t}
-                      tags={TAGS}
-                      onDone={(doc) =>
-                        list.setItems((xs) =>
-                          xs.map((x) => (x.id === doc.id ? { ...x, ...doc } : x)),
-                        )
-                      }
-                    />
-                    <Link
-                      href={href}
-                      aria-label="Sửa"
-                      title="Sửa"
-                      className="grid size-9 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                    >
-                      <Pencil className="size-4" />
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => duplicate(t)}
-                      loading={copying === t.id}
-                      disabled={!!copying}
-                      aria-label="Nhân bản"
-                      title="Nhân bản"
-                    >
-                      {copying !== t.id && <Copy className="size-4" />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove(t)}
-                      aria-label="Xoá"
-                      title="Xoá"
-                      className="text-sun-600"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                    {/* Điện thoại: giá + nút thao tác chung 1 hàng dưới tên tour */}
+                    <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
+                      <div className="sm:w-24 sm:text-right">
+                        <p className="font-bold text-slate-900">
+                          {t.price ? fmtUSD(t.price) : "Liên hệ"}
+                        </p>
+                        {strike && (
+                          <p className="text-xs text-slate-400 line-through">{fmtUSD(strike)}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <VisibilityToggle
+                          path={PATH}
+                          item={t}
+                          tags={TAGS}
+                          onDone={(doc) =>
+                            list.setItems((xs) =>
+                              xs.map((x) => (x.id === doc.id ? { ...x, ...doc } : x)),
+                            )
+                          }
+                        />
+                        <Link
+                          href={href}
+                          aria-label={canEdit ? "Sửa" : "Xem"}
+                          title={canEdit ? "Sửa" : "Xem"}
+                          className="grid size-9 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                        >
+                          {canEdit ? <Pencil className="size-4" /> : <Eye className="size-4" />}
+                        </Link>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => duplicate(t)}
+                            loading={copying === t.id}
+                            disabled={!!copying}
+                            aria-label="Nhân bản"
+                            title="Nhân bản"
+                          >
+                            {copying !== t.id && <Copy className="size-4" />}
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(t)}
+                            aria-label="Xoá"
+                            title="Xoá"
+                            className="text-sun-600"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </BusyArea>
         )}
         <Pagination
           meta={list.meta}

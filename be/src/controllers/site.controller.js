@@ -1,8 +1,11 @@
+import { can } from "../constants/permissions.js";
+import { enquiryModule, viewableKinds } from "../middlewares/enquiry-access.middleware.js";
 import { auditService } from "../services/audit.service.js";
 import { enquiryService } from "../services/enquiry.service.js";
 import { pageService } from "../services/modules.service.js";
 import { publicService } from "../services/public.service.js";
 import { settingsService } from "../services/settings.service.js";
+import { ApiError } from "../utils/ApiError.js";
 import { noContent, ok } from "../utils/response.js";
 
 /** Dữ liệu công khai cho website */
@@ -37,21 +40,34 @@ export const publicController = {
   },
 };
 
+/** Nhật ký: mã đơn + tên khách + nhóm đơn (không ghi email / số điện thoại) */
+const enquiryInfo = (doc) => ({
+  name: doc.code,
+  customer: doc.name ?? "",
+  kind: enquiryModule(doc.type),
+});
+
 /** Đơn đặt tour + yêu cầu từ form (CMS) */
 export const enquiryController = {
   async list(req, res) {
-    const { items, meta } = await enquiryService.list(req.validated.query);
+    const { items, meta } = await enquiryService.list(req.validated.query, viewableKinds(req.user));
     ok(res, items, meta);
   },
-  stats: async (_req, res) => ok(res, await enquiryService.stats()),
+  stats: async (req, res) => ok(res, await enquiryService.stats(viewableKinds(req.user))),
   get: async (req, res) => ok(res, await enquiryService.get(req.validated.params.id)),
-  byCode: async (req, res) => ok(res, await enquiryService.findByCode(req.validated.params.code)),
+  async byCode(req, res) {
+    const found = await enquiryService.findByCode(req.validated.params.code);
+    // đơn thuộc nhóm tài khoản không được xem → coi như không có
+    if (!can(req.user, enquiryModule(found.type), "view"))
+      throw ApiError.notFound("Không tìm thấy mã yêu cầu");
+    ok(res, found);
+  },
 
   async update(req, res) {
     const doc = await enquiryService.update(req.validated.params.id, req.validated.body);
     auditService.record(req, "enquiry.update", {
       target: { type: "enquiry", id: doc.code },
-      meta: req.validated.body,
+      meta: { ...req.validated.body, ...enquiryInfo(doc) },
     });
     ok(res, doc);
   },
@@ -62,7 +78,10 @@ export const enquiryController = {
       req.validated.body.text,
       req.user,
     );
-    auditService.record(req, "enquiry.note", { target: { type: "enquiry", id: doc.code } });
+    auditService.record(req, "enquiry.note", {
+      target: { type: "enquiry", id: doc.code },
+      meta: enquiryInfo(doc),
+    });
     ok(res, doc);
   },
 
@@ -81,7 +100,10 @@ export const enquiryController = {
 
   async remove(req, res) {
     const doc = await enquiryService.remove(req.validated.params.id);
-    auditService.record(req, "enquiry.delete", { target: { type: "enquiry", id: doc.code } });
+    auditService.record(req, "enquiry.delete", {
+      target: { type: "enquiry", id: doc.code },
+      meta: enquiryInfo(doc),
+    });
     noContent(res);
   },
 };
@@ -110,12 +132,6 @@ export const settingsController = {
     auditService.record(req, "settings.notifications", { meta: { count: data.recipients.length } });
     ok(res, data);
   },
-  async testEmail(req, res) {
-    const r = await enquiryService.sendTest();
-    auditService.record(req, "settings.test_email");
-    ok(res, r);
-  },
-
   getTracking: async (_req, res) => ok(res, await settingsService.getTracking()),
   async saveTracking(req, res) {
     const data = await settingsService.saveTracking(req.validated.body, req.user);

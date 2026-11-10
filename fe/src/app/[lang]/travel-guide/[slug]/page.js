@@ -69,9 +69,9 @@ async function GuidePostPageContent({ params }) {
   const title = tr(post.title, lang);
   const category = getGuideCategory(post.category);
   const author = authors[post.author];
-  const rawBody = post.body[lang] ?? post.body.en;
+  const rawBody = tr(post.body, lang);
   const { html, toc } = withAnchors(rawBody);
-  const untranslated = lang !== "en" && !post.body[lang];
+  const untranslated = !post.body[lang]?.trim() && !!rawBody;
   const related = relatedPosts(post, 3);
   const dest = post.destination && getDestination(post.destination);
   const tours = (dest ? toursByDestination(dest.slug) : allTours)
@@ -84,7 +84,7 @@ async function GuidePostPageContent({ params }) {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: title,
-    image: [`${siteConfig.url}${post.image}`],
+    ...(post.image && { image: [`${siteConfig.url}${post.image}`] }),
     datePublished: post.date,
     dateModified: post.date,
     inLanguage: localeMeta[lang].hreflang,
@@ -105,14 +105,19 @@ async function GuidePostPageContent({ params }) {
       <BrushHero
         compact
         title={title}
-        images={[post.image]}
+        images={post.image ? [post.image] : []}
         baseUrl={siteConfig.url}
         breadcrumbs={[
           { label: g.title, href: `${lp(lang)}/travel-guide` },
-          {
-            label: tr(category.name, lang),
-            href: `${lp(lang)}/travel-guide/category/${category.slug}`,
-          },
+          // bài chưa chọn chuyên mục → bỏ mục chuyên mục trong breadcrumb
+          ...(category
+            ? [
+                {
+                  label: tr(category.name, lang),
+                  href: `${lp(lang)}/travel-guide/category/${category.slug}`,
+                },
+              ]
+            : []),
           { label: title },
         ]}
       >

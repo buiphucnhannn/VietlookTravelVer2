@@ -183,7 +183,7 @@ export default function VietnamMap({ items, labels, lang }) {
                     href={t.href}
                     className="group flex gap-3 rounded-2xl bg-cream-50 p-2 ring-1 ring-sand-300/60 transition hover:ring-clay-500"
                   >
-                    <span className="relative size-16 shrink-0 overflow-hidden rounded-xl">
+                    <span className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-sand-300/40">
                       <Image src={t.image} alt="" fill sizes="64px" className="object-cover" />
                     </span>
                     <span className="min-w-0">

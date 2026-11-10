@@ -22,6 +22,7 @@ import {
   LangBar,
   useRemove,
   useReorder,
+  useEditVerb,
 } from "./catalogShared";
 import { useAdminList, useMutation } from "./hooks";
 import { DragHandle, PositionBadge, Sortable, usePagedSort } from "./Sortable";
@@ -38,17 +39,21 @@ import {
   PageHeader,
   Pagination,
   Select,
+  DEFAULT_LANG,
   Toggle,
+  anyLang,
   fmtUSD,
   locText,
   usePaged,
   useUi,
 } from "./ui";
+import { usePermission } from "./permissions";
+import { slugSource, useAutoFill } from "./translate";
 
 const VISA = "/admin/visa-types";
 const FT = "/admin/fast-track";
 const TAGS = ["services"];
-const VISA_PAGE = 8; // 2 hàng × 4 cột
+const VISA_PAGE = 8; // 4 hàng × 2 cột
 const FT_PAGE = 10;
 const L = () => ({ en: "", zh: "", vi: "" });
 
@@ -121,6 +126,7 @@ const patchItem = (list) => (doc) =>
   list.setItems((xs) => xs.map((x) => (x.id === doc.id ? doc : x)));
 
 export default function ServicesVisaPage() {
+  const { canEdit } = usePermission("visa");
   const visas = useAdminList(VISA, { limit: 100, sort: "order" });
   const fts = useAdminList(FT, { limit: 200, sort: "order" });
   const [visa, setVisa] = useState(null);
@@ -134,7 +140,7 @@ export default function ServicesVisaPage() {
     <>
       <PageHeader
         title="Visa & fast-track"
-        description="Các loại visa Việt Nam và gói đón tiễn nhanh (fast-track) tại sân bay, hiện trên trang dịch vụ của website. Giữ và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ."
+        description={`Các loại visa Việt Nam và gói đón tiễn nhanh (fast-track) tại sân bay, hiện trên trang dịch vụ của website.${canEdit ? " Giữ và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ." : ""}`}
       />
 
       <div className="space-y-6">
@@ -142,9 +148,11 @@ export default function ServicesVisaPage() {
           title="Loại visa"
           description="Thời gian lưu trú, thời gian xử lý, phí và ghi chú của từng loại visa."
           actions={
-            <Button size="sm" icon={Plus} onClick={() => setVisa(EMPTY_VISA)}>
-              Thêm loại visa
-            </Button>
+            canEdit && (
+              <Button size="sm" icon={Plus} onClick={() => setVisa(EMPTY_VISA)}>
+                Thêm loại visa
+              </Button>
+            )
           }
           bodyClassName="p-4 sm:p-5"
         >
@@ -159,47 +167,57 @@ export default function ServicesVisaPage() {
               items={visaPaged.items}
               getId={(v) => v.id}
               layout="grid"
-              className={CARD_GRID}
+              className="grid gap-5 lg:grid-cols-2"
               onReorder={visaSort.onPageReorder}
               highlight={visaSort.flash}
+              disabled={!canEdit}
             >
               {(v, i, drag) => (
                 <article
                   className={cn(
-                    "flex h-full flex-col rounded-2xl bg-white ring-1 ring-slate-200 transition-shadow hover:shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)]",
+                    "@container flex h-full flex-col rounded-2xl bg-white ring-1 ring-slate-200 transition-shadow hover:shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)]",
                     drag.dragging && "ring-2 ring-brand-400",
                   )}
                 >
-                  <div {...drag.handle} className="flex-1 px-4 pt-4 pb-3 outline-none">
-                    <div className="flex items-start gap-2">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
-                        <Stamp className="size-[18px]" />
+                  <div {...drag.handle} className="flex-1 px-5 pt-5 pb-4 outline-none">
+                    <div className="flex items-start gap-3">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                        <Stamp className="size-5" />
                       </span>
-                      <p className="min-w-0 flex-1 pt-1.5 leading-snug font-semibold text-slate-900">
+                      <p className="min-w-0 flex-1 pt-2 text-[15px] leading-snug font-semibold text-slate-900">
                         {locText(v.name)}
                       </p>
-                      <span className="flex shrink-0 items-center gap-0.5 pt-1">
-                        <GripVertical className="size-4 text-slate-400" aria-hidden="true" />
-                        <PositionBadge {...visaSort.badge(v, i)} />
-                      </span>
+                      {canEdit && (
+                        <span className="flex shrink-0 items-center gap-0.5 pt-1">
+                          <GripVertical className="size-4 text-slate-400" aria-hidden="true" />
+                          <PositionBadge {...visaSort.badge(v, i)} />
+                        </span>
+                      )}
                     </div>
-                    <dl className="mt-3 space-y-1.5 text-xs text-slate-600">
+                    <dl className="mt-4 grid divide-y divide-slate-100 rounded-xl bg-slate-50/80 px-3.5 ring-1 ring-slate-100 @[30rem]:grid-cols-3 @[30rem]:divide-x @[30rem]:divide-y-0 @[30rem]:px-0">
                       {[
                         { Icon: CalendarDays, label: "Lưu trú", text: locText(v.stay) },
                         { Icon: Clock, label: "Xử lý", text: locText(v.processing) },
                         { Icon: Wallet, label: "Phí", text: locText(v.fee) },
                       ].map((r) => (
-                        <div key={r.label} className="flex gap-2">
-                          <dt className="flex w-[4.5rem] shrink-0 items-center gap-1.5 self-start text-slate-400">
-                            <r.Icon className="size-3.5" />
-                            {r.label}
-                          </dt>
-                          <dd className="min-w-0 flex-1 font-medium">{r.text || "—"}</dd>
+                        <div
+                          key={r.label}
+                          className="flex gap-3 py-2.5 @[30rem]:px-4 @[30rem]:py-3.5"
+                        >
+                          <r.Icon className="mt-0.5 size-4 shrink-0 text-brand-600/70" />
+                          <div className="min-w-0 flex-1">
+                            <dt className="text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+                              {r.label}
+                            </dt>
+                            <dd className="mt-0.5 text-[13px] leading-relaxed font-medium text-slate-700">
+                              {r.text || "—"}
+                            </dd>
+                          </div>
                         </div>
                       ))}
                     </dl>
                   </div>
-                  <footer className="border-t border-slate-100 px-3 py-2">
+                  <footer className="border-t border-slate-100 px-4 py-2.5">
                     <ItemActions
                       path={VISA}
                       item={v}
@@ -220,9 +238,11 @@ export default function ServicesVisaPage() {
           title="Gói fast-track"
           description="Giá tính bằng USD theo từng sân bay. Để trống thì website hiện “Giá liên hệ”."
           actions={
-            <Button size="sm" icon={Plus} onClick={() => setFt(EMPTY_FT)}>
-              Thêm gói
-            </Button>
+            canEdit && (
+              <Button size="sm" icon={Plus} onClick={() => setFt(EMPTY_FT)}>
+                Thêm gói
+              </Button>
+            )
           }
           bodyClassName="p-0"
         >
@@ -287,6 +307,7 @@ function FastTrackGroup({ group: g, list, onEdit, onAdd }) {
   const remove = useRemove(FT, "gói fast-track", TAGS, list.reload);
   const reorder = useReorder(list, FT, TAGS);
   const sort = usePagedSort({ all: rows, paged, onReorder: reorder });
+  const { canEdit } = usePermission("visa");
 
   return (
     <section className="py-4">
@@ -298,9 +319,11 @@ function FastTrackGroup({ group: g, list, onEdit, onAdd }) {
           {g.label}
           <span className="text-xs font-medium text-slate-400">({rows.length})</span>
         </h3>
-        <Button variant="ghost" size="sm" icon={Plus} onClick={onAdd}>
-          Thêm
-        </Button>
+        {canEdit && (
+          <Button variant="ghost" size="sm" icon={Plus} onClick={onAdd}>
+            Thêm
+          </Button>
+        )}
       </div>
 
       {!rows.length ? (
@@ -325,6 +348,7 @@ function FastTrackGroup({ group: g, list, onEdit, onAdd }) {
             className="divide-y divide-slate-100 border-t border-slate-100"
             onReorder={sort.onPageReorder}
             highlight={sort.flash}
+            disabled={!canEdit}
           >
             {(x, i, drag) => (
               <div
@@ -334,8 +358,12 @@ function FastTrackGroup({ group: g, list, onEdit, onAdd }) {
                 )}
               >
                 <span className="flex shrink-0 items-center gap-1">
-                  <DragHandle {...drag.handle} />
-                  <PositionBadge {...sort.badge(x, i)} />
+                  {canEdit && (
+                    <>
+                      <DragHandle {...drag.handle} />
+                      <PositionBadge {...sort.badge(x, i)} />
+                    </>
+                  )}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-900">
@@ -391,21 +419,23 @@ function FastTrackGroup({ group: g, list, onEdit, onAdd }) {
 function useEditor(initial, empty, path, label) {
   const isNew = !initial.id;
   const [d, setD] = useState({ ...empty, ...initial });
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const [keyTouched, setKeyTouched] = useState(!isNew);
   const { run, busy } = useMutation(TAGS);
+  const autoFill = useAutoFill();
   const { toast } = useUi();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
-  const setName = (name) =>
-    set({ name, ...(!keyTouched && lang === "en" && { key: slugify(name.en) }) });
+  const setName = (name) => set({ name, ...(!keyTouched && { key: slugify(slugSource(name)) }) });
 
   const save = async (toPayload, onSaved) => {
-    if (!d.name.en?.trim()) {
-      setLang("en");
-      return toast(`Vui lòng nhập tên ${label} bằng tiếng Anh`, "error");
-    }
-    if (!d.key) return toast("Vui lòng nhập mã", "error");
-    const body = toPayload(d);
+    if (!anyLang(d.name))
+      return toast(`Vui lòng nhập tên ${label} ở ít nhất một ngôn ngữ`, "error");
+    const { value: v, failed } = await autoFill.fill(d, { lang });
+    if (v !== d) setD(v);
+    const key = v.key || slugify(slugSource(v.name));
+    if (!key) return toast("Vui lòng nhập mã", "error");
+    if (key !== v.key) set({ key });
+    const body = toPayload({ ...v, key });
     const ok = await run(
       () =>
         isNew
@@ -413,9 +443,28 @@ function useEditor(initial, empty, path, label) {
           : api(`${path}/${d.id}`, { method: "PUT", body }),
       isNew ? `Đã thêm ${label}` : `Đã lưu ${label}`,
     );
-    if (ok) onSaved();
+    if (!ok) return;
+    if (failed)
+      autoFill.offerRetry((t) =>
+        api(`${path}/${ok.data?.id ?? d.id}`, {
+          method: "PUT",
+          body: { ...toPayload({ ...t, key }), order: body.order },
+        }),
+      );
+    onSaved();
   };
-  return { isNew, d, setD, set, setName, lang, setLang, setKeyTouched, busy, save };
+  return {
+    isNew,
+    d,
+    setD,
+    set,
+    setName,
+    lang,
+    setLang,
+    setKeyTouched,
+    busy: busy || autoFill.busy,
+    save,
+  };
 }
 
 function KeyField({ e, hint }) {
@@ -433,11 +482,12 @@ function KeyField({ e, hint }) {
 }
 
 function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
+  const editVerb = useEditVerb();
   const e = useEditor(initial, EMPTY_VISA, VISA, "loại visa");
   const { d, set, lang } = e;
   return (
     <EditorModal
-      title={e.isNew ? "Thêm loại visa" : `Sửa: ${locText(initial.name)}`}
+      title={e.isNew ? "Thêm loại visa" : `${editVerb}: ${locText(initial.name)}`}
       onClose={onClose}
       onSave={() =>
         e.save((x) => ({ ...visaPayload(x), ...(e.isNew && { order: nextOrder }) }), onSaved)
@@ -446,7 +496,7 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
     >
       <div className="space-y-5">
         <LangBar lang={lang} onLang={e.setLang} form={d} onForm={e.setD} />
-        <Field label="Tên loại visa" required={lang === "en"}>
+        <Field label="Tên loại visa" required>
           <LocInput value={d.name} lang={lang} onChange={e.setName} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -476,7 +526,7 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
 
         <FormSection title="Thiết lập" className="border-t border-slate-100 pt-5">
           <div className="grid items-start gap-4 sm:grid-cols-2">
-            <KeyField e={e} hint="Tự tạo từ tên tiếng Anh. Vd: evisa-30-days" />
+            <KeyField e={e} hint="Tự tạo từ tên. Vd: evisa-30-days" />
             <div className="sm:pt-9">
               <Toggle
                 checked={d.isActive}
@@ -492,6 +542,7 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
 }
 
 function FastTrackEditor({ initial, all, onClose, onSaved }) {
+  const editVerb = useEditVerb();
   const e = useEditor(
     { ...initial, prices: { ...EMPTY_FT.prices, ...initial.prices } },
     EMPTY_FT,
@@ -510,14 +561,14 @@ function FastTrackEditor({ initial, all, onClose, onSaved }) {
 
   return (
     <EditorModal
-      title={e.isNew ? "Thêm gói fast-track" : `Sửa: ${locText(initial.name)}`}
+      title={e.isNew ? "Thêm gói fast-track" : `${editVerb}: ${locText(initial.name)}`}
       onClose={onClose}
       onSave={() => e.save(payload, onSaved)}
       busy={e.busy}
     >
       <div className="space-y-5">
         <LangBar lang={lang} onLang={e.setLang} form={d} onForm={e.setD} />
-        <Field label="Tên gói" required={lang === "en"}>
+        <Field label="Tên gói" required>
           <LocInput value={d.name} lang={lang} onChange={e.setName} />
         </Field>
         <Field label="Mô tả">
@@ -563,7 +614,7 @@ function FastTrackEditor({ initial, all, onClose, onSaved }) {
                 ))}
               </Select>
             </Field>
-            <KeyField e={e} hint="Tự tạo từ tên tiếng Anh. Vd: arrival-standard" />
+            <KeyField e={e} hint="Tự tạo từ tên. Vd: arrival-standard" />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <Toggle

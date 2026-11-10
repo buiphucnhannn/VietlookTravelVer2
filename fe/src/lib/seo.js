@@ -1,5 +1,5 @@
 import { siteConfig } from "@/constants/site";
-import { defaultLocale, href, localeMeta, locales } from "@/i18n/config";
+import { defaultLocale, fallbackLangs, href, localeMeta, locales } from "@/i18n/config";
 
 /**
  * Chuẩn hoá description cho Google: bỏ HTML/khoảng trắng thừa, cắt gọn ở ranh giới từ
@@ -28,7 +28,10 @@ export function notFoundMetadata() {
 
 /** Metadata chuẩn SEO: canonical, hreflang (en / zh-Hans / vi / x-default), Open Graph. */
 /** Tiêu đề / mô tả Google nhập trong CMS cho tour, bài viết, trang — trống thì trả "" (dùng nội dung mặc định) */
-export const seoField = (seo, lang, key) => seo?.[lang]?.[key] || seo?.en?.[key] || "";
+export const seoField = (seo, lang, key) =>
+  fallbackLangs(lang)
+    .map((l) => seo?.[l]?.[key])
+    .find((v) => v && String(v).trim()) ?? "";
 
 export function pageMetadata({ lang, path = "", title, description, image, type = "website" }) {
   description = clampDescription(description, lang);

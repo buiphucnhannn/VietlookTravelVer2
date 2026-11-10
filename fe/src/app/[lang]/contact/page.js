@@ -1,7 +1,7 @@
 import { ChevronRight, Clock, Mail, MapPin, Phone } from "lucide-react";
 import BgImage from "@/components/ui/BgImage";
 import { getDictionary } from "@/i18n/dictionaries";
-import { tr } from "@/i18n/config";
+import { href, tr } from "@/i18n/config";
 import { pageMetadata } from "@/lib/seo";
 import { siteConfig } from "@/constants/site";
 import { Container } from "@/components/ui";
@@ -75,7 +75,7 @@ export default async function ContactPage({ params }) {
           "/images/tours/v2/hanoi-3300834.jpg",
           "/images/tours/v2/hanoi-33497770.jpg",
         ]}
-        breadcrumbs={[{ label: "Vietlook", href: "/" + lang }, { label: t.title }]}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: t.title }]}
       />
       <section className="relative isolate overflow-clip bg-[#e6f4ef] py-14 lg:py-[4.5rem]">
         <BgImage src="/images/tours/v2/hanoi-32307858.jpg" tone="mist" />

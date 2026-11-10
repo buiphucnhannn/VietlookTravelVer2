@@ -73,16 +73,33 @@ export const authService = {
       if (after && isLocked(after)) {
         const err = locked(after.lockUntil);
         err.userId = String(user._id);
+        err.username = user.username;
         throw err;
       }
       const err = invalidCredentials();
       err.userId = String(user._id);
+      err.username = user.username;
       throw err;
     }
     if (!user.isActive) throw ApiError.forbidden("Tài khoản đã bị vô hiệu hoá", "ACCOUNT_DISABLED");
 
     await userRepository.registerSuccessfulLogin(user._id, meta.ip ?? "");
     const session = await issueSession(user, meta, remember);
+    await sessionRepository.revokeOldest(user._id, env.maxSessions);
+    return session;
+  },
+
+  /**
+   * Đăng nhập nhanh cho bản demo (DEMO_LOGIN=true): vào tài khoản ADMIN_USERNAME, không cần mật khẩu.
+   * Tắt cờ → coi như không có tính năng này (404). Tài khoản bị khoá / vô hiệu hoá vẫn bị chặn.
+   */
+  async demoLogin(meta) {
+    if (!env.demoLogin) throw ApiError.notFound("Không tìm thấy");
+    const user = await userRepository.findByUsernameWithPassword(env.admin.username);
+    if (!user) throw ApiError.notFound("Tài khoản demo chưa sẵn sàng, vui lòng thử lại sau");
+    if (!user.isActive) throw ApiError.forbidden("Tài khoản đã bị vô hiệu hoá", "ACCOUNT_DISABLED");
+    await userRepository.registerSuccessfulLogin(user._id, meta.ip ?? "");
+    const session = await issueSession(user, meta, false);
     await sessionRepository.revokeOldest(user._id, env.maxSessions);
     return session;
   },

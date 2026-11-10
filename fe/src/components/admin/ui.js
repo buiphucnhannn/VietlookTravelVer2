@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -42,13 +43,23 @@ import { CROP_PRESETS, canRecrop, cropSpec, useImageCrop } from "./ImageCropper"
  * Ngôn ngữ nội dung
  * ========================================================================= */
 
+/** Nhập nội dung bằng ngôn ngữ nào cũng được — ngôn ngữ còn trống sẽ tự dịch khi lưu */
 export const LANGS = [
-  { key: "en", label: "English", short: "EN", required: true },
-  { key: "zh", label: "中文", short: "中文" },
   { key: "vi", label: "Tiếng Việt", short: "VI" },
+  { key: "en", label: "English", short: "EN" },
+  { key: "zh", label: "中文", short: "中文" },
 ];
 
-/** Tab ngôn ngữ: chấm xanh = đã nhập, chấm xám = để trống (website dùng bản tiếng Anh) */
+/** Ngôn ngữ mở sẵn khi soạn nội dung (nhân viên thường viết tiếng Việt trước) */
+export const DEFAULT_LANG = "vi";
+
+/** Chữ đầu tiên có nội dung trong { en, zh, vi } (ưu tiên `prefer`) */
+export const anyLang = (loc, prefer) =>
+  (prefer && String(loc?.[prefer] ?? "").trim()) ||
+  ["en", "vi", "zh"].map((l) => String(loc?.[l] ?? "").trim()).find(Boolean) ||
+  "";
+
+/** Tab ngôn ngữ: chấm xanh = đã nhập, chấm xám = còn trống (sẽ tự dịch khi lưu) */
 export function LangTabs({ value, onChange, filled = {}, className }) {
   return (
     <div
@@ -73,7 +84,7 @@ export function LangTabs({ value, onChange, filled = {}, className }) {
           <span
             className={cn(
               "size-1.5 rounded-full",
-              filled[l.key] ? "bg-emerald-500" : l.required ? "bg-sun-500" : "bg-slate-300",
+              filled[l.key] ? "bg-emerald-500" : "bg-slate-300",
             )}
           />
         </button>
@@ -192,7 +203,7 @@ export function Select({ className, children, ...props }) {
       {...props}
       className={cn(
         inputClass,
-        "bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22 viewBox=%220 0 24 24%22><path d=%22m6 9 6 6 6-6%22/></svg>')] cursor-pointer appearance-none bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10",
+        "cursor-pointer appearance-none bg-[url('data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20fill=%22none%22%20stroke=%22%2364748b%22%20stroke-width=%222%22%20viewBox=%220%200%2024%2024%22%3E%3Cpath%20d=%22m6%209%206%206%206-6%22/%3E%3C/svg%3E')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10",
         className,
       )}
     >
@@ -240,10 +251,8 @@ export function Toggle({ checked, onChange, label, hint, disabled }) {
 export function LocInput({ value, onChange, lang, multiline, rows, placeholder, ...props }) {
   const v = value?.[lang] ?? "";
   const set = (x) => onChange({ en: "", zh: "", vi: "", ...value, [lang]: x });
-  const ph =
-    lang !== "en" && value?.en
-      ? `(trống → dùng bản tiếng Anh) ${value.en.slice(0, 60)}`
-      : placeholder;
+  const other = v.trim() ? "" : anyLang({ ...value, [lang]: "" });
+  const ph = other ? `(trống — sẽ tự dịch khi lưu) ${other.slice(0, 60)}` : placeholder;
   return multiline ? (
     <Textarea
       value={v}
@@ -375,6 +384,31 @@ export function LoadingBlock({ text = "Đang tải…", rows = 4 }) {
   );
 }
 
+/**
+ * Vùng danh sách đang tải trang / bộ lọc mới: giữ dữ liệu cũ (làm mờ) + nhãn "Đang tải…" nhỏ ở trên,
+ * thay vì nháy khung trống. Mờ sau 150ms nên tải nhanh thì không thấy nháy.
+ */
+export function BusyArea({ busy, children, className }) {
+  return (
+    <div aria-busy={busy || undefined} className={cn("relative", className)}>
+      <div
+        className={cn(
+          "transition-opacity duration-200",
+          busy && "pointer-events-none opacity-50 delay-150",
+        )}
+      >
+        {children}
+      </div>
+      {busy && (
+        <span className="pointer-events-none absolute top-12 left-1/2 z-10 inline-flex -translate-x-1/2 animate-[admin-fade_.2s_ease-out_.15s_both] items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-md ring-1 ring-slate-200">
+          <Loader2 className="size-3.5 animate-spin text-brand-600" />
+          Đang tải…
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function EmptyState({ icon: Icon = Info, title, text, action }) {
   return (
     <div className="flex flex-col items-center px-6 py-14 text-center">
@@ -450,6 +484,40 @@ function pageList(page, total) {
  * Phân trang: "Hiển thị 21–40 trong 176" + số trang. Dùng cho cả danh sách phân trang ở máy chủ
  * (meta từ API) lẫn ở trình duyệt (usePaged). bare = không kẻ viền / nền (đặt ngoài Card).
  */
+/** Ô nhập "Đến trang __ / N": gõ số rồi Enter (hoặc rời ô) để nhảy tới trang đó */
+function PageJump({ page, totalPages, onGo }) {
+  const [text, setText] = useState("");
+  const submit = () => {
+    const n = Number.parseInt(text, 10);
+    setText("");
+    if (Number.isFinite(n)) onGo(Math.min(totalPages, Math.max(1, n)));
+  };
+  return (
+    <label className="flex items-center gap-2 text-[13px] whitespace-nowrap text-slate-500">
+      Đến trang
+      <input
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={totalPages}
+        value={text}
+        placeholder={String(page)}
+        onChange={(e) => setText(e.target.value.replace(/\D/g, "").slice(0, 5))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        onBlur={() => text && submit()}
+        aria-label={`Nhập số trang (1–${totalPages})`}
+        className="h-9 w-14 [appearance:textfield] rounded-xl bg-white text-center text-[13px] font-semibold text-slate-800 ring-1 ring-slate-200 transition outline-none placeholder:font-medium placeholder:text-slate-400 focus:ring-2 focus:ring-brand-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <span>/ {totalPages}</span>
+    </label>
+  );
+}
+
 export function Pagination({ meta, onPage, bare, unit = "mục", className }) {
   if (!meta || meta.totalPages <= 1) return null;
   const { page, totalPages, total } = meta;
@@ -521,6 +589,14 @@ export function Pagination({ meta, onPage, bare, unit = "mục", className }) {
         >
           <ChevronRight className="size-4" />
         </button>
+        {totalPages >= 5 && (
+          <>
+            <span className="mx-1.5 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true" />
+            <span className="ml-1.5 sm:ml-0">
+              <PageJump page={page} totalPages={totalPages} onGo={go} />
+            </span>
+          </>
+        )}
       </div>
     </nav>
   );
@@ -559,6 +635,8 @@ export function usePaged(items, pageSize = 12) {
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
+const MODAL_STACK = [];
+
 export function Modal({
   open,
   onClose,
@@ -589,7 +667,11 @@ export function Modal({
         panel?.querySelector(FOCUSABLE);
       first?.focus({ preventScroll: true });
     }, 60);
+    // Popup lồng nhau (vd. cắt ảnh trong popup sửa): chỉ popup trên cùng nhận Esc / Tab
+    const token = {};
+    MODAL_STACK.push(token);
     const onKey = (e) => {
+      if (MODAL_STACK[MODAL_STACK.length - 1] !== token) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         onCloseRef.current?.();
@@ -611,6 +693,7 @@ export function Modal({
     document.addEventListener("keydown", onKey);
     return () => {
       clearTimeout(t);
+      MODAL_STACK.splice(MODAL_STACK.indexOf(token), 1);
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
       prevFocus?.focus?.({ preventScroll: true });
@@ -623,7 +706,8 @@ export function Modal({
     danger: "bg-sun-50 text-sun-600 ring-sun-100",
     success: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   };
-  return (
+  // Gắn thẳng vào <body>: popup luôn nằm trên cùng, không bị thanh dính / khung có hiệu ứng của trang đè lên
+  return createPortal(
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-6">
       <div
         className="absolute inset-0 animate-[admin-fade_.18s_ease-out] bg-slate-950/50 backdrop-blur-[3px]"
@@ -648,7 +732,7 @@ export function Modal({
       >
         {/* tay nắm kéo (điện thoại) */}
         <span className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-slate-200 sm:hidden" />
-        <header className="flex items-start gap-3.5 border-b border-slate-100 px-5 pt-4 pb-4 sm:px-6 sm:pt-5">
+        <header className="flex items-center gap-3.5 border-b border-slate-100 px-5 py-4 sm:px-6">
           {Icon && (
             <span
               className={cn(
@@ -659,7 +743,7 @@ export function Modal({
               <Icon className="size-5" />
             </span>
           )}
-          <div className="min-w-0 flex-1 pt-0.5">
+          <div className="min-w-0 flex-1">
             <h3 className="text-[17px] leading-snug font-bold text-slate-900">{title}</h3>
             {description && (
               <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500">{description}</p>
@@ -669,7 +753,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="-mt-1 -mr-2 grid size-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="-mr-2 grid size-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           >
             <X className="size-5" />
           </button>
@@ -683,7 +767,8 @@ export function Modal({
           </footer>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -693,31 +778,249 @@ export function Modal({
 
 const UiContext = createContext(null);
 
-const TOAST_STYLE = {
+/**
+ * Thông báo nổi (toast) — 1 kiểu duy nhất cho cả khu quản trị.
+ *   const { toast } = useUi();
+ *   toast("Đã lưu tour")                                  // thành công (mặc định)
+ *   toast("Không lưu được", "error")                      // tone: success | error | warning | info
+ *   toast.error("Chưa tải được danh sách", { title: "Có lỗi", action: { label: "Thử lại", onClick } })
+ *   const t = toast.loading("Đang tải lại…");  …  t.success("Đã cập nhật danh sách")  /  t.error("…")
+ * - Tự ẩn: thành công 3,5s · thông tin 4,5s · cảnh báo 5,5s · lỗi 7s (có nút bấm → ít nhất 7s);
+ *   rê chuột / bấm Tab vào thông báo thì dừng đếm.
+ * - Tối đa 4 thông báo, mới nhất ở trên; thông báo trùng hệt bắn liên tiếp → gộp lại (×2) và đếm lại từ đầu.
+ */
+const TOAST_TONE = {
   success: {
     Icon: CheckCircle2,
-    ring: "ring-emerald-100",
-    icon: "text-emerald-500",
+    ms: 3500,
+    icon: "bg-emerald-50 text-emerald-600 ring-emerald-100",
     bar: "bg-emerald-500",
+    action: "text-emerald-700 hover:bg-emerald-50",
   },
-  error: { Icon: XCircle, ring: "ring-sun-100", icon: "text-sun-500", bar: "bg-sun-500" },
-  info: { Icon: Info, ring: "ring-brand-100", icon: "text-brand-600", bar: "bg-brand-500" },
+  error: {
+    Icon: XCircle,
+    ms: 7000,
+    icon: "bg-sun-50 text-sun-600 ring-sun-100",
+    bar: "bg-sun-500",
+    action: "text-sun-700 hover:bg-sun-50",
+  },
+  warning: {
+    Icon: AlertTriangle,
+    ms: 5500,
+    icon: "bg-amber-50 text-amber-600 ring-amber-100",
+    bar: "bg-amber-500",
+    action: "text-amber-700 hover:bg-amber-50",
+  },
+  info: {
+    Icon: Info,
+    ms: 4500,
+    icon: "bg-brand-50 text-brand-600 ring-brand-100",
+    bar: "bg-brand-500",
+    action: "text-brand-700 hover:bg-brand-50",
+  },
+  loading: {
+    Icon: Loader2,
+    ms: 0,
+    icon: "bg-brand-50 text-brand-600 ring-brand-100 [&_svg]:animate-spin",
+    bar: "",
+    action: "text-brand-700 hover:bg-brand-50",
+  },
 };
+const TOAST_MAX = 4;
+const toneOf = (t) => (t === "warn" ? "warning" : TOAST_TONE[t] ? t : "success");
+
+function ToastItem({ t, onDismiss }) {
+  const s = TOAST_TONE[t.tone];
+  const [paused, setPaused] = useState(false);
+  const left = useRef(t.duration);
+  const seen = useRef(t.v);
+
+  // Đếm ngược (dừng khi rê chuột / đang thao tác trong thông báo); t.v đổi = gộp / cập nhật → đếm lại
+  useEffect(() => {
+    if (seen.current !== t.v) {
+      seen.current = t.v;
+      left.current = t.duration;
+    }
+    if (!t.duration || paused || t.leaving) return;
+    const start = Date.now();
+    const timer = setTimeout(() => onDismiss(t.id), left.current);
+    return () => {
+      clearTimeout(timer);
+      left.current = Math.max(400, left.current - (Date.now() - start));
+    };
+  }, [t.v, t.duration, t.id, t.leaving, paused, onDismiss]);
+
+  const isError = t.tone === "error";
+  return (
+    <div
+      role={isError ? "alert" : "status"}
+      aria-live={isError ? "assertive" : "polite"}
+      aria-atomic="true"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPaused(false)}
+      className={cn(
+        "pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-2xl bg-white/95 py-3 pr-2 pl-3 text-slate-700 shadow-[0_16px_48px_-14px_rgba(10,37,60,0.35),0_2px_6px_-2px_rgba(10,37,60,0.08)] ring-1 ring-slate-900/[0.07] backdrop-blur",
+        t.leaving
+          ? "animate-[admin-toast-out_.18s_ease-in_forwards]"
+          : "animate-[admin-toast_.28s_cubic-bezier(.2,.8,.2,1)]",
+      )}
+    >
+      <span className={cn("grid size-8 shrink-0 place-items-center rounded-full ring-1", s.icon)}>
+        <s.Icon className="size-[18px]" />
+      </span>
+      <div className="min-w-0 flex-1 pt-[5px]">
+        {t.title && <p className="text-sm leading-snug font-semibold text-slate-900">{t.title}</p>}
+        {t.message && (
+          <p
+            className={cn(
+              "leading-snug break-words",
+              t.title ? "mt-0.5 text-[13px] text-slate-600" : "text-sm font-medium text-slate-800",
+            )}
+          >
+            {t.message}
+            {t.count > 1 && (
+              <span className="ml-1.5 inline-grid h-[18px] min-w-[18px] place-items-center rounded-full bg-slate-100 px-1 align-[1px] text-[10px] font-bold text-slate-500">
+                ×{t.count}
+              </span>
+            )}
+          </p>
+        )}
+        {t.action && (
+          <button
+            type="button"
+            onClick={() => {
+              onDismiss(t.id);
+              t.action.onClick?.();
+            }}
+            className={cn(
+              "mt-1.5 -ml-2 inline-flex h-8 items-center rounded-lg px-2 text-[13px] font-bold transition",
+              s.action,
+            )}
+          >
+            {t.action.label}
+          </button>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => onDismiss(t.id)}
+        aria-label="Đóng thông báo"
+        className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+      >
+        <X className="size-4" />
+      </button>
+      {t.duration > 0 && (
+        <span
+          key={t.v}
+          aria-hidden
+          className={cn(
+            "absolute bottom-0 left-0 h-[3px] w-full origin-left animate-[admin-shrink_linear_forwards] opacity-70",
+            s.bar,
+          )}
+          style={{
+            animationDuration: `${t.duration}ms`,
+            animationPlayState: paused ? "paused" : "running",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Kho thông báo: giữ danh sách trong ref (đọc / ghi đồng bộ, không phụ thuộc lúc React vẽ lại) */
+function useToastStore() {
+  const [toasts, setToasts] = useState([]);
+  const store = useRef([]);
+  const seq = useRef(0);
+
+  const toast = useMemo(() => {
+    const commit = (next) => {
+      store.current = next;
+      setToasts(next);
+    };
+    const remove = (id) => commit(store.current.filter((x) => x.id !== id));
+    const dismiss = (id) => {
+      if (!store.current.some((x) => x.id === id && !x.leaving)) return;
+      commit(store.current.map((x) => (x.id === id ? { ...x, leaving: true } : x)));
+      setTimeout(() => remove(id), 180);
+    };
+    const build = (base, message, opts) => {
+      const tone = toneOf(opts.tone ?? base.tone);
+      const action = opts.action === undefined ? base.action : opts.action;
+      const duration =
+        opts.duration ??
+        (tone === "loading" ? 0 : Math.max(TOAST_TONE[tone].ms, action ? 7000 : 0));
+      const title = opts.title === undefined ? base.title : opts.title;
+      return {
+        ...base,
+        tone,
+        title,
+        message: message ?? base.message ?? "",
+        action,
+        duration,
+        key: `${tone}|${title ?? ""}|${message ?? base.message ?? ""}`,
+      };
+    };
+    const handle = (id) => ({
+      id,
+      update: (message, opts = {}) => update(id, message, opts),
+      success: (message, opts = {}) => update(id, message, { ...opts, tone: "success" }),
+      error: (message, opts = {}) => update(id, message, { ...opts, tone: "error" }),
+      warning: (message, opts = {}) => update(id, message, { ...opts, tone: "warning" }),
+      info: (message, opts = {}) => update(id, message, { ...opts, tone: "info" }),
+      dismiss: () => dismiss(id),
+    });
+    const update = (id, message, opts) => {
+      const cur = store.current.find((x) => x.id === id);
+      if (!cur || cur.leaving) return show(message, opts); // đã bị đóng → hiện thông báo mới
+      const next = build({ ...cur, title: undefined, action: undefined }, message, {
+        title: null,
+        action: null,
+        ...opts,
+      });
+      commit(store.current.map((x) => (x.id === id ? { ...next, v: cur.v + 1, count: 1 } : x)));
+      return handle(id);
+    };
+    const show = (message, toneOrOpts) => {
+      const opts = typeof toneOrOpts === "string" ? { tone: toneOrOpts } : (toneOrOpts ?? {});
+      const next = build({ tone: "success" }, message, opts);
+      const live = store.current.filter((x) => !x.leaving);
+      const dup = next.tone !== "loading" && live.find((x) => x.key === next.key);
+      if (dup) {
+        // trùng hệt → đưa lên đầu, ×2, đếm lại
+        const bumped = { ...dup, ...next, id: dup.id, v: dup.v + 1, count: dup.count + 1 };
+        commit([bumped, ...store.current.filter((x) => x.id !== dup.id)]);
+        return handle(dup.id);
+      }
+      const id = `t${++seq.current}`;
+      const kept = live.slice(0, TOAST_MAX - 1);
+      commit([
+        { ...next, id, v: 0, count: 1 },
+        ...store.current.filter((x) => x.leaving || kept.includes(x)),
+      ]);
+      return handle(id);
+    };
+    const fn = (message, toneOrOpts) => show(message, toneOrOpts);
+    for (const tone of ["success", "error", "warning", "info", "loading"])
+      fn[tone] = (message, opts = {}) => show(message, { ...opts, tone });
+    fn.dismiss = dismiss;
+    return fn;
+  }, []);
+
+  return { toasts, toast };
+}
 
 export function AdminProviders({ children }) {
-  const [toasts, setToasts] = useState([]);
+  const { toasts, toast } = useToastStore();
+  // Chỉ khi chạy thử trên máy (không có ở bản chạy thật): gọi window.__vlToast(...) để kiểm tra giao diện
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    window.__vlToast = toast;
+    return () => delete window.__vlToast;
+  }, [toast]);
   const [confirmState, setConfirmState] = useState(null);
-
-  const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
-  const toast = useCallback(
-    (message, tone = "success") => {
-      const id = Math.random().toString(36).slice(2);
-      const ms = tone === "error" ? 7000 : 3500;
-      setToasts((t) => [...t.slice(-3), { id, message, tone, ms }]);
-      setTimeout(() => dismiss(id), ms);
-    },
-    [dismiss],
-  );
 
   const confirm = useCallback(
     (opts) => new Promise((resolve) => setConfirmState({ ...opts, resolve })),
@@ -735,45 +1038,18 @@ export function AdminProviders({ children }) {
     <UiContext.Provider value={value}>
       {children}
 
-      {/* Thông báo: góc trên phải (máy tính) / trên cùng (điện thoại) */}
-      <div
-        aria-live="polite"
-        className="pointer-events-none fixed inset-x-3 top-3 z-[95] flex flex-col items-center gap-2 sm:inset-x-auto sm:top-5 sm:right-5 sm:items-end"
+      {/* Thông báo: điện thoại = giữa, ngay dưới thanh tiêu đề; máy tính = góc phải, nằm dưới hàng nút
+          đầu trang (Lưu / Tải lại…) để không che nút đang dùng */}
+      <section
+        aria-label="Thông báo"
+        className="pointer-events-none fixed inset-x-3 top-[4.5rem] z-[95] mx-auto flex max-w-[420px] flex-col gap-2 sm:inset-x-auto sm:right-5 sm:w-[340px] lg:top-5 max-sm:[&>*:nth-child(n+4)]:hidden"
       >
-        {toasts.map((t) => {
-          const s = TOAST_STYLE[t.tone] ?? TOAST_STYLE.success;
-          return (
-            <div
-              key={t.id}
-              role={t.tone === "error" ? "alert" : "status"}
-              className={cn(
-                "pointer-events-auto relative flex w-full max-w-[380px] animate-[admin-toast_.25s_cubic-bezier(.2,.8,.2,1)] items-start gap-3 overflow-hidden rounded-2xl bg-white py-3 pr-2.5 pl-3.5 text-sm text-slate-700 shadow-[0_12px_40px_-12px_rgba(10,37,60,0.35)] ring-1",
-                s.ring,
-              )}
-            >
-              <s.Icon className={cn("mt-0.5 size-5 shrink-0", s.icon)} />
-              <span className="min-w-0 flex-1 pt-0.5 leading-snug font-medium">{t.message}</span>
-              <button
-                type="button"
-                onClick={() => dismiss(t.id)}
-                aria-label="Đóng thông báo"
-                className="grid size-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="size-4" />
-              </button>
-              <span
-                className={cn(
-                  "absolute bottom-0 left-0 h-0.5 w-full origin-left animate-[admin-shrink_linear_forwards]",
-                  s.bar,
-                )}
-                style={{ animationDuration: `${t.ms}ms` }}
-              />
-            </div>
-          );
-        })}
-      </div>
+        {toasts.map((t) => (
+          <ToastItem key={t.id} t={t} onDismiss={toast.dismiss} />
+        ))}
+      </section>
 
-      {/* Hộp xác nhận: biểu tượng lớn ở giữa, nút rõ ràng; Enter = đồng ý */}
+      {/* Hộp xác nhận: biểu tượng lớn ở giữa, nút rõ ràng; Esc = huỷ */}
       {confirmState && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-6">
           <div
@@ -789,12 +1065,34 @@ export function AdminProviders({ children }) {
 
 function ConfirmPanel({ state, danger, onClose }) {
   const okRef = useRef(null);
+  const cancelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    okRef.current?.focus();
-    const onKey = (e) => e.key === "Escape" && onClose(false);
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    onCloseRef.current = onClose;
   }, [onClose]);
+  useEffect(() => {
+    const prevFocus = document.activeElement;
+    // Hỏi xoá/thao tác nguy hiểm: con trỏ đặt ở "Huỷ" để lỡ bấm Enter không xoá nhầm
+    (danger ? cancelRef : okRef).current?.focus();
+    // Bắt phím ở pha capture: Esc chỉ đóng hộp xác nhận (không đóng luôn popup bên dưới),
+    // Tab chỉ chạy vòng giữa 2 nút
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onCloseRef.current(false);
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        const next = document.activeElement === okRef.current ? cancelRef : okRef;
+        next.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      prevFocus?.focus?.({ preventScroll: true });
+    };
+  }, [danger]);
   const Icon = state.icon ?? (danger ? AlertTriangle : HelpCircle);
   return (
     <div
@@ -819,7 +1117,12 @@ function ConfirmPanel({ state, danger, onClose }) {
         </p>
       )}
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row">
-        <Button variant="secondary" className="flex-1" onClick={() => onClose(false)}>
+        <Button
+          ref={cancelRef}
+          variant="secondary"
+          className="flex-1"
+          onClick={() => onClose(false)}
+        >
           {state.cancelText ?? "Huỷ"}
         </Button>
         <Button
@@ -835,8 +1138,22 @@ function ConfirmPanel({ state, danger, onClose }) {
   );
 }
 
+// Ngoài AdminProviders (vd. trang đăng nhập): thông báo bị bỏ qua nhưng gọi hàm không lỗi
+const noopHandle = {};
+const noopToast = Object.assign(() => noopHandle, {
+  success: () => noopHandle,
+  error: () => noopHandle,
+  warning: () => noopHandle,
+  info: () => noopHandle,
+  loading: () => noopHandle,
+  dismiss: () => {},
+});
+for (const k of ["update", "success", "error", "warning", "info"]) noopHandle[k] = () => noopHandle;
+noopHandle.dismiss = () => {};
+const NOOP_UI = { toast: noopToast, confirm: async () => true };
+
 export function useUi() {
-  return useContext(UiContext) ?? { toast: () => {}, confirm: async () => true };
+  return useContext(UiContext) ?? NOOP_UI;
 }
 
 /* =========================================================================
@@ -1556,7 +1873,7 @@ function VideoPreview({ url, compact }) {
         href={open}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-medium text-brand-700 hover:underline"
+        className="font-medium text-brand-700 transition-colors hover:text-sun-600"
       >
         Mở trong tab mới ↗
       </a>

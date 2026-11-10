@@ -10,6 +10,16 @@ async function bootstrap() {
   configureCloudinary();
   if (!env.captcha.enabled && env.isProd)
     logger.warn("TURNSTILE_SECRET_KEY chưa đặt — form công khai KHÔNG có captcha");
+  if (!env.mail.enabled)
+    logger.warn("RESEND_API_KEY chưa đặt — không gửi email thông báo (đơn vẫn lưu trong CMS)");
+  if (env.demoLogin)
+    logger.warn(
+      `DEMO_LOGIN=true — AI CŨNG vào được CMS bằng tài khoản ${env.admin.username} không cần mật khẩu. Chỉ dùng cho bản demo!`,
+    );
+  if (env.isProd && !env.proxySecret)
+    logger.warn(
+      "PROXY_SECRET chưa đặt — API nhận request gọi thẳng, IP khách lấy theo TRUST_PROXY",
+    );
   await connectDatabase();
   await ensureFirstAdmin(); // tạo tài khoản admin đầu tiên từ .env nếu chưa có
 

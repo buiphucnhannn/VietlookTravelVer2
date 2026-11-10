@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 import { auditService } from "../services/audit.service.js";
 import { authService } from "../services/auth.service.js";
 import { REFRESH_COOKIE, clearAuthCookies, setAuthCookies } from "../utils/auth-cookies.js";
@@ -32,7 +33,8 @@ export const authController = {
           req,
           err.code === "ACCOUNT_LOCKED" ? "auth.locked" : "auth.login_failed",
           {
-            actor: err.userId ? { id: err.userId } : null,
+            // đúng tên đăng nhập → ghi tên tài khoản đó; tên không tồn tại → để trống (không ghi chữ đã gõ)
+            actor: err.userId ? { id: err.userId, username: err.username } : null,
             level: "warn",
           },
         );
@@ -40,6 +42,18 @@ export const authController = {
     }
     const { user, accessToken, refreshToken, remember } = session;
     auditService.record(req, "auth.login", { actor: user });
+    setAuthCookies(res, { accessToken, refreshToken, remember });
+    ok(res, { user });
+  },
+
+  /** GET /auth/demo — trang đăng nhập hỏi có hiện nút "Đăng nhập nhanh" không */
+  demoStatus(_req, res) {
+    ok(res, { enabled: env.demoLogin });
+  },
+
+  async demoLogin(req, res) {
+    const { user, accessToken, refreshToken, remember } = await authService.demoLogin(meta(req));
+    auditService.record(req, "auth.login", { actor: user, meta: { demo: true } });
     setAuthCookies(res, { accessToken, refreshToken, remember });
     ok(res, { user });
   },

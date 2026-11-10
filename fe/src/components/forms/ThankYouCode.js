@@ -10,8 +10,8 @@ export default function ThankYouCode({ labels }) {
   const [copied, setCopied] = useState(false);
   if (!code) return null;
   return (
-    <div className="mx-auto mt-8 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border border-dashed border-sand-300 bg-cream-50 px-4 py-2.5 sm:px-5">
-      <span className="text-sm text-muted">{labels.yourRequestCode}:</span>
+    <div className="mx-auto mt-8 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 rounded-2xl border border-dashed border-sand-300 bg-cream-50 px-4 py-2.5 sm:flex-nowrap sm:gap-x-3 sm:px-5">
+      <span className="basis-full text-sm text-muted sm:basis-auto">{labels.yourRequestCode}:</span>
       <span className="font-mono text-base font-bold tracking-wider whitespace-nowrap text-forest-700 sm:text-lg">
         {code}
       </span>

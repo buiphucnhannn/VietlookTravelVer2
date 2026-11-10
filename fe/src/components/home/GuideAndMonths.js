@@ -13,14 +13,17 @@ function GuideCard({ post, lang }) {
       href={`${lp(lang)}/travel-guide/${post.slug}`}
       className="group flex h-full w-[78%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-border transition hover:-translate-y-1 hover:shadow-lg sm:w-auto"
     >
-      <span className="relative block aspect-[16/10] overflow-hidden">
-        <Image
-          src={post.image}
-          alt=""
-          fill
-          sizes="(min-width: 1024px) 25vw, 50vw"
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
-        />
+      <span className="relative block aspect-[16/10] overflow-hidden bg-gradient-to-br from-cream-100 to-sand-300/40">
+        {/* bài chưa có ảnh bìa → giữ khung nền nhạt, không render ảnh trống */}
+        {post.image && (
+          <Image
+            src={post.image}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 25vw, 50vw"
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        )}
       </span>
       <span className="flex flex-1 items-start gap-3 p-5">
         <span className="line-clamp-3 flex-1 leading-snug font-bold text-ink group-hover:text-forest-700">
