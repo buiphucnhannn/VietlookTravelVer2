@@ -21,8 +21,12 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { priceLineVi } from "@/lib/pricing-labels";
-import { TODO_EVENT, toastError, useAdminList, useMutation } from "./hooks";
+import { TODO_EVENT, toastError, useAdminList, useMutation, useOptions } from "./hooks";
+import { regions } from "@/data/regions";
 import { usePermission } from "./permissions";
+import { LANG_LABELS, PAYMENT_STATUSES, STATUSES, detailRows, sitePageName } from "./labels";
+import { carRoutes, places as carPlaces, routeTitle } from "@/data/cars";
+import { airports as visaAirports } from "@/data/visa";
 import {
   Badge,
   BusyArea,
@@ -37,6 +41,7 @@ import {
   SearchBox,
   Select,
   Textarea,
+  fmtDate,
   fmtDateTime,
   fmtUSD,
   useUi,
@@ -50,13 +55,7 @@ const MAIL_OFF_TEXT =
  * Nhãn dùng chung (Dashboard cũng dùng)
  * ========================================================================= */
 
-export const STATUSES = [
-  { value: "new", label: "Mới", tone: "red" },
-  { value: "contacted", label: "Đã liên hệ", tone: "amber" },
-  { value: "confirmed", label: "Đã xác nhận", tone: "blue" },
-  { value: "completed", label: "Hoàn tất", tone: "green" },
-  { value: "cancelled", label: "Huỷ", tone: "gray" },
-];
+// Trạng thái đơn + thanh toán: ./labels.js (Nhật ký thao tác dùng chung)
 const statusOf = (v) => STATUSES.find((s) => s.value === v) ?? { label: v, tone: "gray" };
 
 export const ENQUIRY_TYPES = [
@@ -80,12 +79,6 @@ export function TypeBadge({ type }) {
   return <Badge tone={t.tone}>{t.label}</Badge>;
 }
 
-/** Thanh toán của đơn đặt tour (9Pay tự cập nhật; nhân viên cũng đổi tay được) */
-const PAYMENT_STATUSES = [
-  { value: "unpaid", label: "Chưa thanh toán", tone: "gray" },
-  { value: "deposit", label: "Đã đặt cọc", tone: "amber" },
-  { value: "paid", label: "Đã thanh toán", tone: "green" },
-];
 const paymentOf = (v) => PAYMENT_STATUSES.find((s) => s.value === v) ?? PAYMENT_STATUSES[0];
 
 function PaymentBadge({ value }) {
@@ -93,11 +86,11 @@ function PaymentBadge({ value }) {
   return <Badge tone={s.tone}>{s.label}</Badge>;
 }
 
-/** "2026-05-12" → "12/05/2026" (không đổi múi giờ) */
+/** "2026-05-12" → "05/12/2026" (không đổi múi giờ) */
 export const fmtDay = (s) => {
   if (!s) return "";
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s);
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(s));
+  return m ? fmtDate(m[1]) : String(s);
 };
 
 export const fmtMoney = (estimate) => {
@@ -121,8 +114,6 @@ export const paxText = (e) => {
 export const emailFailed = (e) =>
   e.emailStatus?.customer === "failed" || e.emailStatus?.company === "failed";
 
-const LANG_LABEL = { en: "Tiếng Anh", zh: "Tiếng Trung", vi: "Tiếng Việt" };
-
 const EMAIL_STATE = {
   sent: { label: "Đã gửi", tone: "green" },
   failed: { label: "Chưa gửi được", tone: "red" },
@@ -130,94 +121,15 @@ const EMAIL_STATE = {
   skipped: { label: "Không gửi", tone: "gray" },
 };
 
-/** Tên tiếng Việt cho các trường riêng của từng form (không có → hiện tên gốc) */
-const DETAIL_LABELS = {
-  date: "Ngày đi",
-  returnDate: "Ngày về",
-  time: "Giờ đón",
-  pickupTime: "Giờ đón",
-  pickup: "Điểm đón",
-  dropoff: "Điểm trả",
-  route: "Lộ trình",
-  tripType: "Loại chuyến",
-  vehicle: "Loại xe",
-  passengers: "Số khách",
-  luggage: "Hành lý",
-  airport: "Sân bay",
-  flight: "Chuyến bay",
-  arrival: "Ngày đến",
-  arrivalDate: "Ngày đến",
-  departure: "Ngày khởi hành",
-  entryDate: "Ngày nhập cảnh",
-  exitDate: "Ngày xuất cảnh",
-  service: "Dịch vụ",
-  visaType: "Loại visa",
-  entries: "Số lần nhập cảnh",
-  processing: "Thời gian xử lý",
-  purpose: "Mục đích",
-  quantity: "Số lượng",
-  budget: "Ngân sách",
-  hotel: "Khách sạn",
-  accommodation: "Lưu trú",
-  destinations: "Điểm đến",
-  duration: "Thời lượng",
-  days: "Số ngày",
-  nights: "Số đêm",
-  adults: "Người lớn",
-  children: "Trẻ em",
-  travelers: "Số khách",
-  travelStyle: "Phong cách du lịch",
-  interests: "Sở thích",
-  pace: "Nhịp độ",
-  region: "Khu vực",
-  country: "Quốc gia",
-  subject: "Chủ đề",
-  company: "Công ty",
-  position: "Chức vụ",
-  website: "Website",
-  market: "Thị trường",
-  volume: "Lượng khách dự kiến",
-  summary: "Tóm tắt",
-  source: "Biết đến qua",
-  level: "Gói dịch vụ",
-  travellers: "Số khách",
-  flexible: "Ngày đi linh hoạt",
-  requests: "Yêu cầu riêng",
-  contactVia: "Muốn liên hệ qua",
-  payment: "Hình thức thanh toán",
-  from: "Điểm đi",
-  to: "Điểm đến",
-  returnTime: "Giờ về",
-  routeSlug: "Tuyến",
-  priceUSD: "Giá báo (USD)",
+// Tên miền (Bắc / Trung / Nam), địa danh đón/trả và tuyến xe, sân bay visa: lấy từ dữ liệu website.
+// Điểm đến, hạng xe, gói fast-track: tên trong CMS (tải khi mở chi tiết). Cách đổi mã → chữ: ./labels.js
+const STATIC_NAMES = {
+  regions: Object.fromEntries(regions.map((r) => [r.slug, r.short?.vi || r.name.vi])),
+  places: Object.fromEntries(Object.entries(carPlaces).map(([k, p]) => [k, p.name.vi])),
+  routes: Object.fromEntries(carRoutes.map((r) => [r.slug, routeTitle(r.title, "vi")])),
+  airports: Object.fromEntries(visaAirports.map((a) => [a.code, a.name.vi])),
 };
-
-/** Giá trị dạng mã của form → chữ dễ hiểu */
-const DETAIL_VALUES = {
-  oneWay: "Một chiều",
-  roundTrip: "Khứ hồi",
-  cash: "Tiền mặt",
-  transfer: "Chuyển khoản",
-  card: "Thẻ",
-  none: "Không",
-  "on request": "Liên hệ báo giá",
-};
-const detailLabel = (k) =>
-  DETAIL_LABELS[k] ??
-  k
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .replace(/^./, (c) => c.toUpperCase());
-
-const detailValue = (v) => {
-  if (v == null || v === "") return "";
-  if (Array.isArray(v)) return v.map(detailValue).filter(Boolean).join(", ");
-  if (typeof v === "boolean") return v ? "Có" : "Không";
-  if (typeof v === "object") return Object.values(v).map(detailValue).filter(Boolean).join(" · ");
-  const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return fmtDay(s);
-  return DETAIL_VALUES[s] ?? s;
-};
+const nameOf = (x) => x.name?.vi || x.name?.en || "";
 
 /** Số điện thoại → số dùng cho WhatsApp (số VN bắt đầu bằng 0 → thêm mã 84) */
 const waNumber = (phone) => {
@@ -420,16 +332,22 @@ export default function EnquiriesPage({ kind = "bookings" }) {
                         e.status === "new" && "bg-sun-50/30",
                       )}
                     >
-                      <td className="px-2 py-3.5">
-                        <span className="flex items-center justify-center gap-1.5">
+                      <td className="px-4 py-3.5">
+                        <span className="relative inline-flex items-center">
                           {e.status === "new" && (
-                            <span className="size-2 shrink-0 rounded-full bg-sun-500" />
+                            <span
+                              className="absolute top-1/2 -left-3.5 size-2 -translate-y-1/2 rounded-full bg-sun-500"
+                              title="Mới"
+                            />
                           )}
                           <span className="font-mono text-xs font-semibold whitespace-nowrap text-slate-800">
                             {e.code}
                           </span>
                           {emailFailed(e) && (
-                            <span title="Chưa gửi được email">
+                            <span
+                              title="Chưa gửi được email"
+                              className="absolute top-1/2 -right-5 -translate-y-1/2"
+                            >
                               <AlertTriangle className="size-4 text-sun-500" />
                             </span>
                           )}
@@ -592,6 +510,18 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
   const [item, setItem] = useState(null);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  // Tên tiếng Việt (điểm đến, hạng xe, gói fast-track) để hiện thay mã khách chọn; không có quyền đọc → tên dự phòng
+  const destinations = Object.fromEntries(
+    useOptions("/admin/destinations?limit=200&sort=order", (x) => [x.slug, nameOf(x) || x.slug]),
+  );
+  const vehicles = Object.fromEntries(
+    useOptions("/admin/cars?limit=100&sort=order", (x) => [x.key, nameOf(x)]).filter(([, n]) => n),
+  );
+  const levels = Object.fromEntries(
+    useOptions("/admin/fast-track?limit=200&sort=order", (x) => [x.key, nameOf(x)]).filter(
+      ([, n]) => n,
+    ),
+  );
   const [resending, setResending] = useState(false);
 
   const apply = useCallback(
@@ -703,7 +633,10 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
   };
 
   const isBooking = item?.type === "booking";
-  const details = Object.entries(item?.details ?? {}).filter(([, v]) => detailValue(v) !== "");
+  const details = detailRows(item?.details, {
+    type: item?.type,
+    names: { ...STATIC_NAMES, destinations, vehicles, levels },
+  });
   const cur = item?.estimate?.currency || "USD";
 
   return (
@@ -738,7 +671,7 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
       ) : !item ? (
         <LoadingBlock />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Mã + xử lý */}
           <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
             <div className="flex flex-wrap items-center gap-2">
@@ -773,7 +706,7 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
               </label>
               {/* Thanh toán chỉ áp dụng cho đơn đặt tour; yêu cầu báo giá (xe, visa…) chưa có tiền để đánh dấu */}
               {item.type !== "booking" ? (
-                <p className="flex items-end pb-2.5 text-[13px] leading-snug text-slate-500">
+                <p className="flex min-h-[42px] items-center self-end text-[13px] leading-snug text-slate-500">
                   Chuyển trạng thái sau khi đã liên hệ hoặc gửi báo giá cho khách.
                 </p>
               ) : (
@@ -804,38 +737,44 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
 
           {/* Khách hàng */}
           <Section title="Khách hàng">
-            <p className="text-lg font-bold text-slate-900">{item.name}</p>
-            <div className="mt-3 flex flex-col gap-2">
-              {item.email && (
-                <ContactRow icon={Mail} href={`mailto:${item.email}`} text={item.email}>
-                  <CopyBtn value={item.email} label="email" />
-                </ContactRow>
-              )}
-              {item.phone && (
-                <ContactRow
-                  icon={Phone}
-                  href={`tel:${item.phone.replace(/[^\d+]/g, "")}`}
-                  text={item.phone}
-                >
-                  <CopyBtn value={item.phone} label="số điện thoại" />
-                  <a
-                    href={`https://wa.me/${waNumber(item.phone)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex h-7 items-center gap-1 rounded-lg bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
-                  >
-                    <MessageCircle className="size-3.5" /> WhatsApp
-                  </a>
-                </ContactRow>
-              )}
+            {/* Trái: tên + liên hệ · phải: quốc tịch, ngôn ngữ (xếp dọc, không để nửa hàng trống) */}
+            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
+              <div className="min-w-0">
+                <p className="text-lg font-bold text-slate-900">{item.name}</p>
+                <div className="mt-3 flex flex-col gap-2">
+                  {item.email && (
+                    <ContactRow icon={Mail} href={`mailto:${item.email}`} text={item.email}>
+                      <CopyBtn value={item.email} label="email" />
+                    </ContactRow>
+                  )}
+                  {item.phone && (
+                    <ContactRow
+                      icon={Phone}
+                      href={`tel:${item.phone.replace(/[^\d+]/g, "")}`}
+                      text={item.phone}
+                    >
+                      <CopyBtn value={item.phone} label="số điện thoại" />
+                      <a
+                        href={`https://wa.me/${waNumber(item.phone)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-7 items-center gap-1 rounded-lg bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                      >
+                        <MessageCircle className="size-3.5" /> WhatsApp
+                      </a>
+                    </ContactRow>
+                  )}
+                </div>
+              </div>
+              <InfoGrid
+                cols={1}
+                className="max-sm:grid-cols-2 sm:border-l sm:border-slate-100 sm:pl-6"
+                rows={[
+                  ["Quốc tịch", item.nationality],
+                  ["Ngôn ngữ trang", LANG_LABELS[item.lang] ?? item.lang],
+                ]}
+              />
             </div>
-            <InfoGrid
-              className="mt-4"
-              rows={[
-                ["Quốc tịch", item.nationality],
-                ["Ngôn ngữ trang", LANG_LABEL[item.lang] ?? item.lang],
-              ]}
-            />
           </Section>
 
           {/* Tour */}
@@ -846,6 +785,7 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
                 <p className="mt-0.5 font-mono text-xs text-slate-500">{item.tour.code}</p>
               )}
               <InfoGrid
+                cols={item.hotelClass ? 4 : 3}
                 className="mt-3"
                 rows={[
                   ["Ngày khởi hành", fmtDay(item.departureDate)],
@@ -856,6 +796,7 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
                       ? `${item.childAges.length} (${item.childAges.map((a) => `${a} tuổi`).join(", ")})`
                       : "",
                   ],
+                  ["Hạng khách sạn", item.hotelClass ? `${item.hotelClass} sao` : ""],
                 ]}
               />
             </Section>
@@ -896,7 +837,7 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
           {/* Thông tin form */}
           {details.length > 0 && (
             <Section title="Thông tin khách điền">
-              <InfoGrid rows={details.map(([k, v]) => [detailLabel(k), detailValue(v)])} />
+              <InfoGrid cols={3} rows={details} />
             </Section>
           )}
 
@@ -908,22 +849,13 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
             </Section>
           )}
 
+          {/* Nguồn gửi (trang khách bấm gửi). Dòng "đã đồng ý chính sách" không hiển thị — dữ liệu vẫn lưu trong hệ thống */}
           {item.page && (
-            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <p className="flex min-w-0 items-center gap-1.5 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500 ring-1 ring-slate-100">
               <Globe className="size-3.5 shrink-0" />
-              Gửi từ trang: <span className="truncate font-mono">{item.page}</span>
-            </p>
-          )}
-
-          {/* Bằng chứng khách đã tick ô đồng ý Chính sách bảo mật & Điều khoản khi gửi form */}
-          {item.consent?.agreedAt && (
-            <p className="flex items-start gap-1.5 text-xs text-emerald-700">
-              <ShieldCheck className="mt-px size-3.5 shrink-0" />
-              <span>
-                Đã đồng ý Chính sách bảo mật & Điều khoản lúc {fmtDateTime(item.consent.agreedAt)}
-                {item.consent.policyVersion &&
-                  ` (bản chính sách ${fmtDay(item.consent.policyVersion)})`}
-                {item.marketingConsentAt && " · Đồng ý nhận email ưu đãi"}
+              <span className="shrink-0">Gửi từ trang:</span>
+              <span className="truncate text-slate-600" title={item.page}>
+                {sitePageName(item.page)}
               </span>
             </p>
           )}
@@ -1023,10 +955,10 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
 
 function Section({ title, hint, children }) {
   return (
-    <section>
+    <section className="border-t border-slate-100 pt-5 first-of-type:border-t-0 first-of-type:pt-1">
       <h4 className="text-[11px] font-bold tracking-[0.14em] text-slate-400 uppercase">{title}</h4>
       {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
-      <div className="mt-2.5">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -1110,13 +1042,28 @@ function PaymentsSection({ payments, status, total }) {
   );
 }
 
-function InfoGrid({ rows, className }) {
+/** Lưới thông tin: nhãn nhỏ nhạt, giá trị đậm vừa. cols = số cột từ màn hình vừa (1–4);
+ *  giá trị dài tự chiếm cả hàng để không chừa nửa hàng trống lệch */
+function InfoGrid({ rows, className, cols = 2 }) {
   const shown = rows.filter(([, v]) => v !== "" && v != null);
   if (!shown.length) return null;
   return (
-    <dl className={cn("grid gap-x-6 gap-y-3 sm:grid-cols-2", className)}>
+    <dl
+      className={cn(
+        "grid gap-x-6 gap-y-3",
+        cols === 4
+          ? "grid-cols-2 sm:grid-cols-4"
+          : cols === 3
+            ? "grid-cols-2 sm:grid-cols-3"
+            : cols === 2 && "sm:grid-cols-2",
+        className,
+      )}
+    >
       {shown.map(([k, v]) => (
-        <div key={k} className={cn("min-w-0", String(v).length > 60 && "sm:col-span-2")}>
+        <div
+          key={k}
+          className={cn("min-w-0", cols > 1 && String(v).length > 60 && "col-span-full")}
+        >
           <dt className="text-xs text-slate-500">{k}</dt>
           <dd className="mt-0.5 text-sm font-medium break-words whitespace-pre-line text-slate-800">
             {v}

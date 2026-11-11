@@ -92,13 +92,24 @@ export function cloudinaryVideo(input) {
   return m ? { cloud: m[1], version: m[2], publicId: m[3] } : null;
 }
 
+/**
+ * Bản dọc nhẹ cho điện thoại: cắt giữa khung 480×854 (đúng tỉ lệ màn hình dọc → nét hơn bản ngang 720px
+ * bị phóng to khi phủ kín màn hình), nén mạnh (q_auto:eco) và giới hạn ~1 Mbps → phát mượt trên 4G.
+ * Cùng thông số với bản tạo sẵn (eager) lúc chép video (be/src/services/upload.service.js).
+ */
+export const CLD_PHONE = "br_1m,c_fill,h_854,q_auto:eco,w_480";
+
 /** Link phát video Cloudinary (mp4 nén tự động, rộng tối đa `width`) — dựng từ các phần đã kiểm tra */
 export function cloudinaryVideoUrl(
   { cloud, version, publicId },
-  { width = 1920, poster = false } = {},
+  { width = 1920, poster = false, phone = false } = {},
 ) {
   // cùng thứ tự tham số với Cloudinary SDK → trùng bản đã tạo sẵn (eager) lúc chép video
-  const t = poster ? `c_limit,q_auto,so_0,w_${width}` : `c_limit,q_auto,w_${width}`;
+  const t = phone
+    ? CLD_PHONE
+    : poster
+      ? `c_limit,q_auto,so_0,w_${width}`
+      : `c_limit,q_auto,w_${width}`;
   return `https://res.cloudinary.com/${cloud}/video/upload/${t}/v${version}/${publicId}.${poster ? "jpg" : "mp4"}`;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -19,7 +19,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage, isAbort } from "@/lib/api";
 import { siteConfig } from "@/constants/site";
 import {
   canonicalVideo,
@@ -31,6 +31,13 @@ import {
 } from "@/lib/video";
 import { cn } from "@/lib/utils";
 import { canRecrop, useImageCrop } from "../ImageCropper";
+import {
+  cancelCopy,
+  copyDriveVideo,
+  copyState,
+  isUnsavedVideo,
+  useVideoCopies,
+} from "../pendingVideos";
 import { Sortable } from "../Sortable";
 import {
   Button,
@@ -40,7 +47,6 @@ import {
   VideoChip,
   VideoHelp,
   anyLang,
-  importDriveVideo,
   useUi,
 } from "../ui";
 import {
@@ -77,6 +83,14 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
 
   const setSlide = (patch) =>
     setBanner({ slides: slides.map((s, k) => (k === cur ? { ...s, ...patch } : s)) });
+  /**
+   * Video Drive lấy xong (có thể sau vài phút, nhân viên đã sửa phần khác / chuyển slide):
+   * thay đúng link Drive đó bằng video đã lấy, trên dữ liệu MỚI NHẤT (không ghi đè các sửa đổi trong lúc chờ).
+   */
+  const replaceVideo = (from, to) =>
+    setBanner((b) => ({
+      slides: b.slides.map((s) => (s.video.trim() === from ? { ...s, video: to } : s)),
+    }));
   const addSlide = () => {
     setBanner({ slides: [...slides, { ...EMPTY_SLIDE, caption: L() }] });
     setSel(slides.length);
@@ -238,7 +252,7 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
         )}
         <span className="ml-auto shrink-0 pl-2 text-right text-[11px] leading-relaxed text-white/55">
           {slides.length}/{MAX_SLIDES} slide
-          {slides.length > 1 && <span className="block">Giữ và kéo để đổi thứ tự</span>}
+          {slides.length > 1 && <span className="block">Kéo thả để sắp xếp</span>}
         </span>
       </div>
 
@@ -249,8 +263,8 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
             <p className="text-sm font-bold text-slate-900">
               Slide {cur + 1}
               <span className="ml-2 text-xs font-normal text-slate-500">
-                Máy tính phát video. Điện thoại: video YouTube → hiện ảnh nền; video Google Drive →
-                phát bản nhẹ. Slide không có video thì hiện ảnh.
+                Máy tính và điện thoại đều phát video. Ảnh chỉ hiện khi mạng yếu hoặc video chưa tải
+                được.
               </span>
             </p>
             <Button variant="danger" size="sm" icon={Trash2} onClick={removeSlide}>
@@ -259,19 +273,23 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <SlideVideo value={slide.video} onChange={(video) => setSlide({ video })} />
+            <SlideVideo
+              value={slide.video}
+              onChange={(video) => setSlide({ video })}
+              onCopied={replaceVideo}
+            />
             <SlideImage
               icon={Smartphone}
-              label="Ảnh nền cho điện thoại"
-              hint="Nên dùng ảnh dọc."
+              label="2. Ảnh dọc cho điện thoại (hiện khi mạng yếu)"
+              hint="Điện thoại hiện ảnh này trong lúc video đang tải hoặc khi mạng yếu. Nên chọn ảnh chụp dọc."
               portrait
               value={slide.posterMobile}
               onChange={(posterMobile) => setSlide({ posterMobile })}
             />
             <SlideImage
               icon={ImageIcon}
-              label="Ảnh chờ khi video đang tải"
-              hint="Không bắt buộc — để trống sẽ dùng ảnh bìa của video."
+              label="3. Ảnh hiện trước khi video chạy"
+              hint="Không bắt buộc. Máy tính hiện ảnh này trong lúc video đang tải hoặc khi mạng yếu. Để trống sẽ dùng ảnh đầu tiên của video. Nếu slide không có video, máy tính sẽ hiện ảnh này."
               value={slide.poster}
               onChange={(poster) => setSlide({ poster })}
             />
@@ -364,16 +382,21 @@ const SITE_VIDEO = /^\/videos\/[\w./-]+\.(mp4|webm)$/i;
  * website (Drive không tự phát làm nền được) rồi phát bằng thẻ video. Ô nhập chỉ hiện link người dùng dán,
  * không hiện link kỹ thuật của video đã chép.
  */
-function SlideVideo({ value, onChange }) {
+/** 75 giây → "1:15" */
+const fmtElapsed = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+function SlideVideo({ value, onChange, onCopied }) {
   const { toast } = useUi();
-  const shown = (v) => (cloudinaryVideo(v) ? "" : (v ?? "")); // video đã chép → ô nhập trống
+  useVideoCopies(); // vẽ lại khi video đang chuẩn bị xong / lỗi
+  const shown = (v) => (cloudinaryVideo(v) ? "" : (v ?? "")); // video đã lấy về → ô nhập trống
   const [text, setText] = useState(shown(value));
   const [lastValue, setLastValue] = useState(value ?? "");
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(""); // lời báo lỗi khi chép video Drive
-  const job = useRef(0);
+  const [now, setNow] = useState(0);
   if ((value ?? "") !== lastValue) {
-    // giá trị đổi từ bên ngoài (hoàn tác, link được chuẩn hoá, chép xong) → ô nhập hiện theo
+    // giá trị đổi từ bên ngoài (hoàn tác, link được chuẩn hoá, lấy xong) → ô nhập hiện theo
     setLastValue(value ?? "");
     setText(shown(value));
   }
@@ -382,38 +405,51 @@ function SlideVideo({ value, onChange }) {
   const copied = cloudinaryVideo(v);
   const site = SITE_VIDEO.test(v) && !v.includes("..");
   const parsed = parseVideo(t);
+  // trạng thái lấy video Drive (giữ nguyên khi chuyển slide rồi quay lại)
+  const state = parseVideo(v)?.provider === "drive" ? copyState(v) : null;
+  const busy = state?.status === "running";
+  const failed = state?.status === "failed" ? state.error : "";
   const error = failed || (t && !parsed && !site ? videoLinkError(t) : "");
+  const ready = copied && isUnsavedVideo(v);
 
-  const importDrive = async (link) => {
-    const token = ++job.current;
-    setBusy(true);
-    const note = toast.loading("Đang chép video từ Google Drive… (có thể mất vài chục giây)");
-    try {
-      const video = await importDriveVideo(link);
-      if (token !== job.current) return note.dismiss(); // người dùng đã dán link khác
-      onChange(video.url);
-      note.success("Đã chép video từ Google Drive");
-    } catch (err) {
-      if (token !== job.current) return note.dismiss();
-      setFailed(errorMessage(err));
-      note.error(errorMessage(err), {
-        title: "Chưa chép được video",
-        action: { label: "Thử lại", onClick: () => importDrive(link) },
-      });
-    } finally {
-      if (token === job.current) setBusy(false);
-    }
+  // đồng hồ "đã chờ" khi đang chuẩn bị video
+  useEffect(() => {
+    if (!busy) return;
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [busy]);
+
+  const importDrive = (link) => {
+    const from = canonicalVideo(link.trim());
+    const note = toast.loading("Đang chuẩn bị video từ Google Drive…");
+    copyDriveVideo(link).then(
+      (video) => {
+        onCopied(from, video.url);
+        note.success("Video đã sẵn sàng — bấm Lưu để áp dụng");
+      },
+      (err) => {
+        if (isAbort(err)) return note.dismiss(); // đã gỡ / thay video
+        note.error(errorMessage(err), {
+          title: "Chưa lấy được video",
+          action: { label: "Thử lại", onClick: () => importDrive(link) },
+        });
+      },
+    );
   };
 
   const commit = (raw) => {
     setText(raw);
-    setFailed("");
-    job.current++; // bỏ kết quả của lần chép trước (nếu đang chạy)
-    setBusy(false);
     const s = raw.trim();
     const p = parseVideo(s);
+    // gỡ / thay video đang chuẩn bị → huỷ (video đã lấy về mà bỏ thì tự được dọn khi không còn trong form)
+    if (busy && (!p || canonicalVideo(s) !== v)) cancelCopy(v);
     if (!s) return onChange("");
-    // link Drive: lưu tạm link Drive (chưa bấm Lưu được) trong lúc chép, chép xong thay bằng video đã chép
+    // link Drive: tạm giữ link Drive trong lúc chuẩn bị, xong thì thay bằng video đã lấy về
     onChange(p ? canonicalVideo(s) : s);
     if (p?.provider === "drive") importDrive(s);
   };
@@ -422,37 +458,58 @@ function SlideVideo({ value, onChange }) {
   return (
     <MediaCard
       icon={Monitor}
-      label="Video nền cho máy tính"
-      hint="Dán link YouTube hoặc Google Drive (video ngang). Video tự phát, không tiếng."
+      label="1. Video (máy tính và điện thoại)"
+      hint="Dán link Google Drive hoặc YouTube. Nên dùng video quay ngang, cảnh chính nằm giữa khung — điện thoại cắt lấy phần giữa theo chiều dọc. Video tự chạy, không có tiếng. Link YouTube chỉ phát trên máy tính (điện thoại hiện ảnh dọc cho nhẹ), muốn điện thoại cũng phát video hãy dùng link Google Drive."
       error={error}
       preview={
         <div className={cn(FRAME, "bg-slate-800")}>
           {busy ? (
-            <span className="flex flex-col items-center gap-2 px-4 text-center text-xs text-white/85">
+            <span
+              className="flex flex-col items-center gap-2 px-4 text-center text-xs text-white/85"
+              role="status"
+            >
               <Spinner className="size-6 text-white" />
-              <b className="text-sm text-white">Đang chép video từ Drive…</b>
-              Video lớn có thể mất một lúc, cứ tiếp tục sửa phần khác.
+              <b className="text-sm text-white">
+                Đang chuẩn bị video…{" "}
+                <span className="font-mono tabular-nums">
+                  {fmtElapsed(Math.max(0, now - state.startedAt))}
+                </span>
+              </b>
+              Video lớn có thể mất vài phút. Bạn cứ sửa phần khác — bấm Lưu sẽ tự chờ video xong.
+              <Button size="sm" variant="soft" onClick={() => commit("")}>
+                Huỷ
+              </Button>
             </span>
           ) : copied ? (
-            <video
-              key={v}
-              src={cloudinaryVideoUrl(copied, { width: 720 })}
-              poster={videoThumb(v)}
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="absolute inset-0 size-full object-cover"
-            />
+            <>
+              <video
+                key={v}
+                src={cloudinaryVideoUrl(copied, { width: 720 })}
+                poster={videoThumb(v)}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="absolute inset-0 size-full object-cover"
+              />
+              {ready && (
+                <span
+                  role="status"
+                  className="absolute inset-x-2 bottom-2 rounded-lg bg-emerald-600/95 px-2.5 py-1.5 text-center text-[11px] font-semibold text-white shadow"
+                >
+                  Video đã sẵn sàng — bấm Lưu để áp dụng
+                </span>
+              )}
+            </>
           ) : parsed?.provider === "youtube" ? (
             <Pic src={videoThumb(t)} />
           ) : parsed?.provider === "drive" ? (
-            // chép lỗi / bị gián đoạn (đổi slide khi đang chép) → chép lại
+            // lấy lỗi / bị gián đoạn (tải lại trang khi đang chuẩn bị) → thử lại
             <span className="flex flex-col items-center gap-2 px-4 text-center text-xs text-white/85">
               <Film className="size-6" />
-              Video Drive chưa được chép về website.
-              <Button size="sm" variant="soft" onClick={() => (setFailed(""), importDrive(t))}>
-                Chép lại
+              Chưa lấy được video từ Google Drive.
+              <Button size="sm" variant="soft" onClick={() => importDrive(t)}>
+                Thử lại
               </Button>
             </span>
           ) : (

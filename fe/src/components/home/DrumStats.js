@@ -20,9 +20,21 @@ import { cn } from "@/lib/utils";
 const ANGLES = [-140, 180, 140, -40, 0, 40];
 
 export default async function DrumStats({ lang, dict }) {
-  const { allTours, destinations, home } = await getCatalog();
+  const { allTours, destinations, home, fleet, allPackages } = await getCatalog();
   const t = dict.home;
   const p = lp(lang);
+  // Tự tính từ dữ liệu CMS (Visa & fast-track, Xe & khu vực) thay cho số để cứng:
+  // số sân bay có giá fast-track, số chỗ của xe nhỏ nhất – lớn nhất
+  const airports = new Set(
+    allPackages().flatMap((x) =>
+      Object.entries(x.prices ?? {})
+        .filter(([, v]) => v != null)
+        .map(([code]) => code),
+    ),
+  ).size;
+  const seats = fleet.map((f) => f.seats).filter(Boolean);
+  const minSeats = seats.length ? Math.min(...seats) : 0;
+  const maxSeats = seats.length ? Math.max(...seats) : 0;
   const stats = [
     {
       icon: CalendarCheck,
@@ -49,7 +61,7 @@ export default async function DrumStats({ lang, dict }) {
     },
     {
       icon: Plane,
-      value: 5,
+      value: airports,
       label: {
         en: "Airports with fast-track",
         zh: "个机场提供快速通关",
@@ -59,8 +71,8 @@ export default async function DrumStats({ lang, dict }) {
     },
     {
       icon: Car,
-      value: 45,
-      prefix: "4–",
+      value: maxSeats,
+      prefix: minSeats && minSeats !== maxSeats ? `${minSeats}–` : "",
       label: {
         en: "Seats – cars to coaches",
         zh: "座 · 从轿车到大巴",

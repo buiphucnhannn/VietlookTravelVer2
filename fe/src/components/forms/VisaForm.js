@@ -184,6 +184,7 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
       <Field label={t.entryDate} htmlFor="vs-date" error={errs.entryDate}>
         <DateInput
           id="vs-date"
+          lang={lang}
           value={d.entryDate}
           onChange={set("entryDate")}
           aria-invalid={!!errs.entryDate}

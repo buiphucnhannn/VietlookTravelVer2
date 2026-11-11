@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Quote } from "lucide-react";
 import { siteConfig } from "@/constants/site";
 import { tr } from "@/i18n/config";
-import { dateLocale } from "@/lib/utils";
+import { fmtMonthYear } from "@/lib/dates";
 import { Container, SectionHeading } from "@/components/ui";
 import Carousel from "@/components/ui/Carousel";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
@@ -39,13 +39,8 @@ function Laurel({ flip, className }) {
  */
 export default function Reviews({ lang, dict, reviews }) {
   const t = dict.home;
-  const fmtDate = (d) =>
-    d
-      ? new Date(d).toLocaleDateString(dateLocale(lang), {
-          year: "numeric",
-          month: "short",
-        })
-      : "";
+  // "2026-10" / ngày đầy đủ → "10/2026" (dạng số như toàn hệ thống, không tên tháng)
+  const fmtDate = fmtMonthYear;
   return (
     <section
       className="relative isolate overflow-hidden bg-forest-900 py-14 text-white lg:py-[4.5rem]"

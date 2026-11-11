@@ -11,18 +11,17 @@ const folder = z
 
 export const folderQuery = z.object({ folder });
 
-/** Thêm ảnh từ link: http(s), tối đa 2048 ký tự (kiểm tra máy nội bộ ở upload.service.checkImageUrl) */
-export const imageFromUrlSchema = z.object({
+/**
+ * Xem trước ảnh từ link (chưa lưu kho ảnh): http(s), tối đa 2048 ký tự
+ * (kiểm tra máy nội bộ ở upload.service.checkImageUrl)
+ */
+export const linkPreviewSchema = z.object({
   url: z
     .string()
     .trim()
     .max(2048, "Link quá dài")
     .regex(/^https?:\/\/\S+$/i, "Link ảnh phải bắt đầu bằng http:// hoặc https://"),
-  folder,
 });
-
-/** Xem trước ảnh từ link (chưa lưu kho ảnh) */
-export const linkPreviewSchema = imageFromUrlSchema.pick({ url: true });
 
 export const deleteImageSchema = z.object({
   // chỉ được xoá ảnh trong thư mục của website (không đụng ảnh khác trên tài khoản Cloudinary)
@@ -48,3 +47,8 @@ export const driveVideoSchema = z.object({
 });
 
 export const driveVideoJobParams = z.object({ jobId: z.uuid("Không tìm thấy") });
+
+/** Bỏ ảnh / video vừa tải mà chưa lưu: tối đa 30 link / lần (máy chủ chỉ xoá file đúng điều kiện) */
+export const discardPendingSchema = z.object({
+  urls: z.array(z.string().trim().max(600)).min(1).max(30),
+});

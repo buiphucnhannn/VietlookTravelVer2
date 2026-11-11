@@ -60,6 +60,10 @@ const ROLES = [
   { value: "editor", label: "Nhân viên", hint: "Chỉ dùng các mục được cấp quyền" },
 ];
 
+const MIN_PASSWORD = 8; // khớp be/src/validators/common.validator.js
+const shortPassword = (pw) =>
+  pw.length < MIN_PASSWORD ? `Mật khẩu cần ít nhất ${MIN_PASSWORD} ký tự` : "";
+
 /** Mật khẩu ngẫu nhiên dễ đọc (bỏ ký tự dễ nhầm 0/O, 1/l) */
 function randomPassword(len = 14) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
@@ -574,6 +578,7 @@ function CreateUser({ onClose, onSaved }) {
     if (!/^[a-z0-9._@-]{3,64}$/.test(d.username))
       return toast("Tên đăng nhập cần 3–64 ký tự, viết liền không dấu (vd: lan.nguyen)", "error");
     if (!d.password) return toast("Vui lòng nhập mật khẩu", "error");
+    if (shortPassword(d.password)) return toast(shortPassword(d.password), "error");
     if (d.role === "editor" && !grantedModules(d.permissions).length)
       return toast(
         "Hãy cấp ít nhất 1 mục cho nhân viên — hoặc bấm một mẫu ở phần Chọn nhanh.",
@@ -623,7 +628,11 @@ function CreateUser({ onClose, onSaved }) {
           <Field label="Email" hint="Không bắt buộc">
             <Input type="email" value={d.email} onChange={(e) => set({ email: e.target.value })} />
           </Field>
-          <Field label="Mật khẩu" required hint="Hãy gửi riêng mật khẩu này cho người dùng.">
+          <Field
+            label="Mật khẩu"
+            required
+            hint={`Ít nhất ${MIN_PASSWORD} ký tự. Hãy gửi riêng mật khẩu này cho người dùng.`}
+          >
             <PasswordInput value={d.password} onChange={(password) => set({ password })} />
           </Field>
         </div>
@@ -755,6 +764,7 @@ function ResetPassword({ user, onClose }) {
 
   const save = async () => {
     if (!pw) return toast("Vui lòng nhập mật khẩu mới", "error");
+    if (shortPassword(pw)) return toast(shortPassword(pw), "error");
     const r = await run(
       () => api(`${PATH}/${user.id}/reset-password`, { method: "POST", body: { newPassword: pw } }),
       `Đã đặt lại mật khẩu cho ${user.username}`,
@@ -783,7 +793,7 @@ function ResetPassword({ user, onClose }) {
           Người này sẽ bị đăng xuất và phải đăng nhập bằng mật khẩu mới. Hãy gửi riêng mật khẩu mới
           cho họ.
         </Notice>
-        <Field label="Mật khẩu mới" required>
+        <Field label="Mật khẩu mới" required hint={`Ít nhất ${MIN_PASSWORD} ký tự.`}>
           <PasswordInput value={pw} onChange={setPw} autoFocus />
         </Field>
       </div>

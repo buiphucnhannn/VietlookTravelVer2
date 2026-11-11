@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ENQUIRY_TYPE_VALUES } from "../constants/content.js";
+import { optionCode } from "../emails/format.js";
 import { plainText } from "./common.validator.js";
 
 /** Hôm nay theo giờ Việt Nam (YYYY-MM-DD) — ngày đi / nhập cảnh không được là ngày đã qua */
@@ -104,6 +105,9 @@ export const publicEnquirySchema = z
       });
     if (d.type === "booking" && !d.tourSlug)
       ctx.addIssue({ code: "custom", path: ["tourSlug"], message: "Tour is required." });
+    // đặt tour phải có ngày khởi hành (khớp lịch tour kiểm tra ở enquiryService.createPublic)
+    if (d.type === "booking" && !d.departureDate)
+      ctx.addIssue({ code: "custom", path: ["departureDate"], message: "Please choose a date." });
     if (Object.keys(d).length > 70)
       ctx.addIssue({ code: "custom", path: [], message: "Too many fields." });
   })
@@ -112,7 +116,13 @@ export const publicEnquirySchema = z
     for (const [k, v] of Object.entries(d)) {
       if (CORE.has(k) || v === "" || v == null) continue;
       if (!/^[a-zA-Z][\w]{0,40}$/.test(k)) continue; // tên trường lạ (vd. "$where", "a.b") → bỏ
-      details[k] = v;
+      // thiết kế tour: lưu MÃ lựa chọn (trang web cũ còn mở có thể vẫn gửi chữ theo ngôn ngữ khách)
+      details[k] =
+        d.type !== "planner"
+          ? v
+          : Array.isArray(v)
+            ? v.map((x) => optionCode(k, x))
+            : optionCode(k, v);
     }
     return { ...d, details };
   });

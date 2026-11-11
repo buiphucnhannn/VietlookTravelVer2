@@ -50,6 +50,7 @@ import {
 } from "./ui";
 import { usePendingImages } from "./pendingImages";
 import { ReadOnlyArea, usePermission } from "./permissions";
+import { PAGE_LABELS } from "./labels";
 
 const TAGS = ["pages"];
 const BASE = `${ADMIN_BASE}/pages`;
@@ -57,35 +58,35 @@ const BASE = `${ADMIN_BASE}/pages`;
 const PAGES = [
   {
     key: "about",
-    label: "Giới thiệu",
+    label: PAGE_LABELS.about,
     icon: Info,
     url: "/about",
     text: "Câu chuyện, tầm nhìn, sứ mệnh và giá trị cốt lõi của Vietlook.",
   },
   {
     key: "terms",
-    label: "Điều khoản sử dụng",
+    label: PAGE_LABELS.terms,
     icon: FileText,
     url: "/policies/terms",
     text: "Điều khoản khi khách sử dụng website và dịch vụ.",
   },
   {
     key: "privacy",
-    label: "Chính sách bảo mật",
+    label: PAGE_LABELS.privacy,
     icon: ShieldCheck,
     url: "/policies/privacy",
     text: "Cách thu thập, sử dụng và bảo vệ thông tin khách hàng.",
   },
   {
     key: "payment",
-    label: "Thanh toán & hoàn tiền",
+    label: PAGE_LABELS.payment,
     icon: CreditCard,
     url: "/policies/payment",
     text: "Hình thức thanh toán, đặt cọc và hoàn tiền.",
   },
   {
     key: "cancellation",
-    label: "Huỷ / đổi tour",
+    label: PAGE_LABELS.cancellation,
     icon: CalendarX2,
     url: "/policies/cancellation",
     text: "Điều kiện và phí khi khách hủy hoặc đổi tour.",
@@ -126,12 +127,24 @@ const ABOUT_TEXT_KEYS = [
  * website để màn sửa hiện đúng như trang thật.
  */
 async function loadAboutDefaults() {
-  const mods = await Promise.all([
+  const count = (path) =>
+    api(path)
+      .then((r) => r.data?.length ?? null)
+      .catch(() => null);
+  const [en, zh, vi, tourCount, postCount] = await Promise.all([
     import("@/i18n/dictionaries/en"),
     import("@/i18n/dictionaries/zh"),
     import("@/i18n/dictionaries/vi"),
+    count("/public/tours"),
+    count("/public/articles"),
   ]);
-  const dict = Object.fromEntries(LANG_KEYS.map((l, i) => [l, mods[i].default]));
+  const dict = Object.fromEntries(LANG_KEYS.map((l, i) => [l, [en, zh, vi][i].default]));
+  // số liệu mặc định = số website tự tính từ dữ liệu CMS (giống trang Giới thiệu): số tour, số bài cẩm nang
+  const liveValues = [
+    undefined,
+    tourCount != null ? `${tourCount}+` : undefined,
+    postCount != null ? String(postCount) : undefined,
+  ];
   const per = (pick) => Object.fromEntries(LANG_KEYS.map((l) => [l, pick(dict[l]) ?? ""]));
   return {
     subtitle: per((t) => t.about.subtitle),
@@ -149,7 +162,7 @@ async function loadAboutDefaults() {
       text: per((t) => t.home.why[i]?.text),
     })),
     stats: dict.en.home.stats.map((s, i) => ({
-      value: s.value,
+      value: liveValues[i] ?? s.value,
       label: per((t) => t.home.stats[i]?.label),
     })),
   };
@@ -572,8 +585,9 @@ function PageCanvas({ page, initial, all = [], defaults }) {
         {saved.updatedAt && ` Lưu lần cuối ${fmtDateTime(saved.updatedAt)}.`}
       </p>
 
-      {/* Thanh chọn ngôn ngữ + bật/tắt hiển thị: luôn nằm trên cùng khi cuộn */}
-      <div className="sticky top-16 z-30 -mx-2 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl bg-slate-50/90 px-2 py-2.5 backdrop-blur lg:top-0">
+      {/* Thanh chọn ngôn ngữ + bật/tắt hiển thị: khi cuộn nổi cách mép trên 12px (điện thoại: dưới thanh tiêu đề
+          64px + 8px), bo tròn đủ 4 góc, nền trắng đặc + viền mảnh + bóng nhẹ → như 1 thanh công cụ nổi, không dính sát mép */}
+      <div className="sticky z-30 -mx-3 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl bg-white/95 px-4 py-2.5 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/80 backdrop-blur max-lg:top-[4.5rem] lg:top-3">
         <Toggle
           checked={d.isActive}
           onChange={(isActive) => set({ isActive })}

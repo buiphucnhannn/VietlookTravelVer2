@@ -23,6 +23,7 @@ import {
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { fmtDayChip, todayVN } from "@/lib/dates";
 import { TODO_EVENT, toastError } from "./hooks";
 import { Button, Card, EmptyState, Spinner, fmtDateTime, useUi } from "./ui";
 import { canUser, useCurrentUser } from "./permissions";
@@ -31,14 +32,8 @@ import { LogSentence, actorText } from "./AuditLogPage";
 
 const A = (p = "") => `${ADMIN_BASE}${p}`;
 
-/** "thứ hai, 10 tháng 11, 2026" */
-const today = () =>
-  new Intl.DateTimeFormat("vi-VN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
+/** "T3 · 11/10/2026" (giờ Việt Nam) */
+const today = () => fmtDayChip(todayVN(), "vi");
 
 const greeting = () => {
   const h = new Date().getHours();

@@ -76,8 +76,6 @@ export default function LanguageSwitcher({ lang, pathname, variant = "light", co
                 href={pathname ? switchLocalePath(pathname, l) : href(l)}
                 hrefLang={localeMeta[l].hreflang}
                 onClick={(e) => {
-                  // Ghi nhớ lựa chọn để trang chủ không tự chuyển theo ngôn ngữ trình duyệt nữa
-                  document.cookie = `lang=${l}; path=/; max-age=31536000; samesite=lax`;
                   setOpen(false);
                   // Giữ bộ lọc / ô tìm (?destination=…&q=…) khi đổi ngôn ngữ — cùng trang ở ngôn ngữ khác nhận
                   // đúng các tham số đó. Đọc lúc bấm (không dùng useSearchParams để header vẫn dựng tĩnh).

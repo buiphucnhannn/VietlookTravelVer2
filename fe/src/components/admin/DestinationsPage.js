@@ -164,11 +164,11 @@ export default function DestinationsPage() {
       />
 
       <Card bodyClassName="p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:px-5">
+        <div className="flex flex-col items-center gap-3 border-b border-slate-100 p-4 sm:px-5">
           <div
             role="tablist"
             aria-label="Miền"
-            className="flex w-full rounded-full bg-slate-100 p-1 sm:w-auto"
+            className="flex w-full justify-center rounded-full bg-slate-100 p-1 sm:w-auto"
           >
             {REGIONS.map((r) => {
               const on = !searching && r.value === region;
@@ -193,7 +193,7 @@ export default function DestinationsPage() {
                   {r.label}
                   <span
                     className={cn(
-                      "rounded-full px-1.5 text-[11px] font-bold",
+                      "inline-grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] leading-none font-bold tabular-nums",
                       on ? "bg-brand-50 text-brand-700" : "bg-slate-200/70 text-slate-500",
                     )}
                   >
@@ -210,7 +210,7 @@ export default function DestinationsPage() {
               paged.setPage(1);
             }}
             placeholder="Tìm điểm đến ở cả 3 miền…"
-            className="w-full sm:w-80"
+            className="w-full"
           />
         </div>
 
@@ -345,70 +345,78 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
       busy={busy || autoFill.busy || images.busy}
       saveLabel={images.label}
     >
+      {/* Thứ tự theo trang điểm đến trên website: đầu trang (ảnh lớn, tên, mô tả) → thẻ điểm đến
+          (ảnh thẻ, điểm nổi bật — ở trang chủ, menu, danh sách) → cài đặt hiển thị ở cuối */}
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
         <div className="space-y-4">
           <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
-          <Field label="Tên điểm đến" required>
-            <LocInput
-              value={d.name}
-              lang={lang}
-              onChange={(name) =>
-                set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })
-              }
-            />
-          </Field>
-          <Field label="Mô tả ngắn (2–3 câu)">
-            <LocInput
-              value={d.intro}
-              lang={lang}
-              multiline
-              rows={4}
-              onChange={(intro) => set({ intro })}
-            />
-          </Field>
-          <Field
-            label="Điểm nổi bật"
-            hint="Hiện dạng thẻ trên trang điểm đến (VD: Phố cổ, Hồ Hoàn Kiếm). Kéo để đổi thứ tự."
-          >
-            <Lines
-              value={d.highlights}
-              onChange={(highlights) => set({ highlights })}
-              text={(h) => h?.[lang]}
-              withText={(h, v) => ({ ...L(), ...h, [lang]: v })}
-              blank={L()}
-              addLabel="Thêm điểm nổi bật"
-            />
-          </Field>
+          <FormSection title="Đầu trang điểm đến">
+            <Field
+              label="Ảnh lớn đầu trang"
+              hint="Phủ ngang đầu trang điểm đến. Để trống thì dùng ảnh thẻ."
+            >
+              <ImageField
+                value={d.hero}
+                onChange={(hero) => set({ hero })}
+                folder="destinations"
+                crop={{ ratio: 12 / 5, width: 2400 }}
+              />
+            </Field>
+            <Field
+              label="Tên điểm đến"
+              required
+              hint="Tiêu đề đầu trang hiện “Tour + tên điểm đến”."
+            >
+              <LocInput
+                value={d.name}
+                lang={lang}
+                onChange={(name) =>
+                  set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })
+                }
+              />
+            </Field>
+            <Field label="Mô tả ngắn (2–3 câu)" hint="Hiện dưới tiêu đề đầu trang.">
+              <LocInput
+                value={d.intro}
+                lang={lang}
+                multiline
+                rows={4}
+                onChange={(intro) => set({ intro })}
+              />
+            </Field>
+          </FormSection>
         </div>
 
         <div className="space-y-6">
-          <FormSection title="Hình ảnh">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Ảnh thẻ"
-                hint="Hiện ở thẻ điểm đến (trang chủ, menu, danh sách). Ảnh ngang, chủ thể ở giữa."
-              >
+          <FormSection title="Thẻ điểm đến">
+            <Field
+              label="Ảnh thẻ"
+              hint="Hiện ở thẻ điểm đến (trang chủ, menu, danh sách). Ảnh ngang, chủ thể ở giữa."
+            >
+              <div className="max-w-xs">
                 <ImageField
                   value={d.image}
                   onChange={(image) => set({ image })}
                   folder="destinations"
                 />
-              </Field>
-              <Field
-                label="Ảnh lớn đầu trang"
-                hint="Phủ ngang đầu trang điểm đến. Để trống thì dùng ảnh thẻ."
-              >
-                <ImageField
-                  value={d.hero}
-                  onChange={(hero) => set({ hero })}
-                  folder="destinations"
-                  crop={{ ratio: 12 / 5, width: 2400 }}
-                />
-              </Field>
-            </div>
+              </div>
+            </Field>
+            <Field
+              label="Điểm nổi bật"
+              hint="Hiện dạng nhãn trên thẻ điểm đến ở trang chủ (VD: Phố cổ, Hồ Hoàn Kiếm). Kéo để đổi thứ tự."
+            >
+              <Lines
+                value={d.highlights}
+                onChange={(highlights) => set({ highlights })}
+                text={(h) => h?.[lang]}
+                withText={(h, v) => ({ ...L(), ...h, [lang]: v })}
+                blank={L()}
+                addLabel="Thêm điểm nổi bật"
+              />
+            </Field>
           </FormSection>
 
-          <FormSection title="Thiết lập">
+          <FormSection title="Cài đặt hiển thị">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Miền" required>
                 <Select value={d.region} onChange={(e) => set({ region: e.target.value })}>

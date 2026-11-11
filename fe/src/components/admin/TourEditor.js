@@ -9,12 +9,14 @@ import {
   ChevronDown,
   CircleHelp,
   Columns3,
+  Compass,
   ExternalLink,
   Image as ImageIcon,
   Info,
   ListChecks,
   ListPlus,
   MessageSquareQuote,
+  Plane,
   Plus,
   Rows3,
   Save,
@@ -23,12 +25,14 @@ import {
   Star,
   Tag,
   Trash2,
+  Video,
   X,
 } from "lucide-react";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { api, errorMessage } from "@/lib/api";
 import { estimatePrice } from "@/lib/pricing";
 import { cn, slugify } from "@/lib/utils";
+import { fmtDate, isISODate } from "@/lib/dates";
 import { priceLineVi } from "@/lib/pricing-labels";
 import { useMutation, useOptions } from "./hooks";
 import RichText from "./RichTextLazy";
@@ -42,6 +46,7 @@ import {
   Field,
   GalleryField,
   ImageField,
+  DateInput,
   Input,
   LANGS,
   LangTabs,
@@ -365,10 +370,10 @@ export function toTourPayload(t) {
 /** Kiểm tra nhanh trước khi gửi → câu báo lỗi đầu tiên (hoặc null) */
 function validate(p) {
   if (!LANG_KEYS.some((l) => p.content[l].title))
-    return "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục Thông tin chung).";
+    return "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục 2. Tên tour & thông tin chính).";
   if (p.nights > p.days)
-    return "Số đêm không được nhiều hơn số ngày (mục Thông tin chung) — VD: 3 ngày 2 đêm, tour trong ngày 1 ngày 0 đêm.";
-  if (!p.slug) return "Vui lòng nhập đường dẫn trang (mục Tuỳ chọn thêm).";
+    return "Số đêm không được nhiều hơn số ngày (mục 2. Tên tour & thông tin chính) — VD: 3 ngày 2 đêm, tour trong ngày 1 ngày 0 đêm.";
+  if (!p.slug) return "Vui lòng nhập đường dẫn trang (mục Cài đặt hiển thị).";
   if (!SLUG_RX.test(p.slug))
     return "Đường dẫn trang chỉ gồm chữ thường không dấu, số và dấu gạch ngang.";
   if (p.originalPrice != null && (p.price == null || p.originalPrice <= p.price))
@@ -389,11 +394,8 @@ function validate(p) {
   return null;
 }
 
-/** 2027-02-06 → 06/02/2027 · 01-01 → 01/01 hằng năm */
-const fmtDay = (d) =>
-  d.length === 5
-    ? `${d.slice(3)}/${d.slice(0, 2)} hằng năm`
-    : `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+/** 2027-02-06 → 02/06/2027 · 12-24 → 12/24 hằng năm (mm/dd như toàn hệ thống) */
+const fmtDay = (d) => (d.length === 5 ? `${fmtDate(d)} hằng năm` : fmtDate(d));
 
 /** Chữ của trường `key` ở một ngôn ngữ KHÁC đã có (để gợi ý trong ô đang trống) */
 const otherText = (t, lang, key) =>
@@ -490,16 +492,22 @@ function withTranslation(tour, translated, from) {
  * Trang soạn tour
  * ========================================================================= */
 
-/** Thứ tự các mục đi theo đúng “mẫu thông tin tour”; các mục `extra` là phần tuỳ chọn thêm */
+/**
+ * Thứ tự các mục đi đúng thứ tự trang tour trên website (từ trên xuống) để dễ đối chiếu khi sửa.
+ * Các mục `extra` (cài đặt — khách không nhìn thấy) luôn ở cuối.
+ */
 const SECTIONS = [
-  { id: "thong-tin", label: "1. Thông tin chung", icon: Info },
-  { id: "lich-trinh", label: "2. Lịch trình", icon: CalendarDays },
-  { id: "gia", label: "3. Giá", icon: Tag },
-  { id: "bao-gom", label: "4. Bao gồm / Không", icon: ListChecks },
-  { id: "hoi-dap", label: "5. Câu hỏi thường gặp", icon: CircleHelp },
-  { id: "anh", label: "6. Ảnh & video", icon: ImageIcon },
-  { id: "tuy-chon", label: "Hiển thị & thông tin phụ", icon: SlidersHorizontal, extra: true },
-  { id: "danh-gia", label: "Đánh giá", icon: Star, extra: true },
+  { id: "anh", label: "1. Ảnh bìa & album", icon: ImageIcon },
+  { id: "thong-tin", label: "2. Tên tour & thông tin chính", icon: Info },
+  { id: "tong-quan", label: "3. Tổng quan", icon: Compass },
+  { id: "lich-trinh", label: "4. Lịch trình theo ngày", icon: CalendarDays },
+  { id: "bao-gom", label: "5. Bao gồm / Không bao gồm", icon: ListChecks },
+  { id: "gia", label: "6. Giá tour", icon: Tag },
+  { id: "khoi-hanh", label: "7. Ngày khởi hành", icon: Plane },
+  { id: "hoi-dap", label: "8. Câu hỏi thường gặp", icon: CircleHelp },
+  { id: "danh-gia", label: "9. Đánh giá của khách", icon: Star },
+  { id: "video", label: "10. Video", icon: Video },
+  { id: "tuy-chon", label: "Cài đặt hiển thị", icon: SlidersHorizontal, extra: true },
   { id: "google", label: "Hiển thị trên Google", icon: SearchIcon, extra: true },
 ];
 
@@ -661,6 +669,15 @@ function EditorBody({
   const autoFill = useAutoFill();
   const images = usePendingImages(t);
   const { canEdit } = usePermission("tours"); // chỉ xem → form chỉ đọc, không có nút Lưu
+  const active = useActiveSection(SECTIONS);
+  const chipRef = useRef(null);
+  // điện thoại: giữ nút của mục đang xem trong tầm nhìn của thanh mục cuộn ngang
+  useEffect(() => {
+    const el = chipRef.current;
+    const bar = el?.parentElement;
+    if (!el || !bar) return;
+    bar.scrollTo({ left: el.offsetLeft - bar.clientWidth / 2 + el.clientWidth / 2 });
+  }, [active]);
 
   /** Ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết (tab đang chọn nếu có chữ) */
   const fillLanguages = async (tour) => {
@@ -676,12 +693,15 @@ function EditorBody({
   const save = async () => {
     if (busy || autoFill.busy || images.busy || !canEdit) return;
     if (!anyLang(titlesOf(t)))
-      return toast.error("Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục Thông tin chung).", {
-        title: "Chưa lưu được",
-      });
+      return toast.error(
+        "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục 2. Tên tour & thông tin chính).",
+        {
+          title: "Chưa lưu được",
+        },
+      );
     if (Number(t.nights) > Number(t.days))
       return toast.error(
-        "Số đêm không được nhiều hơn số ngày (mục Thông tin chung) — VD: 3 ngày 2 đêm, tour trong ngày 1 ngày 0 đêm.",
+        "Số đêm không được nhiều hơn số ngày (mục 2. Tên tour & thông tin chính) — VD: 3 ngày 2 đêm, tour trong ngày 1 ngày 0 đêm.",
         { title: "Chưa lưu được" },
       );
     // ảnh vừa chọn (ảnh bìa, album, ảnh trong nội dung) chỉ được lưu vào kho ảnh lúc này — trước khi dịch
@@ -741,8 +761,12 @@ function EditorBody({
 
   return (
     <div className="pb-16">
-      {/* Thanh tiêu đề dính trên cùng */}
-      <div className="sticky top-16 z-30 -mx-4 mb-6 border-b border-slate-200/80 bg-slate-50/90 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 lg:top-0 lg:-mx-10 lg:px-10">
+      {/* Thanh tiêu đề: thẻ trắng bo tròn, nổi cách mép trên 12px khi cuộn (điện thoại: dưới thanh tiêu đề 64px + 8px)
+          — cùng kiểu thanh công cụ ở trang Giới thiệu & chính sách, thẳng mép với nội dung bên dưới */}
+      <div
+        data-section-bar
+        className="sticky z-30 mb-6 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/80 backdrop-blur max-lg:top-[4.5rem] sm:px-5 lg:top-3"
+      >
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
             <BackLink />
@@ -798,8 +822,15 @@ function EditorBody({
           {SECTIONS.map((s) => (
             <a
               key={s.id}
+              ref={s.id === active ? chipRef : undefined}
               href={`#${s.id}`}
-              className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
+              aria-current={s.id === active ? "location" : undefined}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition",
+                s.id === active
+                  ? "bg-brand-600 text-white ring-brand-600"
+                  : "bg-white text-slate-600 ring-slate-200",
+              )}
             >
               {s.label}
             </a>
@@ -809,7 +840,7 @@ function EditorBody({
 
       <div className="lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-8">
         <nav className="hidden lg:block">
-          <ul className="sticky top-32 space-y-1">
+          <ul className="sticky top-28 space-y-1">
             {SECTIONS.map(({ id, label, icon: Icon, extra }) => (
               <li
                 key={id}
@@ -817,9 +848,14 @@ function EditorBody({
               >
                 <a
                   href={`#${id}`}
+                  aria-current={id === active ? "location" : undefined}
                   className={cn(
                     "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition hover:bg-white hover:text-brand-700 hover:shadow-sm",
-                    extra ? "text-slate-400" : "text-slate-600",
+                    id === active
+                      ? "bg-white font-semibold text-brand-700 shadow-sm ring-1 ring-brand-100"
+                      : extra
+                        ? "text-slate-400"
+                        : "text-slate-600",
                   )}
                 >
                   <Icon className="size-4 shrink-0" /> {label}
@@ -831,6 +867,8 @@ function EditorBody({
 
         <div className="min-w-0 space-y-6">
           <ReadOnlyArea readOnly={!canEdit} className="space-y-6">
+            {/* Các mục xếp đúng thứ tự trang tour trên website, từ trên xuống */}
+            <PhotosSection t={t} set={set} />
             <GeneralSection
               t={t}
               set={set}
@@ -841,6 +879,13 @@ function EditorBody({
               destinations={destinations}
               themes={themes}
             />
+            <OverviewSection
+              t={t}
+              setContent={setContent}
+              lang={lang}
+              setLang={setLang}
+              onTranslated={onTranslated}
+            />
             <ItinerarySection
               t={t}
               setContent={setContent}
@@ -849,7 +894,6 @@ function EditorBody({
               setLang={setLang}
               onTranslated={onTranslated}
             />
-            <PricingSection t={t} set={set} />
             <IncludesSection
               t={t}
               setContent={setContent}
@@ -857,6 +901,15 @@ function EditorBody({
               setLang={setLang}
               onTranslated={onTranslated}
             />
+            <PricingSection
+              t={t}
+              set={set}
+              setContent={setContent}
+              lang={lang}
+              setLang={setLang}
+              onTranslated={onTranslated}
+            />
+            <DepartureSection t={t} set={set} />
             <FaqSection
               t={t}
               setContent={setContent}
@@ -864,25 +917,16 @@ function EditorBody({
               setLang={setLang}
               onTranslated={onTranslated}
             />
-            <MediaSection t={t} set={set} />
+            <ReviewsSection t={t} set={set} />
+            <VideoSection t={t} set={set} />
 
             <div className="pt-4">
-              <p className="text-sm font-bold text-slate-500">Tuỳ chọn thêm</p>
+              <p className="text-sm font-bold text-slate-500">Cài đặt</p>
               <p className="mt-0.5 text-xs text-slate-400">
-                Các mục dưới đây không có trong mẫu thông tin tour — chỉ điền khi cần.
+                Các mục dưới đây không hiện thành nội dung trên trang tour.
               </p>
             </div>
-            <ExtrasSection
-              t={t}
-              set={set}
-              setSlug={setSlug}
-              setContent={setContent}
-              isNew={isNew}
-              lang={lang}
-              setLang={setLang}
-              onTranslated={onTranslated}
-            />
-            <ReviewsSection t={t} set={set} />
+            <ExtrasSection t={t} set={set} setSlug={setSlug} isNew={isNew} />
             <SeoSection t={t} set={set} lang={lang} setLang={setLang} onTranslated={onTranslated} />
           </ReadOnlyArea>
           {canEdit && (
@@ -896,6 +940,44 @@ function EditorBody({
       </div>
     </div>
   );
+}
+
+/**
+ * Mục đang xem (để tô sáng trên menu mục): mục cuối cùng có mép trên đã đi qua vạch ngay dưới thanh tiêu đề dính.
+ * Cuộn tới đáy trang → mục cuối cùng (mục ngắn ở cuối có thể không bao giờ chạm vạch).
+ */
+function useActiveSection(sections) {
+  const [active, setActive] = useState(sections[0].id);
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      // vạch = mép dưới thanh tiêu đề dính (điện thoại cao hơn vì có thêm thanh mục) + một khoảng nhỏ
+      const bar = document.querySelector("[data-section-bar]")?.getBoundingClientRect().bottom ?? 0;
+      const line = Math.max(bar + 80, Math.min(window.innerHeight / 3, 260));
+      let cur = sections[0].id;
+      for (const { id } of sections) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= line) cur = id;
+      }
+      const doc = document.documentElement;
+      if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4)
+        cur = sections[sections.length - 1].id;
+      setActive(cur);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [sections]);
+  return active;
 }
 
 /** Khung mỗi mục: Card có id để nhảy tới từ menu mục */
@@ -1016,7 +1098,7 @@ function Counter({ n, max }) {
 }
 
 /* =========================================================================
- * 1. Thông tin chung
+ * 2. Tên tour & thông tin chính (phần chữ đầu trang tour, cạnh khung giá)
  * ========================================================================= */
 
 const GeneralSection = memoOn(
@@ -1048,8 +1130,8 @@ const GeneralSection = memoOn(
     return (
       <Section
         id="thong-tin"
-        title="1. Thông tin chung"
-        description="Viết bằng ngôn ngữ nào cũng được — khi lưu, các ngôn ngữ còn trống tự được dịch."
+        title="2. Tên tour & thông tin chính"
+        description="Phần chữ đầu trang tour, ngay dưới album ảnh. Viết bằng ngôn ngữ nào cũng được — khi lưu, các ngôn ngữ còn trống tự được dịch."
         actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
       >
         <div className="space-y-5">
@@ -1101,7 +1183,7 @@ const GeneralSection = memoOn(
                 onChange={(nights) => set({ nights })}
               />
             </Field>
-            <div className="col-span-2 flex items-end pb-2 sm:col-span-1">
+            <div className="col-span-2 flex min-h-[42px] items-center self-end sm:col-span-1">
               <Toggle
                 checked={t.halfDay}
                 onChange={(halfDay) => set({ halfDay })}
@@ -1110,7 +1192,19 @@ const GeneralSection = memoOn(
             </div>
           </div>
 
-          <Field label={`Điểm đến (${t.destinations.length})`}>
+          <Field label="Tour ghép hay tour riêng">
+            <Segmented
+              label="Tour ghép hay tour riêng"
+              options={TOUR_TYPES}
+              value={t.tourType}
+              onChange={(tourType) => set({ tourType })}
+            />
+          </Field>
+
+          <Field
+            label={`Điểm đến (${t.destinations.length})`}
+            hint="Hiện thành dòng điểm đến dưới tên tour."
+          >
             {!destinations.length ? (
               <p className="text-xs text-slate-400">Đang tải danh sách điểm đến…</p>
             ) : (
@@ -1148,7 +1242,10 @@ const GeneralSection = memoOn(
             )}
           </Field>
 
-          <Field label={`Loại tour / chủ đề (${t.themes.length}/8)`}>
+          <Field
+            label={`Loại tour / chủ đề (${t.themes.length}/8)`}
+            hint="3 chủ đề đầu hiện thành nhãn nhỏ phía trên tên tour."
+          >
             {!themes.length ? (
               <p className="text-xs text-slate-400">Đang tải danh sách chủ đề…</p>
             ) : (
@@ -1160,73 +1257,64 @@ const GeneralSection = memoOn(
               />
             )}
           </Field>
+        </div>
+      </Section>
+    );
+  },
+  ["content", "seo", "days", "nights", "halfDay", "destinations", "themes", "tourType"],
+);
 
-          <Field label="Tour ghép hay tour riêng">
-            <Segmented
-              label="Tour ghép hay tour riêng"
-              options={TOUR_TYPES}
-              value={t.tourType}
-              onChange={(tourType) => set({ tourType })}
-            />
-          </Field>
+/* =========================================================================
+ * 3. Tổng quan (khung “Tổng quan”: mô tả ngắn → chặng đường → điểm nổi bật)
+ * ========================================================================= */
 
-          <Field label="Ngày khởi hành">
-            <div className="space-y-3">
-              <Segmented
-                label="Ngày khởi hành"
-                options={DEPARTURES}
-                value={t.departure}
-                onChange={(departure) => set({ departure })}
-              />
-              {t.departure === "weekly" && (
-                <div>
-                  <p className="mb-1.5 text-xs text-slate-500">Chọn các thứ có khởi hành:</p>
-                  <ChipSelect
-                    options={WEEKDAYS}
-                    value={t.departureDays}
-                    onChange={(days) => set({ departureDays: cleanWeekdays(days) })}
-                  />
-                </div>
-              )}
-              {t.departure === "dates" && (
-                <DateChips
-                  value={t.departureDates}
-                  onChange={(departureDates) => set({ departureDates })}
-                />
-              )}
-            </div>
-          </Field>
-
+const OverviewSection = memoOn(
+  function OverviewSection({ t, setContent, lang, setLang, onTranslated }) {
+    const c = t.content[lang];
+    const setL = useCallback((patch) => setContent(lang, patch), [lang, setContent]);
+    return (
+      <Section
+        id="tong-quan"
+        title="3. Tổng quan"
+        description="Khung đầu tiên bên dưới phần tên tour."
+        actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
+      >
+        <div className="space-y-6">
           <Field label="Mô tả ngắn (2–3 câu)">
             <Textarea
               value={c.summary}
               rows={4}
               maxLength={3000}
               placeholder={phOf(otherText(t, lang, "summary"))}
-              onChange={(e) => setContent(lang, { summary: e.target.value })}
+              onChange={(e) => setL({ summary: e.target.value })}
             />
           </Field>
+          <div className="grid gap-6 xl:grid-cols-2">
+            <Field label="Chặng đường" hint="Mỗi ngày một chặng. VD: Hanoi → Halong Bay">
+              <StringList
+                value={c.route}
+                onChange={(route) => setL({ route })}
+                addLabel="Thêm chặng"
+                placeholder="Tên chặng"
+              />
+            </Field>
+            <Field label="Điểm nổi bật">
+              <StringList
+                value={c.highlights}
+                onChange={(highlights) => setL({ highlights })}
+                addLabel="Thêm điểm nổi bật"
+              />
+            </Field>
+          </div>
         </div>
       </Section>
     );
   },
-  [
-    "content",
-    "seo",
-    "days",
-    "nights",
-    "halfDay",
-    "destinations",
-    "themes",
-    "tourType",
-    "departure",
-    "departureDays",
-    "departureDates",
-  ],
+  ["content", "seo"],
 );
 
 /* =========================================================================
- * 2. Lịch trình
+ * 4. Lịch trình theo ngày
  * ========================================================================= */
 
 const ItinerarySection = memoOn(
@@ -1239,7 +1327,7 @@ const ItinerarySection = memoOn(
     return (
       <Section
         id="lich-trinh"
-        title={`2. Lịch trình (${t.content[lang].itinerary.length} ngày)`}
+        title={`4. Lịch trình theo ngày (${t.content[lang].itinerary.length} ngày)`}
         description="Mỗi ngày một dòng. Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự."
         actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
       >
@@ -1258,7 +1346,7 @@ const ItinerarySection = memoOn(
 );
 
 /* =========================================================================
- * 3. Giá
+ * 6. Giá tour (khung giá đầu trang + khung “Bảng giá”)
  * ========================================================================= */
 
 /** Bảng nhỏ: mỗi dòng nhiều ô số */
@@ -1335,8 +1423,7 @@ function DateChips({ value, onChange, holiday }) {
   return (
     <div className="space-y-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          type="date"
+        <DateInput
           value={draft}
           aria-label="Chọn ngày"
           onChange={(e) => setDraft(e.target.value)}
@@ -1346,7 +1433,7 @@ function DateChips({ value, onChange, holiday }) {
               add();
             }
           }}
-          className="max-w-48"
+          wrapperClassName="w-48 max-w-full"
         />
         {holiday && (
           <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600 select-none">
@@ -1359,7 +1446,7 @@ function DateChips({ value, onChange, holiday }) {
             Lặp lại hằng năm
           </label>
         )}
-        <Button variant="secondary" icon={Plus} onClick={add} disabled={!draft}>
+        <Button variant="secondary" icon={Plus} onClick={add} disabled={!isISODate(draft)}>
           Thêm ngày
         </Button>
       </div>
@@ -1496,15 +1583,27 @@ const CHILD_COLS = [
 ];
 
 const PricingSection = memoOn(
-  function PricingSection({ t, set }) {
+  function PricingSection({ t, set, setContent, lang, setLang, onTranslated }) {
     const p = t.pricing;
     const setP = (patch) => set((x) => ({ pricing: { ...x.pricing, ...patch } }));
     const price = numOrNull(t.price);
     const original = numOrNull(t.originalPrice);
     const discount = price && original > price ? Math.round((1 - price / original) * 100) : null;
+    // bảng giá dạng chữ kiểu cũ: chỉ hiện khi tour đã có sẵn
+    const hasOldTables = LANG_KEYS.some((l) => t.content[l].priceTables.length > 0);
+    const setL = useCallback((patch) => setContent(lang, patch), [lang, setContent]);
 
     return (
-      <Section id="gia" title="3. Giá" description="Tất cả giá tính bằng USD cho mỗi người.">
+      <Section
+        id="gia"
+        title="6. Giá tour"
+        description="Giá bán hiện ở khung giá đầu trang; giá trẻ em, phụ thu và giá theo số khách hiện ở khung “Bảng giá”. Tất cả tính bằng USD cho mỗi người."
+        actions={
+          hasOldTables && (
+            <TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />
+          )
+        }
+      >
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
@@ -1618,11 +1717,59 @@ const PricingSection = memoOn(
           </div>
 
           <PricePreview price={t.price} pricing={p} />
+
+          {hasOldTables && (
+            <PriceTablesEditor
+              key={`pt-${lang}`}
+              value={t.content[lang].priceTables}
+              onChange={setL}
+            />
+          )}
         </div>
       </Section>
     );
   },
-  ["price", "originalPrice", "pricing"],
+  ["price", "originalPrice", "pricing", "content", "seo"],
+);
+
+/* =========================================================================
+ * 7. Ngày khởi hành (khung “Ngày khởi hành”)
+ * ========================================================================= */
+
+const DepartureSection = memoOn(
+  function DepartureSection({ t, set }) {
+    return (
+      <Section id="khoi-hanh" title="7. Ngày khởi hành">
+        <Field label="Ngày khởi hành">
+          <div className="space-y-3">
+            <Segmented
+              label="Ngày khởi hành"
+              options={DEPARTURES}
+              value={t.departure}
+              onChange={(departure) => set({ departure })}
+            />
+            {t.departure === "weekly" && (
+              <div>
+                <p className="mb-1.5 text-xs text-slate-500">Chọn các thứ có khởi hành:</p>
+                <ChipSelect
+                  options={WEEKDAYS}
+                  value={t.departureDays}
+                  onChange={(days) => set({ departureDays: cleanWeekdays(days) })}
+                />
+              </div>
+            )}
+            {t.departure === "dates" && (
+              <DateChips
+                value={t.departureDates}
+                onChange={(departureDates) => set({ departureDates })}
+              />
+            )}
+          </div>
+        </Field>
+      </Section>
+    );
+  },
+  ["departure", "departureDays", "departureDates"],
 );
 
 const HOTEL_CLASSES = [
@@ -1666,7 +1813,7 @@ function PricePreview({ price, pricing }) {
           <Input value={ages} onChange={(e) => setAges(e.target.value)} placeholder="Không có" />
         </Field>
         <Field label="Ngày khởi hành">
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateInput value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </div>
       {hasClasses && (
@@ -1702,7 +1849,7 @@ function PricePreview({ price, pricing }) {
 }
 
 /* =========================================================================
- * 4. Bao gồm / Không bao gồm
+ * 5. Bao gồm / Không bao gồm (kèm chính sách trẻ em, ghi chú ở cuối khung)
  * ========================================================================= */
 
 const IncludesSection = memoOn(
@@ -1711,8 +1858,8 @@ const IncludesSection = memoOn(
     return (
       <Section
         id="bao-gom"
-        title="4. Bao gồm / Không bao gồm"
-        description="Mỗi ý một dòng."
+        title="5. Bao gồm / Không bao gồm"
+        description="Mỗi ý một dòng. Chính sách trẻ em và ghi chú hiện ở cuối cùng khung này."
         actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
       >
         <div className="grid gap-6 xl:grid-cols-2">
@@ -1732,6 +1879,24 @@ const IncludesSection = memoOn(
               multiline
             />
           </Field>
+          <Field label="Chính sách trẻ em (dạng chữ)">
+            <Textarea
+              value={c.childPolicy}
+              rows={4}
+              maxLength={5000}
+              placeholder={phOf(otherText(t, lang, "childPolicy"))}
+              onChange={(e) => setContent(lang, { childPolicy: e.target.value })}
+            />
+          </Field>
+          <Field label="Ghi chú">
+            <Textarea
+              value={c.notes}
+              rows={4}
+              maxLength={10000}
+              placeholder={phOf(otherText(t, lang, "notes"))}
+              onChange={(e) => setContent(lang, { notes: e.target.value })}
+            />
+          </Field>
         </div>
       </Section>
     );
@@ -1740,7 +1905,7 @@ const IncludesSection = memoOn(
 );
 
 /* =========================================================================
- * 5. Câu hỏi thường gặp
+ * 8. Câu hỏi thường gặp
  * ========================================================================= */
 
 const FaqSection = memoOn(
@@ -1749,7 +1914,7 @@ const FaqSection = memoOn(
     return (
       <Section
         id="hoi-dap"
-        title={`5. Câu hỏi thường gặp (${t.content[lang].faqs.length})`}
+        title={`8. Câu hỏi thường gặp (${t.content[lang].faqs.length})`}
         description="Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự."
         actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
       >
@@ -1761,46 +1926,22 @@ const FaqSection = memoOn(
 );
 
 /* =========================================================================
- * 6. Ảnh & video
+ * 1. Ảnh bìa & album (đầu trang tour)
  * ========================================================================= */
 
 const MIN_PHOTOS = 6;
 
-const MediaSection = memoOn(
-  function MediaSection({ t, set }) {
+const PhotosSection = memoOn(
+  function PhotosSection({ t, set }) {
     const missing = Math.max(0, MIN_PHOTOS - t.gallery.length);
     return (
       <Section
         id="anh"
-        title="6. Ảnh & video"
-        description="Ảnh bìa là ảnh đại diện của tour; album hiện trong trang tour."
+        title="1. Ảnh bìa & album"
+        description="Album hiện ngay đầu trang tour; ảnh bìa là ảnh đại diện của tour."
       >
-        <div className="space-y-6">
-          {/* ảnh bìa | video đặt cạnh nhau cho cân, album trải hết chiều ngang bên dưới */}
-          <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-            <Field
-              label="Ảnh bìa"
-              hint="Hiện ở thẻ tour (khung gần vuông) và khi chia sẻ link. Ảnh ngang, chủ thể ở giữa."
-            >
-              <ImageField value={t.image} onChange={(image) => set({ image })} folder="tours" />
-            </Field>
-            <Field
-              label={`Video review (${t.videos.length}/10)`}
-              hint="Dán link YouTube hoặc Google Drive — video đầu tiên hiện lớn nhất trong trang tour."
-            >
-              <div className="space-y-3">
-                <VideoListField value={t.videos} onChange={(videos) => set({ videos })} max={10} />
-                <details className="group/help">
-                  <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600 [&::-webkit-details-marker]:hidden">
-                    Cách lấy link video YouTube / Google Drive
-                  </summary>
-                  <div className="mt-2">
-                    <VideoHelp />
-                  </div>
-                </details>
-              </div>
-            </Field>
-          </div>
+        {/* album | ảnh bìa đặt cạnh nhau trên màn rộng; album (to hơn) đứng trước như trên trang tour */}
+        <div className="grid gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
           <Field
             label={`Album ảnh (${t.gallery.length}/40)`}
             hint={
@@ -1817,11 +1958,51 @@ const MediaSection = memoOn(
               onSetCover={(image) => set({ image })}
             />
           </Field>
+          <Field
+            label="Ảnh bìa"
+            hint="Hiện ở thẻ tour (khung gần vuông), khi chia sẻ link và ở đầu trang nếu album trống. Ảnh ngang, chủ thể ở giữa."
+          >
+            <ImageField value={t.image} onChange={(image) => set({ image })} folder="tours" />
+          </Field>
         </div>
       </Section>
     );
   },
-  ["image", "gallery", "videos"],
+  ["image", "gallery"],
+);
+
+/* =========================================================================
+ * 10. Video (khung video cuối trang tour)
+ * ========================================================================= */
+
+const VideoSection = memoOn(
+  function VideoSection({ t, set }) {
+    return (
+      <Section
+        id="video"
+        title="10. Video"
+        description="Khung video ở cuối trang tour, sau phần đánh giá."
+      >
+        <Field
+          label={`Video review (${t.videos.length}/10)`}
+          hint="Dán link YouTube hoặc Google Drive — video đầu tiên hiện lớn nhất trong trang tour."
+        >
+          <div className="space-y-3">
+            <VideoListField value={t.videos} onChange={(videos) => set({ videos })} max={10} />
+            <details className="group/help">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-brand-700 transition-colors hover:text-sun-600 [&::-webkit-details-marker]:hidden">
+                Cách lấy link video YouTube / Google Drive
+              </summary>
+              <div className="mt-2">
+                <VideoHelp />
+              </div>
+            </details>
+          </div>
+        </Field>
+      </Section>
+    );
+  },
+  ["videos"],
 );
 
 /** Hàng tiêu đề nhóm con trong một mục */
@@ -2069,7 +2250,7 @@ const PriceTablesEditor = memo(function PriceTablesEditor({ value, onChange }) {
                 <Input
                   value={tb.period}
                   maxLength={300}
-                  placeholder="Thời gian áp dụng (VD: 01/01 – 31/12/2027)"
+                  placeholder="Thời gian áp dụng (VD: 01/01 – 12/31/2027)"
                   onChange={(e) => setTable(i, { period: e.target.value })}
                 />
               </div>
@@ -2287,22 +2468,16 @@ const FaqEditor = memo(function FaqEditor({ value, onChange }) {
 });
 
 /* =========================================================================
- * Tuỳ chọn thêm (không có trong mẫu thông tin tour)
+ * Cài đặt hiển thị (khách không nhìn thấy)
  * ========================================================================= */
 
 const ExtrasSection = memoOn(
-  function ExtrasSection({ t, set, setSlug, setContent, isNew, lang, setLang, onTranslated }) {
-    const c = t.content[lang];
-    const setL = useCallback((patch) => setContent(lang, patch), [lang, setContent]);
-    // bảng giá dạng chữ kiểu cũ: chỉ hiện khi tour đã có sẵn
-    const hasOldTables = LANG_KEYS.some((l) => t.content[l].priceTables.length > 0);
-
+  function ExtrasSection({ t, set, setSlug, isNew }) {
     return (
       <Section
         id="tuy-chon"
-        title="Hiển thị & thông tin phụ"
-        description="Cài đặt hiển thị và các nội dung bổ sung của tour."
-        actions={<TourLangTabs t={t} lang={lang} setLang={setLang} onTranslated={onTranslated} />}
+        title="Cài đặt hiển thị"
+        description="Mã tour, đường dẫn trang, thứ tự và các nhãn — không hiện thành nội dung trên trang tour."
       >
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)_140px]">
@@ -2382,55 +2557,15 @@ const ExtrasSection = memoOn(
               ; nếu khối đó chưa chọn tour nào, website tự hiện các tour được đánh dấu ở đây.
             </p>
           </div>
-
-          <div className="grid gap-6 border-t border-slate-100 pt-6 xl:grid-cols-2">
-            <Field label="Điểm nổi bật">
-              <StringList
-                value={c.highlights}
-                onChange={(highlights) => setL({ highlights })}
-                addLabel="Thêm điểm nổi bật"
-              />
-            </Field>
-            <Field label="Chặng đường" hint="VD: Hanoi → Halong Bay → Hanoi">
-              <StringList
-                value={c.route}
-                onChange={(route) => setL({ route })}
-                addLabel="Thêm chặng"
-                placeholder="Tên chặng"
-              />
-            </Field>
-            <Field label="Chính sách trẻ em (dạng chữ)">
-              <Textarea
-                value={c.childPolicy}
-                rows={4}
-                maxLength={5000}
-                placeholder={phOf(otherText(t, lang, "childPolicy"))}
-                onChange={(e) => setL({ childPolicy: e.target.value })}
-              />
-            </Field>
-            <Field label="Ghi chú">
-              <Textarea
-                value={c.notes}
-                rows={4}
-                maxLength={10000}
-                placeholder={phOf(otherText(t, lang, "notes"))}
-                onChange={(e) => setL({ notes: e.target.value })}
-              />
-            </Field>
-          </div>
-
-          {hasOldTables && (
-            <PriceTablesEditor key={`pt-${lang}`} value={c.priceTables} onChange={setL} />
-          )}
         </div>
       </Section>
     );
   },
-  ["code", "slug", "rank", "isActive", "cruise", "featured", "featuredLong", "content", "seo"],
+  ["code", "slug", "rank", "isActive", "cruise", "featured", "featuredLong"],
 );
 
 /* =========================================================================
- * Đánh giá của khách (tuỳ chọn thêm)
+ * 9. Đánh giá của khách
  * ========================================================================= */
 
 const ReviewsSection = memoOn(
@@ -2444,7 +2579,7 @@ const ReviewsSection = memoOn(
     return (
       <Section
         id="danh-gia"
-        title="Đánh giá của khách"
+        title="9. Đánh giá của khách"
         description="Nên ghi rõ nguồn (TripAdvisor, Google…)."
         actions={
           reviews.length > 0 && (

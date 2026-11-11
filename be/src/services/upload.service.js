@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import dns from "node:dns";
 import http from "node:http";
 import https from "node:https";
@@ -6,7 +6,15 @@ import { isIP } from "node:net";
 import { cloudinary } from "../config/cloudinary.js";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
+import { ROLES } from "../constants/roles.js";
 import { ApiError } from "../utils/ApiError.js";
+import {
+  extractRefs,
+  isManaged,
+  orphanStore,
+  pendingStore,
+  scanReferences,
+} from "./media-cleanup.service.js";
 import {
   cloudinaryVideo,
   cloudinaryVideoUrl,
@@ -56,6 +64,85 @@ const toImage = (r) => ({
   format: r.format,
   bytes: r.bytes,
 });
+
+/**
+ * Tên file trên Cloudinary theo NỘI DUNG ảnh (sha256): bấm Lưu lại sau lỗi mạng, chọn trùng 1 ảnh 2 lần…
+ * → cùng 1 file, không sinh bản trùng (tải lên với overwrite: false → Cloudinary trả lại file đã có).
+ */
+export const imagePublicId = (buffer) =>
+  `h-${createHash("sha256").update(buffer).digest("hex").slice(0, 32)}`;
+
+/** Kho "chờ lưu" + danh sách đánh dấu dọn — thay thế được khi kiểm thử */
+export const mediaDeps = {
+  pending: () => pendingStore(),
+  orphans: () => orphanStore(),
+  references: async () => (await scanReferences()).refs,
+  destroy: (publicId, resourceType) =>
+    cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true }),
+};
+
+/**
+ * Ghi nhận file vừa tải lên / chép về (CHƯA lưu vào bản ghi): file mới → "chờ lưu";
+ * file đã có (cùng nội dung) → chỉ làm mới nếu đang chờ lưu, và bỏ đánh dấu dọn (sắp được dùng lại).
+ * Lỗi chỉ ghi log: không ghi nhận được thì file được coi như "từng lưu" → chờ đủ ngày (an toàn).
+ */
+export async function recordUpload(publicId, { existed, owner }, deps = mediaDeps) {
+  if (!isManaged(publicId)) return;
+  try {
+    if (existed) {
+      await deps.pending().touch(publicId, { owner });
+      await deps.orphans().unmark([publicId]);
+    } else await deps.pending().add(publicId, { owner });
+  } catch (err) {
+    logger.warn({ err, publicId }, "[upload] không ghi nhận được file chờ lưu");
+  }
+}
+
+/** public_id của file Cloudinary thuộc website (đúng tài khoản, trong thư mục CMS) từ link, hoặc null */
+export function managedPublicId(url) {
+  const s = String(url ?? "");
+  const cloud = env.cloudinary.cloudName;
+  if (!cloud || !s.startsWith(`https://res.cloudinary.com/${cloud}/`)) return null;
+  const [id] = extractRefs(s);
+  return id && isManaged(id) ? id : null;
+}
+
+/**
+ * Nhân viên bỏ file vừa tải / vừa chép mà CHƯA lưu (gỡ video, đóng form, rời trang) → xoá ngay.
+ * Chỉ xoá khi: file đang "chờ lưu" (chưa từng được lưu), người bỏ là người đã tải (hoặc admin), không còn form
+ * nào khác giữ, và không bản ghi nào đang dùng. Trường hợp khác → bỏ qua (lần dọn hằng ngày lo).
+ * @param {string[]} urls
+ * @param {{ id: string, role?: string }} user
+ * @returns {Promise<number>} số file đã xoá
+ */
+export async function discardPending(urls, user, deps = mediaDeps) {
+  if (!env.cloudinary.enabled && deps === mediaDeps) return 0;
+  const ids = [...new Set(urls.map(managedPublicId).filter(Boolean))];
+  if (!ids.length) return 0;
+  const store = deps.pending();
+  let refs = null;
+  let removed = 0;
+  for (const id of ids) {
+    const doc = await store.get(id);
+    if (!doc) continue; // đã được lưu / không do CMS tải lên lúc soạn → không bao giờ xoá ở đây
+    const mine = (doc.owners ?? []).includes(String(user?.id)) || user?.role === ROLES.ADMIN;
+    if (!mine) continue;
+    if ((await store.release(id)) > 0) continue; // form khác (tab khác) vẫn đang giữ
+    refs ??= await deps.references();
+    if (refs.has(id)) {
+      await store.clear([id]); // đã nằm trong bản ghi → từ giờ chờ đủ ngày như mọi file đã lưu
+      continue;
+    }
+    try {
+      await deps.destroy(id, doc.resourceType ?? "image");
+      await store.clear([id]);
+      removed++;
+    } catch (err) {
+      logger.warn({ err, publicId: id }, "[upload] không xoá được file bỏ dở"); // lần dọn hằng ngày lo
+    }
+  }
+  return removed;
+}
 
 /**
  * Nhận diện ảnh theo CHỮ KÝ FILE (vài byte đầu), không tin đuôi file / Content-Type trình duyệt gửi.
@@ -220,10 +307,13 @@ export const uploadService = {
   },
 
   /**
+   * Ảnh được đặt tên theo nội dung (imagePublicId) → tải lại cùng ảnh không sinh file trùng.
+   * Ảnh mới được ghi nhận "chờ lưu" cho tới khi 1 bản ghi lưu thành công dùng nó.
    * @param {Express.Multer.File[]} files
    * @param {string} subfolder vd. "tours", "articles", "destinations"
+   * @param {{ owner?: string }} [opts] id nhân viên tải lên
    */
-  async uploadImages(files, subfolder = "misc") {
+  async uploadImages(files, subfolder = "misc", { owner = "" } = {}) {
     ensureEnabled();
     if (!files?.length) throw ApiError.badRequest("Chưa chọn ảnh");
     // Chữ ký file phải là ảnh thật (file .php / .html đổi đuôi thành .jpg bị chặn ngay tại đây)
@@ -238,6 +328,8 @@ export const uploadService = {
       files.map((f, index) =>
         uploadBuffer(f.buffer, {
           folder: folderOf(subfolder),
+          public_id: imagePublicId(f.buffer),
+          overwrite: false, // đã có (cùng nội dung) → trả lại file cũ, không tải / tạo bản mới
           resource_type: "image", // Cloudinary kiểm tra lại nội dung thật là ảnh
           allowed_formats: ALLOWED_FORMATS,
         }).catch((err) => {
@@ -250,31 +342,10 @@ export const uploadService = {
         }),
       ),
     );
+    await Promise.all(
+      results.map((r) => recordUpload(r.public_id, { existed: !!r.existing, owner })),
+    );
     return results.map(toImage);
-  },
-
-  /**
-   * Thêm ảnh từ link: Cloudinary tự tải link về (máy chủ website KHÔNG gọi tới link lạ → không có rủi ro SSRF
-   * cho hạ tầng của mình), chỉ nhận ảnh, lưu bản sao trên Cloudinary của website.
-   */
-  async uploadFromUrl(url, subfolder = "misc") {
-    ensureEnabled();
-    if (!checkImageUrl(url))
-      throw ApiError.badRequest("Link ảnh không hợp lệ — cần link http(s) công khai tới file ảnh");
-    try {
-      const r = await cloudinary.uploader.upload(url, {
-        folder: folderOf(subfolder),
-        resource_type: "image",
-        allowed_formats: ALLOWED_FORMATS,
-        timeout: 60_000,
-      });
-      return toImage(r);
-    } catch (err) {
-      throw ApiError.unprocessable(
-        "Không lấy được ảnh từ link này — kiểm tra link mở được công khai và là file ảnh (JPG, PNG, WebP…)",
-        [{ field: "body.url", message: err?.message?.slice(0, 200) ?? "fetch failed" }],
-      );
-    }
   },
 
   async deleteImage(publicId) {
@@ -296,6 +367,12 @@ export const uploadService = {
     if (v?.provider !== "drive") throw ApiError.badRequest("Link chưa phải video Google Drive");
     const source = driveDownloadUrl(v.id);
     await probeDriveFile(source);
+    const publicId = `${folderOf(BANNER_SUBFOLDER)}/drive-${v.id}`;
+    // Đã có trên website (chép trước đây, có thể đang dùng) → không bao giờ coi là "chờ lưu"
+    const existed = await cloudinary.api.resource(publicId, { resource_type: "video" }).then(
+      () => true,
+      (err) => (err?.error?.http_code ?? err?.http_code) !== 404, // lỗi khác → coi như đã có (an toàn)
+    );
     let r;
     try {
       r = await cloudinary.uploader.upload(source, {
@@ -304,26 +381,34 @@ export const uploadService = {
         public_id: `drive-${v.id}`,
         overwrite: true,
         invalidate: true,
-        // tạo sẵn bản phát cho máy tính (1920) và điện thoại (720) — khách không phải chờ nén lần đầu
-        eager: [1920, 720].map((width) => ({
-          crop: "limit",
-          quality: "auto",
-          width,
-          format: "mp4",
-        })),
+        // tạo sẵn bản phát cho máy tính (1920), điện thoại (720) và bản dọc nhẹ cho điện thoại
+        // (= "br_1m,c_fill,h_854,q_auto:eco,w_480", fe/src/lib/video.js CLD_PHONE) — khách không phải chờ nén lần đầu
+        eager: [
+          ...[1920, 720].map((width) => ({ crop: "limit", quality: "auto", width, format: "mp4" })),
+          {
+            bit_rate: "1m",
+            crop: "fill",
+            height: 854,
+            quality: "auto:eco",
+            width: 480,
+            format: "mp4",
+          },
+        ],
         eager_async: true,
         timeout: 300_000,
       });
     } catch (err) {
       const code = err?.http_code ?? 0;
       if (!code || code >= 500) throw err; // lỗi mạng / cấu hình → 500
-      throw driveError(err?.message?.slice(0, 200) ?? "fetch failed");
+      const reason = err?.message?.slice(0, 200) ?? "fetch failed";
+      throw driveError(reason, /too large|file size/i.test(reason) ? "large" : "unreadable");
     }
     if (r.bytes > MAX_BANNER_VIDEO_BYTES) {
-      await cloudinary.uploader
-        .destroy(r.public_id, { resource_type: "video", invalidate: true })
-        .catch(() => {});
-      throw driveError(`too large: ${r.bytes}`);
+      if (!existed)
+        await cloudinary.uploader
+          .destroy(r.public_id, { resource_type: "video", invalidate: true })
+          .catch(() => {});
+      throw driveError(`too large: ${r.bytes}`, "large");
     }
     const parts = {
       cloud: env.cloudinary.cloudName,
@@ -338,6 +423,7 @@ export const uploadService = {
       height: r.height,
       duration: r.duration,
       bytes: r.bytes,
+      existed,
     };
   },
 
@@ -347,11 +433,19 @@ export const uploadService = {
    * @param {string} link
    * @param {string} owner id nhân viên — chỉ người tạo mới xem được kết quả
    * @param {(video: object) => void} [onDone] gọi khi chép xong (ghi nhật ký)
+   * @param {{ waitMs?: number, abandoned?: () => boolean }} [opts] abandoned: trình duyệt đã bỏ đi trước khi
+   *   nhận kết quả (đóng trang / huỷ) → chép xong thì bỏ luôn file vừa chép
    */
-  async startDriveImport(link, owner, onDone, { waitMs = 20_000 } = {}) {
-    const job = { owner: String(owner ?? ""), status: "pending", at: Date.now() };
+  async startDriveImport(link, owner, onDone, { waitMs = 20_000, abandoned } = {}) {
+    const job = { owner: String(owner ?? ""), status: "pending", at: Date.now(), cancelled: false };
     job.promise = this.importDriveVideo(link).then(
-      (video) => {
+      async ({ existed, ...video }) => {
+        await recordUpload(video.publicId, { existed, owner: job.owner });
+        if (job.cancelled || abandoned?.()) {
+          Object.assign(job, { status: "cancelled" });
+          await discardPending([video.url], { id: job.owner }).catch(() => {});
+          return video;
+        }
         Object.assign(job, { status: "done", video });
         onDone?.(video);
         return video;
@@ -378,11 +472,24 @@ export const uploadService = {
   /** Kết quả chép video Drive đang chạy: { status: "pending" } | { status: "done", video } | ném lỗi */
   driveImportJob(jobId, owner) {
     const job = driveJobs.get(jobId);
-    if (!job || job.owner !== String(owner ?? "")) throw ApiError.notFound("Không tìm thấy");
+    if (!job || job.owner !== String(owner ?? "") || job.status === "cancelled")
+      throw ApiError.notFound("Không tìm thấy");
     if (job.status === "pending") return { status: "pending" };
     driveJobs.delete(jobId);
     if (job.status === "error") throw job.error;
     return { status: "done", video: job.video };
+  },
+
+  /** Nhân viên huỷ lúc đang chép (gỡ video / rời trang) → chép xong tự bỏ file. Không có việc → bỏ qua. */
+  cancelDriveImport(jobId, owner) {
+    const job = driveJobs.get(jobId);
+    if (!job || job.owner !== String(owner ?? "")) return false;
+    job.cancelled = true;
+    if (job.status === "done" && job.video) {
+      driveJobs.delete(jobId);
+      discardPending([job.video.url], { id: job.owner }).catch(() => {});
+    }
+    return true;
   },
 
   /**
@@ -412,16 +519,35 @@ const BANNER_SUBFOLDER = "banner";
 const driveJobs = new Map();
 const JOB_TTL_MS = 30 * 60 * 1000;
 export const MAX_BANNER_VIDEO_BYTES = 100 * 1024 * 1024;
-const DRIVE_VIDEO_ERROR =
-  "Video trên Drive chưa chia sẻ công khai hoặc quá lớn (tối đa 100MB) — hãy kiểm tra quyền chia sẻ hoặc tải lên YouTube";
+/** Lời báo khi không lấy được video Drive: nói rõ lý do + việc cần làm (không dùng từ kỹ thuật) */
+export const DRIVE_VIDEO_ERRORS = {
+  private:
+    "Video chưa được chia sẻ công khai. Trên Google Drive, bấm Chia sẻ → chọn “Bất kỳ ai có đường liên kết” rồi dán lại link.",
+  missing: "Không tìm thấy video trên Google Drive — link có thể sai hoặc file đã bị xoá.",
+  notVideo: "File trên Google Drive không phải video — hãy kiểm tra lại link.",
+  large:
+    "Video quá lớn (tối đa 100 MB). Hãy cắt ngắn hoặc giảm chất lượng video, hoặc đăng lên YouTube rồi dán link YouTube.",
+  unreadable:
+    "Chưa lấy được video từ Google Drive — file có thể bị hỏng. Hãy thử lại, hoặc đăng lên YouTube rồi dán link YouTube.",
+};
 
 /** Lỗi chép video Drive: nhân viên chỉ thấy câu dễ hiểu, lý do kỹ thuật ghi vào log */
-function driveError(reason) {
+function driveError(reason, kind = "unreadable") {
   logger.info(
-    { event: "media.drive_video_failed", reason },
+    { event: "media.drive_video_failed", reason, kind },
     "[upload] không chép được video Drive",
   );
-  return ApiError.unprocessable(DRIVE_VIDEO_ERROR);
+  return ApiError.unprocessable(DRIVE_VIDEO_ERRORS[kind] ?? DRIVE_VIDEO_ERRORS.unreadable);
+}
+
+/** Phân loại phản hồi của Google khi hỏi trước file Drive → loại lỗi, hoặc null nếu dùng được */
+export function driveProbeError(status, type = "", total = NaN) {
+  if (status === 404) return "missing";
+  if (![200, 206].includes(status)) return "private"; // chuyển sang trang đăng nhập / 401 / 403
+  if (/^text\/html/i.test(type)) return "private"; // trang "cần quyền truy cập" của Google
+  if (!/^(video\/|application\/octet-stream)/i.test(type)) return "notVideo";
+  if (Number.isFinite(total) && total > MAX_BANNER_VIDEO_BYTES) return "large";
+  return null;
 }
 
 /** publicId của video nền đã chép về (đúng tài khoản + thư mục banner của website), hoặc null */
@@ -449,12 +575,10 @@ async function probeDriveFile(source) {
   }
   res.body?.cancel().catch(() => {});
   const type = res.headers.get("content-type") ?? "";
-  if (![200, 206].includes(res.status) || !/^(video\/|application\/octet-stream)/i.test(type))
-    throw driveError(`drive ${res.status} ${type.slice(0, 60)}`);
   const total = Number(
     res.headers.get("content-range")?.split("/")[1] ??
       (res.status === 200 ? res.headers.get("content-length") : NaN),
   );
-  if (Number.isFinite(total) && total > MAX_BANNER_VIDEO_BYTES)
-    throw driveError(`too large: ${total}`);
+  const kind = driveProbeError(res.status, type, total);
+  if (kind) throw driveError(`drive ${res.status} ${type.slice(0, 60)} ${total}`, kind);
 }

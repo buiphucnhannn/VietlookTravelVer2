@@ -46,7 +46,8 @@ const telHref = (phone) => {
 export const adminLink = (e) =>
   `${env.siteUrl}${ADMIN_BASE}/${e.type === "booking" ? "bookings" : "requests"}?code=${encodeURIComponent(e.code)}`;
 
-const firstLine = (s, max = 60) => {
+/** 1 dòng, cắt ngắn — dùng cho tiêu đề email (không để xuống dòng / khoảng trắng lạ lọt vào Subject) */
+export const firstLine = (s, max = 60) => {
   const t = String(s ?? "")
     .replace(/\s+/g, " ")
     .trim();
@@ -287,7 +288,7 @@ export function companyEmail(e, lookups = {}) {
   ].filter(Boolean);
 
   const customer = [
-    `<p class="tx" style="margin:0 0 4px;text-align:center;font-family:${FONT};font-size:18px;line-height:26px;font-weight:700;color:${C.text}">${escape(name)}</p>`,
+    `<p class="tx" style="margin:0 0 4px;text-align:center;font-family:${FONT};font-size:18px;line-height:26px;font-weight:700;color:${C.text};word-break:break-word">${escape(name)}</p>`,
     contactLinks.length ? p(contactLinks.join(dot), { margin: "0", align: "center" }) : "",
     email
       ? p(link(`mailto:${email}?subject=${replySubject}`, email), { margin: "0", align: "center" })

@@ -12,7 +12,7 @@ import { getCatalog, getTracking } from "@/lib/catalog";
 import Tracking from "@/components/layout/Tracking";
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, locales, localeMeta, tr } from "@/i18n/config";
-import { JsonLd, pageMetadata } from "@/lib/seo";
+import { ICONS, JsonLd, pageMetadata } from "@/lib/seo";
 // CSS riêng của website (không kèm lớp của khu quản trị → nhẹ hơn)
 import "../site.css";
 
@@ -50,6 +50,9 @@ export async function generateMetadata({ params }) {
     ...pageMetadata({ lang, title: dict.meta.title, description: dict.meta.description }),
     // Đặt SAU pageMetadata để mẫu "%s | Vietlook Travel" không bị ghi đè
     title: { default: dict.meta.title, template: `%s | ${siteConfig.name}` },
+    icons: ICONS,
+    // Tên miền tạm / preview → noindex toàn site (trang nào tự đặt robots thì cũng đã là noindex)
+    ...(!siteConfig.allowIndexing && { robots: { index: false, follow: false } }),
   };
 }
 

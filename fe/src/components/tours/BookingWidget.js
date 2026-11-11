@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, CalendarDays, Info, ShieldCheck } from "lucide-react";
-import { cn, dateLocale, formatUSD } from "@/lib/utils";
+import { ArrowLeft, Info, ShieldCheck } from "lucide-react";
+import { cn, formatUSD } from "@/lib/utils";
+import { fmtDate as fmtDateOnly, fmtDayChip, isISODate, weekdayShort } from "@/lib/dates";
 import { childPercent, hotelClasses, isHoliday, unitPrice } from "@/lib/pricing";
 import { tr } from "@/i18n/config";
 import { childRatesSummary } from "@/components/tours/PriceTable";
 import {
   Counter,
+  DateInput,
   Field,
   FormError,
   Honeypot,
@@ -71,6 +73,11 @@ const FIXED_NOTE = {
   en: "Fixed departures – choose one of the next dates:",
   zh: "固定日期出发——请选择以下日期：",
   vi: "Khởi hành ngày cố định – chọn một trong các ngày sau:",
+};
+const OFF_SCHEDULE = {
+  en: "Please choose one of this tour's departure dates.",
+  zh: "请选择该行程的出发日期之一。",
+  vi: "Vui lòng chọn một trong các ngày khởi hành của tour.",
 };
 const HOTEL_LABEL = { en: "Hotel class", zh: "酒店星级", vi: "Hạng khách sạn" };
 const EXTRA_LABEL = {
@@ -150,13 +157,20 @@ export default function BookingWidget({ lang, tour, t, c, payment }) {
   };
   const setChildren = (n) =>
     setAges((a) => (n > a.length ? [...a, ...Array(n - a.length).fill(8)] : a.slice(0, n)));
-  const fmtDate = (iso) =>
-    new Intl.DateTimeFormat(dateLocale(lang), {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      timeZone: "UTC",
-    }).format(new Date(iso));
+  // Ngày khởi hành kèm thứ: "Mon · 11/16/2026" (khách chọn ngày đi cần biết thứ)
+  const fmtDate = (iso) => fmtDayChip(iso, lang);
+
+  // Tour có lịch cố định (ngày / thứ trong tuần) → chỉ được chọn đúng lịch (lịch khoá các ngày khác;
+  // gõ tay sai lịch → báo lỗi; máy chủ cũng kiểm tra)
+  const fixedOnly =
+    (tour.departure === "dates" && departures.length > 0) ||
+    (tour.departure === "weekly" && tour.departureDays?.length > 0);
+  const offSchedule = fixedOnly
+    ? (d) =>
+        tour.departure === "dates"
+          ? !tour.departureDates.includes(d)
+          : !tour.departureDays.includes(new Date(d).getUTCDay())
+    : undefined;
 
   if (offer && code && p) {
     const guests = [
@@ -198,11 +212,16 @@ export default function BookingWidget({ lang, tour, t, c, payment }) {
     const m = formMsg(lang);
     if (step === 0) {
       // Ngày khởi hành bắt buộc và không được sớm hơn ngày sớm nhất có thể đặt (kể cả khi gõ tay)
+      // tour có lịch cố định (ngày / thứ trong tuần) → phải chọn đúng lịch (máy chủ cũng kiểm tra)
       const bad = !date
         ? m.date
-        : !/^\d{4}-\d{2}-\d{2}$/.test(date) || (minDate && date < minDate)
-          ? m.dateFuture
-          : "";
+        : !isISODate(date)
+          ? m.dateInvalid
+          : minDate && date < minDate
+            ? m.dateFuture
+            : offSchedule?.(date)
+              ? tr(OFF_SCHEDULE, lang)
+              : "";
       setErrs(bad ? { date: bad } : {});
       if (bad) return setError("");
       setError("");
@@ -245,7 +264,7 @@ export default function BookingWidget({ lang, tour, t, c, payment }) {
       ref={formRef}
       onSubmit={onSubmit}
       noValidate
-      className={cn("relative space-y-4", step === 0 && "short:space-y-3")}
+      className={cn("relative space-y-4", step === 0 && "space-y-5 short:space-y-4")}
     >
       <Honeypot />
       {/* Mô tả chỉ cần ở bước chọn ngày; bước liên hệ bỏ đi để khung luôn vừa màn hình */}
@@ -253,43 +272,63 @@ export default function BookingWidget({ lang, tour, t, c, payment }) {
       {step === 0 ? (
         <>
           <Field label={t.departureDate} required htmlFor="bk-date" error={errs.date}>
-            <div className="relative">
-              <CalendarDays className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-brand-500" />
-              <Input
-                id="bk-date"
-                type="date"
-                min={minDate}
-                value={date}
-                onChange={(e) => pickDate(e.target.value)}
-                aria-invalid={!!errs.date}
-                className="pl-11 short:h-11"
-              />
-            </div>
+            <DateInput
+              id="bk-date"
+              lang={lang}
+              required
+              min={minDate}
+              isDisabled={offSchedule}
+              value={date}
+              onChange={(e) => pickDate(e.target.value)}
+              aria-invalid={!!errs.date}
+              className="short:h-11"
+            />
           </Field>
           {departures.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-muted">
+              <p className="mb-2.5 text-xs leading-snug text-muted">
                 {tour.departure === "dates" ||
                 (tour.departure === "weekly" && tour.departureDays?.length)
                   ? tr(FIXED_NOTE, lang)
                   : t.departureNote}
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {departures.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => pickDate(d)}
-                    className={cn(
-                      "rounded-full border px-3 py-0.5 text-xs font-medium transition",
-                      date === d
-                        ? "border-brand-600 bg-brand-600 text-white"
-                        : "border-border hover:border-brand-300",
-                    )}
-                  >
-                    {fmtDate(d)}
-                  </button>
-                ))}
+              {/* Lưới đều nhau: thứ (nhỏ, nhạt) trên — ngày mm/dd/yyyy (đậm) dưới; số cột chia hết số ngày → không lẻ ô */}
+              <div
+                className={cn(
+                  "grid gap-2",
+                  departures.length % 3 && departures.length % 2 === 0
+                    ? "grid-cols-2"
+                    : "grid-cols-3",
+                )}
+              >
+                {departures.map((d) => {
+                  const on = date === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={fmtDate(d)}
+                      onClick={() => pickDate(d)}
+                      className={cn(
+                        "flex h-12 flex-col items-center justify-center rounded-xl border leading-tight transition focus-visible:ring-4 focus-visible:ring-brand-500/20 focus-visible:outline-none short:h-11",
+                        on
+                          ? "border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/25"
+                          : "border-border bg-white text-ink hover:border-brand-300 hover:bg-brand-50",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "text-[0.7rem] font-medium",
+                          on ? "text-white/80" : "text-muted",
+                        )}
+                      >
+                        {weekdayShort(d, lang)}
+                      </span>
+                      <span className="text-[0.8rem] font-bold tabular-nums">{fmtDateOnly(d)}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

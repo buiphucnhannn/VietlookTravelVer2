@@ -248,22 +248,8 @@ const FX_SOURCE = {
 /** Tỷ giá tự động (chỉ xem) — dùng để đổi giá tour (USD) sang tiền Việt khi khách thanh toán */
 function FxRate({ fx }) {
   const rate = Math.round(Number(fx?.rate) || 0);
-  // "10:42, 11/11" (giờ Việt Nam)
-  const parts = fx?.fetchedAt
-    ? Object.fromEntries(
-        new Intl.DateTimeFormat("en-GB", {
-          hour: "2-digit",
-          minute: "2-digit",
-          day: "2-digit",
-          month: "2-digit",
-          hour12: false,
-          timeZone: "Asia/Ho_Chi_Minh",
-        })
-          .formatToParts(new Date(fx.fetchedAt))
-          .map((x) => [x.type, x.value]),
-      )
-    : null;
-  const at = parts ? `${parts.hour}:${parts.minute}, ${parts.day}/${parts.month}` : "";
+  // "11/11/2026 10:42" (giờ Việt Nam)
+  const at = fx?.fetchedAt ? fmtDateTime(fx.fetchedAt) : "";
   return (
     <Field
       label="Tỷ giá USD → VND hôm nay"
@@ -353,7 +339,11 @@ function PaymentCard() {
             placeholder="CÔNG TY TNHH VIETLOOK TRAVEL"
           />
         </Field>
-        <Field label="Merchant Key" hint="Mã cửa hàng trong trang quản lý của 9Pay.">
+        {/* Tên trong ngoặc giữ đúng chữ 9Pay ghi trên trang quản lý của họ để dễ tìm & chép */}
+        <Field
+          label="Mã cửa hàng (Merchant Key)"
+          hint="Chép từ trang quản lý của 9Pay, mục Merchant Key."
+        >
           <Input
             value={form.merchantKey}
             onChange={(e) => set({ merchantKey: e.target.value })}
@@ -362,14 +352,14 @@ function PaymentCard() {
           />
         </Field>
         <SecretInput
-          label="Secret Key"
+          label="Mã bí mật (Secret Key)"
           isSet={data.secretKeySet}
           masked={data.secretKeyMasked}
           value={form.secretKey}
           onChange={(secretKey) => set({ secretKey })}
         />
         <SecretInput
-          label="Checksum Key"
+          label="Mã kiểm tra (Checksum Key)"
           isSet={data.checksumKeySet}
           masked={data.checksumKeyMasked}
           value={form.checksumKey}

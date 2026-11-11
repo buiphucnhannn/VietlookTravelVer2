@@ -8,7 +8,7 @@ import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, locales, lp, tr } from "@/i18n/config";
 import { cn } from "@/lib/utils";
-import { pageMetadata, notFoundMetadata, seoField } from "@/lib/seo";
+import { pageMetadata, notFoundMetadata, policyLangs, seoField } from "@/lib/seo";
 import { Container } from "@/components/ui";
 import { BannerHero } from "@/components/ui/PageHero";
 import { getCatalog } from "@/lib/catalog";
@@ -40,6 +40,7 @@ export async function generateMetadata({ params }) {
         .replace(/<[^>]+>/g, " ")
         .slice(0, 155),
     image: p.image || undefined,
+    langs: policyLangs(p),
   });
 }
 
@@ -56,7 +57,18 @@ async function PolicyPageContent({ params }) {
   const toc = [];
   const body = tr(policy.body, lang).replace(/<h2>(.*?)<\/h2>/g, (_, text) => {
     const id = `section-${toc.length + 1}`;
-    toc.push({ id, text: text.replace(/<[^>]+>/g, "") });
+    // Mục lục là chữ thường (React tự thoát ký tự) → giải mã &amp; … để không hiện "&amp;" trên trang
+    toc.push({
+      id,
+      text: text
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#0?39;/g, "'")
+        .replace(/&amp;/g, "&"),
+    });
     return `<h2 id="${id}">${text}</h2>`;
   });
 

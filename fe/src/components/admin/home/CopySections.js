@@ -134,8 +134,7 @@ export function ServicesSection() {
         ))}
       </div>
       <AutoNote className="mt-5">
-        Ảnh nào trên trang chủ cũng đổi được bằng các nút ngay trên ảnh. Bấm “Bỏ ảnh” để dùng lại
-        ảnh có sẵn.
+        Dùng các nút trên ảnh để thay ảnh. Ảnh đã thay có thể khôi phục bằng nút “Về ảnh mặc định”.
       </AutoNote>
     </Sec>
   );
@@ -272,7 +271,7 @@ export function MapSection() {
     <Sec name="Bản đồ Việt Nam" className="bg-cream-100">
       <MiniHeading eyebrow="mapEyebrow" title="mapTitle" subtitle="mapSubtitle" className="mb-5" />
       <AutoNote href="/admin/destinations" linkText="Mở mục Điểm đến">
-        Bản đồ tự hiện mọi điểm đến đang bật cùng 2 tour tiêu biểu của điểm đó.
+        Bản đồ tự động hiển thị các điểm đến đang bật, mỗi điểm kèm 2 tour tiêu biểu.
       </AutoNote>
     </Sec>
   );
@@ -358,7 +357,7 @@ export function StatsSection({ values, onValues, auto }) {
         <ul className="max-lg:contents lg:grid lg:gap-7">{[3, 4, 5].map((i) => stat(i, true))}</ul>
       </div>
       <AutoNote dark className="mt-6">
-        Con số để trống (chữ mờ) sẽ do website tự tính. Gõ vào ô nếu muốn tự đặt con số.
+        Ô để trống (chữ mờ) sẽ được website tự động tính. Nhập số nếu muốn hiển thị số liệu riêng.
       </AutoNote>
     </Sec>
   );
@@ -728,7 +727,7 @@ export function GuideSection() {
           <T k="guideCta" dark label="Chữ trên nút" />
         </span>
         <AutoNote href="/admin/articles" linkText="Mở mục Bài viết">
-          4 bài viết mới nhất tự hiện ở đây.
+          Tự động hiển thị 4 bài viết mới nhất.
         </AutoNote>
       </div>
     </Sec>
@@ -741,7 +740,7 @@ export function MonthsSection() {
       <MiniHeading eyebrow="monthEyebrow" title="monthTitle" subtitle="monthSubtitle" />
       <PostSkeletons n={4} className="grid-cols-2 sm:grid-cols-4" />
       <AutoNote className="mt-5" href="/admin/articles" linkText="Mở mục Bài viết">
-        12 thẻ tháng tự lấy từ các bài viết thuộc chuyên mục “Việt Nam theo tháng”.
+        Tự động lấy từ các bài viết thuộc chuyên mục “Việt Nam theo tháng”.
       </AutoNote>
     </Sec>
   );

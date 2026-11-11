@@ -147,7 +147,12 @@ export default async function HomePage({ params }) {
       <DrumStats lang={lang} dict={dict} />
       <LongTours
         lang={lang}
-        dict={dict}
+        t={{
+          longToursTitle: dict.home.longToursTitle,
+          longToursSubtitle: dict.home.longToursSubtitle,
+          weekTabs: dict.home.weekTabs,
+          longToursCta: dict.home.longToursCta,
+        }}
         labels={labels}
         cards={longTours({ shown: featured.map((c) => c.slug) }).map((t) => toCard(t, lang))}
       />

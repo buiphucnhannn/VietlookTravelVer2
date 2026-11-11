@@ -16,6 +16,7 @@ import { useCurrentUser } from "./permissions";
 import { Button, Card, Field, Input, Notice, PageHeader, useUi } from "./ui";
 
 const EMPTY = { currentPassword: "", newPassword: "", confirm: "" };
+const MIN_PASSWORD = 8; // khớp be/src/validators/common.validator.js
 
 const TIPS = [
   {
@@ -85,6 +86,8 @@ export default function ChangePasswordPage() {
     e.preventDefault();
     if (!d.currentPassword) return setError("Vui lòng nhập mật khẩu hiện tại.");
     if (!d.newPassword) return setError("Vui lòng nhập mật khẩu mới.");
+    if (d.newPassword.length < MIN_PASSWORD)
+      return setError(`Mật khẩu mới cần ít nhất ${MIN_PASSWORD} ký tự.`);
     if (d.newPassword !== d.confirm) return setError("Mật khẩu nhập lại chưa khớp.");
     if (d.newPassword === d.currentPassword)
       return setError("Mật khẩu mới phải khác mật khẩu hiện tại.");
@@ -132,7 +135,7 @@ export default function ChangePasswordPage() {
                 autoFocus
               />
             </Field>
-            <Field label="Mật khẩu mới" required>
+            <Field label="Mật khẩu mới" required hint={`Ít nhất ${MIN_PASSWORD} ký tự.`}>
               <PasswordInput
                 autoComplete="new-password"
                 value={d.newPassword}

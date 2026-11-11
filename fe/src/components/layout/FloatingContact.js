@@ -170,7 +170,7 @@ export default function FloatingContact({ labels, contact, messaging }) {
           onClick={() => setWechat(false)}
         >
           <div
-            className="relative max-h-full w-full max-w-sm overflow-y-auto overscroll-contain rounded-3xl bg-white px-5 pt-7 pb-6 text-center shadow-2xl sm:p-7"
+            className="relative max-h-full w-full max-w-sm scrollbar-thin overflow-y-auto overscroll-contain rounded-3xl bg-white px-5 pt-7 pb-6 text-center shadow-2xl sm:p-7"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -185,7 +185,7 @@ export default function FloatingContact({ labels, contact, messaging }) {
               <WeChatIcon className="size-9" />
             </span>
             <h3 className="mt-4 text-xl font-bold text-ink">{labels.addWeChat}</h3>
-            <p className="mt-1 text-sm text-muted">{labels.wechatHint}</p>
+            <p className="mt-1 text-sm text-balance text-muted">{labels.wechatHint}</p>
             <div className="mt-5 flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
               <span className="min-w-0 font-mono text-lg font-semibold tracking-wide break-all text-ink">
                 {messaging.wechatId}

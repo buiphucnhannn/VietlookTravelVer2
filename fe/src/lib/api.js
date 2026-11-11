@@ -134,7 +134,13 @@ export function errorMessage(err) {
     const first = err.details?.find((d) => /[À-ỹđĐ]/.test(d.message ?? ""))?.message;
     return first || "Có thông tin chưa hợp lệ — vui lòng kiểm tra lại các ô đã nhập.";
   }
-  return err.message;
+  // Câu tiếng Việt của máy chủ thì giữ; câu kỹ thuật (tiếng Anh, mã lỗi, đường dẫn API) → câu chung dễ hiểu
+  const msg = String(err.message ?? "");
+  if (/[À-ỹđĐ]/.test(msg) && !/API|\b[A-Z]+_[A-Z_]+\b|\/api\//.test(msg)) return msg;
+  if (err.status === 404) return "Không tìm thấy mục này — có thể đã bị xoá. Hãy tải lại trang.";
+  if (err.status === 409) return "Dữ liệu bị trùng với mục đã có — vui lòng kiểm tra lại.";
+  if (err.status === 401) return "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.";
+  return "Đã có lỗi xảy ra, vui lòng thử lại.";
 }
 
 /** Lỗi có thể tự hết khi thử lại (mất mạng, hệ thống chậm / đang khởi động lại) → nên kèm nút "Thử lại" */

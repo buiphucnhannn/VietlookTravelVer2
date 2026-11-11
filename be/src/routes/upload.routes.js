@@ -6,10 +6,10 @@ import { uploadImages } from "../middlewares/upload.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import {
   deleteImageSchema,
+  discardPendingSchema,
   driveVideoJobParams,
   driveVideoSchema,
   folderQuery,
-  imageFromUrlSchema,
   linkPreviewSchema,
 } from "../validators/upload.validator.js";
 
@@ -24,14 +24,6 @@ router.post(
   uploadImages.array("files", 10),
   validate({ query: folderQuery }),
   uploadController.images,
-);
-
-// POST /api/v1/uploads/images/from-url   body: { url, folder } — Cloudinary tự tải ảnh từ link về
-router.post(
-  "/images/from-url",
-  limiter({ windowMs: 60 * 1000, limit: 20, message: "Thêm ảnh từ link quá nhanh, chờ 1 phút" }),
-  validate({ body: imageFromUrlSchema }),
-  uploadController.fromUrl,
 );
 
 // POST /api/v1/uploads/images/link-preview   body: { url } — lấy ảnh từ link về để xem trước / cắt (CHƯA lưu kho ảnh;
@@ -61,6 +53,16 @@ router.get(
   validate({ params: driveVideoJobParams }),
   uploadController.driveVideoJob,
 );
+// DELETE /api/v1/uploads/videos/from-drive/:jobId — huỷ chép (nhân viên gỡ video / rời trang khi đang chép)
+router.delete(
+  "/videos/from-drive/:jobId",
+  validate({ params: driveVideoJobParams }),
+  uploadController.cancelDriveVideo,
+);
+
+// DELETE /api/v1/uploads/pending   body: { urls } — bỏ ảnh / video vừa tải mà CHƯA lưu (gỡ, đóng form, rời trang).
+// Chỉ xoá file "chờ lưu" do chính người đó tải (admin: mọi người), không form nào khác giữ, không bản ghi nào dùng.
+router.delete("/pending", validate({ body: discardPendingSchema }), uploadController.discard);
 
 // DELETE /api/v1/uploads/images   body: { publicId }
 router.delete("/images", validate({ body: deleteImageSchema }), uploadController.remove);

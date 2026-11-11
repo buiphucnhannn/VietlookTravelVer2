@@ -17,13 +17,18 @@ export const username = z
 
 export const email = z.string().trim().toLowerCase().max(254).pipe(z.email("Email không hợp lệ"));
 
+/** Độ dài tối thiểu khi ĐẶT mật khẩu quản trị (fe kiểm tra trước: MIN_PASSWORD trong trang Đổi mật khẩu / Tài khoản) */
+export const MIN_PASSWORD = 8;
+
 /**
- * Mật khẩu tài khoản quản trị: khách đặt tuỳ ý, chỉ cần không để trống.
+ * Mật khẩu khi tạo tài khoản / đặt lại / đổi mật khẩu: ít nhất 8 ký tự, không bắt ký tự đặc biệt.
+ * Chỉ áp dụng khi ĐẶT mật khẩu — đăng nhập vẫn nhận mật khẩu cũ ngắn hơn (loginSchema).
  * Giới hạn 128 ký tự để chống gửi chuỗi khổng lồ làm nặng việc băm (DoS).
  */
 export const strongPassword = z
   .string()
   .min(1, "Vui lòng nhập mật khẩu")
+  .min(MIN_PASSWORD, `Mật khẩu cần ít nhất ${MIN_PASSWORD} ký tự`)
   .max(128, "Mật khẩu tối đa 128 ký tự");
 
 /** Chữ thuần (tên, ghi chú): bỏ ký tự điều khiển vô hình, giới hạn độ dài */

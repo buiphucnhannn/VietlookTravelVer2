@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, Save } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { cn, slugify } from "@/lib/utils";
+import { isISODate } from "@/lib/dates";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { useMutation, useOptions } from "./hooks";
 import RichText from "./RichTextLazy";
@@ -13,6 +14,7 @@ import { AutoTranslate, slugSource, useAutoFill } from "./translate";
 import {
   Button,
   Card,
+  DateInput,
   Field,
   ImageField,
   Input,
@@ -188,6 +190,8 @@ function EditorForm({ initial, back }) {
     if (!canEdit) return;
     const errs = {};
     if (!anyLang(d.title)) errs.title = "Nhập tiêu đề ở ít nhất một ngôn ngữ";
+    if (d.publishedAt && !isISODate(d.publishedAt))
+      errs.publishedAt = "Ngày đăng không hợp lệ (định dạng mm/dd/yyyy)";
     // ảnh vừa chọn (ảnh bìa, ảnh chèn trong bài) chỉ được lưu vào kho ảnh lúc này — trước khi dịch,
     // để bản dịch dùng đúng link ảnh đã lưu
     const base = errs.title ? d : await images.prepare(d);
@@ -317,14 +321,26 @@ function EditorForm({ initial, back }) {
       />
 
       <ReadOnlyArea readOnly={!canEdit}>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0 space-y-6">
-            <Card
-              title="Nội dung"
-              description="Chấm xanh: đã nhập · chấm xám: còn trống (tự dịch khi lưu)"
-              actions={langBar}
-            >
-              <div className="space-y-5">
+        {/* Các mục xếp đúng thứ tự trang bài viết trên website, từ trên xuống; phần cài đặt ở cuối */}
+        <div className="space-y-6">
+          <Card
+            title="1. Ảnh bìa & tiêu đề"
+            description="Đầu bài trên website: ảnh bìa phủ ngang, tiêu đề, tác giả và ngày đăng."
+            actions={langBar}
+          >
+            <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+              <Field
+                label="Ảnh bìa"
+                hint="Ảnh ngang, tối thiểu 1200px. Phủ ngang đầu bài (chỉ hiện phần giữa ảnh) và hiện ở thẻ bài viết."
+              >
+                <ImageField
+                  value={d.image}
+                  onChange={(image) => set({ image })}
+                  folder="articles"
+                  crop={{ width: 1920 }}
+                />
+              </Field>
+              <div className="min-w-0 space-y-5">
                 <Field label="Tiêu đề" required error={errors.title}>
                   <LocInput
                     value={d.title}
@@ -339,83 +355,122 @@ function EditorForm({ initial, back }) {
                     }
                   />
                 </Field>
-                <Field label="Tóm tắt" hint="1–3 câu, hiện trên thẻ bài viết và đầu bài">
-                  <LocInput
-                    value={d.excerpt}
-                    lang={lang}
-                    multiline
-                    rows={3}
-                    onChange={(excerpt) => set({ excerpt })}
-                  />
-                </Field>
-                <Field label="Nội dung bài viết">
-                  <RichText
-                    value={d.body[lang]}
-                    onChange={(html) => setD((x) => ({ ...x, body: { ...x.body, [lang]: html } }))}
-                    folder="articles"
-                    minHeight={420}
-                    placeholder={
-                      ["en", "zh", "vi"].some((l) => l !== lang && d.body[l])
-                        ? "Để trống — sẽ tự dịch từ ngôn ngữ đã viết khi lưu"
-                        : "Nhập nội dung bài viết…"
-                    }
-                  />
-                </Field>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Chuyên mục" hint="Hiện trên dòng đường dẫn phía trên tiêu đề">
+                    <OptionSelect
+                      value={d.category}
+                      onChange={(category) => set({ category })}
+                      options={categories}
+                      emptyLabel="— Không có chuyên mục —"
+                    />
+                  </Field>
+                  {isMonth && (
+                    <Field label="Tháng" hint="Bài thuộc mục “Việt Nam theo tháng”">
+                      <Select
+                        value={d.month ?? ""}
+                        onChange={(e) =>
+                          set({ month: e.target.value ? Number(e.target.value) : null })
+                        }
+                      >
+                        <option value="">— Chọn tháng —</option>
+                        {MONTHS.map((m) => (
+                          <option key={m} value={m}>
+                            Tháng {m}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
+                  <Field label="Tác giả" hint="Hiện dưới tiêu đề">
+                    <OptionSelect
+                      value={d.author}
+                      onChange={(author) => set({ author })}
+                      options={authors}
+                      emptyLabel="— Không ghi tác giả —"
+                    />
+                  </Field>
+                  <Field
+                    label="Ngày đăng"
+                    hint="Hiện cạnh tác giả. Bài sắp xếp theo ngày đăng, mới nhất trước"
+                    error={errors.publishedAt}
+                  >
+                    <DateInput
+                      value={d.publishedAt}
+                      aria-invalid={!!errors.publishedAt}
+                      onChange={(e) => set({ publishedAt: e.target.value })}
+                    />
+                  </Field>
+                </div>
               </div>
-            </Card>
+            </div>
+          </Card>
 
-            <Card
-              title="Hiển thị trên Google"
-              description="Để trống thì dùng tiêu đề và tóm tắt của bài."
-              actions={langBar}
+          <Card
+            title="2. Tóm tắt & nội dung bài"
+            description="Chấm xanh: đã nhập · chấm xám: còn trống (tự dịch khi lưu)"
+            actions={langBar}
+          >
+            <div className="space-y-5">
+              <Field
+                label="Tóm tắt"
+                hint="1–3 câu, hiện ngay dưới ảnh bìa (đầu bài) và trên thẻ bài viết"
+              >
+                <LocInput
+                  value={d.excerpt}
+                  lang={lang}
+                  multiline
+                  rows={3}
+                  onChange={(excerpt) => set({ excerpt })}
+                />
+              </Field>
+              <Field label="Nội dung bài viết">
+                <RichText
+                  value={d.body[lang]}
+                  onChange={(html) => setD((x) => ({ ...x, body: { ...x.body, [lang]: html } }))}
+                  folder="articles"
+                  minHeight={420}
+                  placeholder={
+                    ["en", "zh", "vi"].some((l) => l !== lang && d.body[l])
+                      ? "Để trống — sẽ tự dịch từ ngôn ngữ đã viết khi lưu"
+                      : "Nhập nội dung bài viết…"
+                  }
+                />
+              </Field>
+            </div>
+          </Card>
+
+          <Card title="3. Tour gợi ý cuối bài">
+            <Field
+              label="Điểm đến liên quan"
+              hint="Cuối bài gợi ý các tour đi qua điểm đến này; bài cũng hiện ở trang điểm đến đó. Không gắn thì gợi ý tour bất kỳ."
             >
-              <SeoFields
-                value={d.seo}
-                onChange={(seo) => set({ seo })}
-                lang={lang}
-                fallbackTitle={anyLang(d.title, lang)}
-                fallbackDescription={anyLang(d.excerpt, lang)}
-                path={`travel-guide/${d.slug || "…"}`}
-              />
-            </Card>
+              <div className="max-w-md">
+                <OptionSelect
+                  value={d.destination}
+                  onChange={(destination) => set({ destination })}
+                  options={destinations}
+                  emptyLabel="— Không gắn điểm đến —"
+                />
+              </div>
+            </Field>
+          </Card>
+
+          <div className="pt-4">
+            <p className="text-sm font-bold text-slate-500">Cài đặt</p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Các mục dưới đây không hiện thành nội dung trên trang bài viết.
+            </p>
           </div>
 
-          <aside className="space-y-6">
-            <Card title="Xuất bản">
-              <div className="space-y-5">
+          <Card title="Cài đặt hiển thị">
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="space-y-3">
                 <Toggle
                   checked={d.isActive}
                   onChange={(isActive) => set({ isActive })}
                   label="Hiện trên website"
                   hint={d.isActive ? "Khách xem được bài này" : "Bài đang ẩn, khách không thấy"}
                 />
-                <Field label="Ngày đăng" hint="Bài sắp xếp theo ngày đăng, mới nhất trước">
-                  <Input
-                    type="date"
-                    value={d.publishedAt}
-                    onChange={(e) => set({ publishedAt: e.target.value })}
-                  />
-                </Field>
-                <Field
-                  label="Đường dẫn trang"
-                  required
-                  error={errors.slug}
-                  hint={
-                    isNew
-                      ? "Phần cuối của địa chỉ trang, viết không dấu. Tự tạo từ tiêu đề."
-                      : "Phần cuối của địa chỉ trang. Nếu đổi, địa chỉ cũ vẫn tự dẫn sang địa chỉ mới."
-                  }
-                >
-                  <Input
-                    value={d.slug}
-                    aria-invalid={!!errors.slug}
-                    className="font-mono text-[13px]"
-                    onChange={(e) => {
-                      setSlugTouched(true);
-                      set({ slug: slugify(e.target.value) });
-                    }}
-                  />
-                </Field>
                 {!isNew && saved.slug && (
                   <a
                     href={`/travel-guide/${saved.slug}`}
@@ -433,65 +488,43 @@ function EditorForm({ initial, back }) {
                   </p>
                 )}
               </div>
-            </Card>
-
-            <Card title="Ảnh bìa">
-              <Field hint="Ảnh ngang, tối thiểu 1200px. Hiện ở thẻ bài viết và phủ ngang đầu bài (đầu bài chỉ hiện phần giữa ảnh).">
-                <ImageField
-                  value={d.image}
-                  onChange={(image) => set({ image })}
-                  folder="articles"
-                  crop={{ width: 1920 }}
+              <Field
+                label="Đường dẫn trang"
+                required
+                error={errors.slug}
+                hint={
+                  isNew
+                    ? "Phần cuối của địa chỉ trang, viết không dấu. Tự tạo từ tiêu đề."
+                    : "Phần cuối của địa chỉ trang. Nếu đổi, địa chỉ cũ vẫn tự dẫn sang địa chỉ mới."
+                }
+              >
+                <Input
+                  value={d.slug}
+                  aria-invalid={!!errors.slug}
+                  className="font-mono text-[13px]"
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    set({ slug: slugify(e.target.value) });
+                  }}
                 />
               </Field>
-            </Card>
+            </div>
+          </Card>
 
-            <Card title="Phân loại">
-              <div className="space-y-5">
-                <Field label="Chuyên mục">
-                  <OptionSelect
-                    value={d.category}
-                    onChange={(category) => set({ category })}
-                    options={categories}
-                    emptyLabel="— Không có chuyên mục —"
-                  />
-                </Field>
-                {isMonth && (
-                  <Field label="Tháng" hint="Bài thuộc mục “Việt Nam theo tháng”">
-                    <Select
-                      value={d.month ?? ""}
-                      onChange={(e) =>
-                        set({ month: e.target.value ? Number(e.target.value) : null })
-                      }
-                    >
-                      <option value="">— Chọn tháng —</option>
-                      {MONTHS.map((m) => (
-                        <option key={m} value={m}>
-                          Tháng {m}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                )}
-                <Field label="Tác giả">
-                  <OptionSelect
-                    value={d.author}
-                    onChange={(author) => set({ author })}
-                    options={authors}
-                    emptyLabel="— Không ghi tác giả —"
-                  />
-                </Field>
-                <Field label="Điểm đến liên quan" hint="Bài sẽ hiện ở trang điểm đến này">
-                  <OptionSelect
-                    value={d.destination}
-                    onChange={(destination) => set({ destination })}
-                    options={destinations}
-                    emptyLabel="— Không gắn điểm đến —"
-                  />
-                </Field>
-              </div>
-            </Card>
-          </aside>
+          <Card
+            title="Hiển thị trên Google"
+            description="Để trống thì dùng tiêu đề và tóm tắt của bài."
+            actions={langBar}
+          >
+            <SeoFields
+              value={d.seo}
+              onChange={(seo) => set({ seo })}
+              lang={lang}
+              fallbackTitle={anyLang(d.title, lang)}
+              fallbackDescription={anyLang(d.excerpt, lang)}
+              path={`travel-guide/${d.slug || "…"}`}
+            />
+          </Card>
         </div>
       </ReadOnlyArea>
 

@@ -7,7 +7,8 @@ import { Container } from "@/components/ui";
 import HeroVideos from "./HeroVideos";
 import { cloudinaryVideo, cloudinaryVideoUrl, embedUrl, parseVideo } from "@/lib/video";
 
-// Video nền mặc định: 4 clip cắt từ video do khách cung cấp (public/videos/vietlooktravel_video.mp4).
+// Video nền mặc định: 4 clip cắt từ video do khách cung cấp (file gốc 79 MB lưu NGOÀI repo:
+// assets-goc/vietlooktravel_video.mp4 cạnh thư mục dự án — không để trong public/).
 // Banner (dòng chữ nhỏ, tiêu đề, mô tả, video / ảnh + chú thích) chỉnh trong CMS → Trang chủ.
 const clip = (name) => ({
   src: `/videos/${name}.mp4`,
@@ -38,9 +39,13 @@ const DEFAULT_VIDEOS = [
 /**
  * Slide từ CMS → định dạng HeroVideos (poster điện thoại trống → dùng poster máy tính).
  * - Link YouTube → yt = link nhúng nền (dựng từ mã video); poster trống → ảnh bìa YouTube.
- * - Video Google Drive đã chép về Cloudinary → <video> mp4 tự phát (máy tính 1920px, điện thoại 720px);
- *   poster trống → khung hình đầu của video.
+ *   Điện thoại KHÔNG nạp khung YouTube (nặng, iPhone tiết kiệm pin hiện nút Play) → giữ ảnh dọc,
+ *   trừ khi slide có sẵn file mp4 riêng cho điện thoại (videoMobile).
+ * - Video Google Drive đã chép về Cloudinary → <video> mp4 tự phát (máy tính 1920px; điện thoại: bản dọc
+ *   nhẹ 480×854, lỗi thì dùng bản 720px); poster trống → khung hình đầu của video.
+ * srcMobile: danh sách nguồn cho điện thoại (thử lần lượt), rỗng → điện thoại chỉ hiện ảnh.
  */
+const playable = (x) => (x && !parseVideo(x) ? x : null);
 const toVideo = (s, lang) => {
   const src = s.video || s.src;
   const label = tr(s.caption, lang);
@@ -50,7 +55,10 @@ const toVideo = (s, lang) => {
     return {
       src: cloudinaryVideoUrl(cld),
       yt: null,
-      srcMobile: cloudinaryVideoUrl(cld, { width: 720 }),
+      srcMobile: [
+        cloudinaryVideoUrl(cld, { phone: true }),
+        cloudinaryVideoUrl(cld, { width: 720 }),
+      ],
       poster,
       posterMobile: s.posterMobile || poster,
       label,
@@ -59,10 +67,11 @@ const toVideo = (s, lang) => {
   const v = parseVideo(src);
   const yt = v?.provider === "youtube" ? embedUrl(src, { background: true }) : null;
   const poster = s.poster || (yt ? `https://i.ytimg.com/vi/${v.id}/maxresdefault.jpg` : "");
+  const mobile = playable(s.videoMobile) || playable(s.srcMobile) || playable(src);
   return {
-    src,
+    src: playable(src),
     yt,
-    srcMobile: s.videoMobile && !parseVideo(s.videoMobile) ? s.videoMobile : s.srcMobile || src,
+    srcMobile: mobile ? [mobile] : [],
     poster,
     posterMobile: s.posterMobile || poster,
     label,

@@ -10,7 +10,7 @@ import {
 } from "../src/repositories/content.repository.js";
 import { userRepository } from "../src/repositories/user.repository.js";
 import { auditService } from "../src/services/audit.service.js";
-import { enquiryService } from "../src/services/enquiry.service.js";
+import { enquiryService, matchesSchedule } from "../src/services/enquiry.service.js";
 import { mailService } from "../src/services/mail.service.js";
 import { paymentService } from "../src/services/payment/payment.service.js";
 import { signAccessToken } from "../src/services/token.service.js";
@@ -57,6 +57,15 @@ const TOUR = {
   },
 };
 
+// Tour chạy theo ngày cố định / thứ trong tuần (2099-03-02 là thứ Hai)
+const FIXED_TOUR = {
+  ...TOUR,
+  slug: "fixed-dates-tour",
+  departure: "dates",
+  departureDates: ["2099-03-01", "2099-04-01"],
+};
+const WEEKLY_TOUR = { ...TOUR, slug: "weekly-tour", departure: "weekly", departureDays: [1] };
+
 describe("giá tạm tính — bảng giá theo mẫu tour", () => {
   it("bậc số khách × hạng khách sạn, đếm cả trẻ em vào số khách", () => {
     // 2 lớn + 2 trẻ = 4 khách → bậc 4–9, 4★ = 400; trẻ 5 tuổi 50%, 12 tuổi 80%
@@ -102,8 +111,16 @@ describe("form công khai → lưu đơn + mã yêu cầu (không phụ thuộc 
       }),
       stub(enquiryRepository, "setEmailStatus", async () => {}),
       stub(settingRepository, "get", async () => null),
-      stub(tourRepository, "findBySlugOrOld", async (slug) =>
-        slug === TOUR.slug || slug === "old-hanoi-slug" ? TOUR : null,
+      stub(
+        tourRepository,
+        "findBySlugOrOld",
+        async (slug) =>
+          ({
+            [TOUR.slug]: TOUR,
+            "old-hanoi-slug": TOUR,
+            [FIXED_TOUR.slug]: FIXED_TOUR,
+            [WEEKLY_TOUR.slug]: WEEKLY_TOUR,
+          })[slug] ?? null,
       ),
     );
   });
@@ -144,6 +161,8 @@ describe("form công khai → lưu đơn + mã yêu cầu (không phụ thuộc 
       hotelClass: 4,
       destinations: ["hanoi", "hoi-an"],
       date: "2099-05-01",
+      adults: 2, // số người lớn / trẻ em của form thiết kế tour được giữ trong details
+      children: 1,
     },
     car: { route: "Hanoi → Halong", date: "2099-04-01", vehicle: "7-seat", pax: 4, airport: true },
     visa: {
@@ -312,6 +331,109 @@ describe("form công khai → lưu đơn + mã yêu cầu (không phụ thuộc 
     assert.equal(res2.status, 201);
     assert.deepEqual(Object.keys(saved.at(-1).details), []);
   });
+
+  it("đặt tour thiếu ngày khởi hành → 422, câu theo ngôn ngữ khách, không lưu", async () => {
+    const before = saved.length;
+    const res = await post(
+      { type: "booking", name: "QA", email: "qa@example.com", tourSlug: TOUR.slug },
+      "vi",
+    );
+    assert.equal(res.status, 422);
+    const d = res.body.error.details.find((x) => x.field === "body.departureDate");
+    assert.equal(d?.message, "Vui lòng chọn ngày từ hôm nay trở đi.");
+    assert.equal(saved.length, before);
+  });
+
+  it("tour ngày cố định / thứ trong tuần: ngày lệch lịch → 400 câu theo ngôn ngữ khách; đúng lịch → 201", async () => {
+    const book = (tourSlug, departureDate, lang) =>
+      post({ type: "booking", name: "QA", email: "qa@example.com", tourSlug, departureDate }, lang);
+    const before = saved.length;
+    const offFixed = await book(FIXED_TOUR.slug, "2099-03-05", "zh");
+    assert.equal(offFixed.status, 400);
+    assert.equal(offFixed.body.error.code, "DEPARTURE_NOT_SCHEDULED");
+    assert.equal(offFixed.body.error.details[0].field, "body.departureDate");
+    assert.equal(offFixed.body.error.details[0].message, "请选择该行程的出发日期之一。");
+    const offWeekly = await book(WEEKLY_TOUR.slug, "2099-03-03", "en"); // thứ Ba
+    assert.equal(offWeekly.status, 400);
+    assert.equal(
+      offWeekly.body.error.details[0].message,
+      "Please choose one of this tour's departure dates.",
+    );
+    assert.equal(saved.length, before);
+    assert.equal((await book(FIXED_TOUR.slug, "2099-04-01")).status, 201);
+    assert.equal((await book(WEEKLY_TOUR.slug, "2099-03-02")).status, 201); // thứ Hai
+    assert.equal((await book(TOUR.slug, "2099-03-03")).status, 201); // khởi hành hằng ngày
+  });
+
+  it("thiết kế tour: lưu MÃ loại chuyến / sở thích (trang cũ gửi chữ theo ngôn ngữ → đổi về mã)", async () => {
+    const base = { type: "planner", name: "QA", email: "qa@example.com" };
+    const res = await post({ ...base, tripType: "group", interests: ["culture", "beach"] });
+    assert.equal(res.status, 201);
+    assert.equal(saved.at(-1).details.tripType, "group");
+    assert.deepEqual(saved.at(-1).details.interests, ["culture", "beach"]);
+    const old = await post(
+      { ...base, tripType: "私人/定制游", interests: ["Biển & đảo", "Something else"] },
+      "zh",
+    );
+    assert.equal(old.status, 201);
+    assert.equal(saved.at(-1).details.tripType, "private");
+    assert.deepEqual(saved.at(-1).details.interests, ["beach", "Something else"]);
+    // form khác giữ nguyên giá trị (vd. loại chuyến xe)
+    await post({ type: "car", name: "QA", email: "qa@example.com", tripType: "Group tour" });
+    assert.equal(saved.at(-1).details.tripType, "Group tour");
+  });
+});
+
+describe("lịch khởi hành của tour (matchesSchedule)", () => {
+  it("hết ngày cố định (từ hôm nay + 2) → vẫn nhận ngày khách chọn; thiếu thứ trong tuần → ngày nào cũng được", () => {
+    // hôm nay 28/3 → sớm nhất 30/3: còn ngày 01/4 → phải chọn đúng ngày cố định
+    assert.equal(matchesSchedule(FIXED_TOUR, "2099-05-01", "2099-03-28"), false);
+    assert.equal(matchesSchedule(FIXED_TOUR, "2099-04-01", "2099-03-28"), true);
+    // hôm nay 31/3 → sớm nhất 02/4: hết ngày cố định → nhận ngày khách chọn
+    assert.equal(matchesSchedule(FIXED_TOUR, "2099-05-01", "2099-03-31"), true);
+    assert.equal(matchesSchedule({ departure: "weekly", departureDays: [] }, "2099-03-03"), true);
+    assert.equal(matchesSchedule({ departure: "on-request" }, "2099-03-03"), true);
+  });
+});
+
+describe("danh sách tour cho website", () => {
+  it("không tải album ảnh / mảng đánh giá; số ảnh, số đánh giá, điểm TB tính trong DB — dữ liệu trả về giữ nguyên", async () => {
+    let args;
+    const restore = stub(tourRepository, "listCards", async (...a) => {
+      args = a;
+      return [
+        {
+          _id: "x",
+          slug: "t1",
+          code: "VL-1",
+          content: { en: { title: "T1", route: Array(10).fill("A") }, vi: { title: "T1 vi" } },
+          photoCount: 7,
+          reviewCount: 3,
+          ratingAvg: 4.666,
+        },
+        { slug: "t2", photoCount: 0, reviewCount: 0, ratingAvg: null },
+      ];
+    });
+    try {
+      const res = await request(app).get("/api/v1/public/tours");
+      assert.equal(res.status, 200);
+      const [fields, sort] = args;
+      assert.ok(!fields.some((f) => /^(gallery|reviews)/.test(f)), fields.join(" "));
+      assert.deepEqual(sort, { rank: 1, createdAt: -1 });
+      const [a, b] = res.body.data;
+      assert.equal(a.photos, 7);
+      assert.equal(a.reviewCount, 3);
+      assert.equal(a.rating, 4.7);
+      assert.equal(a.tourType, "private");
+      assert.equal(a.route.en.length, 8);
+      assert.deepEqual(a.title, { en: "T1", zh: "", vi: "T1 vi" });
+      assert.equal(a._id, undefined);
+      assert.equal(a.photoCount, undefined);
+      assert.deepEqual([b.photos, b.reviewCount, b.rating], [0, 0, null]);
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("email: chưa có RESEND_API_KEY không làm hỏng form", () => {
@@ -387,7 +509,10 @@ describe("email: chưa có RESEND_API_KEY không làm hỏng form", () => {
       const undo2 = stub(paymentService, "offerFor", async () => null); // 9Pay tắt / đã trả đủ
       await enquiryService.resendEmail("64b000000000000000000001");
       undo2();
-      assert.doesNotMatch(sent.find((m) => m.to === booking.email).html, /If you chose to pay online/);
+      assert.doesNotMatch(
+        sent.find((m) => m.to === booking.email).html,
+        /If you chose to pay online/,
+      );
     } finally {
       restores.forEach((x) => x());
       Object.defineProperty(mailService, "enabled", enabled);

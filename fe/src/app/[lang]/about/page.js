@@ -35,7 +35,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function AboutPage({ params }) {
-  const { about, aboutPage } = await getCatalog();
+  const { about, aboutPage, allTours, allPosts } = await getCatalog();
   const { lang } = await params;
   const dict = await getDictionary(lang);
   // Tiêu đề / mô tả đầu trang sửa trong CMS (Giới thiệu & chính sách); chưa nhập → câu mặc định
@@ -73,7 +73,12 @@ export default async function AboutPage({ params }) {
   const cmsStats = (about.stats ?? [])
     .map((s) => ({ value: s.value, label: tr(s.label, lang) }))
     .filter((s) => s.value || s.label);
-  const stats = cmsStats.length ? cmsStats : dict.home.stats;
+  // Chưa nhập số liệu trong CMS → bộ mặc định, nhưng số tour / số bài cẩm nang lấy đúng số đang có trong CMS
+  // (trước đây để cứng "371+" / "434" → sai lệch khi thêm / ẩn tour, bài viết)
+  const liveValues = [undefined, `${allTours.length}+`, String(allPosts.length)];
+  const stats = cmsStats.length
+    ? cmsStats
+    : dict.home.stats.map((s, i) => ({ ...s, value: liveValues[i] ?? s.value }));
 
   return (
     <>

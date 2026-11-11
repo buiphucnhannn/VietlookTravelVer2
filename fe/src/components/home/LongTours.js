@@ -20,8 +20,8 @@ const groups = {
  * Nay là LƯỚI HIỆN SẴN: tối đa 8 tour bày cùng lúc (4 cột × 2 hàng desktop, 2 cột mobile),
  * thẻ khung vòm nền kem, kèm bộ lọc theo số tuần như Link 3.
  */
-export default function LongTours({ lang, dict, cards, labels }) {
-  const t = dict.home;
+// `t`: chỉ các câu chữ khối này dùng (không truyền cả từ điển xuống trình duyệt — trang chủ nặng thêm ~50 KB)
+export default function LongTours({ lang, t, cards, labels }) {
   const [tab, setTab] = useState("all");
   const list = cards.filter(groups[tab]).slice(0, 8);
 

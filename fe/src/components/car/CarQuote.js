@@ -4,18 +4,9 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { createPortal } from "react-dom";
 import { lockScroll, smoothScrollTo } from "@/components/fx/SmoothScroll";
 import Image from "next/image";
-import {
-  ArrowUpDown,
-  Briefcase,
-  CalendarDays,
-  Circle,
-  Clock,
-  MapPin,
-  Send,
-  Users,
-  X,
-} from "lucide-react";
+import { ArrowUpDown, Briefcase, Circle, MapPin, Send, Users, X } from "lucide-react";
 import { cn, formatUSD } from "@/lib/utils";
+import { fmtDate, fmtDuration, isTime } from "@/lib/dates";
 import { useVisualViewport } from "@/lib/use-visual-viewport";
 import { useA11y } from "@/components/layout/A11y";
 import {
@@ -29,6 +20,8 @@ import {
   Select,
   SuccessPanel,
   Textarea,
+  TimeInput,
+  dateError,
   formMsg,
   isFutureDate,
   useMinBookingDate,
@@ -42,14 +35,27 @@ import ConsentCheckbox, {
   hasFieldErrors,
 } from "@/components/forms/ConsentCheckbox";
 
-/** Kiểm tra ngày đi / ngày về của báo giá xe: không được là ngày đã qua; ngày về ≥ ngày đi. */
+/**
+ * Kiểm tra ngày / giờ đi – về của báo giá xe: không được là ngày đã qua; ngày về ≥ ngày đi;
+ * giờ đúng dạng HH:mm; về trong cùng ngày → giờ về sau giờ đón.
+ */
 function carDateErrors(q, lang) {
   const m = formMsg(lang);
   const e = {};
-  if (q.date && !isFutureDate(q.date)) e.date = m.dateFuture;
-  if (q.tripType === "roundTrip" && q.returnDate) {
-    if (!isFutureDate(q.returnDate)) e.returnDate = m.dateFuture;
-    else if (q.date && q.returnDate < q.date) e.returnDate = m.returnAfter;
+  const round = q.tripType === "roundTrip";
+  if (q.date && dateError(q.date, m)) e.date = dateError(q.date, m);
+  if (q.time && !isTime(q.time)) e.time = m.timeInvalid;
+  if (round && q.returnTime && !isTime(q.returnTime)) e.returnTime = m.timeInvalid;
+  if (round && q.returnDate) {
+    if (dateError(q.returnDate, m)) e.returnDate = dateError(q.returnDate, m);
+    else if (isFutureDate(q.date) && q.returnDate < q.date) e.returnDate = m.returnAfter;
+    else if (
+      q.returnDate === q.date &&
+      isTime(q.time) &&
+      isTime(q.returnTime) &&
+      q.returnTime <= q.time
+    )
+      e.returnTime = m.returnTimeAfter;
   }
   return e;
 }
@@ -241,60 +247,81 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="relative">
-          <span className="mb-1 block text-xs font-semibold text-muted">{t.date}</span>
-          <CalendarDays className="pointer-events-none absolute bottom-3.5 left-3 size-4 text-muted" />
-          <input
-            type="date"
+        <div>
+          <label htmlFor="qq-date" className="mb-1 block text-xs font-semibold text-muted">
+            {t.date}
+          </label>
+          <DateInput
+            id="qq-date"
+            lang={lang}
             min={minDate}
-            suppressHydrationWarning
             value={quote.date}
             onChange={(e) => (update({ date: e.target.value }), setDateErr({}))}
             aria-invalid={!!dateErr.date}
-            className="h-12 w-full rounded-xl border border-border pr-2 pl-9 text-sm focus:border-brand-500 focus:outline-none aria-[invalid=true]:border-sun-500"
+            className="rounded-xl px-3 text-sm"
           />
           {dateErr.date && (
             <span className="mt-1 block text-xs font-medium text-sun-600">{dateErr.date}</span>
           )}
-        </label>
-        <label className="relative">
-          <span className="mb-1 block text-xs font-semibold text-muted">{t.time}</span>
-          <Clock className="pointer-events-none absolute bottom-3.5 left-3 size-4 text-muted" />
-          <input
-            type="time"
+        </div>
+        <div>
+          <label htmlFor="qq-time" className="mb-1 block text-xs font-semibold text-muted">
+            {t.time}
+          </label>
+          <TimeInput
+            id="qq-time"
+            lang={lang}
             value={quote.time}
-            onChange={(e) => update({ time: e.target.value })}
-            className="h-12 w-full rounded-xl border border-border pr-2 pl-9 text-sm focus:border-brand-500 focus:outline-none"
+            onChange={(e) => (update({ time: e.target.value }), setDateErr({}))}
+            aria-invalid={!!dateErr.time}
+            className="rounded-xl px-3 text-sm"
           />
-        </label>
+          {dateErr.time && (
+            <span className="mt-1 block text-xs font-medium text-sun-600">{dateErr.time}</span>
+          )}
+        </div>
         {quote.tripType === "roundTrip" && (
           <>
-            <label className="relative">
-              <span className="mb-1 block text-xs font-semibold text-muted">{t.returnDate}</span>
-              <input
-                type="date"
-                min={quote.date || minDate}
-                suppressHydrationWarning
+            <div>
+              <label htmlFor="qq-return" className="mb-1 block text-xs font-semibold text-muted">
+                {t.returnDate}
+              </label>
+              <DateInput
+                id="qq-return"
+                lang={lang}
+                min={isFutureDate(quote.date) ? quote.date : minDate}
                 value={quote.returnDate}
                 onChange={(e) => (update({ returnDate: e.target.value }), setDateErr({}))}
                 aria-invalid={!!dateErr.returnDate}
-                className="h-12 w-full rounded-xl border border-border px-3 text-sm focus:border-brand-500 focus:outline-none aria-[invalid=true]:border-sun-500"
+                className="rounded-xl px-3 text-sm"
               />
               {dateErr.returnDate && (
                 <span className="mt-1 block text-xs font-medium text-sun-600">
                   {dateErr.returnDate}
                 </span>
               )}
-            </label>
-            <label className="relative">
-              <span className="mb-1 block text-xs font-semibold text-muted">{t.returnTime}</span>
-              <input
-                type="time"
+            </div>
+            <div>
+              <label
+                htmlFor="qq-return-time"
+                className="mb-1 block text-xs font-semibold text-muted"
+              >
+                {t.returnTime}
+              </label>
+              <TimeInput
+                id="qq-return-time"
+                lang={lang}
                 value={quote.returnTime}
-                onChange={(e) => update({ returnTime: e.target.value })}
-                className="h-12 w-full rounded-xl border border-border px-3 text-sm focus:border-brand-500 focus:outline-none"
+                onChange={(e) => (update({ returnTime: e.target.value }), setDateErr({}))}
+                aria-invalid={!!dateErr.returnTime}
+                className="rounded-xl px-3 text-sm"
               />
-            </label>
+              {dateErr.returnTime && (
+                <span className="mt-1 block text-xs font-medium text-sun-600">
+                  {dateErr.returnTime}
+                </span>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -323,7 +350,7 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
             <span className="flex-1">{placeName(quote.from)}</span>
             {route?.hours && (
               <span className="shrink-0 text-xs text-[#a26a00]">
-                ~{route.hours} {t.hours}
+                {fmtDuration(route.hours, lang)}
               </span>
             )}
             <span className="flex-1 text-right">{placeName(quote.to)}</span>
@@ -426,10 +453,10 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
           onClose={() => setOpen(false)}
           summary={{
             route: `${placeName(quote.from)} → ${placeName(quote.to)}`,
-            pickup: [quote.date, quote.time].filter(Boolean).join(" · "),
+            pickup: [fmtDate(quote.date), quote.time].filter(Boolean).join(" · "),
             back:
               quote.tripType === "roundTrip"
-                ? [quote.returnDate, quote.returnTime].filter(Boolean).join(" · ")
+                ? [fmtDate(quote.returnDate), quote.returnTime].filter(Boolean).join(" · ")
                 : null,
             pax: quote.passengers,
             vehicle: selected?.name,
@@ -520,12 +547,12 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
           type="button"
           onClick={onClose}
           aria-label={a11y.close}
-          className="absolute top-2.5 right-2.5 z-10 grid size-10 place-items-center rounded-full bg-white/90 hover:bg-surface sm:top-4 sm:right-4"
+          className="absolute top-2 right-2.5 z-10 grid size-10 place-items-center rounded-full bg-white/90 hover:bg-surface sm:top-6 sm:right-6"
         >
           <X className="size-5" />
         </button>
         {status === "success" ? (
-          <div className="min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-8">
+          <div className="min-h-0 scrollbar-thin overflow-y-auto overscroll-contain p-5 sm:p-8">
             <SuccessPanel title={t.successTitle} text={t.successText} code={code} labels={c} />
           </div>
         ) : (
@@ -535,10 +562,10 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
             noValidate
             className="relative flex min-h-0 flex-1 flex-col"
           >
-            <h3 className="shrink-0 border-b border-black/5 py-3.5 pr-14 pl-5 text-xl font-bold text-ink sm:px-8 sm:pt-7 sm:pb-4 sm:text-2xl">
+            <h3 className="shrink-0 border-b border-black/5 py-3.5 pr-14 pl-5 text-xl font-bold text-ink sm:pt-7 sm:pr-16 sm:pb-4 sm:pl-8 sm:text-2xl">
               {t.yourInfo}
             </h3>
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-8 sm:py-5">
+            <div className="min-h-0 flex-1 scrollbar-thin space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-8 sm:py-5">
               <Honeypot />
               <dl className="space-y-2 rounded-2xl bg-[#f6f1e8] p-4 text-sm">
                 {rows.map(([k, v]) => (
@@ -637,7 +664,9 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
               />
               <FormError
                 show={hasFieldErrors(errs)}
-                text={errs.date || errs.returnDate || formMsg(lang).fix}
+                text={
+                  errs.date || errs.returnDate || errs.time || errs.returnTime || formMsg(lang).fix
+                }
               />
               <FormError show={status === "error"} text={sendError || c.errorGeneric} />
             </div>
@@ -735,17 +764,19 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
       <Field label={t.date} htmlFor="cq-date" error={errs.date}>
         <DateInput
           id="cq-date"
+          lang={lang}
           value={quote.date}
           onChange={(e) => update({ date: e.target.value })}
           aria-invalid={!!errs.date}
         />
       </Field>
-      <Field label={t.time} htmlFor="cq-time">
-        <Input
+      <Field label={t.time} htmlFor="cq-time" error={errs.time}>
+        <TimeInput
           id="cq-time"
-          type="time"
+          lang={lang}
           value={quote.time}
           onChange={(e) => update({ time: e.target.value })}
+          aria-invalid={!!errs.time}
         />
       </Field>
       <Field label={t.vehicle} htmlFor="cq-vehicle">

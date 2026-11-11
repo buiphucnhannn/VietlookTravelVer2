@@ -16,8 +16,9 @@ import {
 import { getDictionary } from "@/i18n/dictionaries";
 import { fill, href, locales, lp, tr } from "@/i18n/config";
 import { cardLabels } from "@/lib/labels";
-import { formatDate, formatUSD } from "@/lib/utils";
-import { JsonLd, pageMetadata, notFoundMetadata, seoField } from "@/lib/seo";
+import { cn, formatUSD } from "@/lib/utils";
+import { fmtDayChip, fmtMonthYear } from "@/lib/dates";
+import { JsonLd, pageMetadata, notFoundMetadata, seoField, tourLangs } from "@/lib/seo";
 import { siteConfig } from "@/constants/site";
 import { Breadcrumbs, Container, SectionHeading, Stars } from "@/components/ui";
 import TourCard from "@/components/tours/TourCard";
@@ -30,7 +31,6 @@ import MobileBookBar from "@/components/tours/MobileBookBar";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { parseVideo } from "@/lib/video";
 import { GoogleIcon, TripAdvisorIcon, WeChatIcon, WhatsAppIcon } from "@/components/ui/BrandIcons";
-import { reviews as allReviews } from "@/data/reviews";
 import { getCatalog, getPaymentConfig, getTour, tourText } from "@/lib/catalog";
 
 export async function generateStaticParams() {
@@ -52,6 +52,7 @@ export async function generateMetadata({ params }) {
       seoField(tour.seo, lang, "description") ||
       tourDescription(tour, tx, lang, (await getCatalog()).toCard),
     image: tour.image,
+    langs: tourLangs(tour),
   });
   return meta;
 }
@@ -145,6 +146,10 @@ async function TourPageContent({ params }) {
         : `1 ${c.day}`
       : `${tour.days} ${c.days} / ${tour.nights} ${c.nights}`;
 
+  // Tour có nhập riêng trong CMS không (không có → ẩn khối + mục lục tương ứng)
+  const hasFaq = (tx.faqs ?? []).some((f) => f.q && f.a);
+  const hasReviews = (tour.reviews ?? []).some((r) => r.text);
+  const hasVideo = (tour.videos ?? []).some((v) => parseVideo(v));
   const structured = hasStructuredPricing(tour.pricing);
   const tabs = [
     { id: "overview", label: t.overview },
@@ -152,43 +157,33 @@ async function TourPageContent({ params }) {
     { id: "included", label: t.included },
     (tx.priceTables.length > 0 || structured) && { id: "prices", label: t.pricing },
     { id: "departures", label: t.departures },
-    { id: "faq", label: t.faqTitle },
-    { id: "reviews", label: t.reviewsTitle },
-    { id: "video", label: t.video },
+    // 3 khối dưới chỉ có khi tour được nhập riêng trong CMS (trống → ẩn cả khối lẫn mục lục)
+    hasFaq && { id: "faq", label: t.faqTitle },
+    hasReviews && { id: "reviews", label: t.reviewsTitle },
+    hasVideo && { id: "video", label: t.video },
   ].filter(Boolean);
 
-  // FAQ: nhập riêng cho tour trong CMS; chưa có → bộ câu hỏi chung (yêu cầu SEO: mỗi tour có FAQ + review thật)
+  // FAQ / Đánh giá / Video: CHỈ nội dung nhập riêng cho tour trong CMS — trống thì ẩn khối (không dùng nội dung chung)
   const ownFaq = (tx.faqs ?? []).filter((f) => f.q && f.a);
-  const faq = ownFaq.length
-    ? ownFaq.map((f) => ({
-        q: f.q,
-        a: f.a
-          .replace(/<[^>]+>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim(),
-        own: true,
-      }))
-    : t.faq.map((f) => ({
-        q: fill(f.q, { title, dest: destNames.join(lang === "zh" ? "、" : ", ") || "Vietnam" }),
-        a: fill(f.a, { title, dest: destNames.join(lang === "zh" ? "、" : ", ") || "Vietnam" }),
-      }));
-  // Review thật: ưu tiên review có điểm đến trùng với tour, bổ sung cho đủ 3
-  const destEn = tour.destinations.map((d) => getDestination(d)?.name?.en).filter(Boolean);
-  const matched = allReviews.filter((r) => destEn.some((n) => r.trip.en.includes(n)));
-  // Đánh giá nhập riêng cho tour trong CMS; chưa có → review TripAdvisor thật của công ty, ưu tiên cùng điểm đến
+  const faq = ownFaq.map((f) => ({
+    q: f.q,
+    a: f.a
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+    own: true,
+  }));
   const ownReviews = (tour.reviews ?? [])
     .filter((r) => r.text)
     .map((r) => ({
       title: r.name || "Vietlook guest",
-      trip: [r.country, r.date].filter(Boolean).join(" · "),
+      trip: [r.country, fmtMonthYear(r.date)].filter(Boolean).join(" · "),
       text: r.text,
       rating: r.rating || 5,
       source: /google/i.test(r.source) ? "google" : "tripadvisor",
     }));
-  const tourReviews = ownReviews.length
-    ? ownReviews.slice(0, 6)
-    : [...matched, ...allReviews.filter((r) => !matched.includes(r))].slice(0, 3);
-  // Video nhập trong CMS (YouTube / Google Drive, bỏ link hỏng); chưa có → video giới thiệu của công ty
+  const tourReviews = ownReviews.slice(0, 6);
+  // Video nhập trong CMS (YouTube / Google Drive, bỏ link hỏng)
   const videos = (tour.videos ?? []).filter((v) => parseVideo(v));
   const absUrl = (u) => (/^https?:\/\//.test(u) ? u : `${siteConfig.url}${u}`);
   // Ngày khởi hành cụ thể (CMS) — chỉ ngày từ hôm nay trở đi
@@ -237,17 +232,21 @@ async function TourPageContent({ params }) {
   return (
     <>
       <JsonLd data={jsonLd} />
-      <JsonLd
-        data={{
-          "@context": "https://schema.org",
-          "@type": "FAQPage",
-          mainEntity: faq.map((f) => ({
-            "@type": "Question",
-            name: f.q,
-            acceptedAnswer: { "@type": "Answer", text: f.a },
-          })),
-        }}
-      />
+      {/* Dữ liệu cấu trúc FAQ chỉ khi tour có FAQ riêng nhập trong CMS — bộ câu hỏi mẫu chung
+          (vẫn hiện trên trang) lặp lại ở hàng trăm tour nên không khai báo cho Google */}
+      {ownFaq.length > 0 && (
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faq.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          }}
+        />
+      )}
 
       <Container className="pt-6 sm:pt-8">
         <Breadcrumbs
@@ -410,7 +409,7 @@ async function TourPageContent({ params }) {
       <div className="bg-gradient-to-b from-surface to-white">
         <Container className="grid gap-8 py-10 lg:grid-cols-[1fr_400px]">
           <div className="min-w-0 space-y-6">
-            <Card id="overview" eyebrow={t.overview} title={t.overview}>
+            <Card id="overview" eyebrow={t.overviewEyebrow} title={t.overview}>
               <p className="text-lg leading-relaxed text-ink/85">{tx.summary}</p>
               {tx.route.length > 1 && (
                 <div className="mt-8">
@@ -422,8 +421,9 @@ async function TourPageContent({ params }) {
                   <ol className="grid gap-x-8 sm:grid-cols-2">
                     {tx.route.map((r, i) => (
                       <li key={i} className="flex items-start gap-3 border-b border-border py-2.5">
-                        <span className="mt-0.5 grid h-6 min-w-14 shrink-0 place-items-center rounded-full bg-brand-50 px-2 text-xs font-bold text-brand-700 capitalize">
-                          {c.day} {i + 1}
+                        {/* Ô "Ngày N" cùng một bề rộng (đủ cho số 2 chữ số) → chữ lộ trình thẳng hàng */}
+                        <span className="mt-0.5 grid h-6 w-[4.5rem] shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold whitespace-nowrap text-brand-700 capitalize tabular-nums">
+                          {lang === "zh" ? `第${i + 1}天` : `${c.day} ${i + 1}`}
                         </span>
                         <span className="text-[0.95rem] leading-snug text-ink/85">{r}</span>
                       </li>
@@ -501,7 +501,7 @@ async function TourPageContent({ params }) {
               </Card>
             )}
 
-            <Card id="included" eyebrow={t.included} title={t.included}>
+            <Card id="included" eyebrow={t.includedEyebrow} title={t.included}>
               {tx.included.length || tx.excluded.length ? (
                 <div className="grid gap-8 sm:grid-cols-2">
                   <div>
@@ -535,15 +535,19 @@ async function TourPageContent({ params }) {
                 <p className="text-ink/80">{t.inclusionsOnRequest}</p>
               )}
               {(tx.childPolicy || tx.notes) && (
-                <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                // Có cả "Chính sách trẻ em" và "Ghi chú" → 2 cột; chỉ có 1 khối → trải ngang hết bề rộng.
+                // whitespace-pre-line: giữ xuống dòng như khi nhập trong CMS (mỗi mức tuổi 1 dòng)
+                <div
+                  className={cn("mt-8 grid gap-4", tx.childPolicy && tx.notes && "sm:grid-cols-2")}
+                >
                   {tx.childPolicy && (
-                    <div className="rounded-xl bg-surface p-4 text-sm leading-relaxed text-ink/80">
+                    <div className="rounded-xl bg-surface p-4 text-sm leading-relaxed whitespace-pre-line text-ink/80">
                       <p className="mb-1 font-bold text-ink">{t.childPolicyTitle}</p>
                       {tx.childPolicy}
                     </div>
                   )}
                   {tx.notes && (
-                    <div className="rounded-xl bg-surface p-4 text-sm leading-relaxed text-ink/80">
+                    <div className="rounded-xl bg-surface p-4 text-sm leading-relaxed whitespace-pre-line text-ink/80">
                       <p className="mb-1 font-bold text-ink">{t.notesTitle}</p>
                       {tx.notes}
                     </div>
@@ -553,7 +557,7 @@ async function TourPageContent({ params }) {
             </Card>
 
             {(tx.priceTables.length > 0 || structured) && (
-              <Card id="prices" eyebrow={t.pricing} title={t.pricing}>
+              <Card id="prices" eyebrow={t.pricingEyebrow} title={t.pricing}>
                 <div className="space-y-6">
                   {structured && <PricingGrid pricing={tour.pricing} lang={lang} />}
                   {tx.priceTables.map((tb, i) => (
@@ -564,14 +568,14 @@ async function TourPageContent({ params }) {
               </Card>
             )}
 
-            <Card id="departures" eyebrow={t.departures} title={t.departures}>
+            <Card id="departures" eyebrow={t.departuresEyebrow} title={t.departures}>
               <div className="flex flex-wrap items-center gap-4">
                 <span className="flex items-center gap-3 rounded-xl bg-brand-50 px-5 py-4">
                   <Plane className="size-6 text-brand-600" />
                   <span>
                     <span className="block font-bold text-ink">
                       {upcoming.length
-                        ? upcoming.map((d) => formatDate(d, lang)).join(" · ")
+                        ? upcoming.map((d) => fmtDayChip(d, lang)).join(", ")
                         : weekly.length
                           ? weekly.join(" · ")
                           : t.dailyDeparture}
@@ -591,88 +595,94 @@ async function TourPageContent({ params }) {
               </div>
             </Card>
 
-            <Card id="faq" eyebrow={t.faqEyebrow} title={t.faqTitle}>
-              <div className="divide-y divide-sand-300/60 overflow-hidden rounded-xl ring-1 ring-sand-300/60">
-                {faq.map((f, i) => (
-                  <details key={f.q} open={i === 0} className="group bg-cream-50/60">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 font-semibold text-ink">
-                      {f.q}
-                      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white text-clay-600 ring-1 ring-sand-300/70 transition group-open:rotate-45">
-                        +
-                      </span>
-                    </summary>
-                    <p className="px-5 pb-5 leading-relaxed text-muted">
-                      {f.a}
-                      {!f.own && i === 3 && (
-                        <a
-                          href={`${lp(lang)}/policies/payment`}
-                          className="ml-1 font-semibold text-clay-600 hover:underline"
-                        >
-                          →
-                        </a>
-                      )}
-                      {!f.own && i === 4 && (
-                        <a
-                          href={`${lp(lang)}/policies/cancellation`}
-                          className="ml-1 font-semibold text-clay-600 hover:underline"
-                        >
-                          →
-                        </a>
-                      )}
-                    </p>
-                  </details>
-                ))}
-              </div>
-            </Card>
-
-            <Card id="reviews" eyebrow={t.reviewsEyebrow} title={t.reviewsTitle}>
-              <div className="grid gap-4 md:grid-cols-3">
-                {tourReviews.map((r) => (
-                  <figure
-                    key={tr(r.title, "en") + tr(r.text, "en").slice(0, 20)}
-                    className="flex flex-col rounded-2xl border border-sand-300/70 bg-cream-50 p-5"
-                  >
-                    <Stars value={r.rating} size={14} />
-                    <p className="mt-2 font-bold text-forest-700">{tr(r.title, lang)}</p>
-                    <blockquote className="mt-2 line-clamp-5 flex-1 text-sm leading-relaxed text-ink/80">
-                      {tr(r.text, lang)}
-                    </blockquote>
-                    <figcaption className="mt-4 flex items-center justify-between gap-2 border-t border-sand-300/60 pt-3 text-xs text-muted">
-                      <span className="truncate">{tr(r.trip, lang)}</span>
-                      {r.source === "google" ? (
-                        <GoogleIcon className="size-4 shrink-0" />
-                      ) : (
-                        <TripAdvisorIcon className="size-5 shrink-0 text-[#00af87]" />
-                      )}
-                    </figcaption>
-                  </figure>
-                ))}
-              </div>
-              <a
-                href={siteConfig.social.tripadvisor}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-5 inline-flex items-center gap-2 font-semibold text-clay-600 hover:underline"
-              >
-                <TripAdvisorIcon className="size-5 text-[#00af87]" /> {t.reviewsMore}
-              </a>
-            </Card>
-
-            <Card id="video" eyebrow={t.watchDream} title={t.videoTitle}>
-              <div className="overflow-hidden rounded-xl">
-                <VideoEmbed url={videos[0]} fallbackId={siteConfig.youtubeIds[0]} title={title} />
-              </div>
-              {/* Các video còn lại nhập trong CMS */}
-              {videos.length > 1 && (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  {videos.slice(1).map((v, i) => (
-                    <div key={v} className="overflow-hidden rounded-xl">
-                      <VideoEmbed url={v} title={`${title} (${i + 2})`} />
-                    </div>
+            {hasFaq && (
+              <Card id="faq" eyebrow={t.faqEyebrow} title={t.faqTitle}>
+                <div className="divide-y divide-sand-300/60 overflow-hidden rounded-xl ring-1 ring-sand-300/60">
+                  {faq.map((f, i) => (
+                    <details key={f.q} open={i === 0} className="group bg-cream-50/60">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 font-semibold text-ink">
+                        {f.q}
+                        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white text-clay-600 ring-1 ring-sand-300/70 transition group-open:rotate-45">
+                          +
+                        </span>
+                      </summary>
+                      <p className="px-5 pb-5 leading-relaxed text-muted">
+                        {f.a}
+                        {!f.own && i === 3 && (
+                          <a
+                            href={`${lp(lang)}/policies/payment`}
+                            className="ml-1 font-semibold text-clay-600 hover:underline"
+                          >
+                            →
+                          </a>
+                        )}
+                        {!f.own && i === 4 && (
+                          <a
+                            href={`${lp(lang)}/policies/cancellation`}
+                            className="ml-1 font-semibold text-clay-600 hover:underline"
+                          >
+                            →
+                          </a>
+                        )}
+                      </p>
+                    </details>
                   ))}
                 </div>
-              )}
-            </Card>
+              </Card>
+            )}
+
+            {hasReviews && (
+              <Card id="reviews" eyebrow={t.reviewsEyebrow} title={t.reviewsTitle}>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {tourReviews.map((r) => (
+                    <figure
+                      key={tr(r.title, "en") + tr(r.text, "en").slice(0, 20)}
+                      className="flex flex-col rounded-2xl border border-sand-300/70 bg-cream-50 p-5"
+                    >
+                      <Stars value={r.rating} size={14} />
+                      <p className="mt-2 font-bold text-forest-700">{tr(r.title, lang)}</p>
+                      <blockquote className="mt-2 line-clamp-5 flex-1 text-sm leading-relaxed text-ink/80">
+                        {tr(r.text, lang)}
+                      </blockquote>
+                      <figcaption className="mt-4 flex items-center justify-between gap-2 border-t border-sand-300/60 pt-3 text-xs text-muted">
+                        <span className="truncate">{tr(r.trip, lang)}</span>
+                        {r.source === "google" ? (
+                          <GoogleIcon className="size-4 shrink-0" />
+                        ) : (
+                          <TripAdvisorIcon className="size-5 shrink-0 text-[#00af87]" />
+                        )}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+                <a
+                  href={siteConfig.social.tripadvisor}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 inline-flex items-center gap-2 font-semibold text-clay-600 hover:underline"
+                >
+                  <TripAdvisorIcon className="size-5 text-[#00af87]" /> {t.reviewsMore}
+                </a>
+              </Card>
+            )}
+
+            {hasVideo && (
+              <Card id="video" eyebrow={t.watchDream} title={t.videoTitle}>
+                <div className="overflow-hidden rounded-xl">
+                  <VideoEmbed url={videos[0]} title={title} />
+                </div>
+                {/* Các video còn lại nhập trong CMS */}
+                {videos.length > 1 && (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    {videos.slice(1).map((v, i) => (
+                      <div key={v} className="overflow-hidden rounded-xl">
+                        <VideoEmbed url={v} title={`${title} (${i + 2})`} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
 
           {/* Khối đặt tour dính bên phải */}
@@ -681,7 +691,10 @@ async function TourPageContent({ params }) {
               offset={176}
               className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border xl:p-6 short:p-5"
             >
-              <h2 className="mb-3.5 text-xl font-bold tracking-tight text-ink">{t.bookTitle}</h2>
+              {/* leading-none: bỏ khoảng trống dòng chữ thừa → lề trên (tới chữ) bằng lề dưới (dưới nút đặt) */}
+              <h2 className="mt-0.5 mb-4 text-xl leading-none font-bold tracking-tight text-ink">
+                {t.bookTitle}
+              </h2>
               <BookingWidget
                 lang={lang}
                 tour={{
@@ -732,6 +745,8 @@ async function TourPageContent({ params }) {
 
 // Đọc params bên trong <Suspense> để điều hướng hiển thị tức thì (khung chờ),
 // nội dung vẫn được prerender sẵn nhờ generateStaticParams.
+// Tour vừa ẩn: đúng 1 lượt mở đầu có thể trả 200 + noindex (khung đã gửi), sau đó 404 thật. Kiểm tour ngoài
+// <Suspense> không chữa được (Next vẫn gửi khung dự phòng của route) mà làm trang 404 mất nội dung → giữ nguyên.
 export default function TourPage(props) {
   return (
     <>

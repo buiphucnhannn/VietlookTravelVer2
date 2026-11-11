@@ -13,7 +13,7 @@ import {
   table,
   title,
 } from "./layout.js";
-import { adminLink } from "./templates.js";
+import { adminLink, firstLine } from "./templates.js";
 
 /**
  * Email khi khách thanh toán online thành công (9Pay) — cùng khung với email đơn mới (layout.js):
@@ -161,6 +161,10 @@ export function paymentCustomerEmail(e, attempt) {
     "",
     t.signoff,
     t.team,
+    "",
+    "--",
+    COMPANY.legalName[lang],
+    COMPANY.address[lang],
   ].join("\n");
   return { subject, html, text, headers: { "X-Entity-Ref-ID": `${e.code}-${attempt.invoiceNo}` } };
 }
@@ -170,7 +174,7 @@ export function paymentCompanyEmail(e, attempt) {
   const amount = fmtVnd(attempt.amount);
   const name = String(e.name ?? "").trim();
   const headline = deposit ? "Khách đã đặt cọc" : "Khách đã thanh toán";
-  const subject = `${headline} ${amount} – ${e.code} – ${name.slice(0, 40)}`;
+  const subject = `${headline} ${amount} – ${e.code} – ${firstLine(name, 40)}`;
   const rest = remainingUsd(e);
   const rows = [
     { label: "Khách hàng", text: name },

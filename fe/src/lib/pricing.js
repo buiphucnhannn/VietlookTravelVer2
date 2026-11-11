@@ -50,9 +50,7 @@ export function unitPrice(tour, pax, hotelClass) {
   const classes = hotelClasses(tour);
   const cls = classes.includes(hotelClass) ? hotelClass : (classes[0] ?? 3);
   const byGap = [...tiers].sort((a, b) => paxGap(a, pax) - paxGap(b, pax));
-  const sameClass = byGap.find((t) => tierPrice(t, cls) > 0);
-  if (sameClass && paxGap(sameClass, pax) === paxGap(byGap[0], pax))
-    return tierPrice(sameClass, cls);
+  const sameClass = byGap.find((t) => tierPrice(t, cls) > 0); // bước 1 + 2
   if (sameClass) return tierPrice(sameClass, cls);
   const order = [cls, cls - 1, cls + 1, cls - 2, cls + 2].filter((c) => c >= 3 && c <= 5);
   for (const c of order) {

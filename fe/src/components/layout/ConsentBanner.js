@@ -82,7 +82,7 @@ export default function ConsentBanner({ ids, labels, privacyHref }) {
       role="region"
       aria-labelledby={titleId}
       data-lenis-prevent
-      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[60] mx-auto max-h-[calc(100dvh-24px)] max-w-3xl animate-fade-up overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.45)] ring-1 ring-sand-300/70 sm:inset-x-6 sm:bottom-6 sm:p-5"
+      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[60] mx-auto max-h-[calc(100dvh-24px)] max-w-3xl animate-fade-up scrollbar-thin overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.45)] ring-1 ring-sand-300/70 sm:inset-x-6 sm:bottom-6 sm:p-5"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Cookie className="hidden size-9 shrink-0 text-clay-500 sm:block" strokeWidth={1.6} />

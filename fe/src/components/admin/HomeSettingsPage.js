@@ -16,6 +16,7 @@ import {
   Notice,
   DEFAULT_LANG,
   PageHeader,
+  Spinner,
   anyLang,
   filledOf,
   fmtUSD,
@@ -51,6 +52,7 @@ import {
 } from "./home/Sections";
 import { CopyContext, EMPTY_SLIDE, L, validBannerVideo, validImage } from "./home/shared";
 import { usePendingImages } from "./pendingImages";
+import { usePendingVideos } from "./pendingVideos";
 import { ReadOnlyArea, usePermission } from "./permissions";
 
 const PATH = "/settings/home";
@@ -160,7 +162,7 @@ const mediaProblems = (slides) =>
     if (!validBannerVideo(s.video.trim()))
       out.push({
         slide: i,
-        message: `Slide ${n}: video nền chưa dùng được — hãy dán link YouTube hoặc Google Drive và chờ chép xong.`,
+        message: `Slide ${n}: video nền chưa dùng được — hãy dán link YouTube hoặc Google Drive và chờ video chuẩn bị xong.`,
       });
     if (!validBannerVideo(s.videoMobile.trim()))
       out.push({
@@ -207,6 +209,33 @@ export default function HomeSettingsPage() {
   );
   // Tour đang hiện trên web (đủ số ảnh, đánh giá…) → tính đúng bộ tour website TỰ CHỌN khi danh sách trống
   const publicTours = useOptions("/public/tours", sameTour);
+  // Số sân bay có giá fast-track + số chỗ xe (khối "con số nổi bật" tự tính giống website)
+  const [services, setServices] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api("/public/services")
+      .then(({ data: s }) => {
+        if (!alive || !s) return;
+        const codes = new Set(
+          (s.fastTrack ?? []).flatMap((p) =>
+            Object.entries(p.prices ?? {})
+              .filter(([, v]) => v != null)
+              .map(([c]) => c),
+          ),
+        );
+        const seats = (s.cars ?? []).map((c) => c.seats).filter(Boolean);
+        const lo = seats.length ? Math.min(...seats) : null;
+        const hi = seats.length ? Math.max(...seats) : null;
+        setServices({
+          airports: codes.size,
+          seats: hi ? (lo !== hi ? `${lo}–${hi}` : `${hi}`) : "—",
+        });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   // Tour ngoài 200 tour đầu: tìm được qua ô tìm, hoặc tra theo đường dẫn của tour đã chọn → thẻ hiện đúng tên, ảnh
   const [foundTours, setFoundTours] = useState([]);
   const tours = useMemo(() => {
@@ -294,7 +323,12 @@ export default function HomeSettingsPage() {
   useUnsavedGuard(dirty);
 
   const set = (patch) => setData((d) => ({ ...d, ...patch }));
-  const setBanner = (patch) => setData((d) => ({ ...d, banner: { ...d.banner, ...patch } }));
+  // patch: object, hoặc hàm (banner mới nhất) → object — dùng khi cập nhật sau một lúc chờ (video Drive)
+  const setBanner = (patch) =>
+    setData((d) => ({
+      ...d,
+      banner: { ...d.banner, ...(typeof patch === "function" ? patch(d.banner) : patch) },
+    }));
 
   const problems = useMemo(() => (data ? mediaProblems(data.banner.slides) : []), [data]);
 
@@ -320,6 +354,8 @@ export default function HomeSettingsPage() {
   );
 
   const save = async () => {
+    // video Drive còn đang chuẩn bị → chờ xong rồi tự lưu (nút Lưu hiện "Đang chuẩn bị video…", có nút Huỷ)
+    if (videos.copying) return videos.waitAndSave();
     if (problems.length) {
       setSlideIndex(problems[0].slide);
       toast.error(problems[0].message, { title: "Chưa lưu được" });
@@ -332,6 +368,7 @@ export default function HomeSettingsPage() {
     const { value: body, failed } = await autoFill.fill(withImages, { lang });
     const r = await run(() => api(PATH, { method: "PUT", body }), "Đã lưu trang chủ");
     if (r) {
+      videos.saved(body); // video vừa lấy về đã được lưu → không còn bị dọn khi rời trang
       const n = normalize(r.data ?? body, defs);
       setData(n);
       setSaved(JSON.stringify(n));
@@ -344,6 +381,8 @@ export default function HomeSettingsPage() {
         });
     }
   };
+  // video Drive đang chuẩn bị / đã lấy về mà chưa lưu (bỏ thì tự dọn); onReady: lưu tiếp khi đang chờ video
+  const videos = usePendingVideos(data, { onReady: save });
 
   const discard = async () => {
     const ok = await confirm({
@@ -393,12 +432,13 @@ export default function HomeSettingsPage() {
   );
 
   // Con số website tự tính cho khối "con số nổi bật" (hiện mờ khi nhân viên không tự nhập)
+  // (giống website: số sân bay có giá fast-track, số chỗ xe nhỏ nhất – lớn nhất tính từ Xe & Visa)
   const autoStats = [
     String(siteConfig.since),
     tours.length ? `${shown(tours)}+` : "…",
     destinations.length ? String(shown(destinations)) : "…",
-    "5",
-    "4–45",
+    services ? String(services.airports) : "…",
+    services ? services.seats : "…",
     `${siteConfig.tripadvisorRating.score.toFixed(1)}★`,
   ];
 
@@ -407,7 +447,7 @@ export default function HomeSettingsPage() {
       <HomeImagesContext.Provider value={imagesContext}>
         <PageHeader
           title="Trang chủ"
-          description={`Đây là bản thu nhỏ của trang chủ, đúng thứ tự các khối trên website.${canEdit ? " Bấm thẳng vào chữ, ảnh hoặc ô bất kỳ để sửa; giữ và kéo thẻ để đổi thứ tự." : ""}`}
+          description={`Bản xem trước trang chủ theo đúng thứ tự trên website.${canEdit ? " Bấm vào chữ hoặc ảnh để chỉnh sửa, kéo thả thẻ để sắp xếp, sau đó bấm Lưu." : ""}`}
         />
 
         {/* ----- Khung "trang web thu nhỏ" ----- */}
@@ -488,7 +528,7 @@ export default function HomeSettingsPage() {
         </ReadOnlyArea>
 
         <p className="mt-3 text-center text-xs text-slate-500">
-          Ô nào để trống, website sẽ tự dùng câu có sẵn.
+          Ô để trống sẽ dùng nội dung mặc định của website.
         </p>
 
         {/* ----- Thanh lưu ----- */}
@@ -501,7 +541,12 @@ export default function HomeSettingsPage() {
                 !problems.length && "max-sm:hidden",
               )}
             >
-              {problems.length ? (
+              {videos.copying ? (
+                <span className="flex min-w-0 items-center gap-1.5 font-medium text-brand-700">
+                  <Spinner className="size-4 shrink-0" />
+                  <span className="line-clamp-2">Đang chuẩn bị video…</span>
+                </span>
+              ) : problems.length ? (
                 <span className="flex min-w-0 items-center gap-1.5 font-medium text-sun-600">
                   <AlertTriangle className="size-4 shrink-0" />
                   <span className="line-clamp-2">{problems[0].message}</span>
@@ -528,13 +573,18 @@ export default function HomeSettingsPage() {
                   <span className="max-sm:hidden">Hoàn tác</span>
                 </Button>
               )}
+              {videos.waiting && (
+                <Button variant="ghost" size="sm" onClick={videos.cancelWait}>
+                  Huỷ lưu
+                </Button>
+              )}
               <Button
                 icon={Save}
                 onClick={save}
-                loading={busy || autoFill.busy || images.busy}
+                loading={busy || autoFill.busy || images.busy || videos.waiting}
                 disabled={!dirty}
               >
-                {images.label || (
+                {(videos.waiting && "Đang chuẩn bị video… vui lòng chờ") || images.label || (
                   <>
                     <span className="max-sm:hidden">Lưu thay đổi</span>
                     <span className="sm:hidden">Lưu</span>

@@ -305,6 +305,19 @@ async function shrinkToFile(src, alpha, name) {
 }
 
 const isHuge = (w, h) => Math.max(w, h) > HUGE_SIDE;
+/** Ảnh rất lớn (ảnh gốc máy ảnh / file in ấn) → báo nhẹ là đã tự thu nhỏ */
+const VERY_LARGE_SIDE = 8000;
+const VERY_LARGE_BYTES = 25 * 1024 * 1024;
+const mb = (bytes) => (bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0);
+
+/**
+ * Ảnh iPhone (HEIC / HEIF). Ô chọn ảnh chỉ nhận JPG / PNG… nên iPhone tự đổi sang JPG khi chọn từ thư viện;
+ * file HEIC còn lọt vào (kéo thả trên máy tính, chọn "Tất cả file") → trình duyệt mở được (Safari) thì tự đổi
+ * sang ảnh thường, không mở được thì báo cách xử lý.
+ */
+const isHeic = (f) => /image\/hei[cf]/i.test(f.type || "") || /\.hei[cf]$/i.test(f.name || "");
+const HEIC_HELP = (name) =>
+  `"${name}" là ảnh iPhone (HEIC) mà trình duyệt này chưa mở được. Hãy mở trang bằng Safari, hoặc đổi ảnh sang JPG rồi chọn lại.`;
 
 /** Chỉ đọc ảnh của website: bản trên Cloudinary (có CORS) hoặc /images cùng tên miền */
 async function fetchOwnImage(url) {
@@ -379,10 +392,15 @@ export function useImageCrop(spec, folder = "misc") {
 
   /** Lọc định dạng / dung lượng (ảnh lỗi báo ngay, không chặn các ảnh khác) */
   const acceptable = (f) => {
-    if (!ACCEPT.includes(f.type))
+    if (!ACCEPT.includes(f.type) && !isHeic(f))
       toast(`"${f.name}" không phải ảnh JPG / PNG / WebP / AVIF / GIF`, "error");
-    else if (f.size > (f.type === "image/gif" ? SERVER_LIMIT : MAX_INPUT))
-      toast(`"${f.name}" quá nặng — hãy chọn ảnh nhỏ hơn`, "error");
+    else if (f.type === "image/gif" && f.size > SERVER_LIMIT)
+      toast(
+        `"${f.name}" là ảnh động (GIF) quá nặng (${mb(f.size)} MB, tối đa 8 MB) — hãy chọn ảnh nhẹ hơn hoặc ảnh JPG / PNG.`,
+        "error",
+      );
+    else if (f.size > MAX_INPUT)
+      toast(`"${f.name}" quá nặng (${mb(f.size)} MB) — hãy chọn ảnh dưới 40 MB.`, "error");
     else return true;
     return false;
   };
@@ -392,17 +410,26 @@ export function useImageCrop(spec, folder = "misc") {
    * Lệch khung → hỏi vùng cắt; quá lớn → thu nhỏ; còn lại giữ nguyên file.
    */
   const processFile = async (f, index, total, beforeCrop) => {
-    // GIF (có thể là ảnh động) giữ nguyên
+    // GIF (có thể là ảnh động) giữ nguyên — không cắt / nén để ảnh động vẫn chạy
     if (f.type === "image/gif") return { file: f, original: f };
+    const heic = isHeic(f);
     let src;
     try {
       src = await decode(f);
     } catch {
-      if (f.size <= SERVER_LIMIT) return { file: f, original: f }; // để hệ thống kiểm tra lại khi lưu
-      toast(`Không đọc được ảnh "${f.name}"`, "error");
+      if (heic) toast(HEIC_HELP(f.name), "error");
+      else if (f.size <= SERVER_LIMIT)
+        return { file: f, original: f }; // để hệ thống kiểm tra lại khi lưu
+      else
+        toast(
+          `Không mở được ảnh "${f.name}" — file có thể bị hỏng hoặc quá lớn. Hãy chọn ảnh nhỏ hơn (dưới ${VERY_LARGE_SIDE} điểm ảnh mỗi cạnh).`,
+          "error",
+        );
       return "skip";
     }
     try {
+      if (Math.max(src.width, src.height) > VERY_LARGE_SIDE || f.size > VERY_LARGE_BYTES)
+        toast(`"${f.name}" rất lớn — đã tự thu nhỏ cho vừa website, ảnh vẫn nét.`);
       const alpha = hasAlpha(src, f.type);
       let decision = { type: "original" };
       if (needsCrop(src.width, src.height, spec)) {
@@ -425,7 +452,8 @@ export function useImageCrop(spec, folder = "misc") {
       if (decision.type === "cancel" || decision.type === "skip") return decision.type;
       if (decision.type === "crop")
         return { file: await cropToFile(src, alpha, decision, spec, f.name), original: f };
-      if (isHuge(src.width, src.height) || f.size > SERVER_LIMIT)
+      // ảnh iPhone luôn được đổi sang ảnh thường (website / kho ảnh không nhận HEIC)
+      if (heic || isHuge(src.width, src.height) || f.size > SERVER_LIMIT)
         return { file: await shrinkToFile(src, alpha, f.name), original: f };
       return { file: f, original: f };
     } finally {

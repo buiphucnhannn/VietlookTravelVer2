@@ -1,6 +1,7 @@
 import { siteConfig } from "@/constants/site";
 import { defaultLocale, href, localeMeta, locales } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
+import { policyLangs, postLangs, primaryLang, tourLangs } from "@/lib/seo";
 
 const staticPaths = [
   "",
@@ -41,20 +42,31 @@ export default async function sitemap() {
     ...Object.keys(authors).map((a) => `/travel-guide/author/${a}`),
   ];
 
-  return paths.map((p) => ({
-    url: `${siteConfig.url}${href(defaultLocale, p || "/")}`,
-    ...(modified[p] && { lastModified: new Date(modified[p]) }),
-    changeFrequency:
-      p.startsWith("/tours/") || p.startsWith("/travel-guide/") ? "weekly" : "monthly",
-    priority: p === "" ? 1 : p.split("/").length <= 2 ? 0.8 : 0.6,
-    alternates: {
-      languages: {
-        ...Object.fromEntries(
-          locales.map((l) => [localeMeta[l].hreflang, `${siteConfig.url}${href(l, p || "/")}`]),
-        ),
-        // giống thẻ hreflang trong <head> (lib/seo.js)
-        "x-default": `${siteConfig.url}${href(defaultLocale, p || "/")}`,
+  // Tour / bài viết / chính sách chưa có nội dung ở ngôn ngữ nào → bỏ ngôn ngữ đó (giống hreflang trong <head>)
+  const langsOf = Object.fromEntries([
+    ...allTours.map((t) => [`/tours/${t.slug}`, tourLangs(t)]),
+    ...allPosts.map((p) => [`/travel-guide/${p.slug}`, postLangs(p)]),
+    ...Object.entries(policies).map(([k, p]) => [`/policies/${k}`, policyLangs(p)]),
+  ]);
+
+  return paths.map((p) => {
+    const langs = langsOf[p] ?? locales;
+    const main = primaryLang(defaultLocale, langs);
+    return {
+      url: `${siteConfig.url}${href(main, p || "/")}`,
+      ...(modified[p] && { lastModified: new Date(modified[p]) }),
+      changeFrequency:
+        p.startsWith("/tours/") || p.startsWith("/travel-guide/") ? "weekly" : "monthly",
+      priority: p === "" ? 1 : p.split("/").length <= 2 ? 0.8 : 0.6,
+      alternates: {
+        languages: {
+          ...Object.fromEntries(
+            langs.map((l) => [localeMeta[l].hreflang, `${siteConfig.url}${href(l, p || "/")}`]),
+          ),
+          // giống thẻ hreflang trong <head> (lib/seo.js)
+          "x-default": `${siteConfig.url}${href(main, p || "/")}`,
+        },
       },
-    },
-  }));
+    };
+  });
 }

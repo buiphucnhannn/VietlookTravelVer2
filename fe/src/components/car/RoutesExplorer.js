@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronRight, Clock, Plane } from "lucide-react";
 import { cn, formatUSD } from "@/lib/utils";
+import { fmtDuration } from "@/lib/dates";
 import { useCarQuote } from "./CarQuote";
 
 // Vị trí các thành phố trên "bản đồ chữ S" cách điệu: x, y (%) và phía đặt nhãn (l = trái, r = phải)
@@ -17,7 +18,7 @@ const nodes = {
 };
 
 /** Bảng giá tuyến phổ biến (giá USD/xe từ website cũ) + bản đồ lộ trình cách điệu. */
-export default function RoutesExplorer({ areas, routes, classes, t }) {
+export default function RoutesExplorer({ areas, routes, classes, t, lang = "en" }) {
   const { update, goToQuick, goToForm } = useCarQuote();
   const [area, setArea] = useState(areas[0].key);
   const [cls, setCls] = useState(classes[1].key);
@@ -25,7 +26,9 @@ export default function RoutesExplorer({ areas, routes, classes, t }) {
   const current = areas.find((a) => a.key === area);
 
   // Đường cong mượt (Catmull-Rom → Bézier) đi qua đúng tâm các chấm
-  const pts = areas.map((a) => nodes[a.key]);
+  // Khu vực mới thêm trong CMS chưa có toạ độ trên bản đồ → bỏ khỏi bản đồ (không làm sập cả trang)
+  const mapAreas = areas.filter((a) => nodes[a.key]);
+  const pts = mapAreas.map((a) => nodes[a.key]);
   const path = pts
     .map(([x, y], i) => {
       if (!i) return `M${x} ${y}`;
@@ -59,7 +62,7 @@ export default function RoutesExplorer({ areas, routes, classes, t }) {
               style={{ strokeWidth: 3.5 }}
             />
           </svg>
-          {areas.map((a) => {
+          {mapAreas.map((a) => {
             const [x, y, side] = nodes[a.key];
             const on = a.key === area;
             return (
@@ -163,7 +166,7 @@ export default function RoutesExplorer({ areas, routes, classes, t }) {
                   <span className="flex-1 font-semibold text-ink">{r.label}</span>
                   {r.hours && (
                     <span className="hidden items-center gap-1 text-sm text-muted sm:flex">
-                      <Clock className="size-3.5" /> {r.hours} {t.hours}
+                      <Clock className="size-3.5" /> {fmtDuration(r.hours, lang)}
                     </span>
                   )}
                   <span className="text-right">

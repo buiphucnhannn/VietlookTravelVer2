@@ -3,6 +3,7 @@ import { logger } from "../config/logger.js";
 import { ROLES } from "../constants/roles.js";
 import { sessionRepository } from "../repositories/session.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
+import { MIN_PASSWORD } from "../validators/common.validator.js";
 import { passwordService } from "./password.service.js";
 
 /**
@@ -32,6 +33,15 @@ export async function ensureFirstAdmin() {
     passwordHash: await passwordService.hash(password),
   });
   logger.info(`[admin] Đã tạo tài khoản admin đầu tiên: ${username}`);
+  warnShortPassword(password);
+}
+
+/** ADMIN_PASSWORD ngắn hơn mức tối thiểu khi đặt trong CMS → vẫn tạo / đặt lại, chỉ nhắc đổi */
+function warnShortPassword(password) {
+  if (password.length < MIN_PASSWORD)
+    logger.warn(
+      `[admin] ADMIN_PASSWORD ngắn hơn ${MIN_PASSWORD} ký tự — nên đăng nhập rồi đổi mật khẩu mạnh hơn trong trang quản trị`,
+    );
 }
 
 /**
@@ -43,6 +53,7 @@ export async function resetAdminFromEnv() {
   const { username, password, name } = env.admin;
   const existing = await userRepository.findByUsername(username);
   const passwordHash = await passwordService.hash(password);
+  warnShortPassword(password);
   if (!existing) {
     await userRepository.create({ username, name, role: ROLES.ADMIN, passwordHash });
     return { username, created: true };

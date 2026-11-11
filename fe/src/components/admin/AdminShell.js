@@ -33,6 +33,7 @@ import { FORBIDDEN_EVENT, api, redirectToLogin, refreshSession } from "@/lib/api
 import { cn } from "@/lib/utils";
 import { TODO_EVENT, prefetchList } from "./hooks";
 import { AdminProviders, LoadingBlock, useUi } from "./ui";
+import { unsavedNote } from "./pendingImages";
 import {
   CurrentUserProvider,
   ModuleScope,
@@ -349,7 +350,7 @@ function Shell({ children }) {
     const onLeave = async (e) => {
       const ok = await confirm({
         title: "Rời trang khi chưa lưu?",
-        message: "Nội dung bạn đang soạn chưa được lưu và sẽ mất nếu rời trang này.",
+        message: unsavedNote("Nội dung bạn đang soạn chưa được lưu và sẽ mất nếu rời trang này."),
         confirmText: "Rời trang",
         cancelText: "Ở lại",
         danger: true,

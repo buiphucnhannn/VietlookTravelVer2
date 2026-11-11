@@ -95,6 +95,28 @@ class TourRepository extends ContentRepository {
     super(Tour);
   }
 
+  /**
+   * Thẻ tour đang bán: chỉ lấy `fields` + số ảnh / số đánh giá / điểm trung bình tính ngay trong DB
+   * (không tải cả album ảnh và mảng đánh giá). Đánh giá thiếu điểm tính là 5.
+   */
+  listCards(fields, sort) {
+    const nonEmpty = (f) => ({ $ifNull: [`$${f}`, []] });
+    return this.model.aggregate([
+      { $match: { isActive: true } },
+      { $sort: sort },
+      {
+        $project: {
+          ...Object.fromEntries(fields.map((f) => [f, 1])),
+          photoCount: { $size: nonEmpty("gallery") },
+          reviewCount: { $size: nonEmpty("reviews") },
+          ratingAvg: {
+            $avg: { $map: { input: nonEmpty("reviews"), in: { $ifNull: ["$$this.rating", 5] } } },
+          },
+        },
+      },
+    ]);
+  }
+
   /** Tour đang bán dùng điểm đến / chủ đề này (chặn xoá điểm đến đang được dùng) */
   countUsing(field, value) {
     return this.model.countDocuments({ [field]: value });

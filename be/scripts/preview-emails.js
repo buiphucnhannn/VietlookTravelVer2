@@ -12,6 +12,7 @@ process.env.MONGODB_URI ||= "mongodb://127.0.0.1:1/preview";
 process.env.LOG_LEVEL ||= "silent";
 
 const { companyEmail, customerEmail } = await import("../src/emails/templates.js");
+const { paymentCompanyEmail, paymentCustomerEmail } = await import("../src/emails/payment.js");
 const { applyRedirect } = await import("../src/services/mail.service.js");
 
 const outDir = resolve(process.argv[2] || join(tmpdir(), "vietlook-email-preview"));
@@ -194,6 +195,50 @@ const redirected = applyRedirect(
   "dev@example.com",
 );
 write("booking-customer-en-redirect", redirected, "booking · khách · MAIL_REDIRECT_TO");
+
+// Thanh toán online (9Pay): biên nhận cho khách (en / zh / vi) + báo nhân viên — đặt cọc & trả đủ
+const paidBooking = (status) => ({
+  ...SAMPLES.booking,
+  paymentStatus: status,
+  payments: [{ status: "paid", amountUsd: status === "deposit" ? 336 : 1120 }],
+});
+const attempt = (status) => ({
+  amount: status === "deposit" ? 8_568_000 : 28_560_000,
+  amountUsd: status === "deposit" ? 336 : 1120,
+  rate: 25_500,
+  paidAt: new Date(),
+  transactionId: "9P-20261110-000123",
+  invoiceNo: "VLBK7QX2-1",
+});
+for (const status of ["deposit", "paid"]) {
+  write(
+    `payment-${status}-staff`,
+    paymentCompanyEmail({ ...paidBooking(status), lang: "en" }, attempt(status)),
+    `thanh toán (${status}) · nhân viên`,
+  );
+  for (const lang of ["en", "zh", "vi"])
+    write(
+      `payment-${status}-customer-${lang}`,
+      paymentCustomerEmail({ ...paidBooking(status), lang }, attempt(status)),
+      `thanh toán (${status}) · khách · ${lang}`,
+    );
+}
+
+// Dữ liệu khó: ký tự đặc biệt, tiếng Việt, chữ Hán, emoji, chữ / link rất dài
+const tricky = {
+  ...SAMPLES.contact,
+  code: "VL-CT261110-EDGE",
+  name: `Nguyễn Thị "Hương" & <Lê> 李小龙 😊`,
+  message: `Địa chỉ: 12 Ngõ Huế, Hà Nội 🏝️\n我想去下龙湾 & 会安 <3\nhttps://example.com/${"rất-dài-".repeat(20)}`,
+  details: { subject: "Tour & giá <VIP>" },
+};
+for (const lang of ["en", "zh", "vi"])
+  write(
+    `edge-customer-${lang}`,
+    customerEmail({ ...tricky, lang }, LOOKUPS),
+    `ký tự khó · khách · ${lang}`,
+  );
+write("edge-staff", companyEmail({ ...tricky, lang: "zh" }, LOOKUPS), "ký tự khó · nhân viên");
 
 const esc = (s) =>
   String(s).replace(

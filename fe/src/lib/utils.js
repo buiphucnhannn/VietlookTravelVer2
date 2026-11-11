@@ -29,20 +29,7 @@ export function formatUSD(value) {
   }).format(value);
 }
 
-/** Locale định dạng ngày theo ngôn ngữ giao diện. */
-export const dateLocale = (lang) => ({ zh: "zh-CN", vi: "vi-VN" })[lang] || "en-GB";
-
-/** Ngày dạng "2025-05-01" (giờ UTC) → hiển thị đúng ngày ở mọi múi giờ (không lùi 1 ngày ở châu Mỹ, khớp server/trình duyệt) */
-export function formatDate(iso, lang = "en") {
-  const d = new Date(iso);
-  if (!iso || Number.isNaN(d.getTime())) return ""; // thiếu ngày → bỏ trống (Intl báo lỗi với ngày không hợp lệ)
-  return new Intl.DateTimeFormat(dateLocale(lang), {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(d);
-}
+/* Định dạng ngày: dùng lib/dates.js (mm/dd/yyyy cho mọi ngôn ngữ). */
 
 export function slugify(text) {
   return String(text)

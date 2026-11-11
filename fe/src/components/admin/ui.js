@@ -29,6 +29,7 @@ import {
   Loader2,
   PlayCircle,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   Upload,
@@ -38,10 +39,13 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { canonicalVideo, embedUrl, parseVideo, videoLinkError, videoThumb } from "@/lib/video";
 import { cn } from "@/lib/utils";
+import { fmtDate as fmtDateShared, fmtDateTime as fmtDateTimeShared } from "@/lib/dates";
+import DatePicker from "@/components/ui/DatePicker";
 import { useVisualViewport } from "@/lib/use-visual-viewport";
 import { DragHandle, Sortable } from "./Sortable";
 import { CROP_PRESETS, canRecrop, cropSpec, useImageCrop } from "./ImageCropper";
 import { isPendingImage } from "./pendingImages";
+import { copyDriveVideo } from "./pendingVideos";
 
 /* =========================================================================
  * Ngôn ngữ nội dung
@@ -155,8 +159,10 @@ export function Button({
   );
 }
 
+// Đệm trái/phải viết TÁCH (pl/pr, không dùng px): ô có ký hiệu / icon ($, %, kính lúp…) truyền pl-… / pr-… để chừa chỗ.
+// Nếu dùng px thì px (padding-inline) và pl (padding-left) là 2 thuộc tính khác nhau → tuỳ thứ tự CSS mà chữ đè lên ký hiệu.
 export const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-ink shadow-[0_1px_1px_rgba(15,23,42,0.03)] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-400 focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-sun-400 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-sun-50";
+  "w-full rounded-xl border border-slate-200 bg-white pr-3.5 pl-3.5 py-2.5 text-sm text-ink shadow-[0_1px_1px_rgba(15,23,42,0.03)] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-400 focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-sun-400 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-sun-50";
 
 export function Field({ label, hint, error, required, children, className, htmlFor, aside }) {
   // Nhãn gắn với ô nhập (bấm nhãn → con trỏ vào ô; trình đọc màn hình đọc đúng tên ô) khi ô là Input/Select…
@@ -167,7 +173,8 @@ export function Field({ label, hint, error, required, children, className, htmlF
     isValidElement(children) &&
     (LINKABLE_TAGS.includes(children.type) || LINKABLE.has(children.type));
   const ownId = linkable ? (children.props.id ?? autoId) : undefined;
-  const control = linkable && !children.props.id ? cloneElement(children, { id: autoId }) : children;
+  const control =
+    linkable && !children.props.id ? cloneElement(children, { id: autoId }) : children;
   return (
     <div className={className}>
       {(label || aside) && (
@@ -198,6 +205,11 @@ export function Field({ label, hint, error, required, children, className, htmlF
 
 export function Input({ className, ...props }) {
   return <input {...props} className={cn(inputClass, className)} />;
+}
+
+/** Ô ngày của CMS: hiện mm/dd/yyyy (không theo ngôn ngữ máy), giá trị ISO — xem components/ui/DatePicker.js */
+export function DateInput({ className, ...props }) {
+  return <DatePicker lang="vi" {...props} className={cn(inputClass, className)} />;
 }
 
 export function Textarea({ className, rows = 4, ...props }) {
@@ -281,7 +293,7 @@ export function LocInput({ value, onChange, lang, multiline, rows, placeholder, 
 
 /** Ô nhập mà <Field> tự gắn nhãn (truyền id xuống thẻ input / textarea / select) */
 const LINKABLE_TAGS = ["input", "textarea", "select"];
-const LINKABLE = new Set([Input, Textarea, Select, LocInput]);
+const LINKABLE = new Set([Input, Textarea, Select, LocInput, DateInput]);
 
 /* =========================================================================
  * Khung trang
@@ -459,28 +471,38 @@ export function Notice({ tone = "info", children, className, title }) {
   );
 }
 
+/**
+ * Ô tìm kiếm: icon kính lúp · ô nhập · nút xoá nằm CẠNH NHAU trong một hàng (flex) — không đặt icon đè lên ô
+ * nhập nên chữ không bao giờ chạy dưới icon, dù cỡ chữ / phông / thiết bị thế nào.
+ */
 export function SearchBox({ value, onChange, placeholder = "Tìm kiếm…", className }) {
   return (
-    <div className={cn("relative", className)}>
-      <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400" />
-      <Input
+    <label
+      className={cn(
+        "flex h-[42px] w-full cursor-text items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 shadow-[0_1px_1px_rgba(15,23,42,0.03)] transition focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-100 hover:border-slate-300",
+        className,
+      )}
+    >
+      <Search className="size-4 shrink-0 text-slate-400" aria-hidden />
+      <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="pl-10"
+        aria-label={placeholder.replace(/…$/, "")}
+        className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-slate-400 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange("")}
           aria-label="Xoá tìm kiếm"
-          className="absolute top-1/2 right-2.5 grid size-6 -translate-y-1/2 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          className="-mr-1 grid size-6 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
         >
           <X className="size-3.5" />
         </button>
       )}
-    </div>
+    </label>
   );
 }
 
@@ -781,12 +803,12 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="grid size-10 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 sm:-mr-2"
+            className="grid size-10 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:bg-slate-100 focus-visible:text-slate-700 focus-visible:ring-4 focus-visible:ring-brand-100 focus-visible:outline-none sm:-mr-2"
           >
             <X className="size-5" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+        <div className="min-h-0 flex-1 scrollbar-thin overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           {children}
         </div>
         {footer && (
@@ -1066,11 +1088,13 @@ export function AdminProviders({ children }) {
     <UiContext.Provider value={value}>
       {children}
 
-      {/* Thông báo: điện thoại = giữa, ngay dưới thanh tiêu đề; máy tính = góc phải, nằm dưới hàng nút
-          đầu trang (Lưu / Tải lại…) để không che nút đang dùng */}
+      {/* Thông báo: luôn ở GÓC TRÊN BÊN PHẢI.
+          Điện thoại / máy tính bảng (có thanh tiêu đề trên cùng): ngay dưới thanh đó, cách mép phải 12–20px.
+          Máy tính: sát góc trên phải màn hình (cách 20px) — cùng một chỗ ở mọi trang, dù đang cuộn tới đâu.
+          Chỉ dùng right + width (không mx-auto) để không bao giờ bị đẩy ra giữa. */}
       <section
         aria-label="Thông báo"
-        className="pointer-events-none fixed inset-x-3 top-[4.5rem] z-[95] mx-auto flex max-w-[420px] flex-col gap-2 sm:inset-x-auto sm:right-5 sm:w-[340px] lg:top-5 max-sm:[&>*:nth-child(n+4)]:hidden"
+        className="pointer-events-none fixed top-[4.5rem] right-3 left-auto z-[95] flex w-[calc(100vw-24px)] flex-col items-stretch gap-2 sm:right-5 sm:w-[360px] lg:top-5 max-sm:[&>*:nth-child(n+4)]:hidden"
       >
         {toasts.map((t) => (
           <ToastItem key={t.id} t={t} onDismiss={toast.dismiss} />
@@ -1129,7 +1153,7 @@ function ConfirmPanel({ state, danger, onClose }) {
       aria-modal="true"
       aria-labelledby={`${labelId}-t`}
       aria-describedby={state.message ? `${labelId}-m` : undefined}
-      className="relative max-h-full w-full max-w-[420px] animate-[admin-pop_.22s_cubic-bezier(.2,.8,.2,1)] overflow-y-auto overscroll-contain rounded-[22px] bg-white px-5 pt-6 pb-5 text-center shadow-[0_24px_80px_-20px_rgba(10,37,60,0.45)] sm:rounded-[24px] sm:px-6 sm:pt-7 sm:pb-6"
+      className="relative max-h-full w-full max-w-[420px] animate-[admin-pop_.22s_cubic-bezier(.2,.8,.2,1)] scrollbar-thin overflow-y-auto overscroll-contain rounded-[22px] bg-white px-5 pt-6 pb-5 text-center shadow-[0_24px_80px_-20px_rgba(10,37,60,0.45)] sm:rounded-[24px] sm:px-6 sm:pt-7 sm:pb-6"
     >
       <span
         className={cn(
@@ -1236,7 +1260,6 @@ export function ImageUrlDialog({ open, onClose, onSubmit, multiple = false, busy
       size="sm"
       icon={Link2}
       title={multiple ? "Thêm ảnh từ link" : "Dán link ảnh"}
-      description="Khi bấm Lưu, ảnh được lưu vào kho ảnh của website, nên link gốc có bị xoá thì ảnh vẫn còn."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -1251,7 +1274,7 @@ export function ImageUrlDialog({ open, onClose, onSubmit, multiple = false, busy
       <Field
         label={multiple ? "Link ảnh (mỗi dòng 1 link)" : "Link ảnh"}
         error={bad.length ? "Link phải bắt đầu bằng http:// hoặc https://" : ""}
-        hint="Dán link trực tiếp tới file ảnh (đuôi .jpg, .png, .webp…). Ảnh phải mở được công khai."
+        hint="Mở ảnh trên trình duyệt, bấm chuột phải → “Sao chép địa chỉ hình ảnh” rồi dán vào đây."
       >
         {multiple ? (
           <Textarea
@@ -1309,8 +1332,12 @@ export function ImageField({
   aspect = "aspect-[16/10]",
   crop,
   label = "Kéo thả ảnh vào đây",
+  // Ô có ảnh mặc định của website (vd. ảnh trang chủ): fallback = URL ảnh mặc định.
+  // Đang dùng ảnh mặc định → không có nút xoá, hiện nhãn "Ảnh mặc định"; đã thay ảnh → nút "Về ảnh mặc định".
+  fallback,
 }) {
   const { toast } = useUi();
+  const isDefault = !!fallback && value === fallback;
   const input = useRef(null);
   const [busy, setBusy] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -1395,6 +1422,15 @@ export function ImageField({
             />
             {/* Các nút nằm gọn ở chân ảnh — ảnh dọc hay ngang đều không có nút lơ lửng bên dưới */}
             <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-center gap-1.5 bg-gradient-to-t from-slate-950/75 via-slate-950/35 to-transparent px-2 pt-9 pb-2.5">
+              {/* Ảnh có sẵn của website: ghi rõ ngay trên hàng nút (không đè lên số / nhãn ở góc ảnh) */}
+              {isDefault && (
+                <span
+                  title="Ảnh có sẵn của website — không xoá được, chỉ thay bằng ảnh khác"
+                  className="basis-full text-center text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]"
+                >
+                  Ảnh mặc định · bấm Đổi ảnh để thay
+                </span>
+              )}
               <OverlayBtn
                 icon={Upload}
                 label="Đổi ảnh"
@@ -1408,13 +1444,27 @@ export function ImageField({
                 onClick={() => setLinkOpen(true)}
               />
               {croppable && <OverlayBtn icon={Crop} label="Cắt ảnh" crowded onClick={recrop} />}
-              <OverlayBtn
-                icon={Trash2}
-                label="Bỏ ảnh"
-                danger
-                iconOnly={croppable}
-                onClick={() => onChange("")}
-              />
+              {fallback ? (
+                !isDefault && (
+                  <OverlayBtn
+                    icon={RotateCcw}
+                    label="Về ảnh mặc định"
+                    iconOnly={croppable}
+                    onClick={() => {
+                      onChange(fallback);
+                      toast("Đã trả về ảnh mặc định — bấm Lưu để lưu lại");
+                    }}
+                  />
+                )
+              ) : (
+                <OverlayBtn
+                  icon={Trash2}
+                  label="Bỏ ảnh"
+                  danger
+                  iconOnly={croppable}
+                  onClick={() => onChange("")}
+                />
+              )}
             </div>
           </>
         ) : (
@@ -1686,22 +1736,11 @@ export function VideoHelp({ banner }) {
   );
 }
 
-/** Chép video Drive đã chia sẻ về website (video nền trang chủ) → { url, poster } */
-export async function importDriveVideo(url) {
-  let { data } = await api("/uploads/videos/from-drive", {
-    method: "POST",
-    body: { url: url.trim() },
-    timeout: 60_000,
-  });
-  // video lớn: máy chủ chép tiếp ở nền → hỏi lại vài giây một lần (tối đa ~10 phút)
-  const { jobId } = data;
-  for (let i = 0; data.status === "pending" && i < 200; i++) {
-    await new Promise((r) => setTimeout(r, 3000));
-    data = (await api(`/uploads/videos/from-drive/${jobId}`)).data;
-  }
-  if (data.status !== "done") throw new Error("Chép video quá lâu — hãy thử lại hoặc dùng YouTube");
-  return data.video;
-}
+/**
+ * Lấy video Drive đã chia sẻ về website (video nền trang chủ) → { url, poster }.
+ * Theo dõi trạng thái / huỷ / bỏ video không lưu: xem ./pendingVideos.js
+ */
+export const importDriveVideo = (url) => copyDriveVideo(url);
 
 /** Nhãn nhận diện nguồn video */
 export function VideoChip({ provider, className }) {
@@ -2136,18 +2175,29 @@ export function ChipSelect({ options, value = [], onChange, max }) {
  * Cảnh báo rời trang khi còn nội dung chưa lưu
  * ========================================================================= */
 
+/**
+ * Mọi nơi đang có thay đổi chưa lưu (trang soạn + hộp thoại mở bên trên). Gom lại để hộp thoại đóng
+ * không xoá mất cảnh báo của trang bên dưới. Muốn rời trang có chủ đích: window.__vlHasUnsaved = () => false.
+ */
+const unsavedSources = new Set();
+const anyUnsaved = () => unsavedSources.size > 0;
+
 export function useUnsavedGuard(dirty) {
   useEffect(() => {
-    window.__vlHasUnsaved = () => dirty;
+    window.__vlHasUnsaved = anyUnsaved;
+    if (!dirty) return;
+    const token = {};
+    unsavedSources.add(token);
     const onBefore = (e) => {
-      if (!dirty) return;
+      if (!window.__vlHasUnsaved?.()) return;
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", onBefore);
     return () => {
+      unsavedSources.delete(token);
       window.removeEventListener("beforeunload", onBefore);
-      window.__vlHasUnsaved = () => false;
+      window.__vlHasUnsaved = anyUnsaved;
     };
   }, [dirty]);
 }
@@ -2156,24 +2206,9 @@ export function useUnsavedGuard(dirty) {
  * Định dạng
  * ========================================================================= */
 
-export const fmtDateTime = (iso) =>
-  iso
-    ? new Intl.DateTimeFormat("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(new Date(iso))
-    : "";
-export const fmtDate = (iso) =>
-  iso
-    ? new Intl.DateTimeFormat("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }).format(new Date(iso))
-    : "";
+/** "mm/dd/yyyy HH:mm" / "mm/dd/yyyy" (giờ Việt Nam) — dùng chung với website: lib/dates.js */
+export const fmtDateTime = fmtDateTimeShared;
+export const fmtDate = fmtDateShared;
 export const fmtUSD = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("en-US")}`);
 
 /** Chuỗi đa ngôn ngữ → tiếng Việt / Anh để hiển thị trong CMS */

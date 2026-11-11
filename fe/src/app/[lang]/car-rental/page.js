@@ -288,7 +288,7 @@ export default async function CarRentalPage({ params }) {
             <h2 className="heading-lg text-ink">{t.routesTitle}</h2>
             <p className="mt-3 text-lg text-muted">{t.routesSubtitle}</p>
           </header>
-          <RoutesExplorer areas={areas} routes={routes} classes={classes} t={t} />
+          <RoutesExplorer areas={areas} routes={routes} classes={classes} t={t} lang={lang} />
         </Container>
       </section>
 

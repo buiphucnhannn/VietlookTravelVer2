@@ -54,6 +54,7 @@ export function ImageSlot({ path, aspect, className, style, label }) {
         aspect={aspect}
         crop={crop}
         label={label}
+        fallback={fallback || undefined}
       />
     </div>
   );

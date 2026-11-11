@@ -1,5 +1,6 @@
 import { Be_Vietnam_Pro } from "next/font/google";
 import ImageRetry from "@/components/fx/ImageRetry";
+import { ICONS } from "@/lib/seo";
 import "../globals.css";
 
 /**
@@ -16,7 +17,7 @@ const font = Be_Vietnam_Pro({
 export const metadata = {
   title: { default: "Quản trị", template: "%s – Quản trị | Vietlook Travel" },
   robots: { index: false, follow: false, nocache: true },
-  icons: { icon: "/icon.png" },
+  icons: ICONS,
 };
 
 export const viewport = { themeColor: "#0a253c" };

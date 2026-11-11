@@ -243,22 +243,43 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
       busy={busy || autoFill.busy || images.busy}
       saveLabel={images.label}
     >
+      {/* Thứ tự theo trang chủ đề trên website: đầu trang (ảnh lớn, tên, câu giới thiệu) → đoạn giới thiệu
+          → thẻ chủ đề (ảnh thẻ — ở mục “Chủ đề khác”, trang chủ, menu) → cài đặt hiển thị ở cuối */}
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
         <div className="space-y-4">
           <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
-          <Field label="Tên chủ đề" required>
-            <LocInput
-              value={d.name}
-              lang={lang}
-              onChange={(name) =>
-                set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })
-              }
-            />
-          </Field>
-          <Field label="Câu giới thiệu ngắn" hint="1 dòng, hiện dưới tên chủ đề trên thẻ">
-            <LocInput value={d.tagline} lang={lang} onChange={(tagline) => set({ tagline })} />
-          </Field>
-          <Field label="Giới thiệu" hint="Đoạn mở đầu trên trang chủ đề">
+          <FormSection title="Đầu trang chủ đề">
+            <Field
+              label="Ảnh lớn đầu trang"
+              hint="Phủ ngang đầu trang chủ đề. Để trống thì dùng ảnh thẻ."
+            >
+              <ImageField
+                value={d.banner}
+                onChange={(banner) => set({ banner })}
+                folder="themes"
+                crop={{ ratio: 12 / 5, width: 2400 }}
+              />
+            </Field>
+            <Field label="Tên chủ đề" required>
+              <LocInput
+                value={d.name}
+                lang={lang}
+                onChange={(name) =>
+                  set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })
+                }
+              />
+            </Field>
+            <Field
+              label="Câu giới thiệu ngắn"
+              hint="1 dòng, hiện dưới tên chủ đề ở đầu trang và trên thẻ"
+            >
+              <LocInput value={d.tagline} lang={lang} onChange={(tagline) => set({ tagline })} />
+            </Field>
+          </FormSection>
+          <Field
+            label="Giới thiệu"
+            hint="Đoạn mở đầu ngay dưới ảnh đầu trang, trước danh sách tour"
+          >
             <LocInput
               value={d.intro}
               lang={lang}
@@ -270,29 +291,18 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
         </div>
 
         <div className="space-y-6">
-          <FormSection title="Hình ảnh">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Ảnh thẻ"
-                hint="Hiện ở thẻ chủ đề (trang chủ, menu, danh sách). Ảnh ngang, chủ thể ở giữa."
-              >
+          <FormSection title="Thẻ chủ đề">
+            <Field
+              label="Ảnh thẻ"
+              hint="Hiện ở thẻ chủ đề (mục “Chủ đề khác” cuối trang, trang chủ, menu). Ảnh ngang, chủ thể ở giữa."
+            >
+              <div className="max-w-xs">
                 <ImageField value={d.image} onChange={(image) => set({ image })} folder="themes" />
-              </Field>
-              <Field
-                label="Ảnh lớn đầu trang"
-                hint="Phủ ngang đầu trang chủ đề. Để trống thì dùng ảnh thẻ."
-              >
-                <ImageField
-                  value={d.banner}
-                  onChange={(banner) => set({ banner })}
-                  folder="themes"
-                  crop={{ ratio: 12 / 5, width: 2400 }}
-                />
-              </Field>
-            </div>
+              </div>
+            </Field>
           </FormSection>
 
-          <FormSection title="Thiết lập">
+          <FormSection title="Cài đặt hiển thị">
             <Field label="Đường dẫn trang" required hint="Viết không dấu. Vd: family-tours">
               <Input
                 value={d.slug}

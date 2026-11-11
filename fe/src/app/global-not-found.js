@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Be_Vietnam_Pro } from "next/font/google";
+import { ICONS } from "@/lib/seo";
 import "./site.css";
 
 const siteFont = Be_Vietnam_Pro({
@@ -14,6 +15,7 @@ const siteFont = Be_Vietnam_Pro({
 export const metadata = {
   title: "404 – Page not found | Vietlook Travel",
   robots: { index: false },
+  icons: ICONS,
 };
 
 export default function GlobalNotFound() {

@@ -83,4 +83,8 @@ temp/
 *.bak
 ~$*
 
-docs/
+# ----- Tài liệu nội bộ: chỉ đưa vào repo hướng dẫn deploy + file đối chiếu URL web cũ (.csv) -----
+# (file docs/ đã theo dõi từ trước vẫn giữ nguyên)
+docs/*
+!docs/DEPLOY.md
+!docs/*.csv

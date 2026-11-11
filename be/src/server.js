@@ -21,9 +21,14 @@ async function bootstrap() {
     logger.warn(
       "PROXY_SECRET chưa đặt — API nhận request gọi thẳng, IP khách lấy theo TRUST_PROXY",
     );
+  if (env.isProd && env.siteUrlNeedsSetup)
+    logger.warn(
+      `PUBLIC_SITE_URL chưa đặt đúng (đang là "${env.siteUrl}") — cần tên miền chính thức dạng https://…, nếu không link trong email, nút "Mở trong CMS" và trang quay về sau thanh toán 9Pay sẽ trỏ sai`,
+    );
   await connectDatabase();
   await ensureFirstAdmin(); // tạo tài khoản admin đầu tiên từ .env nếu chưa có
-  if (env.cloudinary.enabled && env.cloudinary.dailyCleanup) scheduleDailySweep(); // dọn ảnh không dùng
+  // dọn ảnh không dùng ~03:00 giờ VN mỗi ngày (bật mặc định ở production)
+  if (env.cloudinary.enabled && env.cloudinary.dailyCleanup) scheduleDailySweep();
 
   const server = createApp().listen(env.port, () =>
     logger.info(`Vietlook API listening on http://localhost:${env.port}/api/v1 (${env.nodeEnv})`),

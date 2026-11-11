@@ -28,6 +28,12 @@ import ConsentCheckbox, {
 
 // Kênh liên hệ ưu tiên: giá trị gửi về CMS giữ nguyên ("Phone"), chỉ chữ hiển thị theo ngôn ngữ
 const PHONE_LABEL = { en: "Phone", zh: "电话", vi: "Điện thoại" };
+// Loại chuyến / sở thích: gửi MÃ cố định (CMS hiện chữ tiếng Việt) — cùng thứ tự với t.tripTypes / t.interestOptions
+// trong từ điển; khớp PLANNER_OPTIONS ở be/src/emails/labels.js
+const TRIP_TYPES = ["private", "group", "corporate", "b2b"];
+const INTERESTS = ["culture", "nature", "beach", "food", "cruise", "photo", "family", "honeymoon"];
+const codeOptions = (codes, labels) =>
+  codes.map((value, i) => ({ value, label: labels[i] ?? value }));
 
 /**
  * Form thiết kế tour nhiều bước: số ngày, số khách, hạng khách sạn 3–5★, ngân sách,
@@ -47,7 +53,7 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
     adults: 2,
     children: 0,
     hotel: "4",
-    tripType: t.tripTypes[0],
+    tripType: TRIP_TYPES[0],
     interests: [],
     budget: "1000-2000",
     requests: "",
@@ -177,6 +183,7 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
               <Field label={t.startDate} htmlFor="tp-arrival" error={errs.arrival}>
                 <DateInput
                   id="tp-arrival"
+                  lang={lang}
                   value={data.arrival}
                   onChange={set("arrival")}
                   aria-invalid={!!errs.arrival}
@@ -258,7 +265,7 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
             </Field>
             <Field label={t.tripType}>
               <Chips
-                options={t.tripTypes.map((x) => ({ value: x, label: x }))}
+                options={codeOptions(TRIP_TYPES, t.tripTypes)}
                 value={data.tripType}
                 onChange={set("tripType")}
               />
@@ -271,7 +278,7 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
             <Field label={t.interests}>
               <Chips
                 multiple
-                options={t.interestOptions.map((x) => ({ value: x, label: x }))}
+                options={codeOptions(INTERESTS, t.interestOptions)}
                 value={data.interests}
                 onChange={set("interests")}
               />

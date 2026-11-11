@@ -1,5 +1,6 @@
 // Bảng giá lấy từ website cũ có cấu trúc không đều (ô gộp dọc, dòng chú thích, không có dòng tiêu đề).
 // Chuẩn hoá trước khi hiển thị để mọi bảng đều thẳng hàng, dễ đọc.
+import { cn } from "@/lib/utils";
 
 // Là giá khi có số đi kèm đơn vị tiền ("28 USD", "144$", "$95") hoặc số từ 3 chữ số;
 // "Price (USD/PAX)" (tiêu đề cột) không phải giá
@@ -54,6 +55,9 @@ export function normalizeTable(rows) {
   return { caption, header, rows: header ? grid.slice(1) : grid };
 }
 
+/** Cột có ô chữ dài (> 40 ký tự, vd. ghi chú / điều kiện) → căn trái; còn lại căn giữa */
+const longCol = (rows, k) => rows.some((r) => (r[k]?.text?.length ?? 0) > 40);
+
 export default function PriceTable({ table }) {
   const { caption, header, rows } = normalizeTable(table.rows);
   const heading = [table.heading !== "Price" && table.heading, caption].filter(Boolean).join(" · ");
@@ -63,12 +67,19 @@ export default function PriceTable({ table }) {
       {heading && (
         <p className="bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white">{heading}</p>
       )}
-      <table className="w-full min-w-[520px] text-left text-sm">
+      {/* Ô ngắn (số khách, giá, hạng…) căn giữa cho cân đối; ô chữ dài (ghi chú, điều kiện) căn trái cho dễ đọc */}
+      <table className="w-full min-w-[520px] text-sm">
         {header && (
           <thead className="bg-brand-50 text-brand-800">
             <tr>
               {header.map((h, j) => (
-                <th key={j} className="px-4 py-3 align-top font-semibold">
+                <th
+                  key={j}
+                  className={cn(
+                    "px-4 py-3 align-middle font-semibold",
+                    longCol(rows, j) ? "text-left" : "text-center",
+                  )}
+                >
                   {h.text}
                 </th>
               ))}
@@ -83,13 +94,15 @@ export default function PriceTable({ table }) {
                   <td
                     key={k}
                     rowSpan={cell.rowSpan}
-                    className={
+                    className={cn(
+                      "px-4 py-3 align-middle",
+                      longCol(rows, k) ? "text-left" : "text-center",
                       hasPrice(cell.text) && cell.text.length < 40
-                        ? "px-4 py-3 align-top font-semibold whitespace-nowrap text-sun-600"
+                        ? "font-semibold whitespace-nowrap text-sun-600"
                         : k === 0
-                          ? "px-4 py-3 align-top font-medium text-ink"
-                          : "min-w-56 px-4 py-3 align-top text-ink/80"
-                    }
+                          ? "font-medium text-ink"
+                          : "min-w-56 text-ink/80",
+                    )}
                   >
                     {cell.text}
                   </td>
@@ -178,11 +191,11 @@ export function PricingGrid({ pricing, lang }) {
           <table className="w-full text-sm">
             <thead className="bg-brand-50 text-brand-800">
               <tr>
-                <th scope="col" className={`${th} text-left`}>
+                <th scope="col" className={`${th} text-center`}>
                   {pl("group", lang)}
                 </th>
                 {cols.map(([k, n]) => (
-                  <th key={k} scope="col" className={`${th} text-right`}>
+                  <th key={k} scope="col" className={`${th} text-center`}>
                     {multi ? pl("hotel", lang, { n }) : pl("price", lang)}
                   </th>
                 ))}
@@ -193,14 +206,14 @@ export function PricingGrid({ pricing, lang }) {
                 <tr key={i} className="border-t border-border">
                   <th
                     scope="row"
-                    className="px-3 py-3 text-left font-medium whitespace-nowrap text-ink sm:px-4"
+                    className="px-3 py-3 text-center font-medium whitespace-nowrap text-ink sm:px-4"
                   >
                     {range(t.minPax ?? 1, t.maxPax)} {pl("pax", lang)}
                   </th>
                   {cols.map(([k]) => (
                     <td
                       key={k}
-                      className="px-3 py-3 text-right font-semibold whitespace-nowrap text-sun-600 sm:px-4"
+                      className="px-3 py-3 text-center font-semibold whitespace-nowrap text-sun-600 sm:px-4"
                     >
                       {t[k] > 0 ? usd(t[k]) : "–"}
                     </td>

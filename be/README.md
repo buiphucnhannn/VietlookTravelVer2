@@ -21,7 +21,7 @@ npm run dev              # http://localhost:4000/api/v1/health — lần đầu 
 | `npm run secret`         | Sinh JWT secret, DATA_ENCRYPTION_KEY, PROXY_SECRET ngẫu nhiên                                                                                                                                                                                               |
 | `npm run admin:reset`    | Quên mật khẩu admin: đặt lại tài khoản `ADMIN_USERNAME` theo `ADMIN_PASSWORD` trong `.env`, mở khoá, đăng xuất mọi thiết bị                                                                                                                                 |
 | `npm run i18n:fill`      | `-- --to zh` hoặc `-- --to vi`: dịch tự động các ô còn trống từ tiếng Anh (`--from vi` để dịch từ tiếng Việt; `--dry` chỉ đếm, `--backup <thư mục>` sao lưu trước, `--only tours,articles`) — không đụng ô đã có chữ, tự chờ & thử lại khi dịch vụ dịch bận |
-| `npm run media:cleanup`  | Liệt kê ảnh CMS trên Cloudinary không còn dùng (cũ hơn 24 giờ); `-- --apply` để xoá thật. Bật tự chạy mỗi ngày: `MEDIA_CLEANUP_DAILY=true`                                                                                                                  |
+| `npm run media:cleanup`  | Xem trước việc dọn ảnh CMS không còn dùng (không ghi / xoá gì): file mới phát hiện, file đang chờ và ngày xoá được. `-- --apply` chạy như job hằng ngày, `--force` bỏ qua chốt an toàn, `--grace-days=0` xoá ngay, `--list` in hết — xem "Dọn ảnh" bên dưới |
 | `npm run db:backup`      | Sao lưu toàn bộ database ra `BACKUP_DIR/vietlook-<ngày giờ>.json.gz`, giữ `BACKUP_KEEP` (7) ngày gần nhất — xem "Sao lưu database"                                                                                                                          |
 | `npm run db:restore`     | `-- <file.json.gz>` xem trước; thêm `--yes` để khôi phục (tự sao lưu dữ liệu hiện tại trước), `--only tours,articles` chỉ vài bảng                                                                                                                          |
 | `npm run seed`           | Nạp dữ liệu ban đầu từ `seed-data/` — chỉ thêm bản ghi còn thiếu. ⚠ `-- --force` GHI ĐÈ nội dung đã sửa trong CMS                                                                                                                                           |
@@ -84,7 +84,7 @@ khi database chưa có tài khoản đó (`services/admin-bootstrap.service.js` 
 | Đơn / yêu cầu     | `GET /enquiries`, `/enquiries/stats`, `/enquiries/code/:code`, `GET/PATCH/DELETE /enquiries/:id`, `POST/DELETE /enquiries/:id/notes`, `POST /enquiries/:id/resend-email`                    | theo quyền bookings / requests (xoá: full) | Trạng thái, thanh toán, ghi chú nội bộ, gửi lại email                                                                                                       |
 | Trang chủ & trang | `GET/PUT /settings/home`, `GET /settings/pages`, `GET/PUT /settings/pages/:key`                                                                                                             | admin, editor                              | Banner, tour nổi bật, giới thiệu + 4 chính sách                                                                                                             |
 | Cài đặt           | `GET/PUT /settings/notifications`, `GET/PUT /settings/payment`, `GET/PUT /settings/tracking`                                                                                                | admin                                      | Email nhận thông báo, 9Pay (chỉ môi trường thật, key mã hoá, không bao giờ trả nguyên văn), mã Google                                                       |
-| Ảnh               | `POST /uploads/images?folder=` (từ thiết bị), `POST /uploads/images/from-url` (từ link), `POST /uploads/images/link-preview`, `DELETE /uploads/images`                                      | admin, editor                              | Cloudinary · kiểm tra chữ ký file · chặn link nội bộ · không xoá được ảnh hệ thống                                                                          |
+| Ảnh               | `POST /uploads/images?folder=` (lưu ảnh), `POST /uploads/images/link-preview` (xem trước ảnh từ link), `DELETE /uploads/images`                                                             | admin, editor                              | Cloudinary · kiểm tra chữ ký file · chặn link nội bộ · không xoá được ảnh hệ thống                                                                          |
 | Video             | `POST /uploads/videos/from-drive`, `GET /uploads/videos/from-drive/:jobId`                                                                                                                  | admin, editor                              | Không tải file video lên máy chủ: dán link YouTube / Google Drive đã chia sẻ (`utils/video.js`); riêng video nền trang chủ từ Drive được Cloudinary chép về |
 | Dịch tự động      | `POST /translate`                                                                                                                                                                           | admin, editor                              | Dịch en / zh / vi (giữ nguyên thẻ HTML), giới hạn 30 lần / phút                                                                                             |
 | Tài khoản         | `/users` …                                                                                                                                                                                  | admin                                      | Quản lý tài khoản, phân quyền từng mục                                                                                                                      |
@@ -93,6 +93,12 @@ khi database chưa có tài khoản đó (`services/admin-bootstrap.service.js` 
 "admin, editor" = admin luôn được; nhân viên (editor) cần quyền ở mục tương ứng (xem: `view`, thêm/sửa: `edit`, xoá: `full`).
 Phản hồi: `{ success: true, data, meta? }` · lỗi: `{ success: false, error: { code, message, details? } }`.
 Mọi request thay đổi dữ liệu (POST/PATCH/DELETE) phải có header `X-Requested-With: fetch`.
+
+**Dịch tự động** (`services/translate.service.js`): chuỗi dịch vụ thử lần lượt — có key: Microsoft Translator (`AZURE_TRANSLATOR_KEY`),
+DeepL Free (`DEEPL_API_KEY`), Google Cloud (`GOOGLE_TRANSLATE_API_KEY`); không key (không chính thức, xoay vòng để chia tải):
+Google gtx, Google dict-chrome-ex, Lingva, LibreTranslate tự host; MyMemory cuối. Dịch vụ trả 429 / 403 / captcha → nghỉ
+`TRANSLATE_COOLDOWN_MINUTES` (hết hạn mức → tới 0h UTC) và bị bỏ qua ngay; mỗi request ≤ 8 giây, hỏng hết → báo "đang bận" trong ~15 giây.
+Chỉ gửi phần chữ (không gửi thẻ HTML); câu trả về là cảnh báo / captcha không bao giờ được ghi vào nội dung.
 
 ## Bảo mật đã cấu hình sẵn
 
@@ -108,7 +114,7 @@ Mọi request thay đổi dữ liệu (POST/PATCH/DELETE) phải có header `X-R
 - **CSRF**: SameSite=Strict + bắt buộc header `X-Requested-With` + kiểm tra `Origin`.
 - **Header**: Helmet (CSP `default-src 'none'`, HSTS ở production), ẩn `X-Powered-By`, `Cache-Control: no-store` cho route quản trị.
 - **Giới hạn**: body JSON 1MB, ảnh 8MB × 10, chỉ JPG/PNG/WebP/AVIF/GIF (chặn SVG), timeout chống slowloris.
-- **Ảnh**: tải từ thiết bị hoặc từ link (`from-url`: Cloudinary tự tải; `link-preview`: máy chủ tải về để xem trước / cắt — chỉ cổng 80/443, kiểm tra IP thật lúc kết nối, tối đa 25MB / 20 giây / 3 lần chuyển hướng); kiểm tra chữ ký file thật (chặn file đổi đuôi), chặn link localhost / IP nội bộ, chặn SVG; ảnh trong nội dung chỉ giữ ảnh Cloudinary của website; chỉ xoá được ảnh trong `CLOUDINARY_FOLDER` (trừ ảnh hệ thống `site/`).
+- **Ảnh**: tải từ thiết bị hoặc từ link (`link-preview`: máy chủ tải về để xem trước / cắt, chỉ lưu khi bấm Lưu qua `POST /uploads/images` — chỉ cổng 80/443, kiểm tra IP thật lúc kết nối, tối đa 25MB / 20 giây / 3 lần chuyển hướng); kiểm tra chữ ký file thật (chặn file đổi đuôi), chặn link localhost / IP nội bộ, chặn SVG; ảnh trong nội dung chỉ giữ ảnh Cloudinary của website; chỉ xoá được ảnh trong `CLOUDINARY_FOLDER` (trừ ảnh hệ thống `site/`).
 - **Video**: chỉ link YouTube / Google Drive, lưu dạng chuẩn; website dựng link nhúng từ mã video (không nhúng nguyên văn link người dùng nhập).
 - **Captcha**: Cloudflare Turnstile cho mọi form công khai (`TURNSTILE_SECRET_KEY`; trống → bỏ qua, form vẫn chạy). Form công khai còn có honeypot + giới hạn 10 lần / 10 phút / IP.
 - **Lỗi cho khách**: lỗi form công khai (sai dữ liệu, captcha, quá số lần, tour ngừng bán) trả câu dễ hiểu theo ngôn ngữ trang (`body.lang`: en / zh / vi — `utils/form-messages.js`); website hiện thẳng `error.details[0].message`.
@@ -176,6 +182,40 @@ Vì vậy API **không** đặt `Cache-Control` dài cho `/public/*` (CDN cache 
   Từng bảng trong file được XOÁ rồi nạp lại; dữ liệu hiện tại được tự sao lưu ra `pre-restore-….json.gz` trước. Xong thì
   khởi động lại API và website (xoá bộ nhớ đệm).
 - Ảnh / video nằm trên Cloudinary (không thuộc database) — Cloudinary tự lưu trữ; sao lưu toàn web hằng tuần là việc của máy chủ.
+
+## Dọn ảnh không còn dùng (Cloudinary)
+
+`services/media-cleanup.service.js` — xoá chậm, có thời gian chờ, để không bao giờ xoá nhầm:
+
+1. **Đánh dấu, chưa xoá.** Ảnh bị thay / bỏ khi lưu, và (lúc quét) mọi file trong thư mục CMS không còn được dữ liệu nào
+   dùng và đã tải lên hơn 24 giờ — kể cả ảnh tải lên trong CMS rồi bỏ dở không lưu — được ghi vào bảng `mediaorphans`
+   (`publicId`, `firstSeenAt`, `lastCheckedAt`, `reason`).
+2. **Bỏ đánh dấu** nếu file được dùng lại (khôi phục sao lưu, chèn lại vào bài…) hoặc không còn trên Cloudinary.
+3. **Xoá thật** khi đã đánh dấu ≥ `MEDIA_ORPHAN_GRACE_DAYS` ngày (mặc định 21) và lần kiểm tra lại ngay trước khi xoá
+   vẫn không thấy chỗ nào dùng. Mỗi lần có xoá → 1 dòng trong Nhật ký ("Tự dọn N ảnh không còn dùng").
+
+"Được dùng" = mã ảnh xuất hiện ở bất kỳ đâu trong database (trừ `auditlogs`, `sessions`, `mediaorphans`, `medialocks`,
+`mediapending`), kể cả HTML bài viết. Không bao giờ đụng ảnh hệ thống `<folder>/site/` và file ngoài thư mục CMS.
+
+**File chưa từng được lưu** (`mediapending`: ảnh tải lên lúc bấm Lưu, video Drive vừa lấy về): bỏ dấu ngay khi 1 request
+ghi (POST/PUT/PATCH) của nhân viên thành công có nhắc tới file (middleware `confirmSavedMedia`, áp dụng cho mọi route),
+khi lần quét thấy file đang được dùng, hoặc khi file bị bỏ khỏi bản ghi. Còn dấu, không ai dùng, quá 24 giờ kể từ lần
+tải gần nhất → xoá luôn, **không** chờ 21 ngày (không thể nằm trong bản sao lưu nào). File không có dấu (file cũ / đã
+từng lưu) luôn chờ đủ thời gian chờ.
+
+- **Ảnh đặt tên theo nội dung** (`h-<sha256>`, `overwrite: false`): bấm Lưu lại sau lỗi, chọn trùng ảnh → dùng lại đúng
+  file đã có, không sinh bản trùng.
+- **Bỏ ngay** — `DELETE /api/v1/uploads/pending { urls }` (CMS gọi khi gỡ video / đóng form / rời trang mà chưa lưu):
+  chỉ xoá file còn dấu chờ lưu, do chính người đó tải (admin: mọi người), không form nào khác còn giữ (`holds`) và không
+  bản ghi nào đang dùng; mọi trường hợp khác bỏ qua. `DELETE /uploads/videos/from-drive/:jobId` huỷ video Drive đang lấy
+  (lấy xong tự bỏ).
+
+- **Job hằng ngày** lúc ~03:00 giờ Việt Nam: bật mặc định khi `NODE_ENV=production` (tắt: `MEDIA_CLEANUP_DAILY=false`;
+  bật ở máy dev: `true`). Khoá trong bảng `medialocks` (tự hết hạn sau 30 phút) → chạy nhiều máy / khởi động lại không chạy chồng.
+- **Chốt an toàn** (dừng cả đánh dấu lẫn xoá, ghi cảnh báo vào log): > 30% file không dùng, không tìm thấy tham chiếu nào,
+  hoặc database có < 10 bản ghi. Chạy tay với `--force` nếu chắc chắn.
+- **Chạy tay:** `npm run media:cleanup` (xem trước) · `-- --apply` (chạy như job) · `-- --apply --grace-days=0` (xoá ngay).
+- Khôi phục bản sao lưu cũ hơn thời gian chờ có thể trỏ tới ảnh đã bị dọn — đặt `MEDIA_ORPHAN_GRACE_DAYS` ≥ thời gian giữ bản sao lưu cũ nhất (mặc định 21 ngày ứng với 3 bản sao lưu hằng tuần).
 
 ## Captcha (Cloudflare Turnstile)
 

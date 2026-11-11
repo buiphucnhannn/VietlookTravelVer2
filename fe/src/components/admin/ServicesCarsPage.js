@@ -354,54 +354,37 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
       busy={busy || autoFill.busy || images.busy}
       saveLabel={images.label}
     >
+      {/* Cùng bố cục với thẻ xe trên trang Thuê xe: ảnh bên trái, thông tin bên phải theo đúng thứ tự trên trang */}
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
-        <div className="space-y-4">
-          <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
-          <Field label="Tên loại xe" required>
-            <LocInput
-              value={d.name}
-              lang={lang}
-              onChange={(name) =>
-                set({ name, ...(!keyTouched && { key: slugify(slugSource(name)) }) })
-              }
-            />
-          </Field>
-          <Field label="Câu giới thiệu ngắn">
-            <LocInput value={d.tagline} lang={lang} onChange={(tagline) => set({ tagline })} />
-          </Field>
-          <Field label="Mô tả">
-            <LocInput
-              value={d.description}
-              lang={lang}
-              multiline
-              rows={3}
-              onChange={(description) => set({ description })}
-            />
-          </Field>
-          <Field
-            label={`Phù hợp cho (${LANGS.find((l) => l.key === lang)?.label})`}
-            hint="Mỗi dòng 1 ý, vd: Gia đình 3–4 người, Đón sân bay. Kéo để đổi thứ tự."
-          >
-            <Lines
-              value={d.ideal[lang] ?? []}
-              onChange={(vals) => set({ ideal: { ...d.ideal, [lang]: vals } })}
-              addLabel="Thêm dòng"
-            />
-          </Field>
-        </div>
+        <FormSection title="Ảnh xe (ảnh đầu tiên là ảnh đại diện)">
+          <GalleryField
+            value={d.images}
+            onChange={(images) => set({ images })}
+            folder="cars"
+            max={12}
+            crop={{ ratio: 16 / 10, width: 1600 }}
+          />
+        </FormSection>
 
         <div className="space-y-6">
+          <div className="space-y-4">
+            <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
+            <Field label="Câu giới thiệu ngắn" hint="Dòng chữ nhỏ phía trên tên xe.">
+              <LocInput value={d.tagline} lang={lang} onChange={(tagline) => set({ tagline })} />
+            </Field>
+            <Field label="Tên loại xe" required>
+              <LocInput
+                value={d.name}
+                lang={lang}
+                onChange={(name) =>
+                  set({ name, ...(!keyTouched && { key: slugify(slugSource(name)) }) })
+                }
+              />
+            </Field>
+          </div>
+
           <FormSection title="Sức chứa">
             <div className="grid grid-cols-3 gap-4">
-              <Field label="Số chỗ" required>
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={d.seats}
-                  onChange={(e) => set({ seats: e.target.value })}
-                />
-              </Field>
               <Field label="Số khách" error={paxError}>
                 <Input
                   type="number"
@@ -420,6 +403,15 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
                   onChange={(e) => set({ luggage: e.target.value })}
                 />
               </Field>
+              <Field label="Số chỗ" required>
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={d.seats}
+                  onChange={(e) => set({ seats: e.target.value })}
+                />
+              </Field>
             </div>
           </FormSection>
 
@@ -433,18 +425,29 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
             />
           </FormSection>
 
-          <FormSection title="Ảnh xe (ảnh đầu tiên là ảnh đại diện)">
-            <GalleryField
-              value={d.images}
-              onChange={(images) => set({ images })}
-              folder="cars"
-              max={12}
-              crop={{ ratio: 16 / 10, width: 1600 }}
+          <Field
+            label={`Phù hợp cho (${LANGS.find((l) => l.key === lang)?.label})`}
+            hint="Mỗi dòng 1 ý, vd: Gia đình 3–4 người, Đón sân bay. Kéo để đổi thứ tự."
+          >
+            <Lines
+              value={d.ideal[lang] ?? []}
+              onChange={(vals) => set({ ideal: { ...d.ideal, [lang]: vals } })}
+              addLabel="Thêm dòng"
             />
-          </FormSection>
+          </Field>
+
+          <Field label="Mô tả" hint="Hiện chưa hiển thị trên trang Thuê xe.">
+            <LocInput
+              value={d.description}
+              lang={lang}
+              multiline
+              rows={3}
+              onChange={(description) => set({ description })}
+            />
+          </Field>
         </div>
 
-        <FormSection title="Thiết lập" className="lg:col-span-2">
+        <FormSection title="Cài đặt hiển thị" className="lg:col-span-2">
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             <Field label="Mã loại xe (không dấu)" required hint="Tự tạo từ tên, vd: sedan-4.">
               <Input
@@ -537,26 +540,37 @@ function AreaEditor({ initial, nextOrder, onClose, onSaved }) {
       busy={busy || autoFill.busy || images.busy}
       saveLabel={images.label}
     >
+      {/* Theo thứ tự trên thẻ khu vực của trang Thuê xe: ảnh → tên → sân bay */}
       <div className="space-y-5">
-        <LangBar title="Tên theo ngôn ngữ" lang={lang} onLang={setLang} form={d} onForm={setD} />
-        <Field label="Tên khu vực" required>
-          <LocInput
-            value={d.name}
-            lang={lang}
-            onChange={(name) =>
-              set({ name, ...(!keyTouched && { key: slugify(slugSource(name)) }) })
-            }
-          />
-        </Field>
-
         <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
           <Field label="Ảnh" hint="Ảnh ngang của thành phố">
             <ImageField value={d.image} onChange={(image) => set({ image })} folder="cars" />
           </Field>
           <div className="space-y-4">
+            <LangBar
+              title="Tên theo ngôn ngữ"
+              lang={lang}
+              onLang={setLang}
+              form={d}
+              onForm={setD}
+            />
+            <Field label="Tên khu vực" required>
+              <LocInput
+                value={d.name}
+                lang={lang}
+                onChange={(name) =>
+                  set({ name, ...(!keyTouched && { key: slugify(slugSource(name)) }) })
+                }
+              />
+            </Field>
             <Field label="Sân bay" hint="VD: Tân Sơn Nhất (SGN)">
               <Input value={d.airport} onChange={(e) => set({ airport: e.target.value })} />
             </Field>
+          </div>
+        </div>
+
+        <FormSection title="Cài đặt hiển thị" className="border-t border-slate-100 pt-5">
+          <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field label="Mã (không dấu)" required hint="Tự tạo từ tên. Vd: ho-chi-minh">
               <Input
                 value={d.key}
@@ -566,13 +580,15 @@ function AreaEditor({ initial, nextOrder, onClose, onSaved }) {
                 }}
               />
             </Field>
-            <Toggle
-              checked={d.isActive}
-              onChange={(isActive) => set({ isActive })}
-              label="Hiện trên website"
-            />
+            <div className="sm:pt-9">
+              <Toggle
+                checked={d.isActive}
+                onChange={(isActive) => set({ isActive })}
+                label="Hiện trên website"
+              />
+            </div>
           </div>
-        </div>
+        </FormSection>
       </div>
     </EditorModal>
   );

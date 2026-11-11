@@ -8,17 +8,9 @@ import { cn } from "@/lib/utils";
 import { useMutation } from "./hooks";
 import { DragHandle, PositionBadge, Sortable } from "./Sortable";
 import { AutoTranslate } from "./translate";
-import {
-  Button,
-  Input,
-  LangTabs,
-  Modal,
-  filledOf,
-  locText,
-  useUi,
-  useUnsavedGuard,
-} from "./ui";
+import { Button, Input, LangTabs, Modal, filledOf, locText, useUi, useUnsavedGuard } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
+import { unsavedNote } from "./pendingImages";
 import { ReadOnlyArea, usePermission } from "./permissions";
 
 /**
@@ -77,7 +69,7 @@ export function useConfirmClose(value, onClose) {
       dirty &&
       !(await confirm({
         title: "Bỏ thay đổi?",
-        message: "Nội dung bạn vừa nhập chưa được lưu và sẽ mất nếu đóng cửa sổ này.",
+        message: unsavedNote("Nội dung bạn vừa nhập chưa được lưu và sẽ mất nếu đóng cửa sổ này."),
         confirmText: "Bỏ thay đổi",
         cancelText: "Sửa tiếp",
         danger: true,

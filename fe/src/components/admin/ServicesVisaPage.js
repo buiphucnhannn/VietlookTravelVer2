@@ -144,7 +144,44 @@ export default function ServicesVisaPage() {
         description={`Các loại visa Việt Nam và gói đón tiễn nhanh (fast-track) tại sân bay, hiện trên trang dịch vụ của website.${canEdit ? " Giữ và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ." : ""}`}
       />
 
+      {/* Cùng thứ tự với trang Visa & fast-track: gói fast-track ở đầu trang, bảng loại visa ở dưới */}
       <div className="space-y-6">
+        <Card
+          title="Gói fast-track"
+          description="Giá tính bằng USD theo từng sân bay. Để trống thì website hiện “Giá liên hệ”."
+          actions={
+            canEdit && (
+              <Button size="sm" icon={Plus} onClick={() => setFt(EMPTY_FT)}>
+                Thêm gói
+              </Button>
+            )
+          }
+          bodyClassName="p-0"
+        >
+          {fts.error ? (
+            <Notice tone="error" className="m-4">
+              {fts.error}
+            </Notice>
+          ) : fts.loading && !fts.items.length ? (
+            <LoadingBlock />
+          ) : !fts.items.length ? (
+            <EmptyState icon={PlaneLanding} title="Chưa có gói fast-track" />
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {GROUPS.map((g) => (
+                <FastTrackGroup
+                  key={g.value}
+                  group={g}
+                  list={fts}
+                  reveal={savedFt}
+                  onEdit={setFt}
+                  onAdd={() => setFt({ ...EMPTY_FT, group: g.value })}
+                />
+              ))}
+            </div>
+          )}
+        </Card>
+
         <Card
           title="Loại visa"
           description="Thời gian lưu trú, thời gian xử lý, phí và ghi chú của từng loại visa."
@@ -233,42 +270,6 @@ export default function ServicesVisaPage() {
             </Sortable>
           )}
           <Pagination bare unit="loại visa" meta={visaPaged.meta} onPage={visaPaged.setPage} />
-        </Card>
-
-        <Card
-          title="Gói fast-track"
-          description="Giá tính bằng USD theo từng sân bay. Để trống thì website hiện “Giá liên hệ”."
-          actions={
-            canEdit && (
-              <Button size="sm" icon={Plus} onClick={() => setFt(EMPTY_FT)}>
-                Thêm gói
-              </Button>
-            )
-          }
-          bodyClassName="p-0"
-        >
-          {fts.error ? (
-            <Notice tone="error" className="m-4">
-              {fts.error}
-            </Notice>
-          ) : fts.loading && !fts.items.length ? (
-            <LoadingBlock />
-          ) : !fts.items.length ? (
-            <EmptyState icon={PlaneLanding} title="Chưa có gói fast-track" />
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {GROUPS.map((g) => (
-                <FastTrackGroup
-                  key={g.value}
-                  group={g}
-                  list={fts}
-                  reveal={savedFt}
-                  onEdit={setFt}
-                  onAdd={() => setFt({ ...EMPTY_FT, group: g.value })}
-                />
-              ))}
-            </div>
-          )}
         </Card>
       </div>
 
@@ -509,6 +510,15 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
         <Field label="Tên loại visa" required>
           <LocInput value={d.name} lang={lang} onChange={e.setName} />
         </Field>
+        <Field label="Ghi chú" hint="Dòng chữ nhỏ ngay dưới tên loại visa.">
+          <LocInput
+            value={d.note}
+            lang={lang}
+            multiline
+            rows={3}
+            onChange={(note) => set({ note })}
+          />
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Thời gian lưu trú" hint="VD: Tối đa 90 ngày, nhập cảnh nhiều lần">
             <LocInput value={d.stay} lang={lang} onChange={(stay) => set({ stay })} />
@@ -524,17 +534,8 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
         <Field label="Phí" hint="Ghi rõ đơn vị, VD: From $25 / person">
           <LocInput value={d.fee} lang={lang} onChange={(fee) => set({ fee })} />
         </Field>
-        <Field label="Ghi chú">
-          <LocInput
-            value={d.note}
-            lang={lang}
-            multiline
-            rows={3}
-            onChange={(note) => set({ note })}
-          />
-        </Field>
 
-        <FormSection title="Thiết lập" className="border-t border-slate-100 pt-5">
+        <FormSection title="Cài đặt hiển thị" className="border-t border-slate-100 pt-5">
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <KeyField e={e} hint="Tự tạo từ tên. Vd: evisa-30-days" />
             <div className="sm:pt-9">
@@ -577,7 +578,17 @@ function FastTrackEditor({ initial, all, onClose, onSaved }) {
       onSave={() => e.save(payload, onSaved)}
       busy={e.busy}
     >
+      {/* Theo thứ tự trên trang: chọn nhóm (tab) → tên gói → mô tả → giá theo sân bay */}
       <div className="space-y-5">
+        <Field label="Nhóm" required hint="Gói hiện trong tab nhóm này trên website.">
+          <Select value={d.group} onChange={(ev) => set({ group: ev.target.value })}>
+            {GROUPS.map((g) => (
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <LangBar lang={lang} onLang={e.setLang} form={d} onForm={e.setD} />
         <Field label="Tên gói" required>
           <LocInput value={d.name} lang={lang} onChange={e.setName} />
@@ -614,17 +625,8 @@ function FastTrackEditor({ initial, all, onClose, onSaved }) {
           <p className="text-xs text-slate-500">Để trống thì website hiện “Giá liên hệ”.</p>
         </FormSection>
 
-        <FormSection title="Thiết lập" className="border-t border-slate-100 pt-5">
+        <FormSection title="Cài đặt hiển thị" className="border-t border-slate-100 pt-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nhóm" required>
-              <Select value={d.group} onChange={(ev) => set({ group: ev.target.value })}>
-                {GROUPS.map((g) => (
-                  <option key={g.value} value={g.value}>
-                    {g.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
             <KeyField e={e} hint="Tự tạo từ tên. Vd: arrival-standard" />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">

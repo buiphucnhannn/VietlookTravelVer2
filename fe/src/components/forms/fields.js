@@ -4,10 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { CheckCircle2, Copy, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isISODate } from "@/lib/dates";
+import DatePicker from "@/components/ui/DatePicker";
+import TimePicker from "@/components/ui/TimePicker";
 import Captcha, { resetCaptcha } from "./Captcha";
 
 export const inputClass =
-  "h-12 w-full rounded-lg border border-border bg-white px-4 text-[0.95rem] text-ink placeholder:text-muted/70 transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none aria-[invalid=true]:border-sun-500 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-sun-500/10";
+  "h-12 w-full rounded-lg border border-border bg-white pr-4 pl-4 text-[0.95rem] text-ink placeholder:text-muted/70 transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none aria-[invalid=true]:border-sun-500 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-sun-500/10";
 
 /* ───────────── Kiểm tra dữ liệu form (dùng chung mọi form) ───────────── */
 
@@ -26,7 +29,10 @@ const noopSubscribe = () => () => {};
  */
 export const useMinBookingDate = () =>
   useSyncExternalStore(noopSubscribe, minBookingDate, () => undefined);
-export const isFutureDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= minBookingDate();
+export const isFutureDate = (v) => isISODate(v) && v >= minBookingDate();
+/** Lỗi của 1 ô ngày đã có chữ: gõ sai dạng → "ngày không hợp lệ"; ngày đã qua → "chọn ngày trong tương lai" */
+export const dateError = (v, m) =>
+  !isISODate(v) ? m.dateInvalid : !isFutureDate(v) ? m.dateFuture : "";
 export const isEmail = (v) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(String(v).trim());
 /** Số điện thoại: chỉ số, khoảng trắng, + ( ) - . ; 6–15 chữ số. */
 export const cleanPhone = (v) => String(v).replace(/[^\d+\s().-]/g, "");
@@ -45,7 +51,10 @@ const MSG = {
     contactNeeded: "Please enter your email or phone number",
     date: "Please choose a date",
     dateFuture: "Please choose a future date",
+    dateInvalid: "Please enter a valid date (mm/dd/yyyy)",
     returnAfter: "Return date must be on or after the departure date",
+    timeInvalid: "Please enter a valid time (HH:mm, 24-hour)",
+    returnTimeAfter: "Return time must be later than the pickup time on the same day",
     required: "This field is required",
     route: "Please tell us your route (where to pick you up and where to go)",
     fix: "Please check the highlighted fields.",
@@ -58,7 +67,10 @@ const MSG = {
     contactNeeded: "请输入邮箱或电话号码",
     date: "请选择日期",
     dateFuture: "请选择今天之后的日期",
+    dateInvalid: "请输入有效日期（mm/dd/yyyy）",
     returnAfter: "返程日期不能早于出发日期",
+    timeInvalid: "请输入有效时间（HH:mm，24小时制）",
+    returnTimeAfter: "同一天返程时，返程时间须晚于接车时间",
     required: "此项为必填",
     route: "请填写行程路线（从哪里出发、去哪里）",
     fix: "请检查标红的字段。",
@@ -71,7 +83,10 @@ const MSG = {
     contactNeeded: "Vui lòng nhập email hoặc số điện thoại",
     date: "Vui lòng chọn ngày",
     dateFuture: "Vui lòng chọn một ngày trong tương lai",
+    dateInvalid: "Ngày không hợp lệ (định dạng mm/dd/yyyy)",
     returnAfter: "Ngày về không được sớm hơn ngày đi",
+    timeInvalid: "Giờ không hợp lệ (HH:mm, 24 giờ)",
+    returnTimeAfter: "Về trong cùng ngày thì giờ về phải sau giờ đón",
     required: "Vui lòng điền thông tin này",
     route: "Vui lòng cho biết lộ trình (đón ở đâu, đi những nơi nào)",
     fix: "Vui lòng kiểm tra lại các ô được đánh dấu.",
@@ -98,24 +113,31 @@ export function validate(d, lang, { email = "required", dates = {}, required = [
     const v = d[k];
     if (!v) {
       if (req) e[k] = m.date;
-    } else if (!isFutureDate(v)) e[k] = m.dateFuture;
+    } else if (dateError(v, m)) e[k] = dateError(v, m);
   }
   for (const k of required) if (!String(d[k] ?? "").trim()) e[k] = m.required;
   return e;
 }
 
-/** Ô ngày: không cho chọn ngày đã qua (min = ngày mai). */
-export function DateInput({ className, ...props }) {
-  const min = useMinBookingDate();
+/**
+ * Ô ngày của website: luôn hiện mm/dd/yyyy (mọi ngôn ngữ / máy), giá trị ISO; không cho chọn ngày đã qua
+ * (min mặc định = ngày mai). Xem components/ui/DatePicker.js.
+ */
+export function DateInput({ className, lang, min, ...props }) {
+  const minDefault = useMinBookingDate();
   return (
-    <input
-      type="date"
-      min={min}
-      suppressHydrationWarning
+    <DatePicker
+      lang={lang}
+      min={min ?? minDefault}
       className={cn(inputClass, className)}
       {...props}
     />
   );
+}
+
+/** Ô giờ của website: luôn hiện HH:mm (24 giờ, mọi ngôn ngữ / máy). Xem components/ui/TimePicker.js. */
+export function TimeInput({ className, ...props }) {
+  return <TimePicker {...props} className={cn(inputClass, className)} />;
 }
 
 /** Ô điện thoại: chỉ nhận số, khoảng trắng và + ( ) - . */

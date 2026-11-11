@@ -14,6 +14,7 @@ import { formMessage } from "../utils/form-messages.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
 import { estimatePrice } from "../utils/pricing.js";
 import { searchRegex } from "../utils/search.js";
+import { todayVN } from "../validators/enquiry.validator.js";
 import { mailService } from "./mail.service.js";
 import { paymentService } from "./payment/payment.service.js";
 import { settingsService } from "./settings.service.js";
@@ -59,13 +60,18 @@ export async function emailLookups(e) {
           })
         : null,
     ]);
+    // Đường dẫn cũ / viết tắt (vd. "halong" ↔ "halong-bay") → tải cả danh sách để format.destinationName so khớp
+    const allPlaces =
+      (places?.length ?? 0) < dests.length
+        ? await destinationRepository.listActive({ select: "slug name" }).catch(() => places)
+        : places;
     const titles = tour?.content
       ? Object.fromEntries(["en", "zh", "vi"].map((l) => [l, tour.content[l]?.title ?? ""]))
       : null;
     return {
       vehicle: car ? { [car.key]: car.name } : {},
       level: pkg ? { [pkg.key]: pkg.name } : {},
-      destinations: Object.fromEntries((places ?? []).map((p) => [p.slug, p.name])),
+      destinations: Object.fromEntries((allPlaces ?? []).map((p) => [p.slug, p.name])),
       ...(titles && { tourTitle: titles }),
     };
   } catch (err) {
@@ -104,6 +110,26 @@ async function deliver(enquiry, { paymentOnline = false } = {}) {
   return status;
 }
 
+/**
+ * Ngày khởi hành (YYYY-MM-DD, đã kiểm tra định dạng) có khớp lịch tour không:
+ * - "Ngày cố định": phải là 1 ngày trong danh sách — chỉ khi còn ngày từ hôm nay + 2 trở đi (giống website gợi ý;
+ *   hết ngày cố định thì vẫn nhận yêu cầu theo ngày khách chọn)
+ * - "Các thứ trong tuần": phải rơi đúng thứ đã chọn
+ * - hằng ngày / theo yêu cầu: ngày nào cũng được
+ */
+export function matchesSchedule(tour, date, today = todayVN()) {
+  if (tour.departure === "dates") {
+    const min = new Date(`${today}T00:00:00Z`);
+    min.setUTCDate(min.getUTCDate() + 2);
+    const minISO = min.toISOString().slice(0, 10);
+    const list = tour.departureDates ?? [];
+    return !list.some((d) => d >= minISO) || list.includes(date);
+  }
+  if (tour.departure === "weekly" && tour.departureDays?.length)
+    return tour.departureDays.includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+  return true;
+}
+
 /** Chưa đặt RESEND_API_KEY — nhân viên chỉ thấy câu dễ hiểu (CMS dựa vào mã MAIL_NOT_CONFIGURED) */
 const mailOff = () =>
   ApiError.unavailable(
@@ -124,6 +150,13 @@ export const enquiryService = {
         throw new ApiError(400, message, {
           code: "TOUR_UNAVAILABLE",
           details: [{ field: "body.tourSlug", message }],
+        });
+      }
+      if (!matchesSchedule(tour, data.departureDate)) {
+        const message = formMessage(data.lang, "departureSchedule");
+        throw new ApiError(400, message, {
+          code: "DEPARTURE_NOT_SCHEDULED",
+          details: [{ field: "body.departureDate", message }],
         });
       }
       // giá tạm tính tính lại ở máy chủ theo bảng giá trong CMS (không tin số trình duyệt gửi)
@@ -159,10 +192,14 @@ export const enquiryService = {
         estimate,
       }),
       // "children" là trường chung (đặt tour lưu theo tuổi trẻ em) → form khác (thiết kế tour) giữ số trẻ em trong details
-      details:
-        !tour && Number(data.children) > 0
-          ? { ...data.details, children: Number(data.children) }
-          : data.details,
+      // Số người lớn cũng vậy (trước đây bị bỏ mất ở yêu cầu thiết kế tour)
+      details: tour
+        ? data.details
+        : {
+            ...(Number(data.adults) > 0 && { adults: Number(data.adults) }),
+            ...data.details,
+            ...(Number(data.children) > 0 && { children: Number(data.children) }),
+          },
       // validator đã bắt buộc consent === true
       consent: { agreedAt: new Date(), policyVersion: PRIVACY_POLICY_VERSION, lang: data.lang },
       marketingConsentAt: data.marketingConsent ? new Date() : null,

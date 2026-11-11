@@ -36,6 +36,61 @@ export function applyRedirect(msg, redirectTo = env.mail.redirectTo) {
   };
 }
 
+/** Tên hiển thị cố định của người gửi — MAIL_FROM chỉ có địa chỉ trần → thêm "Vietlook Travel <…>" */
+export const fromAddress = (from = env.mail.from) => {
+  const s = String(from ?? "").trim();
+  return s.includes("<") ? s : `Vietlook Travel <${s}>`;
+};
+
+/** Header thư hàng loạt / marketing — thư giao dịch không được có (Gmail dễ xếp vào tab Quảng cáo) */
+const BULK_HEADERS = /^(list-unsubscribe(-post)?|list-id|precedence|x-campaign.*|x-mailer)$/i;
+
+/** Thư thuần chữ dự phòng từ HTML (mọi mẫu đều tự có `text`; đây chỉ là lưới an toàn) */
+export const htmlToText = (html) =>
+  String(html ?? "")
+    .replace(/<head[\s\S]*?<\/head>/i, "")
+    .replace(/<div style="display:none[\s\S]*?<\/div>/i, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|tr|h1|table)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#847;|&zwnj;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+/**
+ * Thân request Resend (hàm thuần — test được):
+ *  - From có tên hiển thị cố định; Subject 1 dòng (bỏ CR/LF).
+ *  - Luôn có phần text/plain → Resend gửi multipart/alternative (text + HTML), UTF-8.
+ *  - X-Entity-Ref-ID duy nhất cho MỖI lần gửi (Gmail không gộp thư gửi lại / thư cùng mã vào 1 luồng).
+ *  - Bỏ header kiểu thư hàng loạt (List-Unsubscribe, Precedence…). Message-ID do Resend tự đặt.
+ */
+export function buildPayload({ to, subject, html, text, replyTo, headers = {} }) {
+  const h = Object.fromEntries(
+    Object.entries(headers ?? {}).filter(
+      ([k, v]) => v != null && v !== "" && !BULK_HEADERS.test(k),
+    ),
+  );
+  h["X-Entity-Ref-ID"] = `${h["X-Entity-Ref-ID"] ?? "vl"}.${randomUUID().slice(0, 8)}`;
+  return {
+    from: fromAddress(),
+    to,
+    subject: String(subject ?? "")
+      .replace(/[\r\n]+/g, " ")
+      .trim(),
+    html,
+    text: text && String(text).trim() ? String(text) : htmlToText(html),
+    headers: h,
+    ...(replyTo && { reply_to: replyTo }),
+  };
+}
+
 /**
  * Gửi email qua Resend (API HTTPS — chạy được cả khi VPS / hosting chặn cổng SMTP).
  * Chưa cấu hình RESEND_API_KEY → trả { ok:false, skipped:true }, KHÔNG ném lỗi (đơn vẫn lưu trong CMS).
@@ -50,16 +105,7 @@ export const mailService = {
       return { ok: false, skipped: true, error: "RESEND_API_KEY chưa cấu hình" };
     if (!asList(message.to).length)
       return { ok: false, skipped: true, error: "Chưa có email người nhận" };
-    const { to, subject, html, text, replyTo, headers } = applyRedirect(message);
-    const body = JSON.stringify({
-      from: env.mail.from,
-      to,
-      subject,
-      html,
-      ...(text && { text }),
-      ...(headers && Object.keys(headers).length && { headers }),
-      ...(replyTo && { reply_to: replyTo }),
-    });
+    const body = JSON.stringify(buildPayload(applyRedirect(message)));
     // Lỗi mạng chập chờn (không tới được Resend) → thử lại tối đa 2 lần; Idempotency-Key giữ cho thư không bị gửi trùng
     const idempotencyKey = randomUUID();
     const ATTEMPTS = 3;
@@ -76,7 +122,10 @@ export const mailService = {
           body,
           signal: AbortSignal.timeout(15_000),
         });
-        if (res.ok) return { ok: true };
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          return { ok: true, id: data?.id };
+        }
         const text = await res.text().catch(() => "");
         logger.warn({ status: res.status }, `[mail] Resend từ chối: ${text.slice(0, 200)}`);
         return { ok: false, error: `Resend HTTP ${res.status}: ${text.slice(0, 200)}` };

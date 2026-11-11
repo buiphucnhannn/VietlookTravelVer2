@@ -46,9 +46,9 @@ function TourCards({ title, options, status, value, onChange, tall, auto = [], o
         <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-2xl bg-brand-50/80 px-4 py-2.5 text-xs text-brand-900 ring-1 ring-brand-200">
           <span>
             <b>
-              Đang tự chọn {auto.length} tour {tall ? "nổi bật" : "dài ngày"}
+              Website đang tự động gợi ý {auto.length} tour {tall ? "nổi bật" : "dài ngày"}.
             </b>{" "}
-            — bấm “Thêm tour” hoặc “Dùng gợi ý này” để tự chọn.
+            Bấm “Dùng gợi ý này” để giữ và sắp xếp lại, hoặc “Thêm tour” để tự chọn.
           </span>
           <button
             type="button"
@@ -258,8 +258,8 @@ export function LongToursSection({ options, status, value, onChange, auto, onSea
         </span>
         <AutoNote>
           {value.length
-            ? `Đã chọn ${value.length}/${MAX_TOURS} tour. Giữ và kéo thẻ để đổi thứ tự — trang chủ hiện 8 tour đứng đầu của mỗi nhóm tuần; tour đã có ở khối “Tour nổi bật” được xếp sau để không lặp lại.`
-            : "Chưa chọn tour nào — trang chủ tự chọn tour từ 7 ngày trở lên, chia đều cho 3 nhóm 1 tuần / 2 tuần / 3 tuần trở lên (ưu tiên tour có giá, đang giảm giá, nhiều ảnh)."}
+            ? `Đã chọn ${value.length}/${MAX_TOURS} tour · Kéo thả thẻ để sắp xếp. Tour đã có trong “Tour nổi bật” sẽ được xếp sau để tránh trùng lặp.`
+            : "Chưa chọn tour — website đang tự động hiển thị các tour từ 7 ngày trở lên."}
         </AutoNote>
       </div>
     </Sec>
@@ -290,8 +290,8 @@ export function FeaturedToursSection({ options, status, value, onChange, auto = 
         </span>
         <AutoNote href={value.length ? undefined : `${ADMIN_BASE}/tours`} linkText="Mở mục Tour">
           {value.length
-            ? `Đã chọn ${value.length}/${MAX_TOURS} tour. Giữ và kéo thẻ để đổi thứ tự — trên web hiện 4 thẻ một lượt, khách bấm mũi tên để xem tiếp.`
-            : "Chưa chọn tour nào — trang chủ tự chọn 8 tour đáng nổi bật nhất: tour đánh dấu “nổi bật”, có giá, đang giảm giá, nhiều ảnh, đủ các miền và không trùng lịch trình."}
+            ? `Đã chọn ${value.length}/${MAX_TOURS} tour · Kéo thả thẻ để sắp xếp. Website hiển thị 4 tour mỗi lượt, khách bấm mũi tên để xem thêm.`
+            : "Chưa chọn tour — website đang tự động hiển thị 8 tour nổi bật."}
         </AutoNote>
       </div>
     </Sec>
@@ -383,8 +383,8 @@ export function ThemeTiles({ options, status, value, onChange }) {
         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
           <AutoNote dark href="/admin/themes" linkText="Sửa tên, ảnh chủ đề">
             {any
-              ? `Đang hiện ${value.length} chủ đề đã chọn. Giữ và kéo ô để đổi thứ tự.`
-              : "Đang hiện tất cả chủ đề theo thứ tự ở mục Chủ đề tour."}
+              ? `Đang hiển thị ${value.length} chủ đề đã chọn · Kéo thả để sắp xếp.`
+              : "Đang hiển thị toàn bộ chủ đề theo thứ tự trong mục Chủ đề tour."}
           </AutoNote>
           <button
             type="button"
@@ -533,8 +533,8 @@ export function DestinationTiles({ options, status, value, onChange }) {
       </div>
 
       <AutoNote className="mt-4" href="/admin/destinations" linkText="Sửa tên, ảnh điểm đến">
-        Bấm vào ô để đổi điểm đến, giữ và kéo để đổi chỗ. Các điểm đến còn lại tự hiện ở dải bên
-        dưới.
+        Bấm vào ô để thay điểm đến, kéo thả để đổi vị trí. Các điểm đến còn lại tự động hiển thị ở
+        dải bên dưới.
       </AutoNote>
 
       {slot !== null && (

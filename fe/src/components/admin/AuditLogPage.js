@@ -7,6 +7,7 @@ import { ADMIN_BASE } from "@/config/urls.mjs";
 import { cn } from "@/lib/utils";
 import { useAdminList } from "./hooks";
 import { canUser, useCurrentUser } from "./permissions";
+import { PAGE_LABELS, PAYMENT_LABELS, STATUS_LABELS } from "./labels";
 import {
   Badge,
   BusyArea,
@@ -52,26 +53,7 @@ const CONTENT_VERBS = {
   reorder: "Sắp xếp lại thứ tự",
 };
 
-const PAGE_LABELS = {
-  about: "Giới thiệu",
-  terms: "Điều khoản sử dụng",
-  privacy: "Chính sách bảo mật",
-  payment: "Thanh toán & hoàn tiền",
-  cancellation: "Huỷ / đổi tour",
-};
 const ROLE_LABELS = { admin: "Quản trị viên", editor: "Nhân viên" };
-const STATUS_LABELS = {
-  new: "Mới",
-  contacted: "Đã liên hệ",
-  confirmed: "Đã xác nhận",
-  completed: "Hoàn tất",
-  cancelled: "Huỷ",
-};
-const PAYMENT_LABELS = {
-  paid: "Đã thanh toán",
-  deposit: "Đã đặt cọc",
-  unpaid: "Chưa thanh toán",
-};
 const USER_FIELDS = {
   name: "Họ tên",
   email: "Email",
@@ -107,6 +89,8 @@ const FIXED = {
   "media.from_url": "Thêm ảnh từ link",
   "media.delete": "Xoá ảnh",
   "media.drive_video": "Thêm video từ Google Drive",
+  "media.cleanup": "Tự dọn ảnh không còn dùng",
+  "media.discard": "Bỏ ảnh / video chưa lưu",
   "page.update": "Sửa trang giới thiệu / chính sách",
   "settings.home": "Sửa trang chủ",
   "settings.notifications": "Sửa email nhận thông báo",
@@ -147,6 +131,8 @@ const BADGES = {
   "media.from_url": ["Ảnh", "blue"],
   "media.drive_video": ["Video", "blue"],
   "media.delete": ["Xoá", "red"],
+  "media.cleanup": ["Dọn ảnh", "gray"],
+  "media.discard": ["Dọn ảnh", "gray"],
   "page.update": ["Sửa", "blue"],
   "user.create": ["Tài khoản", "violet"],
   "user.update": ["Tài khoản", "violet"],
@@ -316,6 +302,12 @@ export function describeLog(x) {
       return plain("Thêm video từ Google Drive");
     case "media.delete":
       return plain("Xoá một ảnh khỏi kho ảnh");
+    case "media.cleanup":
+      return plain(m.count ? `Tự dọn ${m.count} ảnh không còn dùng` : "Tự dọn ảnh không còn dùng");
+    case "media.discard":
+      return plain(
+        m.count ? `Bỏ ${m.count} ảnh / video đã chọn nhưng không lưu` : "Bỏ ảnh / video chưa lưu",
+      );
     case "page.update": {
       const name = x.targetName || PAGE_LABELS[id];
       return name
@@ -470,7 +462,15 @@ const FILTER_GROUPS = [
   })),
   {
     label: "Trang & ảnh",
-    actions: ["page.update", "media.upload", "media.from_url", "media.drive_video", "media.delete"],
+    actions: [
+      "page.update",
+      "media.upload",
+      "media.from_url",
+      "media.drive_video",
+      "media.delete",
+      "media.cleanup",
+      "media.discard",
+    ],
   },
   {
     label: "Cài đặt",
@@ -854,7 +854,7 @@ export default function AuditLogPage() {
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] tracking-wide text-slate-500 uppercase">
                     <th className="px-4 py-3 font-semibold">Thời gian</th>
                     <th className="px-4 py-3 font-semibold">Người làm</th>
-                    <th className="px-4 py-3 font-semibold">Nội dung</th>
+                    <th className="px-4 py-3 text-left font-semibold">Nội dung</th>
                     <th className="px-4 py-3 font-semibold">Thiết bị</th>
                     <th className="px-4 py-3 font-semibold">Chi tiết</th>
                   </tr>
@@ -871,8 +871,8 @@ export default function AuditLogPage() {
                             {fmtDateTime(x.createdAt)}
                           </td>
                           <td className="truncate px-4 py-3">{actorCell(x, id)}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex max-w-full items-baseline gap-3 text-left">
+                          <td className="px-4 py-3 text-left">
+                            <span className="flex max-w-full items-baseline gap-3">
                               <ActionBadge action={x.action} className="shrink-0" />
                               <LogSentence
                                 log={x}

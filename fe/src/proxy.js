@@ -283,15 +283,9 @@ export async function proxy(request) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Trang chủ: trình duyệt ưu tiên tiếng Trung / tiếng Việt và chưa từng tự chọn ngôn ngữ (cookie "lang") → /zh, /vi
-  if (pathname === "/" && !request.cookies.get("lang")) {
-    const first = (request.headers.get("accept-language") || "").split(",")[0].trim();
-    const pref = PREFIXED.find((l) => first.toLowerCase().startsWith(l));
-    if (pref) {
-      url.pathname = `/${pref}`;
-      return NextResponse.redirect(url);
-    }
-  }
+  // Trang chủ "/" LUÔN là tiếng Anh (ngôn ngữ mặc định) — không tự chuyển theo ngôn ngữ trình duyệt/điện thoại.
+  // Khách muốn tiếng Việt / tiếng Trung tự chọn ở nút ngôn ngữ (đường dẫn /vi, /zh). Cũng đúng khuyến nghị của Google:
+  // không tự chuyển hướng theo ngôn ngữ để Googlebot thấy đủ mọi phiên bản.
 
   const res = await slugResponse(url, pathname, defaultLocale, "");
   if (res) return res;

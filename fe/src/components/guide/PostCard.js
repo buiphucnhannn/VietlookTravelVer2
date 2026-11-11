@@ -2,7 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { lp, tr } from "@/i18n/config";
-import { cn, dateLocale, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { fmtDate } from "@/lib/dates";
 
 /** Thẻ bài viết cẩm nang. */
 export default function PostCard({ post, lang, categoryName, className, large }) {
@@ -35,14 +36,12 @@ export default function PostCard({ post, lang, categoryName, className, large })
         )}
         {post.date && (
           <span className="absolute top-3 left-3 flex flex-col items-center rounded-lg bg-white px-2.5 py-1 text-brand-700 shadow ring-1 ring-brand-100">
-            <span className="text-lg leading-none font-bold">
-              {new Date(post.date).getUTCDate()}
+            {/* mm/dd trên, năm dưới (không dùng tên tháng — toàn hệ thống dạng mm/dd/yyyy) */}
+            <span className="text-base leading-none font-bold tabular-nums">
+              {fmtDate(post.date).slice(0, 5)}
             </span>
-            <span className="text-[0.65rem] font-semibold uppercase">
-              {new Date(post.date).toLocaleString(dateLocale(lang), {
-                month: "short",
-                timeZone: "UTC",
-              })}
+            <span className="mt-0.5 text-[0.65rem] font-semibold tabular-nums">
+              {fmtDate(post.date).slice(6)}
             </span>
           </span>
         )}
@@ -68,7 +67,7 @@ export default function PostCard({ post, lang, categoryName, className, large })
         </p>
         {post.date && (
           <span className="mt-auto flex items-center gap-1.5 pt-4 text-xs text-muted">
-            <CalendarDays className="size-3.5" /> {formatDate(post.date, lang)}
+            <CalendarDays className="size-3.5" /> {fmtDate(post.date)}
           </span>
         )}
       </div>

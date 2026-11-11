@@ -7,8 +7,9 @@ import { CalendarDays, Clock, ListOrdered, Languages } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
 import { fill, localeMeta, locales, lp, tr } from "@/i18n/config";
 import { cardLabels } from "@/lib/labels";
-import { formatDate, slugify } from "@/lib/utils";
-import { JsonLd, pageMetadata, notFoundMetadata, seoField } from "@/lib/seo";
+import { slugify } from "@/lib/utils";
+import { fmtDate } from "@/lib/dates";
+import { JsonLd, pageMetadata, notFoundMetadata, postLangs, seoField } from "@/lib/seo";
 import { siteConfig } from "@/constants/site";
 import { Button, Container, SectionHeading } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
@@ -33,6 +34,7 @@ export async function generateMetadata({ params }) {
       description: seoField(post.seo, lang, "description") || tr(post.excerpt, lang),
       image: post.image,
       type: "article",
+      langs: postLangs(post),
     }),
   };
 }
@@ -143,7 +145,7 @@ async function GuidePostPageContent({ params }) {
             </Link>
           </span>
           <span className="flex items-center gap-1.5">
-            <CalendarDays className="size-4" /> {formatDate(post.date, lang)}
+            <CalendarDays className="size-4" /> {fmtDate(post.date)}
           </span>
           <span className="flex items-center gap-1.5">
             <Clock className="size-4" /> {readingTime(rawBody)} {dict.common.minRead}
@@ -160,7 +162,7 @@ async function GuidePostPageContent({ params }) {
           )}
           <p className="text-xl leading-relaxed text-ink/85">{tr(post.excerpt, lang)}</p>
           <p className="mt-4 text-sm text-muted italic">
-            {dict.common.lastUpdated}: {formatDate(post.date, lang)}
+            {dict.common.lastUpdated}: {fmtDate(post.date)}
           </p>
 
           {toc.length > 1 && (

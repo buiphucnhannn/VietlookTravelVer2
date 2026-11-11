@@ -269,7 +269,7 @@ function SectionTitle({ title, subtitle, align = "center" }) {
 
 export function MiniSite({ name, children }) {
   return (
-    <div className="w-full overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05),0_20px_48px_-24px_rgba(15,23,42,0.28)] ring-1 ring-slate-200">
+    <div className="w-full overflow-clip rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05),0_20px_48px_-24px_rgba(15,23,42,0.28)] ring-1 ring-slate-200">
       <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-100 px-3.5 py-2">
         <span className="flex shrink-0 gap-1.5" aria-hidden="true">
           <i className="size-2.5 rounded-full bg-sun-500/70" />
@@ -376,9 +376,18 @@ export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
  * ========================================================================= */
 
 /** Các đề mục lớn trong bài → mục lục như trên website */
+// Chữ trong HTML (&amp; &lt; …) → ký tự thật, để mục lục hiện "Bảo mật & lưu trữ" chứ không phải "&amp;"
+const decodeEntities = (s) =>
+  s
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/g, "&");
 const tocOf = (html) =>
   [...(html ?? "").matchAll(/<h2[^>]*>(.*?)<\/h2>/g)]
-    .map((m) => m[1].replace(/<[^>]+>/g, "").trim())
+    .map((m) => decodeEntities(m[1].replace(/<[^>]+>/g, "")).trim())
     .filter(Boolean);
 
 const POLICY_LABEL = {
@@ -393,13 +402,13 @@ const POLICY_LABEL = {
 export function PolicyBody({ d, lang, set, menu = [] }) {
   const toc = tocOf(d.body[lang] || otherOf(d.body, lang));
   return (
-    <div className="grid gap-6 px-3 py-6 sm:px-6 sm:py-8 xl:grid-cols-[250px_minmax(0,1fr)] xl:gap-8 xl:px-8 xl:py-10 2xl:grid-cols-[250px_minmax(0,1fr)_240px]">
+    <div className="grid gap-6 px-3 py-6 sm:px-6 sm:py-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-8 xl:px-8 xl:py-10 2xl:grid-cols-[260px_minmax(0,1fr)_240px]">
       {/* Menu chính sách */}
-      <nav className="self-start rounded-2xl border border-slate-200 bg-white p-2.5 xl:sticky xl:top-20">
+      <nav className="self-start rounded-2xl border border-slate-200 bg-white p-2.5 lg:sticky lg:top-24">
         <p className="px-3 pt-2 pb-2.5 text-[11px] font-bold tracking-[0.18em] text-brand-700 uppercase">
           {POLICY_LABEL.menu[lang]}
         </p>
-        <ul className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
+        <ul className="grid grid-cols-1 gap-1 sm:max-lg:grid-cols-2">
           {menu.map((m) => (
             <li key={m.key} className="min-w-0">
               <Link
@@ -422,7 +431,7 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
                 >
                   <m.icon className="size-4" />
                 </span>
-                <span className="min-w-0 truncate">{m.title}</span>
+                <span className="min-w-0 leading-snug">{m.title}</span>
               </Link>
             </li>
           ))}
@@ -447,7 +456,7 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
       </div>
 
       {/* Mục lục tự tạo từ các đề mục lớn (chỉ trên màn rộng, giống website) */}
-      <aside className="hidden self-start rounded-2xl border border-slate-200 bg-white p-4 2xl:sticky 2xl:top-20 2xl:block">
+      <aside className="hidden self-start rounded-2xl border border-slate-200 bg-white p-4 2xl:sticky 2xl:top-24 2xl:block">
         <p className="mb-2.5 flex items-center gap-2 text-[11px] font-bold tracking-[0.18em] text-brand-700 uppercase">
           <ListTree className="size-4" />
           {POLICY_LABEL.toc[lang]}

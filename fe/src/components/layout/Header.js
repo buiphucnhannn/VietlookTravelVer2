@@ -618,7 +618,7 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
                 <X className="size-6" />
               </button>
             </div>
-            <nav data-lenis-prevent className="flex-1 overflow-y-auto px-3 py-3">
+            <nav data-lenis-prevent className="flex-1 scrollbar-thin overflow-y-auto px-3 py-3">
               {nav.map((item) => {
                 const expanded = mobileSection === item.key;
                 const groups =

@@ -32,8 +32,13 @@ export const C = {
   codeBg: "#f2f8fc",
 };
 
+/**
+ * Font hệ thống (không tải font ngoài): mọi font đầu danh sách đều có đủ dấu tiếng Việt
+ * (San Francisco, Segoe UI, Roboto, Helvetica Neue, Arial); chữ Trung rơi về font CJK của máy
+ * (PingFang / Hiragino trên Apple, Microsoft YaHei trên Windows, Noto Sans SC trên Android / Linux).
+ */
 export const FONT =
-  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif";
+  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans SC',sans-serif";
 
 /** Logo trên Cloudinary (ảnh /images/logo/vietlook-logo.png của website — xem fe/src/lib/image-loader.js) */
 export const logoUrl = () =>
@@ -68,13 +73,17 @@ a{color:${C.brandText}}
 [data-ogsc] .mu{color:#a3b0bb!important}
 `;
 
-/** Khung email: logo nhỏ căn giữa + nội dung + chân email */
+/**
+ * Khung email: logo nhỏ căn giữa + nội dung + chân email.
+ * Logo không gắn link (thư giao dịch: càng ít link càng tốt), có width/height (530×276 → 96×50) + alt.
+ */
 export function shell({ lang, title, preheader, body, footer }) {
   const htmlLang = lang === "zh" ? "zh-CN" : lang;
   return `<!doctype html>
 <html lang="${escape(htmlLang)}" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="x-apple-disable-message-reformatting">
@@ -82,7 +91,7 @@ export function shell({ lang, title, preheader, body, footer }) {
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
 <title>${escape(title)}</title>
-<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><style>table,td,a,p,span,h1{font-family:Arial,Helvetica,sans-serif!important}</style><![endif]-->
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><style>table,td,a,p,span,h1{font-family:Arial,'Microsoft YaHei',sans-serif!important}</style><![endif]-->
 <style>${CSS}</style>
 </head>
 <body class="bg" style="margin:0;padding:0;width:100%;background:${C.page}">
@@ -93,7 +102,7 @@ export function shell({ lang, title, preheader, body, footer }) {
 <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 <table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid ${C.line};border-top:3px solid ${C.red};border-radius:12px;font-family:${FONT}">
 <tr><td align="center" style="padding:28px 32px 4px">
-<a href="${escape(env.siteUrl)}" target="_blank" style="text-decoration:none"><img src="${escape(logoUrl())}" width="96" alt="Vietlook Travel" style="display:block;margin:0 auto;width:96px;height:auto;border:0;font-family:${FONT};font-size:18px;font-weight:700;color:${C.brand}"></a>
+<img src="${escape(logoUrl())}" width="96" height="50" alt="Vietlook Travel" style="display:block;margin:0 auto;width:96px;height:50px;border:0;font-family:${FONT};font-size:18px;font-weight:700;color:${C.brand}">
 </td></tr>
 <tr><td class="pad" style="padding:20px 40px 36px;font-family:${FONT};text-align:left">
 ${body}
@@ -123,7 +132,7 @@ export const p = (
   html,
   { margin = `0 0 ${SPACE.para}px`, size = 16, muted = false, align = "left" } = {},
 ) =>
-  `<p class="${muted ? "mu" : "tx"}" style="margin:${margin};text-align:${align};font-family:${FONT};font-size:${size}px;line-height:${Math.round(size * 1.6)}px;color:${muted ? C.muted : C.text}">${html}</p>`;
+  `<p class="${muted ? "mu" : "tx"}" style="margin:${margin};text-align:${align};font-family:${FONT};font-size:${size}px;line-height:${Math.round(size * 1.6)}px;color:${muted ? C.muted : C.text};word-break:break-word">${html}</p>`;
 
 /** Tiêu đề mục nhỏ */
 export const subhead = (text) =>

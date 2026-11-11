@@ -11,6 +11,32 @@ function siteUrl() {
   return process.env.NODE_ENV === "production" ? PRIMARY_SITE_URL : "http://localhost:3000";
 }
 
+/**
+ * Cho Google lập chỉ mục? Tự quyết theo tên miền, không cần nhớ bật/tắt tay:
+ * chỉ tên miền thật (VD vietlooktravel.com) mới được index; *.vercel.app, localhost, địa chỉ IP,
+ * tên miền con preview/staging/test/demo/dev và bản Vercel Preview → noindex + robots.txt chặn hết.
+ * Ép tay khi cần: NEXT_PUBLIC_ALLOW_INDEXING=true | false (bỏ trống = tự động). Chỉ dùng ở server.
+ */
+function allowIndexing(url) {
+  const force = process.env.NEXT_PUBLIC_ALLOW_INDEXING?.trim().toLowerCase();
+  if (force === "true") return true;
+  if (force === "false") return false;
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production") return false;
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return !(
+    /(^|\.)(localhost|vercel\.app|netlify\.app|pages\.dev|ngrok-free\.app|ngrok\.io|local)$/.test(
+      host,
+    ) ||
+    /^[\d.]+$|:/.test(host) ||
+    /^(preview|staging|stage|test|demo|dev)[.-]/.test(host)
+  );
+}
+
 const MAP_QUERY = "58 Ngõ 159 Quyết Thắng, Yên Nghĩa, Hà Nội, Việt Nam";
 
 export const siteConfig = {
@@ -23,6 +49,7 @@ export const siteConfig = {
   // Nguồn DUY NHẤT: NEXT_PUBLIC_SITE_URL (domain chính thức) → mặc định PRIMARY_SITE_URL;
   // chỉ khi chạy dev ở máy mới dùng localhost.
   url: siteUrl(),
+  allowIndexing: allowIndexing(siteUrl()),
   since: 2009,
   contact: {
     hotline: "+84 98 339 3588",

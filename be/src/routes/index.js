@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { healthController } from "../controllers/health.controller.js";
+import { confirmSavedMedia } from "../services/media-cleanup.service.js";
 import auditLogRoutes from "./audit-log.routes.js";
 import authRoutes from "./auth.routes.js";
 import contentRoutes from "./content.routes.js";
@@ -25,6 +26,8 @@ const noStore = (_req, res, next) => {
 };
 
 router.get("/health", healthController.check);
+// Lưu thành công có nhắc tới ảnh / video vừa tải → bỏ dấu "chờ lưu" (xem services/media-cleanup.service.js)
+router.use(confirmSavedMedia);
 router.use("/public", publicRoutes);
 router.use("/auth", noStore, authRoutes);
 router.use("/enquiries", noStore, enquiryRoutes);

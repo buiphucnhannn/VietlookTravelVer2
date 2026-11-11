@@ -399,21 +399,8 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
               }
             />
           </Field>
-          <Field
-            label="Đường dẫn trang"
-            required
-            hint="Phần cuối của địa chỉ trang, viết không dấu"
-          >
-            <Input
-              value={d.slug}
-              className="font-mono text-[13px]"
-              onChange={(e) => {
-                setSlugTouched(true);
-                set({ slug: slugify(e.target.value) });
-              }}
-            />
-          </Field>
 
+          {/* Thứ tự theo đầu trang chuyên mục / tác giả trên website; cài đặt hiển thị ở cuối */}
           {kind === "category" ? (
             <>
               <Field label="Mô tả" hint="Hiện ở đầu trang chuyên mục">
@@ -428,17 +415,8 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
             </>
           ) : (
             <>
-              <Field label="Vai trò" hint="VD: Travel Writer, Tour Expert">
+              <Field label="Vai trò" hint="Hiện dưới họ tên. VD: Travel Writer, Tour Expert">
                 <LocInput value={d.role} lang={lang} onChange={(role) => set({ role })} />
-              </Field>
-              <Field label="Giới thiệu ngắn">
-                <LocInput
-                  value={d.bio}
-                  lang={lang}
-                  multiline
-                  rows={4}
-                  onChange={(bio) => set({ bio })}
-                />
               </Field>
               <Field label="Ảnh đại diện" hint="Ảnh vuông, tối thiểu 400px">
                 <div className="max-w-[180px]">
@@ -451,14 +429,40 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
                   />
                 </div>
               </Field>
+              <Field label="Giới thiệu ngắn" hint="Hiện dưới ảnh đại diện và ở cuối mỗi bài viết">
+                <LocInput
+                  value={d.bio}
+                  lang={lang}
+                  multiline
+                  rows={4}
+                  onChange={(bio) => set({ bio })}
+                />
+              </Field>
             </>
           )}
 
-          <Toggle
-            checked={d.isActive}
-            onChange={(isActive) => set({ isActive })}
-            label="Hiện trên website"
-          />
+          <section className="space-y-4 border-t border-slate-100 pt-5">
+            <p className="text-sm font-bold text-slate-800">Cài đặt hiển thị</p>
+            <Field
+              label="Đường dẫn trang"
+              required
+              hint="Phần cuối của địa chỉ trang, viết không dấu"
+            >
+              <Input
+                value={d.slug}
+                className="font-mono text-[13px]"
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  set({ slug: slugify(e.target.value) });
+                }}
+              />
+            </Field>
+            <Toggle
+              checked={d.isActive}
+              onChange={(isActive) => set({ isActive })}
+              label="Hiện trên website"
+            />
+          </section>
         </div>
       </ReadOnlyArea>
     </Modal>

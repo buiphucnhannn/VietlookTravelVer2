@@ -22,3 +22,12 @@ process.env.DATA_ENCRYPTION_KEY = "test-data-encryption-key-0123456789";
 // 9Pay: test luôn dùng cổng mặc định, không giả lập — dù máy dev đang cấu hình sandbox / NINEPAY_FAKE
 process.env.NINEPAY_ENDPOINT = "";
 process.env.NINEPAY_FAKE = "false";
+// Dịch tự động: test dùng createTranslator + fetch giả, không bao giờ dùng key thật của máy dev
+process.env.TRANSLATE_PROVIDERS = "";
+process.env.AZURE_TRANSLATOR_KEY = "";
+process.env.DEEPL_API_KEY = "";
+process.env.GOOGLE_TRANSLATE_API_KEY = "";
+process.env.LIBRETRANSLATE_URL = "";
+process.env.LINGVA_INSTANCES = "";
+process.env.LIBRETRANSLATE_API_KEY = "";
+process.env.MYMEMORY_EMAIL = "";

@@ -235,6 +235,35 @@ body {
     display: none;
   }
 
+  /* Thanh cuộn mảnh, nhạt cho vùng cuộn trong popup / ngăn kéo (không có nút mũi tên) */
+  /* Firefox: thuộc tính chuẩn. Chrome / Edge / Safari: dùng ::-webkit-scrollbar bên dưới
+     (Chrome bỏ qua ::-webkit-scrollbar nếu có scrollbar-width → chỉ đặt cho trình duyệt không hỗ trợ nó) */
+  @supports not selector(::-webkit-scrollbar) {
+    .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(203 213 225) transparent;
+    }
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgb(203 213 225);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(148 163 184);
+  }
+  .scrollbar-thin::-webkit-scrollbar-button {
+    display: none;
+  }
+
   /* Nội dung bài viết cẩm nang */
   .prose-guide {
     @apply text-[1.05rem] leading-8 text-foreground/90;

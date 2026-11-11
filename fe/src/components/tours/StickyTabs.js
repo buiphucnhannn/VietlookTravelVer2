@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Thanh mục lục dính (Overview / Itinerary / Included...) có đánh dấu mục đang xem. */
+/** Thanh mục lục (Overview / Itinerary / Included...) có đánh dấu mục đang xem — nằm yên dưới ảnh tour, không dính theo khi cuộn. */
 export default function StickyTabs({ tabs, cta }) {
   const [active, setActive] = useState(tabs[0]?.id);
 
@@ -24,7 +24,7 @@ export default function StickyTabs({ tabs, cta }) {
   }, [tabs]);
 
   return (
-    <div className="z-30 border-y border-border bg-brand-50/95 backdrop-blur lg:sticky lg:top-[108px]">
+    <div className="relative z-10 border-y border-border bg-brand-50/95">
       <div className="mx-auto flex w-full max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-10">
         <nav className="-mb-px flex flex-1 scrollbar-none gap-1 overflow-x-auto">
           {tabs.map((t) => (

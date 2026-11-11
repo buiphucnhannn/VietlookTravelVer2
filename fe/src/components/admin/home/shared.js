@@ -308,7 +308,7 @@ export function PickerModal({
       {multi && (
         <p className="mt-2 text-xs text-slate-500">
           {full
-            ? `Đã chọn đủ ${room} ${unit} — khối này không thêm được nữa.`
+            ? `Đã đủ ${room} ${unit}. Gỡ bớt một ${unit} để chọn thêm.`
             : `Có thể chọn thêm ${room - picked.length} ${unit}.`}
         </p>
       )}
