@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { CheckCircle2, Copy, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Captcha, { resetCaptcha } from "./Captcha";
@@ -19,6 +19,13 @@ export function minBookingDate() {
   d.setDate(d.getDate() + 1);
   return isoLocal(d);
 }
+const noopSubscribe = () => () => {};
+/**
+ * minBookingDate() dùng khi render: chỉ tính ở trình duyệt (server/dựng sẵn trả undefined → chưa đặt min).
+ * Không gọi new Date() lúc dựng trang tĩnh → trang được dựng sẵn trọn vẹn (không phải chờ phần động).
+ */
+export const useMinBookingDate = () =>
+  useSyncExternalStore(noopSubscribe, minBookingDate, () => undefined);
 export const isFutureDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= minBookingDate();
 export const isEmail = (v) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(String(v).trim());
 /** Số điện thoại: chỉ số, khoảng trắng, + ( ) - . ; 6–15 chữ số. */
@@ -38,7 +45,9 @@ const MSG = {
     contactNeeded: "Please enter your email or phone number",
     date: "Please choose a date",
     dateFuture: "Please choose a future date",
+    returnAfter: "Return date must be on or after the departure date",
     required: "This field is required",
+    route: "Please tell us your route (where to pick you up and where to go)",
     fix: "Please check the highlighted fields.",
   },
   zh: {
@@ -49,7 +58,9 @@ const MSG = {
     contactNeeded: "请输入邮箱或电话号码",
     date: "请选择日期",
     dateFuture: "请选择今天之后的日期",
+    returnAfter: "返程日期不能早于出发日期",
     required: "此项为必填",
+    route: "请填写行程路线（从哪里出发、去哪里）",
     fix: "请检查标红的字段。",
   },
   vi: {
@@ -60,7 +71,9 @@ const MSG = {
     contactNeeded: "Vui lòng nhập email hoặc số điện thoại",
     date: "Vui lòng chọn ngày",
     dateFuture: "Vui lòng chọn một ngày trong tương lai",
+    returnAfter: "Ngày về không được sớm hơn ngày đi",
     required: "Vui lòng điền thông tin này",
+    route: "Vui lòng cho biết lộ trình (đón ở đâu, đi những nơi nào)",
     fix: "Vui lòng kiểm tra lại các ô được đánh dấu.",
   },
 };
@@ -93,10 +106,11 @@ export function validate(d, lang, { email = "required", dates = {}, required = [
 
 /** Ô ngày: không cho chọn ngày đã qua (min = ngày mai). */
 export function DateInput({ className, ...props }) {
+  const min = useMinBookingDate();
   return (
     <input
       type="date"
-      min={minBookingDate()}
+      min={min}
       suppressHydrationWarning
       className={cn(inputClass, className)}
       {...props}
@@ -248,7 +262,8 @@ export function useEnquiry(type, lang) {
   const router = useRouter();
   const [state, setState] = useState({ status: "idle", code: null, error: null });
 
-  async function submit(payload, formEl) {
+  /** stay(data) → true: ở lại trang (vd. bước thanh toán 9Pay), không chuyển sang trang cảm ơn */
+  async function submit(payload, formEl, { stay } = {}) {
     setState({ status: "sending", code: null, error: null });
     try {
       const honeypot = formEl?.querySelector?.('[name="website_url"]')?.value || "";
@@ -265,19 +280,26 @@ export function useEnquiry(type, lang) {
         signal: AbortSignal.timeout(30_000),
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok)
-        throw new Error(json?.error?.details?.[0]?.message || json?.error?.message || "error");
+      if (!res.ok) {
+        const err = new Error(
+          json?.error?.details?.[0]?.message || json?.error?.message || "error",
+        );
+        // Câu máy chủ đã dịch theo ngôn ngữ khách (dữ liệu sai, captcha, gửi quá nhiều, tour ngừng bán) → hiện cho khách;
+        // lỗi máy chủ (5xx) / bị chặn (403) → form hiện câu chung
+        if ([400, 404, 409, 422, 429].includes(res.status)) err.forCustomer = true;
+        throw err;
+      }
       const code = json?.data?.code;
       setState({ status: "success", code, error: null });
-      // Sự kiện chuyển đổi cho GTM/GA4 + chuyển sang trang cảm ơn (URL riêng để đo Google Ads)
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({ event: "generate_lead", form_type: type, request_code: code });
+      if (stay?.(json?.data)) return json?.data;
+      // Chuyển sang trang cảm ơn (URL riêng để đo Google Ads); sự kiện chuyển đổi gửi ở đó khi khách đã đồng ý
+      // cookie (components/forms/LeadEvent.js)
       const prefix = lang && lang !== "en" ? `/${lang}` : "";
       router.push(`${prefix}/thank-you?code=${encodeURIComponent(code || "")}&type=${type}`);
       return json?.data;
     } catch (e) {
       resetCaptcha(formEl);
-      setState({ status: "error", code: null, error: e.message });
+      setState({ status: "error", code: null, error: e.forCustomer ? e.message : null });
     }
   }
 

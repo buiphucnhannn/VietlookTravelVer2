@@ -19,6 +19,15 @@ import {
   useEnquiry,
   validate as validateFields,
 } from "./fields";
+import ConsentCheckbox, {
+  consentError,
+  dropConsentError,
+  focusFirstError,
+  hasFieldErrors,
+} from "./ConsentCheckbox";
+
+// Kênh liên hệ ưu tiên: giá trị gửi về CMS giữ nguyên ("Phone"), chỉ chữ hiển thị theo ngôn ngữ
+const PHONE_LABEL = { en: "Phone", zh: "电话", vi: "Điện thoại" };
 
 /**
  * Form thiết kế tour nhiều bước: số ngày, số khách, hạng khách sạn 3–5★, ngân sách,
@@ -26,7 +35,7 @@ import {
  */
 export default function TripPlannerForm({ lang, t, c, destinationOptions, compact, className }) {
   const formRef = useRef(null);
-  const { status, code, submit, reset } = useEnquiry("planner", lang);
+  const { status, code, submit, reset, error: sendError } = useEnquiry("planner", lang);
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [errs, setErrs] = useState({});
@@ -47,6 +56,7 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
     phone: "",
     nationality: "",
     contactVia: "Email",
+    consent: false,
   });
   const set = (k) => (v) =>
     setData((d) => ({
@@ -66,8 +76,9 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
       return { msg: e.arrival ? formMsg(lang).fix : "", errs: e };
     }
     if (step === 3) {
-      const e = validateFields(data, lang);
-      return { msg: Object.keys(e).length ? formMsg(lang).fix : "", errs: e };
+      // Ô đồng ý chỉ bắt buộc ở bước cuối (bước có nút gửi)
+      const e = { ...validateFields(data, lang), ...consentError(data.consent, c) };
+      return { msg: hasFieldErrors(e) ? formMsg(lang).fix : "", errs: e };
     }
     return { msg: "", errs: {} };
   };
@@ -75,7 +86,7 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
     const { msg, errs: e } = validate();
     setError(msg);
     setErrs(e);
-    if (msg) return;
+    if (msg || Object.keys(e).length) return focusFirstError(formRef.current);
     if (step < steps.length - 1) setStep(step + 1);
     else await submit(data, formRef.current);
   };
@@ -315,21 +326,35 @@ export default function TripPlannerForm({ lang, t, c, destinationOptions, compac
                 autoComplete="country-name"
               />
             </Field>
-            <Field label={t.contactVia} className="sm:col-span-2">
-              <Select value={data.contactVia} onChange={set("contactVia")}>
+            <Field label={t.contactVia} className="sm:col-span-2" htmlFor="tp-via">
+              <Select id="tp-via" value={data.contactVia} onChange={set("contactVia")}>
                 {["Email", "WhatsApp", "WeChat", "Zalo", "Phone"].map((x) => (
-                  <option key={x}>{x}</option>
+                  <option key={x} value={x}>
+                    {x === "Phone" ? (PHONE_LABEL[lang] ?? x) : x}
+                  </option>
                 ))}
               </Select>
             </Field>
             <p className="text-xs text-muted sm:col-span-2">{c.noOnlinePayment}</p>
+            <ConsentCheckbox
+              id="tp-consent"
+              lang={lang}
+              c={c}
+              checked={data.consent}
+              onChange={(v) => {
+                set("consent")(v);
+                if (v) setErrs(dropConsentError);
+              }}
+              error={errs.consent}
+              className="sm:col-span-2"
+            />
           </div>
         )}
       </div>
 
       <div className="mt-6 space-y-4">
         <FormError show={!!error} text={error} />
-        <FormError show={status === "error"} text={c.errorGeneric} />
+        <FormError show={status === "error"} text={sendError || c.errorGeneric} />
         <div className="flex items-center justify-between gap-3">
           {step > 0 ? (
             <button

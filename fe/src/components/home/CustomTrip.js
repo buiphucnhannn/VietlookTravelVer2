@@ -10,14 +10,14 @@ const icons = [Hotel, MessageCircle, SlidersHorizontal, Layers, BadgeDollarSign]
  * Khối "Custom / Make a trip" (yêu cầu khách 31/10, mục 3): thay ảnh ruộng bậc thang hình tròn
  * và huy hiệu xoay bằng hình "dải lụa xoắn" của Demo 3; nền giấy kem vân tròn nhẹ.
  */
-export default function CustomTrip({ lang, dict }) {
+export default function CustomTrip({ lang, dict, starImages, starLabels }) {
   const t = dict.home;
   const points = t.customPoints;
   return (
     <section className="relative isolate overflow-hidden bg-cream-50 bg-[radial-gradient(circle_at_28%_50%,rgba(255,255,255,0.9),rgba(255,255,255,0)_55%),repeating-radial-gradient(circle_at_28%_50%,rgba(160,130,80,0.09)_0_1px,transparent_1px_26px)] py-14 lg:py-[4.5rem]">
       <Container className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
         <Reveal className="mx-auto w-full max-w-[min(520px,calc(100svh-200px))] animate-float px-4 sm:px-0">
-          <RibbonStar lang={lang} />
+          <RibbonStar lang={lang} images={starImages} labels={starLabels} />
         </Reveal>
 
         <div>

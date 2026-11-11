@@ -4,6 +4,7 @@ import {
   publicController,
   settingsController,
 } from "../controllers/site.controller.js";
+import { paymentController } from "../controllers/payment.controller.js";
 import { requireAdmin, requirePermission, requireStaff } from "../middlewares/auth.middleware.js";
 import {
   requireEnquiryAccess,
@@ -45,6 +46,7 @@ publicRoutes.get("/pages", publicController.pages);
 publicRoutes.get("/home", publicController.home);
 publicRoutes.get("/slugs", publicController.slugs);
 publicRoutes.get("/site", publicController.site);
+publicRoutes.get("/payment-config", paymentController.publicConfig);
 
 /* ---------- /enquiries — khách gửi form; CMS quản lý ---------- */
 export const enquiryRoutes = Router();

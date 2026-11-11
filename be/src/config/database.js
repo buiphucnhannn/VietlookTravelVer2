@@ -19,7 +19,9 @@ export async function connectDatabase() {
     dbName: env.mongo.dbName,
     serverSelectionTimeoutMS: 10_000,
     maxPoolSize: 20,
-    autoIndex: !env.isProd, // production: tạo index chủ động (syncIndexes / Atlas UI)
+    // Luôn tự tạo index khai báo trong model (unique slug / mã đơn / tên đăng nhập, TTL phiên đăng nhập & nhật ký).
+    // Dữ liệu nhỏ → tạo rất nhanh; DB mới trên máy chủ khách (hoặc khôi phục vào DB trống) không bị thiếu index.
+    autoIndex: true,
   });
   logger.info(`MongoDB connected (db: ${env.mongo.dbName})`);
 }

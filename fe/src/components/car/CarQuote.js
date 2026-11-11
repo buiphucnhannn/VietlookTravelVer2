@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { cn, formatUSD } from "@/lib/utils";
+import { useVisualViewport } from "@/lib/use-visual-viewport";
+import { useA11y } from "@/components/layout/A11y";
 import {
   Counter,
   DateInput,
@@ -29,10 +31,16 @@ import {
   Textarea,
   formMsg,
   isFutureDate,
-  minBookingDate,
+  useMinBookingDate,
   useEnquiry,
   validate,
 } from "@/components/forms/fields";
+import ConsentCheckbox, {
+  consentError,
+  dropConsentError,
+  focusFirstError,
+  hasFieldErrors,
+} from "@/components/forms/ConsentCheckbox";
 
 /** Kiểm tra ngày đi / ngày về của báo giá xe: không được là ngày đã qua; ngày về ≥ ngày đi. */
 function carDateErrors(q, lang) {
@@ -40,8 +48,8 @@ function carDateErrors(q, lang) {
   const e = {};
   if (q.date && !isFutureDate(q.date)) e.date = m.dateFuture;
   if (q.tripType === "roundTrip" && q.returnDate) {
-    if (!isFutureDate(q.returnDate) || (q.date && q.returnDate < q.date))
-      e.returnDate = m.dateFuture;
+    if (!isFutureDate(q.returnDate)) e.returnDate = m.dateFuture;
+    else if (q.date && q.returnDate < q.date) e.returnDate = m.returnAfter;
   }
   return e;
 }
@@ -118,6 +126,7 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
   const [shown, setShown] = useState(false);
   const [open, setOpen] = useState(false);
   const [dateErr, setDateErr] = useState({});
+  const minDate = useMinBookingDate();
   const kindFor = quote.tripType === "byDay" ? "day" : "transfer";
 
   const fromOptions = useMemo(() => {
@@ -237,7 +246,7 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
           <CalendarDays className="pointer-events-none absolute bottom-3.5 left-3 size-4 text-muted" />
           <input
             type="date"
-            min={minBookingDate()}
+            min={minDate}
             suppressHydrationWarning
             value={quote.date}
             onChange={(e) => (update({ date: e.target.value }), setDateErr({}))}
@@ -264,7 +273,7 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
               <span className="mb-1 block text-xs font-semibold text-muted">{t.returnDate}</span>
               <input
                 type="date"
-                min={quote.date || minBookingDate()}
+                min={quote.date || minDate}
                 suppressHydrationWarning
                 value={quote.returnDate}
                 onChange={(e) => (update({ returnDate: e.target.value }), setDateErr({}))}
@@ -444,7 +453,10 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
 /** Popup "Thông tin của bạn": tóm tắt chuyến + liên hệ + hình thức thanh toán (không online). */
 function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
   const formRef = useRef(null);
-  const { status, code, submit } = useEnquiry("car", lang);
+  const overlayRef = useRef(null);
+  useVisualViewport(overlayRef);
+  const a11y = useA11y();
+  const { status, code, submit, error: sendError } = useEnquiry("car", lang);
   const [d, setD] = useState({
     name: "",
     phone: "",
@@ -452,9 +464,14 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
     flight: "",
     notes: "",
     payment: "cash",
+    consent: false,
   });
   const [errs, setErrs] = useState({});
   const set = (k) => (e) => setD({ ...d, [k]: e.target.value });
+  const setConsent = (v) => {
+    setD({ ...d, consent: v });
+    if (v) setErrs(dropConsentError);
+  };
 
   useEffect(() => {
     lockScroll(true);
@@ -463,9 +480,13 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    const v = { ...validate(d, lang, { email: "either" }), ...carDateErrors(payload, lang) };
+    const v = {
+      ...validate(d, lang, { email: "either" }),
+      ...carDateErrors(payload, lang),
+      ...consentError(d.consent, c),
+    };
     setErrs(v);
-    if (Object.keys(v).length) return;
+    if (Object.keys(v).length) return focusFirstError(formRef.current);
     // Backend chỉ nhận giá trị đơn (chữ/số/mảng) → tóm tắt chuyến gửi dạng một dòng chữ
     const text = [...rows, [t.total, summary.price]].map(([k, v]) => `${k}: ${v}`).join(" · ");
     await submit({ ...payload, ...d, summary: text }, formRef.current);
@@ -482,139 +503,164 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
   // Portal ra body để không bị khung cha có backdrop-filter giới hạn vị trí "fixed"
   return createPortal(
     <div
+      ref={overlayRef}
       data-lenis-prevent
-      className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-brand-950/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-brand-950/60 px-3 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-sm sm:p-6"
       role="dialog"
       aria-modal="true"
+      aria-label={t.yourInfo}
       onClick={onClose}
     >
+      {/* Thẻ giữa màn hình, không cao quá màn hình: tiêu đề + hàng nút luôn hiện, chỉ phần thân cuộn */}
       <div
-        className="relative w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+        className="relative flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
-          className="absolute top-4 right-4 grid size-9 place-items-center rounded-full hover:bg-surface"
+          aria-label={a11y.close}
+          className="absolute top-2.5 right-2.5 z-10 grid size-10 place-items-center rounded-full bg-white/90 hover:bg-surface sm:top-4 sm:right-4"
         >
           <X className="size-5" />
         </button>
         {status === "success" ? (
-          <SuccessPanel title={t.successTitle} text={t.successText} code={code} labels={c} />
+          <div className="min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-8">
+            <SuccessPanel title={t.successTitle} text={t.successText} code={code} labels={c} />
+          </div>
         ) : (
-          <form ref={formRef} onSubmit={onSubmit} noValidate className="relative space-y-4">
-            <Honeypot />
-            <h3 className="text-2xl font-bold text-ink">{t.yourInfo}</h3>
-            <dl className="space-y-2 rounded-2xl bg-[#f6f1e8] p-4 text-sm">
-              {rows.map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-4">
-                  <dt className="text-muted">{k}</dt>
-                  <dd className="text-right font-semibold text-ink">{v}</dd>
-                </div>
-              ))}
-              <div className="flex justify-between gap-4 border-t border-black/5 pt-2">
-                <dt className="text-muted">{t.total}</dt>
-                <dd className="text-lg font-extrabold text-ink">{summary.price}</dd>
-              </div>
-            </dl>
-            <Field label={c.fullName} required htmlFor="ck-name" error={errs.name}>
-              <Input
-                id="ck-name"
-                autoComplete="name"
-                value={d.name}
-                onChange={set("name")}
-                aria-invalid={!!errs.name}
-              />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={c.phone} htmlFor="ck-phone" error={errs.phone}>
-                <PhoneInput
-                  id="ck-phone"
-                  value={d.phone}
-                  onChange={set("phone")}
-                  aria-invalid={!!errs.phone}
-                />
-              </Field>
-              <Field label="Email" htmlFor="ck-email" error={errs.email}>
-                <Input
-                  id="ck-email"
-                  type="email"
-                  autoComplete="email"
-                  value={d.email}
-                  onChange={set("email")}
-                  aria-invalid={!!errs.email}
-                />
-              </Field>
-            </div>
-            {summary.airport && (
-              <Field label={t.flightNumber} htmlFor="ck-flight">
-                <Input
-                  id="ck-flight"
-                  value={d.flight}
-                  onChange={set("flight")}
-                  placeholder="VN123"
-                />
-              </Field>
-            )}
-            <Field label={c.notesOptional} htmlFor="ck-notes">
-              <Textarea
-                id="ck-notes"
-                rows={2}
-                value={d.notes}
-                onChange={set("notes")}
-                placeholder={t.notesHint}
-              />
-            </Field>
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-ink">{t.payment}</legend>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {[
-                  ["cash", t.payCash],
-                  ["bank", t.payBank],
-                ].map(([k, label]) => (
-                  <label
-                    key={k}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold",
-                      d.payment === k ? "border-amber-brand bg-amber-brand/10" : "border-border",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="payment"
-                      value={k}
-                      checked={d.payment === k}
-                      onChange={set("payment")}
-                      className="accent-[#f7b32b]"
-                    />
-                    {label}
-                  </label>
+          <form
+            ref={formRef}
+            onSubmit={onSubmit}
+            noValidate
+            className="relative flex min-h-0 flex-1 flex-col"
+          >
+            <h3 className="shrink-0 border-b border-black/5 py-3.5 pr-14 pl-5 text-xl font-bold text-ink sm:px-8 sm:pt-7 sm:pb-4 sm:text-2xl">
+              {t.yourInfo}
+            </h3>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-8 sm:py-5">
+              <Honeypot />
+              <dl className="space-y-2 rounded-2xl bg-[#f6f1e8] p-4 text-sm">
+                {rows.map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-4">
+                    <dt className="text-muted">{k}</dt>
+                    <dd className="text-right font-semibold text-ink">{v}</dd>
+                  </div>
                 ))}
+                <div className="flex justify-between gap-4 border-t border-black/5 pt-2">
+                  <dt className="text-muted">{t.total}</dt>
+                  <dd className="text-lg font-extrabold text-ink">{summary.price}</dd>
+                </div>
+              </dl>
+              <Field label={c.fullName} required htmlFor="ck-name" error={errs.name}>
+                <Input
+                  id="ck-name"
+                  autoComplete="name"
+                  value={d.name}
+                  onChange={set("name")}
+                  aria-invalid={!!errs.name}
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={c.phone} htmlFor="ck-phone" error={errs.phone}>
+                  <PhoneInput
+                    id="ck-phone"
+                    value={d.phone}
+                    onChange={set("phone")}
+                    aria-invalid={!!errs.phone}
+                  />
+                </Field>
+                <Field label="Email" htmlFor="ck-email" error={errs.email}>
+                  <Input
+                    id="ck-email"
+                    type="email"
+                    autoComplete="email"
+                    value={d.email}
+                    onChange={set("email")}
+                    aria-invalid={!!errs.email}
+                  />
+                </Field>
               </div>
-            </fieldset>
-            <FormError
-              show={Object.keys(errs).length > 0}
-              text={errs.date || errs.returnDate || formMsg(lang).fix}
-            />
-            <FormError show={status === "error"} text={c.errorGeneric} />
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="h-12 rounded-xl border border-border font-semibold text-ink hover:bg-surface"
-              >
-                {t.cancel}
-              </button>
-              <button
-                type="submit"
-                disabled={status === "sending"}
-                className="flex h-12 items-center justify-center gap-2 rounded-xl bg-amber-brand font-bold text-ink hover:brightness-105 disabled:opacity-60"
-              >
-                <Send className="size-4" /> {status === "sending" ? c.sending : t.confirm}
-              </button>
+              {summary.airport && (
+                <Field label={t.flightNumber} htmlFor="ck-flight">
+                  <Input
+                    id="ck-flight"
+                    value={d.flight}
+                    onChange={set("flight")}
+                    placeholder="VN123"
+                  />
+                </Field>
+              )}
+              <Field label={c.notesOptional} htmlFor="ck-notes">
+                <Textarea
+                  id="ck-notes"
+                  rows={2}
+                  value={d.notes}
+                  onChange={set("notes")}
+                  placeholder={t.notesHint}
+                />
+              </Field>
+              <fieldset>
+                <legend className="mb-2 text-sm font-semibold text-ink">{t.payment}</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[
+                    ["cash", t.payCash],
+                    ["bank", t.payBank],
+                  ].map(([k, label]) => (
+                    <label
+                      key={k}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold",
+                        d.payment === k ? "border-amber-brand bg-amber-brand/10" : "border-border",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="payment"
+                        value={k}
+                        checked={d.payment === k}
+                        onChange={set("payment")}
+                        className="accent-[#f7b32b]"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <ConsentCheckbox
+                id="ck-consent"
+                lang={lang}
+                c={c}
+                checked={d.consent}
+                onChange={setConsent}
+                error={errs.consent}
+              />
+              <FormError
+                show={hasFieldErrors(errs)}
+                text={errs.date || errs.returnDate || formMsg(lang).fix}
+              />
+              <FormError show={status === "error"} text={sendError || c.errorGeneric} />
             </div>
-            <p className="text-center text-xs text-muted">{c.noOnlinePayment}</p>
+            <div className="shrink-0 border-t border-black/5 bg-white px-5 pt-3 pb-3 sm:px-8 sm:pt-4 sm:pb-6">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-12 rounded-xl border border-border font-semibold text-ink hover:bg-surface"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={status === "sending"}
+                  className="flex h-12 items-center justify-center gap-2 rounded-xl bg-amber-brand px-2 font-bold text-ink hover:brightness-105 disabled:opacity-60"
+                >
+                  <Send className="size-4 shrink-0" />{" "}
+                  {status === "sending" ? c.sending : t.confirm}
+                </button>
+              </div>
+              <p className="mt-2 text-center text-xs text-muted">{c.noOnlinePayment}</p>
+            </div>
           </form>
         )}
       </div>
@@ -627,8 +673,14 @@ function CheckoutModal({ lang, t, c, summary, payload, onClose }) {
 export function CarQuoteForm({ lang, t, c, vehicles }) {
   const formRef = useRef(null);
   const { quote, update } = useCarQuote();
-  const { status, code, submit, reset } = useEnquiry("car", lang);
-  const [contact, setContact] = useState({ name: "", email: "", phone: "", notes: "" });
+  const { status, code, submit, reset, error: sendError } = useEnquiry("car", lang);
+  const [contact, setContact] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    notes: "",
+    consent: false,
+  });
   const [errs, setErrs] = useState({});
 
   if (status === "success") {
@@ -645,9 +697,15 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    const v = { ...validate(contact, lang, { email: "either" }), ...carDateErrors(quote, lang) };
+    const v = {
+      // chưa có lộ trình thì nhân viên không báo giá được → bắt buộc
+      ...(!String(quote.route ?? "").trim() && { route: formMsg(lang).route }),
+      ...validate(contact, lang, { email: "either" }),
+      ...carDateErrors(quote, lang),
+      ...consentError(contact.consent, c),
+    };
     setErrs(v);
-    if (Object.keys(v).length) return;
+    if (Object.keys(v).length) return focusFirstError(formRef.current);
     await submit({ ...quote, ...contact }, formRef.current);
   };
 
@@ -664,11 +722,14 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
         hint={t.routeHint}
         className="sm:col-span-2 lg:col-span-3"
         htmlFor="cq-route"
+        required
+        error={errs.route}
       >
         <Input
           id="cq-route"
           value={quote.route}
           onChange={(e) => update({ route: e.target.value })}
+          aria-invalid={!!errs.route}
         />
       </Field>
       <Field label={t.date} htmlFor="cq-date" error={errs.date}>
@@ -771,8 +832,19 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
         />
       </Field>
       <div className="space-y-3 sm:col-span-2 lg:col-span-3">
-        <FormError show={Object.keys(errs).length > 0} text={formMsg(lang).fix} />
-        <FormError show={status === "error"} text={c.errorGeneric} />
+        <ConsentCheckbox
+          id="cq-consent"
+          lang={lang}
+          c={c}
+          checked={contact.consent}
+          onChange={(v) => {
+            setContact({ ...contact, consent: v });
+            if (v) setErrs(dropConsentError);
+          }}
+          error={errs.consent}
+        />
+        <FormError show={hasFieldErrors(errs)} text={formMsg(lang).fix} />
+        <FormError show={status === "error"} text={sendError || c.errorGeneric} />
         <button
           type="submit"
           disabled={status === "sending"}

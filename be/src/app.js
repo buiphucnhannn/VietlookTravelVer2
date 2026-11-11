@@ -25,6 +25,9 @@ export function createApp() {
   app.set("query parser", "simple"); // ?a[b]=1 KHÔNG thành object lồng nhau (chống NoSQL injection qua query)
   app.set("json spaces", 0);
 
+  // Máy dev đo tốc độ: giả lập độ trễ mạng tới máy chủ thật (DEV_LATENCY_MS; production luôn tắt)
+  if (env.devLatencyMs > 0) app.use((_req, _res, next) => void setTimeout(next, env.devLatencyMs));
+
   app.use(
     helmet({
       // API chỉ trả JSON → CSP chặt nhất có thể

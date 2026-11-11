@@ -18,8 +18,10 @@ export async function requireAuth(req, _res, next) {
   const payload = verifyAccessToken(token);
   if (!payload) return next(ApiError.unauthorized("Phiên đăng nhập đã hết hạn", "TOKEN_EXPIRED"));
 
+  // Lấy luôn các trường công khai → GET /auth/me dùng lại (req.authUser), không truy vấn DB lần 2
   const user = await userRepository.findById(payload.sub, {
-    select: "username name role permissions isActive tokenVersion",
+    select:
+      "username email name role permissions isActive tokenVersion lockUntil lastLoginAt passwordChangedAt createdAt updatedAt",
   });
   if (!user || !user.isActive || (user.tokenVersion ?? 0) !== payload.tv)
     return next(ApiError.unauthorized("Phiên đăng nhập không còn hiệu lực", "TOKEN_REVOKED"));
@@ -31,6 +33,7 @@ export async function requireAuth(req, _res, next) {
     role: user.role,
     permissions: effectivePermissions(user),
   };
+  req.authUser = user;
   next();
 }
 

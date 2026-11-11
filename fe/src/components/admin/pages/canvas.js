@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { parseVideo, videoThumb } from "@/lib/video";
 import { siteConfig } from "@/constants/site";
 import { ABOUT_COLLAGE, ABOUT_MAX_REASONS } from "@/data/about";
-import RichText from "../RichText";
+import RichText from "../RichTextLazy";
 import { DragHandle, Sortable } from "../Sortable";
 import { Button, ImageField, Modal, VideoChip, VideoField, VideoHelp } from "../ui";
 
@@ -85,6 +85,7 @@ export function InlineText({
       <textarea
         rows={1}
         cols={1}
+        data-inline
         value={value}
         autoFocus={autoFocus}
         aria-label={label}
@@ -201,6 +202,7 @@ function InlineChips({ value, placeholders = [], onChange, dark, addLabel, newHi
                 </span>
                 <input
                   size={1}
+                  data-inline
                   value={item}
                   autoFocus={i === focusAt}
                   placeholder={hint}
@@ -353,7 +355,7 @@ export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
         size="sm"
         icon={ImagePlus}
         title="Ảnh đầu trang"
-        description="Nên chọn ảnh ngang, rõ nét."
+        description="Ảnh ngang phủ hết dải đầu trang (máy tính hiện phần giữa ảnh) — nên chọn ảnh rõ nét, chủ thể ở giữa."
         footer={<Button onClick={() => setImageOpen(false)}>Xong</Button>}
       >
         <div className="flex justify-center">
@@ -361,7 +363,7 @@ export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
             value={d.image}
             onChange={(image) => set({ image })}
             folder="pages"
-            crop={{ ratio: 16 / 9, width: 1920 }}
+            crop={{ ratio: 12 / 5, width: 2400 }}
           />
         </div>
       </Modal>

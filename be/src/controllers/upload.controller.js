@@ -18,6 +18,17 @@ export const uploadController = {
     created(res, image);
   },
 
+  /** Ảnh từ link → trả nguyên file ảnh để xem trước / cắt trên máy (chưa lưu vào kho ảnh) */
+  async linkPreview(req, res) {
+    const { buffer, format } = await uploadService.fetchLinkImage(req.validated.body.url);
+    res.set({
+      "Content-Type": `image/${format}`,
+      "Cache-Control": "no-store",
+      "Content-Disposition": "inline",
+    });
+    res.send(buffer);
+  },
+
   /** Video nền từ Drive: xong nhanh → 201 { video }; file lớn → 202 { jobId } rồi hỏi lại driveVideoJob */
   async driveVideo(req, res) {
     const { video, jobId } = await uploadService.startDriveImport(

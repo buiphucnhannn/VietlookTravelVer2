@@ -7,8 +7,7 @@ import {
 } from "../repositories/audit-log.repository.js";
 import { trusted } from "../repositories/base.repository.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
-
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+import { searchRegex } from "../utils/search.js";
 const refKey = (t) => `${t?.type}:${t?.id}`;
 const canLookup = (t) => AUDIT_TARGET_TYPES.includes(t?.type) && Boolean(t?.id);
 
@@ -101,8 +100,8 @@ export const auditService = {
     if (query.actor) filter.actor = query.actor;
     if (query.q || query.actions?.length) {
       const or = [];
-      if (query.q) {
-        const rx = new RegExp(escapeRegex(query.q), "i");
+      const rx = searchRegex(query.q); // không phân biệt dấu / hoa thường / khoảng trắng
+      if (rx) {
         // tên người làm, mã đơn, tên nội dung / tài khoản, tên khách của đơn
         or.push(
           { actorName: rx },
@@ -113,7 +112,7 @@ export const auditService = {
         );
       }
       if (query.actions?.length) or.push({ action: trusted({ $in: query.actions }) });
-      filter.$or = or;
+      if (or.length) filter.$or = or;
     }
     // Khoảng ngày theo giờ Việt Nam (UTC+7)
     const range = {};

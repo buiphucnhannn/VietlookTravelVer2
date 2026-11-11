@@ -101,7 +101,11 @@ export default function ToursPage() {
       danger: true,
     });
     if (!ok) return;
-    if (await run(() => api(`${PATH}/${t.id}`, { method: "DELETE" }), "Đã xoá tour")) list.reload();
+    // xoá → trang chủ cũng bỏ tour này (máy chủ đã gỡ) → xoá cache trang chủ
+    const removed = await run(() => api(`${PATH}/${t.id}`, { method: "DELETE" }), "Đã xoá tour", {
+      extraTags: ["settings"],
+    });
+    if (removed) list.reload();
   };
 
   /** Nhân bản: tạo bản sao (đang ẩn) với đường dẫn thêm "-copy", rồi mở trang sửa bản sao */

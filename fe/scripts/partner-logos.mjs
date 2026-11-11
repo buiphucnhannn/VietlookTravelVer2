@@ -6,6 +6,8 @@
  * - Ảnh đã trong suốt: chỉ cắt viền.
  * Không phóng to ảnh bitmap gốc (giữ độ nét thật). In ra bề rộng tương ứng chiều cao 160px cho PartnerStrip.
  * Chạy: node scripts/partner-logos.mjs   (ảnh gốc được xoá sau khi chuyển)
+ * Cần thư viện `sharp` — KHÔNG khai trong package.json (script dùng 1 lần): thường Next đã cài kèm trong
+ * node_modules; nếu báo "Cannot find package 'sharp'" thì cài tạm `npm i --no-save sharp` rồi chạy lại.
  */
 import fs from "node:fs";
 import path from "node:path";

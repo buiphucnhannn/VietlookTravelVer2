@@ -14,14 +14,14 @@ import {
   Phone,
   RefreshCw,
   Send,
+  ShieldCheck,
   StickyNote,
   Trash2,
 } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { priceLineVi } from "@/lib/pricing-labels";
-import { toastError, useAdminList, useMutation } from "./hooks";
-import { TODO_EVENT } from "./AdminShell";
+import { TODO_EVENT, toastError, useAdminList, useMutation } from "./hooks";
 import { usePermission } from "./permissions";
 import {
   Badge,
@@ -37,7 +37,6 @@ import {
   SearchBox,
   Select,
   Textarea,
-  Toggle,
   fmtDateTime,
   fmtUSD,
   useUi,
@@ -56,7 +55,7 @@ export const STATUSES = [
   { value: "contacted", label: "Đã liên hệ", tone: "amber" },
   { value: "confirmed", label: "Đã xác nhận", tone: "blue" },
   { value: "completed", label: "Hoàn tất", tone: "green" },
-  { value: "cancelled", label: "Hủy", tone: "gray" },
+  { value: "cancelled", label: "Huỷ", tone: "gray" },
 ];
 const statusOf = (v) => STATUSES.find((s) => s.value === v) ?? { label: v, tone: "gray" };
 
@@ -81,12 +80,17 @@ export function TypeBadge({ type }) {
   return <Badge tone={t.tone}>{t.label}</Badge>;
 }
 
+/** Thanh toán của đơn đặt tour (9Pay tự cập nhật; nhân viên cũng đổi tay được) */
+const PAYMENT_STATUSES = [
+  { value: "unpaid", label: "Chưa thanh toán", tone: "gray" },
+  { value: "deposit", label: "Đã đặt cọc", tone: "amber" },
+  { value: "paid", label: "Đã thanh toán", tone: "green" },
+];
+const paymentOf = (v) => PAYMENT_STATUSES.find((s) => s.value === v) ?? PAYMENT_STATUSES[0];
+
 function PaymentBadge({ value }) {
-  return value === "paid" ? (
-    <Badge tone="green">Đã thanh toán</Badge>
-  ) : (
-    <Badge tone="gray">Chưa thanh toán</Badge>
-  );
+  const s = paymentOf(value);
+  return <Badge tone={s.tone}>{s.label}</Badge>;
 }
 
 /** "2026-05-12" → "12/05/2026" (không đổi múi giờ) */
@@ -345,8 +349,11 @@ export default function EnquiriesPage({ kind = "bookings" }) {
               className="w-full"
             >
               <option value="">Mọi thanh toán</option>
-              <option value="unpaid">Chưa thanh toán</option>
-              <option value="paid">Đã thanh toán</option>
+              {PAYMENT_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
             </Select>
           ) : (
             <Select
@@ -686,7 +693,7 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
   const remove = async () => {
     const ok = await confirm({
       title: "Xoá vĩnh viễn?",
-      message: `${item.code} của ${item.name} sẽ bị xoá và không khôi phục được. Nếu chỉ muốn bỏ qua, hãy đổi trạng thái sang "Hủy".`,
+      message: `${item.code} của ${item.name} sẽ bị xoá và không khôi phục được. Nếu chỉ muốn bỏ qua, hãy đổi trạng thái sang "Huỷ".`,
       confirmText: "Xoá",
       danger: true,
     });
@@ -770,20 +777,27 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
                   Chuyển trạng thái sau khi đã liên hệ hoặc gửi báo giá cho khách.
                 </p>
               ) : (
-                <div className="flex items-end pb-2">
-                  <Toggle
-                    checked={item.paymentStatus === "paid"}
+                <label className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+                    Thanh toán
+                  </span>
+                  <Select
+                    value={paymentOf(item.paymentStatus).value}
                     disabled={busy || !canEdit}
-                    onChange={(paid) =>
+                    onChange={(e) =>
                       patch(
-                        { paymentStatus: paid ? "paid" : "unpaid" },
-                        paid ? "Đã đánh dấu đã thanh toán" : "Đã đánh dấu chưa thanh toán",
+                        { paymentStatus: e.target.value },
+                        `Đã đánh dấu "${paymentOf(e.target.value).label}"`,
                       )
                     }
-                    label={item.paymentStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
-                    hint="Bật khi khách đã chuyển tiền"
-                  />
-                </div>
+                  >
+                    {PAYMENT_STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
               )}
             </div>
           </div>
@@ -870,6 +884,15 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
             </Section>
           )}
 
+          {/* Các lượt thanh toán online (9Pay) */}
+          {isBooking && item.payments?.length > 0 && (
+            <PaymentsSection
+              payments={item.payments}
+              status={item.paymentStatus}
+              total={item.estimate?.total}
+            />
+          )}
+
           {/* Thông tin form */}
           {details.length > 0 && (
             <Section title="Thông tin khách điền">
@@ -889,6 +912,19 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
               <Globe className="size-3.5 shrink-0" />
               Gửi từ trang: <span className="truncate font-mono">{item.page}</span>
+            </p>
+          )}
+
+          {/* Bằng chứng khách đã tick ô đồng ý Chính sách bảo mật & Điều khoản khi gửi form */}
+          {item.consent?.agreedAt && (
+            <p className="flex items-start gap-1.5 text-xs text-emerald-700">
+              <ShieldCheck className="mt-px size-3.5 shrink-0" />
+              <span>
+                Đã đồng ý Chính sách bảo mật & Điều khoản lúc {fmtDateTime(item.consent.agreedAt)}
+                {item.consent.policyVersion &&
+                  ` (bản chính sách ${fmtDay(item.consent.policyVersion)})`}
+                {item.marketingConsentAt && " · Đồng ý nhận email ưu đãi"}
+              </span>
             </p>
           )}
 
@@ -992,6 +1028,85 @@ function Section({ title, hint, children }) {
       {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
       <div className="mt-2.5">{children}</div>
     </section>
+  );
+}
+
+/* ---------- Thanh toán online (9Pay) ---------- */
+
+const ATTEMPT_STATUS = {
+  paid: { label: "Thành công", tone: "green" },
+  pending: { label: "Chưa xong", tone: "blue" },
+  failed: { label: "Thất bại", tone: "red" },
+  cancelled: { label: "Khách huỷ", tone: "gray" },
+};
+const ATTEMPT_KIND = { full: "Trả toàn bộ", deposit: "Đặt cọc", balance: "Trả phần còn lại" };
+const fmtVnd = (n) => `${Math.round(Number(n) || 0).toLocaleString("vi-VN")} ₫`;
+
+/** Các lần khách bấm "Thanh toán qua 9Pay" — mới nhất trước */
+function PaymentsSection({ payments, status, total }) {
+  const list = [...payments].reverse();
+  const paid = payments.filter((x) => x.status === "paid");
+  const paidVnd = paid.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const paidUsd = paid.reduce((s, x) => s + (Number(x.amountUsd) || 0), 0);
+  const restUsd = Math.max(0, Math.round(((Number(total) || 0) - paidUsd) * 100) / 100);
+  return (
+    <Section title="Thanh toán online">
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+        <PaymentBadge value={status} />
+        {paidVnd > 0 && (
+          <span className="text-slate-600">
+            Đã nhận <strong className="text-slate-900">{fmtVnd(paidVnd)}</strong> qua 9Pay
+            {status === "deposit" && restUsd > 0 && (
+              <>
+                {" "}
+                · còn lại khoảng <strong className="text-slate-900">{fmtUSD(restUsd)}</strong>
+              </>
+            )}
+          </span>
+        )}
+      </div>
+      <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+        {list.map((x) => {
+          const s = ATTEMPT_STATUS[x.status] ?? ATTEMPT_STATUS.pending;
+          return (
+            <div
+              key={x.invoiceNo}
+              className="grid gap-x-4 gap-y-1 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0 sm:grid-cols-[1fr_auto]"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-slate-900 tabular-nums">
+                    {fmtVnd(x.amount)}
+                  </span>
+                  {x.amountUsd != null && (
+                    <span className="text-slate-500">≈ {fmtUSD(x.amountUsd)}</span>
+                  )}
+                  <Badge tone={s.tone}>{s.label}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {ATTEMPT_KIND[x.kind] ?? "Thanh toán"} · {fmtDateTime(x.paidAt || x.createdAt)}
+                  {x.rate ? ` · tỷ giá ${Math.round(x.rate).toLocaleString("vi-VN")}đ` : ""}
+                </p>
+                {x.failureReason && (
+                  <p className="mt-1 text-xs text-red-600">Lý do: {x.failureReason}</p>
+                )}
+              </div>
+              <div className="text-xs text-slate-500 sm:text-right">
+                {x.transactionId && (
+                  <p>
+                    Mã GD 9Pay{" "}
+                    <span className="font-mono font-semibold text-slate-700">
+                      {x.transactionId}
+                    </span>
+                  </p>
+                )}
+                <p className="font-mono">{x.invoiceNo}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Section>
   );
 }
 

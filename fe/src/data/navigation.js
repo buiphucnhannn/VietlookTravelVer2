@@ -11,8 +11,8 @@ import { regions } from "./regions";
  */
 /**
  * Ảnh THẬT của Vietlook dùng riêng trong menu thả xuống (ảnh tour web cũ vietlooktravel.com, ảnh đội xe,
- * ảnh nhân viên đón khách). Chỉ ghi đè trong menu – dữ liệu điểm đến/chủ đề ở các trang khác giữ nguyên.
- * Điểm đến chưa có ảnh thật (Đà Lạt, Quảng Bình, Mekong, Vũng Tàu) dùng ảnh hiện có.
+ * ảnh nhân viên đón khách) — CHỈ dùng khi điểm đến / chủ đề chưa có "Ảnh thẻ" trong CMS (ảnh trong CMS luôn được ưu tiên,
+ * để ảnh nhân viên chọn hiện đúng ở menu).
  */
 const NAV_DEST = {
   hanoi: "/images/tours/hd/hanoi7.jpg",
@@ -47,9 +47,22 @@ const NAV_THEME = {
 };
 
 /** catalog: dữ liệu từ CMS (lib/catalog.js) — điểm đến từng miền, chủ đề */
-export function buildNavigation(lang, dict, { destinationsByRegion, getDestination, themes }) {
+export function buildNavigation(
+  lang,
+  dict,
+  { destinationsByRegion, getDestination, themes, policies },
+) {
   const n = dict.nav;
   const h = (p) => href(lang, p);
+  // Chỉ link tới trang chính sách đang bật "Hiện trên website" (trang tắt → 404)
+  const policyLinks = [
+    { key: "payment", label: n.paymentPolicy, icon: "card" },
+    { key: "cancellation", label: n.cancelPolicy, icon: "calendar" },
+    { key: "privacy", label: n.privacyPolicy, icon: "shield" },
+    { key: "terms", label: n.termsPolicy, icon: "file" },
+  ]
+    .filter((l) => !policies || policies[l.key])
+    .map(({ key, ...l }) => ({ ...l, href: h(`/policies/${key}`) }));
   const z = (en, zh, vi) => (lang === "zh" ? zh : lang === "vi" ? (vi ?? en) : en);
   const months = dict.guide.months;
   const monthSlugs = [
@@ -74,7 +87,7 @@ export function buildNavigation(lang, dict, { destinationsByRegion, getDestinati
     links: destinationsByRegion(r.slug).map((d) => ({
       label: tr(d.name, lang),
       href: h(`/destinations/${d.slug}`),
-      image: NAV_DEST[d.slug] || d.image,
+      image: d.image || NAV_DEST[d.slug],
     })),
     footer: {
       label: {
@@ -89,9 +102,9 @@ export function buildNavigation(lang, dict, { destinationsByRegion, getDestinati
   const themeLink = (t) => ({
     label: tr(t.name, lang),
     href: h(`/themes/${t.slug}`),
-    image: NAV_THEME[t.slug] || t.image,
+    image: t.image || NAV_THEME[t.slug],
   });
-  const img = (slug) => NAV_DEST[slug] || getDestination(slug)?.image;
+  const img = (slug) => getDestination(slug)?.image || NAV_DEST[slug];
 
   return [
     {
@@ -579,15 +592,9 @@ export function buildNavigation(lang, dict, { destinationsByRegion, getDestinati
           ),
         },
       ],
-      aside: {
-        title: z("Policies", "政策条款", "Chính sách"),
-        links: [
-          { label: n.paymentPolicy, href: h("/policies/payment"), icon: "card" },
-          { label: n.cancelPolicy, href: h("/policies/cancellation"), icon: "calendar" },
-          { label: n.privacyPolicy, href: h("/policies/privacy"), icon: "shield" },
-          { label: n.termsPolicy, href: h("/policies/terms"), icon: "file" },
-        ],
-      },
+      aside: policyLinks.length
+        ? { title: z("Policies", "政策条款", "Chính sách"), links: policyLinks }
+        : undefined,
       promo: {
         image: "/images/nav/nav-about-hanoi.webp",
         badge: z("Since 2009", "始于2009年", "Từ năm 2009"),

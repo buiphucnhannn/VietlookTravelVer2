@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import pino from "pino";
 import { env } from "./env.js";
 
@@ -24,6 +25,16 @@ const SENSITIVE = [
 ];
 
 const pretty = !env.isProd && !env.isTest;
+
+// Windows: cửa sổ terminal mặc định dùng bảng mã cũ (437/850…) → chữ tiếng Việt trong log bị lỗi font.
+// Khi chạy local, chuyển cửa sổ đang dùng sang UTF-8 (chcp 65001) trước khi in log. Không ảnh hưởng server thật.
+if (pretty && process.platform === "win32") {
+  try {
+    execSync("chcp 65001", { stdio: "ignore", windowsHide: true });
+  } catch {
+    // không có cửa sổ console (vd. chạy nền) → bỏ qua
+  }
+}
 
 export const logger = pino({
   level: env.logLevel,

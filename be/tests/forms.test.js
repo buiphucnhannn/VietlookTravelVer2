@@ -9,11 +9,14 @@ import {
   tourRepository,
 } from "../src/repositories/content.repository.js";
 import { userRepository } from "../src/repositories/user.repository.js";
+import { auditService } from "../src/services/audit.service.js";
 import { enquiryService } from "../src/services/enquiry.service.js";
 import { mailService } from "../src/services/mail.service.js";
+import { paymentService } from "../src/services/payment/payment.service.js";
 import { signAccessToken } from "../src/services/token.service.js";
 import { ACCESS_COOKIE } from "../src/utils/auth-cookies.js";
 import { estimatePrice } from "../src/utils/pricing.js";
+import { PRIVACY_POLICY_VERSION } from "../src/constants/content.js";
 
 /**
  * Form công khai, giá tạm tính, mã yêu cầu, email & phân quyền — KHÔNG cần MongoDB:
@@ -113,7 +116,7 @@ describe("form công khai → lưu đơn + mã yêu cầu (không phụ thuộc 
       .post("/api/v1/enquiries")
       .set("X-Requested-With", "fetch")
       .set("X-Forwarded-For", from)
-      .send({ lang, ...body });
+      .send({ lang, consent: true, ...body });
 
   it("quá 10 form / 10 phút / IP → 429, câu theo ngôn ngữ khách", async () => {
     let res;
@@ -226,6 +229,57 @@ describe("form công khai → lưu đơn + mã yêu cầu (không phụ thuộc 
     assert.equal(date.body.error.details[0].message, "Please choose a future date.");
   });
 
+  it("thiếu / không tick ô đồng ý → 422, câu theo ngôn ngữ khách, không lưu", async () => {
+    const before = saved.length;
+    const base = { type: "contact", name: "QA", email: "qa@example.com" };
+    const cases = [
+      [
+        { consent: undefined },
+        "en",
+        "Please tick the box to let us contact you about your request.",
+      ],
+      [{ consent: false }, "zh", "请勾选同意框，以便我们就您的咨询与您联系。"],
+      [
+        { consent: "true" },
+        "vi",
+        "Vui lòng đánh dấu vào ô đồng ý để chúng tôi có thể liên hệ với bạn về yêu cầu này.",
+      ],
+    ];
+    for (const [extra, lang, msg] of cases) {
+      const res = await post({ ...base, ...extra }, lang);
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      const d = res.body.error.details.find((x) => x.field === "body.consent");
+      assert.equal(d?.message, msg);
+      assert.equal(res.body.error.details[0].message, msg);
+    }
+    // mọi loại form đều bắt buộc
+    for (const type of Object.keys(FORMS)) {
+      const res = await post({ ...base, ...FORMS[type], type, consent: false });
+      assert.equal(res.status, 422, type);
+    }
+    assert.equal(saved.length, before);
+  });
+
+  it("lưu bằng chứng đồng ý (thời điểm, phiên bản chính sách, ngôn ngữ); tiếp thị tách riêng", async () => {
+    const res = await post({ type: "contact", name: "QA", email: "qa@example.com" }, "vi");
+    assert.equal(res.status, 201);
+    const doc = saved.at(-1);
+    assert.ok(doc.consent.agreedAt instanceof Date);
+    assert.equal(doc.consent.policyVersion, PRIVACY_POLICY_VERSION);
+    assert.equal(doc.consent.lang, "vi");
+    assert.equal(doc.marketingConsentAt, null);
+    assert.equal(doc.details.consent, undefined);
+    const mk = await post({
+      type: "contact",
+      name: "QA",
+      email: "qa@example.com",
+      marketingConsent: true,
+    });
+    assert.equal(mk.status, 201);
+    assert.ok(saved.at(-1).marketingConsentAt instanceof Date);
+    assert.equal(saved.at(-1).details.marketingConsent, undefined);
+  });
+
   it("honeypot: giả vờ thành công, không lưu", async () => {
     const before = saved.length;
     const res = await post({
@@ -300,6 +354,78 @@ describe("email: chưa có RESEND_API_KEY không làm hỏng form", () => {
     } finally {
       restore();
     }
+  });
+
+  it("gửi lại email đơn đặt tour → giữ phần nhắc thanh toán online như email gốc", async () => {
+    const booking = {
+      _id: "x",
+      code: "VL-BK1",
+      type: "booking",
+      name: "QA",
+      email: "qa@example.com",
+      lang: "en",
+      details: {},
+      estimate: { currency: "USD", total: 500, lines: [] },
+    };
+    const sent = [];
+    const enabled = Object.getOwnPropertyDescriptor(mailService, "enabled");
+    Object.defineProperty(mailService, "enabled", { get: () => true, configurable: true });
+    const restores = [
+      stub(enquiryRepository, "findById", async () => booking),
+      stub(enquiryRepository, "setEmailStatus", async () => {}),
+      stub(settingRepository, "get", async () => null),
+      stub(mailService, "send", async (m) => (sent.push(m), { ok: true })),
+    ];
+    try {
+      const undo = stub(paymentService, "offerFor", async () => ({ token: "t", amountVnd: 1 }));
+      await enquiryService.resendEmail("64b000000000000000000001");
+      undo();
+      const pay = sent.find((m) => m.to === booking.email);
+      assert.match(pay.html, /If you chose to pay online/);
+
+      sent.length = 0;
+      const undo2 = stub(paymentService, "offerFor", async () => null); // 9Pay tắt / đã trả đủ
+      await enquiryService.resendEmail("64b000000000000000000001");
+      undo2();
+      assert.doesNotMatch(sent.find((m) => m.to === booking.email).html, /If you chose to pay online/);
+    } finally {
+      restores.forEach((x) => x());
+      Object.defineProperty(mailService, "enabled", enabled);
+    }
+  });
+});
+
+describe("nhật ký: xoá ghi chú nội bộ của đơn", () => {
+  it("DELETE /enquiries/:id/notes/:noteId → ghi 'enquiry.note_delete' theo mã đơn", async () => {
+    const admin = {
+      _id: "64b0000000000000000000a1",
+      username: "qa-admin",
+      name: "QA",
+      role: "admin",
+      isActive: true,
+      tokenVersion: 0,
+    };
+    const doc = { _id: "64b000000000000000000099", code: "VL-BK9", type: "booking", name: "QA" };
+    const audits = [];
+    const restores = [
+      stub(userRepository, "findById", async (id) => (String(id) === admin._id ? admin : null)),
+      stub(enquiryRepository, "findById", async () => doc),
+      stub(enquiryRepository, "removeNote", async () => ({ ...doc, notes: [] })),
+      stub(auditService, "record", (_req, action, opts) => audits.push({ action, ...opts })),
+    ];
+    let res;
+    try {
+      res = await request(app)
+        .delete(`/api/v1/enquiries/${doc._id}/notes/64b000000000000000000001`)
+        .set("Cookie", `${ACCESS_COOKIE}=${signAccessToken(admin)}`)
+        .set("X-Requested-With", "fetch");
+    } finally {
+      restores.forEach((x) => x());
+    }
+    assert.equal(res.status, 200);
+    const log = audits.find((a) => a.action === "enquiry.note_delete");
+    assert.ok(log, "phải ghi nhật ký xoá ghi chú");
+    assert.equal(log.target.id, "VL-BK9");
   });
 });
 

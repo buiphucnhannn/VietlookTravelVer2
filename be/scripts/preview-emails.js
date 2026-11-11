@@ -56,8 +56,7 @@ const SAMPLES = {
         { label: "Holiday surcharge × 3", amount: 120 },
       ].slice(0, 3),
     },
-    message:
-      "We'd love a cabin with a balcony if possible.\nOur daughter is vegetarian. Thanks!",
+    message: "We'd love a cabin with a balcony if possible.\nOur daughter is vegetarian. Thanks!",
     details: {},
   },
   car: {

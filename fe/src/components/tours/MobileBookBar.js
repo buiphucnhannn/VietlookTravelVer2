@@ -6,7 +6,8 @@ import { smoothScrollTo } from "@/components/fx/SmoothScroll";
 
 /**
  * Thanh đặt tour dính đáy màn hình trên mobile (<1024px): giá + nút "Book now" cuộn tới form.
- * Tự ẩn khi khung đặt tour (#book) đang hiển thị. Đặt biến --mobile-bar để nút chat nổi nhích lên.
+ * Tự ẩn khi khung đặt tour (#book) đang hiển thị. Đặt biến --mobile-bar để nút chat nổi nhích lên, và
+ * thuộc tính html[data-book-in-view] để nút chat nổi tạm ẩn khi khung đặt tour đang trên màn hình.
  */
 export default function MobileBookBar({ price, originalPrice, labels }) {
   const [show, setShow] = useState(false);
@@ -19,6 +20,8 @@ export default function MobileBookBar({ price, originalPrice, labels }) {
       const on = mq.matches && !bookVisible && window.scrollY > 300;
       setShow(on);
       document.documentElement.style.setProperty("--mobile-bar", on ? "68px" : "0px");
+      // khung đặt tour đang trên màn hình (điện thoại) → nút chat nổi tạm ẩn, không che nút 5★, ô nhập…
+      document.documentElement.toggleAttribute("data-book-in-view", mq.matches && bookVisible);
     };
     const io = new IntersectionObserver(([e]) => {
       bookVisible = e.isIntersecting;
@@ -33,6 +36,7 @@ export default function MobileBookBar({ price, originalPrice, labels }) {
       window.removeEventListener("scroll", sync);
       mq.removeEventListener("change", sync);
       document.documentElement.style.removeProperty("--mobile-bar");
+      document.documentElement.removeAttribute("data-book-in-view");
     };
   }, []);
 

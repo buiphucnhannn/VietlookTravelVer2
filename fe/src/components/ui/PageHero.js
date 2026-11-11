@@ -32,7 +32,11 @@ export function BrushHero({
               src={src}
               alt=""
               fill
-              priority={i < 2}
+              // Chỉ ảnh đầu được tải trước (ảnh LCP); ảnh 2–3 bị ẩn trên điện thoại → không tải trước
+              // (preload sẽ tải cả ảnh đang ẩn, giành băng thông với ảnh chính). Máy tính: tải ngay, ưu tiên thấp hơn.
+              preload={i === 0}
+              fetchPriority={i === 0 ? "high" : undefined}
+              loading={i === 0 ? undefined : "lazy"}
               sizes={n > 1 ? "(min-width: 768px) 34vw, 100vw" : "100vw"}
               className="object-cover"
             />

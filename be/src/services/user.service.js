@@ -8,6 +8,7 @@ import { sessionRepository } from "../repositories/session.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
 import { ApiError } from "../utils/ApiError.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
+import { searchRegex } from "../utils/search.js";
 import { passwordService } from "./password.service.js";
 
 /**
@@ -33,8 +34,6 @@ export function toPublicUser(u) {
   };
 }
 
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 /** Thu hồi mọi phiên + vô hiệu access token hiện có của 1 tài khoản */
 async function forceLogout(id) {
   await userRepository.bumpTokenVersion(id);
@@ -51,8 +50,8 @@ export const userService = {
   async list(query) {
     const page = getPagination(query);
     const filter = {};
-    if (query.q) {
-      const rx = new RegExp(escapeRegex(query.q), "i");
+    const rx = searchRegex(query.q); // không phân biệt dấu / hoa thường / khoảng trắng
+    if (rx) {
       filter.$or = [{ username: rx }, { name: rx }, { email: rx }]; // $or được phép; giá trị là RegExp đã escape
     }
     if (query.role) filter.role = query.role;

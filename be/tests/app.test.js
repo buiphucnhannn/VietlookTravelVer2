@@ -134,7 +134,10 @@ describe("app — khung & bảo mật", () => {
 
 describe("form công khai & phân quyền nội dung", () => {
   const post = (body) =>
-    request(app).post("/api/v1/enquiries").set("X-Requested-With", "fetch").send(body);
+    request(app)
+      .post("/api/v1/enquiries")
+      .set("X-Requested-With", "fetch")
+      .send({ consent: true, ...body });
 
   it("thiếu tên → 422", async () => {
     const res = await post({ type: "contact", email: "a@b.vn" });

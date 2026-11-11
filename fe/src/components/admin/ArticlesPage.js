@@ -29,13 +29,16 @@ const PATH = "/admin/articles";
 const TAGS = ["articles"];
 const BASE = `${ADMIN_BASE}/articles`;
 
+/** Có nội dung ở ngôn ngữ này? Danh sách chỉ nhận true / false (không tải HTML); bài vừa sửa có thể là HTML */
+const hasBody = (v) => v === true || (typeof v === "string" && Boolean(v.trim()));
+
 /** Ngôn ngữ còn thiếu (tiêu đề hoặc nội dung trống) — website tạm dùng ngôn ngữ khác đã có */
 const missingLangs = (a) =>
   [
     { key: "vi", label: "VI" },
     { key: "en", label: "EN" },
     { key: "zh", label: "中文" },
-  ].filter((l) => !a.title?.[l.key]?.trim() || !a.body?.[l.key]?.trim());
+  ].filter((l) => !a.title?.[l.key]?.trim() || !hasBody(a.body?.[l.key]));
 
 export default function ArticlesPage() {
   const { confirm } = useUi();

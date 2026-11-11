@@ -5,6 +5,7 @@ import {
   ENQUIRY_TYPE_VALUES,
   FAST_TRACK_GROUPS,
   PAGE_KEYS,
+  PAYMENT_STATUS,
   REGION_VALUES,
 } from "../constants/content.js";
 import { env } from "../config/env.js";
@@ -198,81 +199,87 @@ const tourLang = z
   })
   .default({});
 
-export const tourSchema = z.object({
-  slug,
-  code: str(30),
-  days: z.coerce.number().int().min(0).max(120).default(1),
-  nights: z.coerce.number().int().min(0).max(120).default(0),
-  halfDay: z.boolean().default(false),
-  destinations: z.array(slug).max(30).default([]),
-  themes: z.array(slug).max(8).default([]),
-  cruise: z.boolean().default(false),
-  tourType: z.enum(["private", "group"]).default("private"),
-  price: money,
-  originalPrice: money,
-  image: media.default(""),
-  gallery: mediaList(40),
-  videos: z.array(videoLink).max(10).default([]),
-  departure: z.enum(["daily", "weekly", "on-request", "dates"]).default("daily"),
-  departureDates: z.array(isoDate).max(200).default([]),
-  departureDays: z.array(z.coerce.number().int().min(0).max(6)).max(7).default([]),
-  content: z
-    .object({ en: tourLang, zh: tourLang, vi: tourLang })
-    .refine((c) => hasAnyLang({ en: c.en?.title, zh: c.zh?.title, vi: c.vi?.title }), {
-      message: "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ",
-    }),
-  pricing: z
-    .object({
-      groupTiers: z
-        .array(
-          z.object({
-            minPax: z.coerce.number().int().min(1).max(100),
-            maxPax: z.coerce.number().int().min(1).max(100),
-            price: z.coerce.number().min(0).max(1_000_000),
-            price4: money,
-            price5: money,
-          }),
-        )
-        .max(20)
-        .default([]),
-      childRates: z
-        .array(
-          z.object({
-            minAge: z.coerce.number().int().min(0).max(17),
-            maxAge: z.coerce.number().int().min(0).max(17),
-            percent: z.coerce.number().min(0).max(100),
-          }),
-        )
-        .max(10)
-        .default([]),
-      singleSupplement: money,
-      holidaySurcharge: money,
-      holidayPercent: z.coerce.number().min(0).max(100).nullable().default(null),
-      holidayDates: z
-        .array(z.string().regex(/^(\d{4}-)?\d{2}-\d{2}$/, "Ngày lễ dạng YYYY-MM-DD hoặc MM-DD"))
-        .max(120)
-        .default([]),
-    })
-    .default({}),
-  reviews: z
-    .array(
-      z.object({
-        name: str(100),
-        country: str(80),
-        rating: z.coerce.number().int().min(1).max(5).default(5),
-        text: str(3000),
-        date: str(20),
-        source: str(40),
+export const tourSchema = z
+  .object({
+    slug,
+    code: str(30),
+    days: z.coerce.number().int().min(0).max(120).default(1),
+    nights: z.coerce.number().int().min(0).max(120).default(0),
+    halfDay: z.boolean().default(false),
+    destinations: z.array(slug).max(30).default([]),
+    themes: z.array(slug).max(8).default([]),
+    cruise: z.boolean().default(false),
+    tourType: z.enum(["private", "group"]).default("private"),
+    price: money,
+    originalPrice: money,
+    image: media.default(""),
+    gallery: mediaList(40),
+    videos: z.array(videoLink).max(10).default([]),
+    departure: z.enum(["daily", "weekly", "on-request", "dates"]).default("daily"),
+    departureDates: z.array(isoDate).max(200).default([]),
+    departureDays: z.array(z.coerce.number().int().min(0).max(6)).max(7).default([]),
+    content: z
+      .object({ en: tourLang, zh: tourLang, vi: tourLang })
+      .refine((c) => hasAnyLang({ en: c.en?.title, zh: c.zh?.title, vi: c.vi?.title }), {
+        message: "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ",
       }),
-    )
-    .max(50)
-    .default([]),
-  seo,
-  featured: z.boolean().default(false),
-  featuredLong: z.boolean().default(false),
-  rank: z.coerce.number().int().min(0).max(100_000).default(1000),
-  isActive,
-});
+    pricing: z
+      .object({
+        groupTiers: z
+          .array(
+            z.object({
+              minPax: z.coerce.number().int().min(1).max(100),
+              maxPax: z.coerce.number().int().min(1).max(100),
+              price: z.coerce.number().min(0).max(1_000_000),
+              price4: money,
+              price5: money,
+            }),
+          )
+          .max(20)
+          .default([]),
+        childRates: z
+          .array(
+            z.object({
+              minAge: z.coerce.number().int().min(0).max(17),
+              maxAge: z.coerce.number().int().min(0).max(17),
+              percent: z.coerce.number().min(0).max(100),
+            }),
+          )
+          .max(10)
+          .default([]),
+        singleSupplement: money,
+        holidaySurcharge: money,
+        holidayPercent: z.coerce.number().min(0).max(100).nullable().default(null),
+        holidayDates: z
+          .array(z.string().regex(/^(\d{4}-)?\d{2}-\d{2}$/, "Ngày lễ dạng YYYY-MM-DD hoặc MM-DD"))
+          .max(120)
+          .default([]),
+      })
+      .default({}),
+    reviews: z
+      .array(
+        z.object({
+          name: str(100),
+          country: str(80),
+          rating: z.coerce.number().int().min(1).max(5).default(5),
+          text: str(3000),
+          date: str(20),
+          source: str(40),
+        }),
+      )
+      .max(50)
+      .default([]),
+    seo,
+    featured: z.boolean().default(false),
+    featuredLong: z.boolean().default(false),
+    rank: z.coerce.number().int().min(0).max(100_000).default(1000),
+    isActive,
+  })
+  // Số đêm không quá số ngày (VD 3 ngày 2 đêm, tour trong ngày 1 ngày 0 đêm)
+  .refine((t) => t.nights <= t.days, {
+    path: ["nights"],
+    message: "Số đêm không được nhiều hơn số ngày",
+  });
 
 /* ---------- Bài viết / chuyên mục / tác giả ---------- */
 
@@ -315,26 +322,32 @@ export const authorSchema = z.object({
 
 const key = slug;
 
-export const carSchema = z.object({
-  key,
-  seats: z.coerce.number().int().min(1).max(60),
-  pax: z.coerce.number().int().min(1).max(60).default(1),
-  luggage: z.coerce.number().int().min(0).max(60).default(0),
-  name: locRequired(100),
-  tagline: loc(200),
-  description: loc(1500),
-  images: mediaList(12),
-  models: list(80, 20),
-  ideal: locList(),
-  priceKey: str(30),
-  accent: z
-    .string()
-    .regex(/^#[0-9a-f]{6}$/i)
-    .default("#1780c1"),
-  vip: z.boolean().default(false),
-  order,
-  isActive,
-});
+export const carSchema = z
+  .object({
+    key,
+    seats: z.coerce.number().int().min(1).max(60),
+    pax: z.coerce.number().int().min(1).max(60).default(1),
+    luggage: z.coerce.number().int().min(0).max(60).default(0),
+    name: locRequired(100),
+    tagline: loc(200),
+    description: loc(1500),
+    images: mediaList(12),
+    models: list(80, 20),
+    ideal: locList(),
+    priceKey: str(30),
+    accent: z
+      .string()
+      .regex(/^#[0-9a-f]{6}$/i)
+      .default("#1780c1"),
+    vip: z.boolean().default(false),
+    order,
+    isActive,
+  })
+  // Số khách tối đa không vượt số chỗ của xe (chỗ ngồi đã gồm ghế khách)
+  .refine((c) => c.pax <= c.seats, {
+    path: ["pax"],
+    message: "Số khách không được nhiều hơn số chỗ của xe",
+  });
 
 export const carAreaSchema = z.object({
   key,
@@ -463,8 +476,16 @@ export const homeSettingsSchema = z.object({
         .default([]),
     })
     .default({}),
-  featuredTours: z.array(slug).max(24).default([]), // tour nổi bật
-  longTours: z.array(slug).max(24).default([]), // tour dài ngày nổi bật (khối trang chủ)
+  featuredTours: z
+    .array(slug)
+    .max(24)
+    .default([])
+    .transform((a) => a.slice(0, 8)), // tour nổi bật (tối đa 8)
+  longTours: z
+    .array(slug)
+    .max(24)
+    .default([])
+    .transform((a) => a.slice(0, 8)), // tour dài ngày (tối đa 8)
   homeThemes: z.array(slug).max(8).default([]), // chủ đề hiện ở trang chủ (trống = tất cả)
   featuredDestinations: z.array(slug).max(5).default([]), // 5 ô lớn của lưới điểm đến
   // Câu chữ các khối trang chủ (cùng tên khoá với từ điển giao diện fe: dict.home) —
@@ -543,6 +564,24 @@ export const homeSettingsSchema = z.object({
     .default({}),
   // Con số ở khối "Vietlook qua những con số" (6 ô) — trống = website tự tính
   statValues: z.array(str(12)).max(6).default([]),
+  // Tên địa điểm hiện khi rê chuột lên 6 cánh ngôi sao (khối "Thiết kế tour") — trống = tên có sẵn
+  starLabels: z.array(loc(60)).max(6).default([]),
+  // Ảnh các khối trang chủ do nhân viên thay — ô trống ("") = website dùng ảnh có sẵn
+  images: z
+    .object({
+      services: z
+        .object({
+          tours: media.default(""),
+          car: media.default(""),
+          visa: media.default(""),
+        })
+        .default({}),
+      star: z.array(media).max(6).default([]), // 6 cánh ngôi sao dải lụa (khối "Thiết kế tour")
+      b2bNorth: z.array(media).max(3).default([]), // khung ảnh lớn khối đối tác (đổi luân phiên)
+      b2bSouth: z.array(media).max(3).default([]), // khung ảnh nhỏ khối đối tác
+      about: media.default(""), // ảnh khối "Về chúng tôi"
+    })
+    .default({}),
 });
 
 export const notificationSettingsSchema = z.object({
@@ -575,6 +614,8 @@ export const paymentSettingsSchema = z.object({
   secretKey: z.string().trim().max(500).optional(),
   checksumKey: z.string().trim().max(500).optional(),
   accountName: str(200), // tên tài khoản nhận tiền (hiển thị nội bộ)
+  // Tỷ lệ đặt cọc khi khách thanh toán online: 100 = trả đủ; vd. 30 = cọc 30%
+  depositPercent: z.coerce.number().int().min(10).max(100).optional(),
 });
 
 /* ---------- Đơn / yêu cầu ---------- */
@@ -584,14 +625,14 @@ export const enquiryListQuery = pageQuery.extend({
   type: z.enum(ENQUIRY_TYPE_VALUES).optional(),
   kind: z.enum(["bookings", "requests"]).optional(),
   status: z.enum(ENQUIRY_STATUS).optional(),
-  paymentStatus: z.enum(["unpaid", "paid"]).optional(),
+  paymentStatus: z.enum(PAYMENT_STATUS).optional(),
   emailFailed: z.enum(["1"]).optional(),
 });
 
 export const enquiryUpdateSchema = z
   .object({
     status: z.enum(ENQUIRY_STATUS).optional(),
-    paymentStatus: z.enum(["unpaid", "paid"]).optional(),
+    paymentStatus: z.enum(PAYMENT_STATUS).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, "Không có thay đổi nào");
 

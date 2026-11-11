@@ -31,7 +31,7 @@ import VideoEmbed from "@/components/ui/VideoEmbed";
 import { parseVideo } from "@/lib/video";
 import { GoogleIcon, TripAdvisorIcon, WeChatIcon, WhatsAppIcon } from "@/components/ui/BrandIcons";
 import { reviews as allReviews } from "@/data/reviews";
-import { getCatalog, getTour, tourText } from "@/lib/catalog";
+import { getCatalog, getPaymentConfig, getTour, tourText } from "@/lib/catalog";
 
 export async function generateStaticParams() {
   const { allTours } = await getCatalog();
@@ -134,6 +134,8 @@ async function TourPageContent({ params }) {
   const t = dict.tour;
   const c = dict.common;
   const tx = tourText(tour, lang);
+  // 9Pay bật trong CMS → sau khi gửi đơn có bước "Thanh toán"; tắt → đặt tour như cũ
+  const paymentConfig = await getPaymentConfig();
   const title = tx.title;
   const destNames = tour.destinations.map((d) => tr(getDestination(d)?.name, lang)).filter(Boolean);
   const duration =
@@ -202,12 +204,15 @@ async function TourPageContent({ params }) {
   const related = relatedTours(tour, 4).map((x) => toCard(x, lang));
   const labels = cardLabels(dict);
 
+  // album trống → hiện ảnh bìa (không để khung ảnh trống đầu trang)
+  const photos = tour.gallery?.length ? tour.gallery : [tour.image].filter(Boolean);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "TouristTrip",
     name: title,
     description: tx.summary,
-    image: tour.gallery.map(absUrl),
+    image: photos.map(absUrl),
     touristType: tour.themes,
     itinerary: {
       "@type": "ItemList",
@@ -257,7 +262,7 @@ async function TourPageContent({ params }) {
             { label: title },
           ]}
         />
-        <TourGallery images={tour.gallery} title={title} label={t.gallery} />
+        <TourGallery images={photos} title={title} label={t.gallery} />
       </Container>
 
       <Container className="grid gap-8 py-8 lg:grid-cols-[1fr_400px] lg:items-center lg:py-10">
@@ -693,6 +698,7 @@ async function TourPageContent({ params }) {
                 }}
                 t={t}
                 c={c}
+                payment={{ ...paymentConfig, labels: dict.payment }}
               />
             </StickySide>
           </div>
@@ -728,8 +734,12 @@ async function TourPageContent({ params }) {
 // nội dung vẫn được prerender sẵn nhờ generateStaticParams.
 export default function TourPage(props) {
   return (
-    <Suspense fallback={<PageSkeleton />}>
-      <TourPageContent {...props} />
-    </Suspense>
+    <>
+      {/* Chừa chỗ cho header nền trắng ngay trong khung tĩnh (header dựng sẵn chưa biết đường dẫn) */}
+      <div aria-hidden className="h-16 lg:h-[108px]" />
+      <Suspense fallback={<PageSkeleton />}>
+        <TourPageContent {...props} />
+      </Suspense>
+    </>
   );
 }

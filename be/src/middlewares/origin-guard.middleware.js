@@ -22,7 +22,8 @@ function sameSite(req, origin) {
  * không gửi được header tuỳ chỉnh) và nếu có Origin thì phải là chính tên miền website hoặc thuộc CORS_ORIGINS.
  */
 export function originGuard(req, _res, next) {
-  if (SAFE.has(req.method)) return next();
+  // IPN: máy chủ 9Pay gọi (không có header của website) — an toàn nhờ checksum từng kết quả
+  if (SAFE.has(req.method) || req.path === "/api/v1/payments/ipn") return next();
   if (req.get("x-requested-with") !== "fetch") {
     auditService.security(req, "security.csrf_rejected");
     return next(ApiError.forbidden("Yêu cầu không hợp lệ", "CSRF_REJECTED"));

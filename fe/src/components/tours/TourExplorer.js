@@ -2,6 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useA11y } from "@/components/layout/A11y";
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,7 +12,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, foldSearch } from "@/lib/utils";
 import { smoothScrollTo } from "@/components/fx/SmoothScroll";
 import TourCard, { AuroraTourCard } from "./TourCard";
 
@@ -34,15 +35,9 @@ const priceMatch = {
 
 /**
  * Chuẩn hoá để tìm kiếm: bỏ dấu, đ→d, chữ thường, BỎ MỌI khoảng trắng/ký tự đặc biệt
- * → "Hà Nội" = "ha noi" = "hanoi", "Sa Pa" = "sapa", "Đà Nẵng" = "danang".
+ * → "Hà Nội" = "ha noi" = "hanoi", "Sa Pa" = "sapa", "Đà Nẵng" = "danang". (Dùng chung với CMS.)
  */
-const normalize = (s) =>
-  String(s || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/gi, "d")
-    .toLowerCase()
-    .replace(/[^a-z0-9一-鿿]+/g, "");
+const normalize = foldSearch;
 
 // Tên gọi khác của cùng một địa danh (đã chuẩn hoá)
 const SYNONYMS = [
@@ -81,6 +76,7 @@ export default function TourExplorer({
   variant,
 }) {
   const router = useRouter();
+  const a11y = useA11y();
   const root = useRef(null);
   const qRef = useRef(null);
   const typing = useRef(null);
@@ -109,12 +105,21 @@ export default function TourExplorer({
     const q = normalize(f.q);
     const variants = q ? queryVariants(q) : [];
     const regionSlugs = new Set(destinationOptions.filter((o) => o.region).map((o) => o.value));
+    const hayOf = (c) =>
+      normalize(
+        `${c.title} ${c.summary} ${c.destinationNames.join(" ")} ${c.destinations.join(" ")} ${c.code || ""}`,
+      );
+    const phrase = (hay) => variants.some((v) => hay.includes(v));
+    // Cả cụm không khớp tour nào (vd. "sapa trek") → khớp từng từ (tour chứa đủ mọi từ)
+    const words = f.q.split(/\s+/).map(normalize).filter(Boolean);
+    const byWords =
+      q && words.length > 1 && !cards.some((c) => phrase(hayOf(c)))
+        ? (hay) => words.every((w) => queryVariants(w).some((v) => hay.includes(v)))
+        : null;
     let list = cards.filter((c) => {
       if (q) {
-        const hay = normalize(
-          `${c.title} ${c.summary} ${c.destinationNames.join(" ")} ${c.destinations.join(" ")} ${c.code || ""}`,
-        );
-        if (!variants.some((v) => hay.includes(v))) return false;
+        const hay = hayOf(c);
+        if (!(byWords ? byWords(hay) : phrase(hay))) return false;
       }
       if (f.destination) {
         const ok = regionSlugs.has(f.destination)
@@ -266,7 +271,8 @@ export default function TourExplorer({
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted">
-          <strong className="text-lg text-ink">{filtered.length}</strong> {t.results}
+          <strong className="text-lg text-ink">{filtered.length}</strong>{" "}
+          {filtered.length === 1 && t.resultOne ? t.resultOne : t.results}
           {active && (
             <button
               type="button"
@@ -312,7 +318,7 @@ export default function TourExplorer({
                 lang={lang}
                 labels={labels}
                 badge={badgeFor?.(card)}
-                priority={i < 4}
+                // không tải trước: thẻ tour nằm dưới ảnh banner (ảnh LCP) → không giành băng thông với ảnh đó
               />
             ),
           )}
@@ -324,20 +330,20 @@ export default function TourExplorer({
       {pages > 1 && (
         <nav
           className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-3"
-          aria-label="Pagination"
+          aria-label={a11y.pagination}
         >
           {/* mobile: bỏ nút Đầu/Cuối (đã có ô nhảy trang) để hàng nút không tràn ngang */}
           <div className="flex items-center gap-1 sm:gap-1.5">
             {[
-              { icon: ChevronsLeft, to: 1, label: "First", off: page <= 1 },
-              { icon: ChevronLeft, to: page - 1, label: "Previous", off: page <= 1 },
+              { icon: ChevronsLeft, to: 1, label: a11y.first, edge: true, off: page <= 1 },
+              { icon: ChevronLeft, to: page - 1, label: a11y.previous, off: page <= 1 },
             ].map((b) => (
               <button
                 key={b.label}
                 type="button"
                 disabled={b.off}
                 onClick={() => goPage(b.to)}
-                className={cn(pagerBtn, /First|Last/.test(b.label) && "max-sm:hidden")}
+                className={cn(pagerBtn, b.edge && "max-sm:hidden")}
                 aria-label={b.label}
               >
                 <b.icon className="size-4" />
@@ -365,15 +371,15 @@ export default function TourExplorer({
                 </span>
               ))}
             {[
-              { icon: ChevronRight, to: page + 1, label: "Next", off: page >= pages },
-              { icon: ChevronsRight, to: pages, label: "Last", off: page >= pages },
+              { icon: ChevronRight, to: page + 1, label: a11y.next, off: page >= pages },
+              { icon: ChevronsRight, to: pages, label: a11y.last, edge: true, off: page >= pages },
             ].map((b) => (
               <button
                 key={b.label}
                 type="button"
                 disabled={b.off}
                 onClick={() => goPage(b.to)}
-                className={cn(pagerBtn, /First|Last/.test(b.label) && "max-sm:hidden")}
+                className={cn(pagerBtn, b.edge && "max-sm:hidden")}
                 aria-label={b.label}
               >
                 <b.icon className="size-4" />

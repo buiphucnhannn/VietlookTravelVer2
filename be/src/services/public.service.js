@@ -43,6 +43,13 @@ function tourCard(t) {
     featured: t.featured,
     featuredLong: t.featuredLong,
     departure: t.departure,
+    // dùng để tự chọn "Tour nổi bật" / "Hành trình dài ngày" trang chủ (fe/src/lib/tour-picks.js)
+    photos: t.gallery?.length ?? 0,
+    reviewCount: t.reviews?.length ?? 0,
+    rating: t.reviews?.length
+      ? Math.round((t.reviews.reduce((s, r) => s + (r.rating ?? 5), 0) / t.reviews.length) * 10) /
+        10
+      : null,
     title: pick("title", (v) => v ?? ""),
     summary: pick("summary", (v) => v ?? ""),
     route: pick("route", (v) => (v ?? []).slice(0, 8)),
@@ -51,7 +58,7 @@ function tourCard(t) {
 }
 
 const CARD_FIELDS =
-  "slug code days nights halfDay regions destinations themes cruise tourType price originalPrice image rank featured featuredLong departure updatedAt content.en.title content.zh.title content.vi.title content.en.summary content.zh.summary content.vi.summary content.en.route content.zh.route content.vi.route";
+  "slug code days nights halfDay regions destinations themes cruise tourType price originalPrice image rank featured featuredLong departure updatedAt gallery reviews.rating content.en.title content.zh.title content.vi.title content.en.summary content.zh.summary content.vi.summary content.en.route content.zh.route content.vi.route";
 
 export const publicService = {
   async tours() {

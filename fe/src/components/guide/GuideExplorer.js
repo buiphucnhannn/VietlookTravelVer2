@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PostCard from "./PostCard";
@@ -9,19 +10,37 @@ const norm = (s) =>
   String(s || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/gi, "d") // "da nang" tìm được "Đà Nẵng"
     .toLowerCase();
 
-/** Danh sách bài cẩm nang + tìm kiếm + lọc chuyên mục (phía client). */
+/**
+ * Danh sách bài cẩm nang + tìm kiếm + lọc chuyên mục (phía client).
+ * Từ khoá lưu trên URL (?q=) → chia sẻ / quay lại được kết quả tìm kiếm.
+ */
 export default function GuideExplorer({ lang, posts, categories, t, initialCategory = "" }) {
-  const [q, setQ] = useState("");
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const typing = useRef(null);
+  const [q, setQState] = useState(() => params.get("q") || "");
   const [cat, setCat] = useState(initialCategory);
+  const setQ = (v) => {
+    setQState(v);
+    setLimit(8);
+    clearTimeout(typing.current);
+    typing.current = setTimeout(() => {
+      const next = new URLSearchParams(params.toString());
+      if (v.trim()) next.set("q", v.trim());
+      else next.delete("q");
+      router.replace(`${pathname}${next.toString() ? `?${next}` : ""}`, { scroll: false });
+    }, 500);
+  };
   const [limit, setLimit] = useState(8);
 
   const list = useMemo(() => {
     const k = norm(q);
     return posts.filter(
-      (p) =>
-        (!cat || p.category === cat) && (!k || norm(`${p.titleText} ${p.excerptText}`).includes(k)),
+      (p) => (!cat || p.category === cat) && (!k || norm(`${p.title} ${p.excerpt}`).includes(k)),
     );
   }, [posts, q, cat]);
 

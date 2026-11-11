@@ -31,7 +31,7 @@ import { estimatePrice } from "@/lib/pricing";
 import { cn, slugify } from "@/lib/utils";
 import { priceLineVi } from "@/lib/pricing-labels";
 import { useMutation, useOptions } from "./hooks";
-import RichText from "./RichText";
+import RichText from "./RichTextLazy";
 import { DragHandle, Sortable } from "./Sortable";
 import { AutoTranslate, pickSource, slugSource, useAutoFill } from "./translate";
 import {
@@ -63,6 +63,7 @@ import {
 } from "./ui";
 import { canonicalVideo, parseVideo } from "@/lib/video";
 import { REGIONS } from "./DestinationsPage";
+import { usePendingImages } from "./pendingImages";
 import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
 
 const PATH = "/admin/tours";
@@ -248,8 +249,6 @@ export function normalizeTour(d = {}) {
   };
 }
 
-/** Giữ để tương thích: link / mã video → dạng chuẩn (YouTube hoặc Google Drive), không nhận ra → null */
-export const extractYouTubeId = (input) => canonicalVideo(str(input).trim());
 const SLUG_RX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const isMedia = (v) =>
   !v ||
@@ -367,6 +366,8 @@ export function toTourPayload(t) {
 function validate(p) {
   if (!LANG_KEYS.some((l) => p.content[l].title))
     return "Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục Thông tin chung).";
+  if (p.nights > p.days)
+    return "Số đêm không được nhiều hơn số ngày (mục Thông tin chung) — VD: 3 ngày 2 đêm, tour trong ngày 1 ngày 0 đêm.";
   if (!p.slug) return "Vui lòng nhập đường dẫn trang (mục Tuỳ chọn thêm).";
   if (!SLUG_RX.test(p.slug))
     return "Đường dẫn trang chỉ gồm chữ thường không dấu, số và dấu gạch ngang.";
@@ -658,6 +659,7 @@ function EditorBody({
   const { toast } = useUi();
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(t);
   const { canEdit } = usePermission("tours"); // chỉ xem → form chỉ đọc, không có nút Lưu
 
   /** Ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết (tab đang chọn nếu có chữ) */
@@ -672,13 +674,22 @@ function EditorBody({
   };
 
   const save = async () => {
-    if (busy || autoFill.busy || !canEdit) return;
+    if (busy || autoFill.busy || images.busy || !canEdit) return;
     if (!anyLang(titlesOf(t)))
       return toast.error("Vui lòng nhập tên tour ở ít nhất một ngôn ngữ (mục Thông tin chung).", {
         title: "Chưa lưu được",
       });
-    const { tour, failed, from } = await fillLanguages(t);
-    if (tour !== t) set({ content: tour.content, seo: tour.seo, slug: tour.slug });
+    if (Number(t.nights) > Number(t.days))
+      return toast.error(
+        "Số đêm không được nhiều hơn số ngày (mục Thông tin chung) — VD: 3 ngày 2 đêm, tour trong ngày 1 ngày 0 đêm.",
+        { title: "Chưa lưu được" },
+      );
+    // ảnh vừa chọn (ảnh bìa, album, ảnh trong nội dung) chỉ được lưu vào kho ảnh lúc này — trước khi dịch
+    const base = await images.prepare(t);
+    if (!base) return;
+    if (base !== t) set(Object.fromEntries(Object.entries(base).filter(([k, v]) => v !== t[k])));
+    const { tour, failed, from } = await fillLanguages(base);
+    if (tour !== base) set({ content: tour.content, seo: tour.seo, slug: tour.slug });
     const body = toTourPayload(tour);
     const problem = validate(body);
     if (problem) return toast.error(problem, { title: "Chưa lưu được" });
@@ -688,6 +699,8 @@ function EditorBody({
           ? api(PATH, { method: "POST", body })
           : api(`${PATH}/${t.id}`, { method: "PUT", body }),
       isNew ? "Đã tạo tour" : "Đã lưu tour",
+      // đổi đường dẫn → máy chủ sửa luôn danh sách tour trên trang chủ → xoá cache trang chủ
+      { extraTags: !isNew && body.slug !== savedSlug ? ["settings"] : [] },
     );
     if (!r?.data) return;
     setDirty(false);
@@ -723,7 +736,8 @@ function EditorBody({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const title = t.content.en.title || t.content.vi.title || t.content.zh.title;
+  // Tiêu đề trang sửa: ưu tiên tên tiếng Việt (CMS dùng tiếng Việt) → tiếng Anh → tiếng Trung
+  const title = t.content.vi.title || t.content.en.title || t.content.zh.title;
 
   return (
     <div className="pb-16">
@@ -772,10 +786,10 @@ function EditorBody({
               <Button
                 icon={Save}
                 onClick={save}
-                loading={busy || autoFill.busy}
+                loading={busy || autoFill.busy || images.busy}
                 title="Lưu (Ctrl + S)"
               >
-                {isNew ? "Tạo tour" : "Lưu"}
+                {images.label || (isNew ? "Tạo tour" : "Lưu")}
               </Button>
             )}
           </div>
@@ -873,8 +887,8 @@ function EditorBody({
           </ReadOnlyArea>
           {canEdit && (
             <div className="flex justify-end">
-              <Button icon={Save} onClick={save} loading={busy || autoFill.busy}>
-                {isNew ? "Tạo tour" : "Lưu thay đổi"}
+              <Button icon={Save} onClick={save} loading={busy || autoFill.busy || images.busy}>
+                {images.label || (isNew ? "Tạo tour" : "Lưu thay đổi")}
               </Button>
             </div>
           )}
@@ -1071,7 +1085,14 @@ const GeneralSection = memoOn(
                 onChange={(days) => set({ days })}
               />
             </Field>
-            <Field label="Số đêm">
+            <Field
+              label="Số đêm"
+              error={
+                Number(t.nights) > Number(t.days)
+                  ? "Số đêm không được nhiều hơn số ngày"
+                  : undefined
+              }
+            >
               <NumInput
                 value={t.nights}
                 min={0}
@@ -1757,7 +1778,10 @@ const MediaSection = memoOn(
         <div className="space-y-6">
           {/* ảnh bìa | video đặt cạnh nhau cho cân, album trải hết chiều ngang bên dưới */}
           <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-            <Field label="Ảnh bìa" hint="Ảnh ngang, rõ nét.">
+            <Field
+              label="Ảnh bìa"
+              hint="Hiện ở thẻ tour (khung gần vuông) và khi chia sẻ link. Ảnh ngang, chủ thể ở giữa."
+            >
               <ImageField value={t.image} onChange={(image) => set({ image })} folder="tours" />
             </Field>
             <Field
@@ -1781,8 +1805,8 @@ const MediaSection = memoOn(
             label={`Album ảnh (${t.gallery.length}/40)`}
             hint={
               missing
-                ? `Nên có tối thiểu ${MIN_PHOTOS} ảnh ngang — còn thiếu ${missing} ảnh.`
-                : `Nên có tối thiểu ${MIN_PHOTOS} ảnh ngang.`
+                ? `Hiện đầu trang tour. Nên có tối thiểu ${MIN_PHOTOS} ảnh ngang — còn thiếu ${missing} ảnh.`
+                : `Hiện đầu trang tour. Nên có tối thiểu ${MIN_PHOTOS} ảnh ngang.`
             }
           >
             <GalleryField

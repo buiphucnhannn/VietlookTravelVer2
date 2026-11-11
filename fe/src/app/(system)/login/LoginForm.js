@@ -14,22 +14,9 @@ import {
   User,
   Zap,
 } from "lucide-react";
-import { ADMIN_BASE, ADMIN_LOGIN } from "@/config/urls.mjs";
+import { safeNext } from "@/config/urls.mjs";
 import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-/** Chỉ quay lại đường dẫn nội bộ trong khu quản trị (chặn open redirect) */
-function safeNext(raw) {
-  const next = String(raw ?? "");
-  if (
-    !next.startsWith(ADMIN_BASE) ||
-    next.startsWith("//") ||
-    next.includes("\\") ||
-    next.startsWith(ADMIN_LOGIN)
-  )
-    return ADMIN_BASE;
-  return next;
-}
 
 /** Mã lỗi backend → câu thông báo thân thiện */
 function messageFor(err) {

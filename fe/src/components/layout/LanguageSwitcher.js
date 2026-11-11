@@ -2,14 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { localeMeta, locales, href, switchLocalePath } from "@/i18n/config";
 import { cn } from "@/lib/utils";
+import { useA11y } from "./A11y";
 import Flag from "./Flag";
 
 /** pathname: truyền từ Header (null khi đang ở khung tĩnh → link trỏ về trang chủ ngôn ngữ đó) */
 export default function LanguageSwitcher({ lang, pathname, variant = "light", compact }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const a11y = useA11y();
   const ref = useRef(null);
   const timer = useRef(null);
 
@@ -45,7 +49,7 @@ export default function LanguageSwitcher({ lang, pathname, variant = "light", co
         onClick={(e) => (e.nativeEvent.pointerType === "mouse" ? show() : setOpen((v) => !v))}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="Language"
+        aria-label={a11y.language}
         className={cn(
           "flex shrink-0 items-center gap-1.5 rounded-full font-semibold whitespace-nowrap transition-colors",
           compact ? "h-10 px-2.5 text-sm sm:px-3" : "h-7 px-2.5 text-xs",
@@ -71,10 +75,17 @@ export default function LanguageSwitcher({ lang, pathname, variant = "light", co
                 prefetch={false}
                 href={pathname ? switchLocalePath(pathname, l) : href(l)}
                 hrefLang={localeMeta[l].hreflang}
-                onClick={() => {
+                onClick={(e) => {
                   // Ghi nhớ lựa chọn để trang chủ không tự chuyển theo ngôn ngữ trình duyệt nữa
                   document.cookie = `lang=${l}; path=/; max-age=31536000; samesite=lax`;
                   setOpen(false);
+                  // Giữ bộ lọc / ô tìm (?destination=…&q=…) khi đổi ngôn ngữ — cùng trang ở ngôn ngữ khác nhận
+                  // đúng các tham số đó. Đọc lúc bấm (không dùng useSearchParams để header vẫn dựng tĩnh).
+                  const { search } = window.location;
+                  if (!pathname || !search || e.metaKey || e.ctrlKey || e.shiftKey || e.button)
+                    return;
+                  e.preventDefault();
+                  router.push(switchLocalePath(pathname, l) + search);
                 }}
                 className={cn(
                   "flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-50",

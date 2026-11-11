@@ -130,7 +130,7 @@ export function toGridItem(d, lang, count) {
   return {
     slug: d.slug,
     name: tr(d.name, lang),
-    image: d.hero || d.image,
+    image: d.image || d.hero,
     intro: tr(d.intro, lang),
     tags,
     count,

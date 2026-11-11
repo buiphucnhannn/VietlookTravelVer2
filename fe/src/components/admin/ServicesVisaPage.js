@@ -131,6 +131,7 @@ export default function ServicesVisaPage() {
   const fts = useAdminList(FT, { limit: 200, sort: "order" });
   const [visa, setVisa] = useState(null);
   const [ft, setFt] = useState(null);
+  const [savedFt, setSavedFt] = useState(null); // gói vừa lưu → nhóm chứa nó tự sang đúng trang + nháy viền
   const removeVisa = useRemove(VISA, "loại visa", TAGS, visas.reload);
   const reorderVisa = useReorder(visas, VISA, TAGS);
   const visaPaged = usePaged(visas.items, VISA_PAGE);
@@ -261,6 +262,7 @@ export default function ServicesVisaPage() {
                   key={g.value}
                   group={g}
                   list={fts}
+                  reveal={savedFt}
                   onEdit={setFt}
                   onAdd={() => setFt({ ...EMPTY_FT, group: g.value })}
                 />
@@ -275,8 +277,9 @@ export default function ServicesVisaPage() {
           initial={visa}
           nextOrder={visas.items.length + 1}
           onClose={() => setVisa(null)}
-          onSaved={() => {
+          onSaved={(id) => {
             setVisa(null);
+            visaSort.reveal(id); // mục vừa lưu: sang đúng trang + nháy viền
             visas.reload();
           }}
         />
@@ -286,8 +289,9 @@ export default function ServicesVisaPage() {
           initial={ft}
           all={fts.items}
           onClose={() => setFt(null)}
-          onSaved={() => {
+          onSaved={(id) => {
             setFt(null);
+            setSavedFt({ id });
             fts.reload();
           }}
         />
@@ -301,12 +305,17 @@ const COL_PRICES = "grid w-full grid-cols-5 gap-2 xl:w-[400px] xl:flex-none";
 const COL_ACTIONS = "w-full xl:w-[196px] xl:flex-none xl:pl-4";
 
 /** 1 nhóm gói fast-track: các hàng kéo – thả được, phân trang riêng */
-function FastTrackGroup({ group: g, list, onEdit, onAdd }) {
+function FastTrackGroup({ group: g, list, onEdit, onAdd, reveal }) {
   const rows = list.items.filter((x) => x.group === g.value);
   const paged = usePaged(rows, FT_PAGE);
   const remove = useRemove(FT, "gói fast-track", TAGS, list.reload);
   const reorder = useReorder(list, FT, TAGS);
   const sort = usePagedSort({ all: rows, paged, onReorder: reorder });
+  const [revealed, setRevealed] = useState(null);
+  if (reveal && reveal !== revealed) {
+    setRevealed(reveal);
+    sort.reveal(reveal.id); // chỉ nhóm chứa gói đó mới tìm thấy → chuyển trang + nháy viền
+  }
   const { canEdit } = usePermission("visa");
 
   return (
@@ -451,7 +460,7 @@ function useEditor(initial, empty, path, label) {
           body: { ...toPayload({ ...t, key }), order: body.order },
         }),
       );
-    onSaved();
+    onSaved(ok.data?.id ?? d.id);
   };
   return {
     isNew,
@@ -488,6 +497,7 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
   return (
     <EditorModal
       title={e.isNew ? "Thêm loại visa" : `${editVerb}: ${locText(initial.name)}`}
+      value={d}
       onClose={onClose}
       onSave={() =>
         e.save((x) => ({ ...visaPayload(x), ...(e.isNew && { order: nextOrder }) }), onSaved)
@@ -562,6 +572,7 @@ function FastTrackEditor({ initial, all, onClose, onSaved }) {
   return (
     <EditorModal
       title={e.isNew ? "Thêm gói fast-track" : `${editVerb}: ${locText(initial.name)}`}
+      value={e.d}
       onClose={onClose}
       onSave={() => e.save(payload, onSaved)}
       busy={e.busy}

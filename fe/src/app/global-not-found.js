@@ -1,12 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Be_Vietnam_Pro } from "next/font/google";
-import "./globals.css";
+import "./site.css";
 
 const siteFont = Be_Vietnam_Pro({
   subsets: ["latin", "latin-ext", "vietnamese"],
   weight: ["400", "600", "800"],
   variable: "--font-be-vietnam",
+  // Font của trang 404 toàn cục bị Next gắn "tải trước" vào MỌI trang → tắt để không tải thừa 9 file font
+  preload: false,
 });
 
 export const metadata = {

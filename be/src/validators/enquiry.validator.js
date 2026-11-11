@@ -30,6 +30,8 @@ const CORE = new Set([
   "childAges",
   "estimateUSD",
   "hotelClass",
+  "consent",
+  "marketingConsent",
 ]);
 
 const PHONE_RX = /^\+?[\d\s().-]+$/;
@@ -78,6 +80,10 @@ export const publicEnquirySchema = z
     adults: z.coerce.number().int().min(1).max(100).optional(),
     childAges: z.array(z.coerce.number().int().min(0).max(17)).max(30).optional().default([]),
     hotelClass: z.coerce.number().int().min(3).max(5).optional(),
+    // Khách PHẢI tự tick ô đồng ý Chính sách bảo mật & Điều khoản (NĐ 13/2023, GDPR) — mọi loại form
+    consent: z.literal(true, { error: "Consent is required." }),
+    // Đồng ý nhận email tiếp thị: tuỳ chọn, tách riêng, không bao giờ bắt buộc
+    marketingConsent: z.boolean().optional().default(false),
   })
   .catchall(extraValue)
   .superRefine((d, ctx) => {

@@ -152,8 +152,6 @@ const hours = {
 
 export const carRoutes = routes.map((r) => ({ ...r, hours: hours[r.slug] ?? null }));
 
-export const routesByArea = (area) => carRoutes.filter((r) => r.area === area);
-
 /** Giá đón sân bay Nội Bài theo hạng xe – dùng làm "giá từ". */
 export function airportFrom(priceKey) {
   const r = carRoutes.find((x) => x.slug === "hanoi-pick-up-at-noi-bai-airport");

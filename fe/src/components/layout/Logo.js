@@ -5,6 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { href } from "@/i18n/config";
 import { smoothScrollTo } from "@/components/fx/SmoothScroll";
+import { useA11y } from "./A11y";
 
 /**
  * Logo ngang: biểu tượng chim hạc + chữ VIETLOOK TRAVEL (cắt từ logo gốc).
@@ -21,6 +22,7 @@ export default function Logo({
   onNavigate,
 }) {
   const home = href(lang);
+  const a11y = useA11y();
   return (
     <Link
       prefetch={false}
@@ -36,7 +38,7 @@ export default function Logo({
         }
       }}
       className={cn("group/logo flex shrink-0 items-center gap-2.5", className)}
-      aria-label="Vietlook Travel – Home"
+      aria-label={a11y.home}
     >
       {/* Logo nổi hơn (yêu cầu khách): to hơn, đĩa trắng + viền sáng tách khỏi nền video/ảnh */}
       <span
@@ -51,6 +53,8 @@ export default function Logo({
           width={210}
           height={210}
           priority
+          // hiển thị 32–48px → tải đúng cỡ (không tải 256/640px)
+          sizes="48px"
           className={cn("h-auto", small ? "w-8" : compact ? "w-8 lg:w-10" : "w-10 lg:w-12")}
         />
       </span>
@@ -60,6 +64,13 @@ export default function Logo({
         width={527}
         height={59}
         priority
+        sizes={
+          small
+            ? "144px"
+            : compact
+              ? "(min-width: 1024px) 176px, 144px"
+              : "(min-width: 1024px) 208px, 176px"
+        }
         className={cn(
           "h-auto transition-[filter] duration-500",
           small ? "w-36" : compact ? "w-32 min-[380px]:w-36 lg:w-44" : "w-44 lg:w-52",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "@/components/admin/Link";
 import {
   ArrowRight,
@@ -23,8 +23,7 @@ import {
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { TODO_EVENT } from "./AdminShell";
-import { toastError } from "./hooks";
+import { TODO_EVENT, toastError } from "./hooks";
 import { Button, Card, EmptyState, Spinner, fmtDateTime, useUi } from "./ui";
 import { canUser, useCurrentUser } from "./permissions";
 import { StatusBadge, TypeBadge, emailFailed, fmtDay, fmtMoney, paxText } from "./EnquiriesPage";
@@ -51,6 +50,18 @@ const greeting = () => {
         ? "Chào buổi chiều"
         : "Chào buổi tối";
 };
+
+/**
+ * Lời chào + ngày hôm nay theo giờ MÁY NGƯỜI DÙNG: chỉ tính trên trình duyệt (trang dựng sẵn lúc build không biết
+ * "bây giờ"; tính lúc dựng sẵn sẽ sai giờ và lệch nội dung khi hiện ra). Chuỗi → so sánh theo giá trị, không dựng lại thừa.
+ */
+const noSubscribe = () => () => {};
+const useHello = () =>
+  useSyncExternalStore(
+    noSubscribe,
+    () => `${greeting()}|${today()}`,
+    () => "",
+  ).split("|");
 
 // perm: [mục, mức] cần có mới hiện lối tắt ("admin" = chỉ quản trị viên)
 const QUICK_LINKS = [
@@ -100,6 +111,11 @@ export default function Dashboard() {
   const seeRequests = can("requests");
   const seeAudit = can("audit");
   const seeTotals = ["tours", "articles", "destinations"].filter((k) => can(k));
+  // Nhân viên chưa được cấp mục nào → nói rõ thay vì để trang tổng quan trống
+  const noAccess =
+    user?.role !== undefined &&
+    user.role !== "admin" &&
+    !Object.values(user.permissions ?? {}).some((l) => l && l !== "none");
   const totalsKey = seeTotals.join(",");
   const [stats, setStats] = useState(null);
   const [totals, setTotals] = useState({});
@@ -108,6 +124,7 @@ export default function Dashboard() {
   const [logs, setLogs] = useState(null); // null = đang tải, false = không có quyền / lỗi
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useUi();
+  const [hello, day = ""] = useHello();
 
   // Đơn + yêu cầu: lỗi thì giữ số liệu cũ (lần đầu → trống) và báo lỗi cho nút "Làm mới"
   const loadEnquiries = useCallback(async () => {
@@ -223,9 +240,9 @@ export default function Dashboard() {
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-slate-500">
             <span className="size-1.5 rounded-full bg-sun-500" />
-            <span>{greeting()}</span>
+            <span>{hello || " "}</span>
             <span className="text-slate-300">·</span>
-            <span className="capitalize">{today()}</span>
+            <span className="capitalize">{day}</span>
           </p>
           <h1 className="mt-2 text-[28px] leading-tight font-bold tracking-tight text-slate-900 sm:text-[34px]">
             {user ? (
@@ -253,7 +270,9 @@ export default function Dashboard() {
               )}
             </span>
             <span>
-              {!seeBookings && !seeRequests ? (
+              {noAccess ? (
+                "Tài khoản của bạn chưa được cấp quyền vào mục nào. Hãy nhờ quản trị viên cấp quyền để bắt đầu làm việc."
+              ) : !seeBookings && !seeRequests ? (
                 "Chúc một ngày làm việc hiệu quả!"
               ) : newBookings || newRequests ? (
                 <>

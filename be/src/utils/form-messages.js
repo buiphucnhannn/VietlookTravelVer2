@@ -16,6 +16,7 @@ const MESSAGES = {
     tour: "Please choose a tour.",
     tooLong: "Some fields are too long. Please shorten them and try again.",
     invalid: "Please check the information you entered and try again.",
+    consent: "Please tick the box to let us contact you about your request.",
   },
   zh: {
     tooMany: "您提交的请求过多，请几分钟后再试。",
@@ -29,6 +30,7 @@ const MESSAGES = {
     tour: "请选择行程。",
     tooLong: "部分内容过长，请缩短后重试。",
     invalid: "请检查您填写的信息后重试。",
+    consent: "请勾选同意框，以便我们就您的咨询与您联系。",
   },
   vi: {
     tooMany: "Bạn đã gửi quá nhiều yêu cầu, vui lòng thử lại sau ít phút.",
@@ -43,6 +45,7 @@ const MESSAGES = {
     tour: "Vui lòng chọn tour.",
     tooLong: "Một số ô nhập quá dài, vui lòng rút gọn rồi gửi lại.",
     invalid: "Vui lòng kiểm tra lại thông tin đã nhập.",
+    consent: "Vui lòng đánh dấu vào ô đồng ý để chúng tôi có thể liên hệ với bạn về yêu cầu này.",
   },
 };
 
@@ -68,6 +71,7 @@ export function localizeFormDetails(details, lang) {
     else if (field === "email") key = /required/i.test(d.message) ? "contact" : "email";
     else if (field === "phone") key = "phone";
     else if (field === "tourSlug") key = "tour";
+    else if (field === "consent") key = "consent";
     else if (DATE_FIELDS.has(field)) key = "date";
     else if (/too (big|long)|Tối đa|<=/i.test(d.message)) key = "tooLong";
     return { field: d.field, message: formMessage(lang, key) };

@@ -32,7 +32,9 @@ import {
   useUi,
 } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
+import { usePendingImages } from "./pendingImages";
 import { ReadOnlyArea, usePermission } from "./permissions";
+import { useConfirmClose } from "./catalogShared";
 
 // đổi chuyên mục / tác giả → menu cẩm nang, trang chuyên mục, trang tác giả và thẻ bài viết đều đổi
 const TAGS = ["taxonomy", "articles"];
@@ -267,8 +269,9 @@ function TaxonomyCard({ kind }) {
           kind={kind}
           initial={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(id) => {
             setEditing(null);
+            sort.reveal(id); // mục vừa lưu: sang đúng trang + nháy viền
             list.reload();
           }}
         />
@@ -295,8 +298,10 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
   const { toast } = useUi();
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(d);
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
   const { canEdit } = usePermission("taxonomy");
+  const close = useConfirmClose(d, onClose); // đã sửa mà chưa lưu → hỏi trước khi đóng
 
   const save = async () => {
     if (!anyLang(d.name)) return toast("Vui lòng nhập tên ở ít nhất một ngôn ngữ", "error");
@@ -311,9 +316,11 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
     const { value: v, failed } = await autoFill.fill(named, { lang, skipKeys: cfg.skipKeys });
     if (v !== d) setD(v);
     const slug = v.slug || slugify(slugSource(v.name));
-    if (!slug) return toast("Cần nhập đường dẫn trang", "error");
+    if (!slug) return toast("Vui lòng nhập đường dẫn trang", "error");
     if (slug !== v.slug) set({ slug });
-    const body = cfg.toPayload({ ...v, slug });
+    // ảnh vừa chọn chỉ được lưu vào kho ảnh lúc này
+    const body = await images.prepare(cfg.toPayload({ ...v, slug }));
+    if (!body) return;
     const ok = await run(
       () =>
         isNew
@@ -329,27 +336,27 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
           body: cfg.toPayload({ ...t, slug }),
         }),
       );
-    onSaved();
+    onSaved(ok.data?.id ?? d.id);
   };
 
   return (
     <Modal
       open
       size="lg"
-      onClose={onClose}
+      onClose={close}
       title={isNew ? `Thêm ${cfg.noun}` : `${canEdit ? "Sửa" : "Xem"}: ${locText(initial.name)}`}
       footer={
         canEdit ? (
           <>
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={close}>
               Huỷ
             </Button>
-            <Button onClick={save} loading={busy || autoFill.busy}>
-              Lưu
+            <Button onClick={save} loading={busy || autoFill.busy || images.busy}>
+              {images.label || "Lưu"}
             </Button>
           </>
         ) : (
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={close}>
             Đóng
           </Button>
         )
@@ -418,14 +425,6 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
                   onChange={(description) => set({ description })}
                 />
               </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Nhóm trên menu" hint="Vd: essentials, transport. Có thể để trống.">
-                  <Input value={d.group} onChange={(e) => set({ group: e.target.value.trim() })} />
-                </Field>
-                <Field label="Biểu tượng" hint="Tên biểu tượng, vd: plane, map. Có thể để trống.">
-                  <Input value={d.icon} onChange={(e) => set({ icon: e.target.value.trim() })} />
-                </Field>
-              </div>
             </>
           ) : (
             <>

@@ -4,6 +4,7 @@ import { connectDatabase, disconnectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
 import { ensureFirstAdmin } from "./services/admin-bootstrap.service.js";
+import { scheduleDailySweep } from "./services/media-cleanup.service.js";
 
 /** Điểm khởi động: kết nối dịch vụ ngoài → mở cổng → tắt êm khi nhận tín hiệu dừng. */
 async function bootstrap() {
@@ -22,6 +23,7 @@ async function bootstrap() {
     );
   await connectDatabase();
   await ensureFirstAdmin(); // tạo tài khoản admin đầu tiên từ .env nếu chưa có
+  if (env.cloudinary.enabled && env.cloudinary.dailyCleanup) scheduleDailySweep(); // dọn ảnh không dùng
 
   const server = createApp().listen(env.port, () =>
     logger.info(`Vietlook API listening on http://localhost:${env.port}/api/v1 (${env.nodeEnv})`),

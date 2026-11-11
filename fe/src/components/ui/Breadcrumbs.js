@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { JsonLd } from "@/lib/seo";
+import { A11yNav } from "@/components/layout/A11y";
 
 /** items: [{ label, href? }] – mục cuối là trang hiện tại. Kèm JSON-LD BreadcrumbList. */
 export default function Breadcrumbs({ items, className, light, baseUrl }) {
@@ -16,7 +18,7 @@ export default function Breadcrumbs({ items, className, light, baseUrl }) {
   };
 
   return (
-    <nav aria-label="Breadcrumb" className={cn("max-w-full text-sm", className)}>
+    <A11yNav label="breadcrumb" className={cn("max-w-full text-sm", className)}>
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((item, i) => (
           // Mục cuối (trang hiện tại) có thể rất dài (tên bài viết/tour) → 1 dòng, cắt "…"
@@ -51,12 +53,7 @@ export default function Breadcrumbs({ items, className, light, baseUrl }) {
           </li>
         ))}
       </ol>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
-    </nav>
+      {jsonLd && <JsonLd data={jsonLd} />}
+    </A11yNav>
   );
 }

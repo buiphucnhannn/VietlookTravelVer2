@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Eye,
   EyeOff,
@@ -12,6 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { useCurrentUser } from "./permissions";
 import { Button, Card, Field, Input, Notice, PageHeader, useUi } from "./ui";
 
 const EMPTY = { currentPassword: "", newPassword: "", confirm: "" };
@@ -69,16 +70,10 @@ function PasswordInput({ value, onChange, autoComplete, autoFocus, invalid }) {
 
 export default function ChangePasswordPage() {
   const { toast } = useUi();
-  const [username, setUsername] = useState("");
+  const username = useCurrentUser()?.username ?? ""; // AdminShell đã tải tài khoản — không hỏi lại /auth/me
   const [d, setD] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    api("/auth/me")
-      .then((r) => setUsername(r.data?.user?.username ?? ""))
-      .catch(() => {});
-  }, []);
 
   const set = (patch) => {
     setError("");

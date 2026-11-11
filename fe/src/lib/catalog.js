@@ -1,10 +1,10 @@
 import "server-only";
 import { cache } from "react";
 import { cacheLife, cacheTag } from "next/cache";
-import { notFound } from "next/navigation";
 import { BACKEND_URL, backendHeaders } from "@/config/urls.mjs";
 import { fallbackLangs, isBlank, tr } from "@/i18n/config";
 import { regions } from "@/data/regions";
+import { autoFeaturedTours, autoLongTours, pushBack } from "@/lib/tour-picks";
 
 /**
  * Nội dung website lấy từ backend (be/) — quản lý trong CMS.
@@ -120,6 +120,22 @@ async function loadSite() {
   return (await get("/site")) ?? { tracking: {} };
 }
 
+/**
+ * Thanh toán online 9Pay (CMS → Cài đặt): { enabled, depositPercent, rate } — không có mã bí mật.
+ * Cache ngắn (vài phút) + thẻ "settings" (CMS lưu → làm mới ngay). Lỗi → coi như tắt (đặt tour như cũ).
+ */
+async function loadPaymentConfig() {
+  "use cache";
+  cacheTag("settings", "payment");
+  cacheLife("minutes");
+  try {
+    return (await get("/payment-config")) ?? { enabled: false };
+  } catch {
+    return { enabled: false };
+  }
+}
+export const getPaymentConfig = cache(loadPaymentConfig);
+
 /** Mã đo lường Google nhập trong CMS (Cài đặt) — { gtmId, ga4Id, adsId } */
 export const getTracking = cache(async () => (await loadSite()).tracking ?? {});
 
@@ -171,23 +187,20 @@ function buildCatalog({ tours, destinations, themes, articles, taxonomy, service
   const bySlugs = (slugs) =>
     (slugs ?? []).map((s) => allTours.find((t) => t.slug === s)).filter(Boolean);
 
-  // Khối tour dài ngày trang chủ: chọn trong CMS (Trang chủ → Tour dài ngày); trống → tour đánh dấu "dài ngày".
+  // Khối tour dài ngày trang chủ: chọn trong CMS (Trang chủ → Tour dài ngày); trống → website tự chọn
+  // (lib/tour-picks.js: tour ≥ 7 ngày, chia đều 1/2/3 tuần, điểm cao trước — giống bản xem trước trong CMS).
   // `shown`: slug các tour đã hiện ở khối "Tour nổi bật" phía trên → đẩy xuống cuối danh sách (không bỏ đi,
   // để bộ lọc theo tuần vẫn đủ tour) — tab "Tất cả" vì vậy mở đầu bằng những tour khác, không lặp lại khối trên.
   const longTours = ({ shown } = {}) => {
-    const picked = bySlugs(home.longTours);
-    const list = picked.length
-      ? picked
-      : allTours.filter((t) => t.featuredLong).sort((a, b) => a.days - b.days);
-    if (!shown?.length) return list;
-    const seen = new Set(shown);
-    return [...list.filter((t) => !seen.has(t.slug)), ...list.filter((t) => seen.has(t.slug))];
+    const picked = bySlugs(home.longTours).slice(0, 8);
+    // tự chọn: đã tự xếp tour trùng khối trên xuống sau trong từng nhóm tuần (giữ xen kẽ 1/2/3 tuần)
+    return picked.length ? pushBack(picked, shown) : autoLongTours(allTours, { avoid: shown });
   };
   // Khối "Tour nổi bật" trang chủ: chọn trong CMS (Trang chủ → Tour nổi bật, giữ đúng thứ tự);
-  // trống → các tour đánh dấu "nổi bật" trong mục Tour (tối đa 12, xếp theo thứ tự ưu tiên của tour)
+  // trống → website tự chọn 8 tour đáng nổi bật nhất (lib/tour-picks.js)
   const featuredTours = () => {
-    const picked = bySlugs(home.featuredTours);
-    return picked.length ? picked : allTours.filter((t) => t.featured).slice(0, 12);
+    const picked = bySlugs(home.featuredTours).slice(0, 8);
+    return picked.length ? picked : autoFeaturedTours(allTours);
   };
 
   /** Gói theo tuần: 1 tuần (5–8 ngày), 2 tuần (9–15), 3 tuần (16+). */
@@ -361,10 +374,6 @@ export const getTour = cache(async (slug) => {
       }
     : null;
 });
-
-export async function getTourOr404(slug) {
-  return (await getTour(slug)) ?? notFound();
-}
 
 /**
  * Nội dung tour theo ngôn ngữ: lấy content[lang], trường nào trống thì dùng bản tiếng Anh.

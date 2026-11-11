@@ -5,6 +5,7 @@ import { enquiryService } from "../services/enquiry.service.js";
 import { pageService } from "../services/modules.service.js";
 import { publicService } from "../services/public.service.js";
 import { settingsService } from "../services/settings.service.js";
+import { fxService } from "../services/payment/fx.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { noContent, ok } from "../utils/response.js";
 
@@ -87,13 +88,21 @@ export const enquiryController = {
 
   async removeNote(req, res) {
     const { id, noteId } = req.validated.params;
-    ok(res, await enquiryService.removeNote(id, noteId));
+    const doc = await enquiryService.removeNote(id, noteId);
+    if (doc)
+      auditService.record(req, "enquiry.note_delete", {
+        target: { type: "enquiry", id: doc.code },
+        meta: enquiryInfo(doc),
+      });
+    ok(res, doc);
   },
 
   async resendEmail(req, res) {
-    const status = await enquiryService.resendEmail(req.validated.params.id);
+    const { status, enquiry } = await enquiryService.resendEmail(req.validated.params.id);
+    // nhật ký tra đơn theo MÃ đơn (như các thao tác khác) — ghi id nội bộ sẽ hiện nhầm "đã xoá"
     auditService.record(req, "enquiry.resend_email", {
-      target: { type: "enquiry", id: req.validated.params.id },
+      target: { type: "enquiry", id: enquiry.code },
+      meta: enquiryInfo(enquiry),
     });
     ok(res, status);
   },
@@ -139,12 +148,17 @@ export const settingsController = {
     ok(res, data);
   },
 
-  getPayment: async (_req, res) => ok(res, await settingsService.getPayment()),
+  // kèm tỷ giá USD → VND đang dùng (tự động) để admin xem
+  getPayment: async (_req, res) =>
+    ok(res, { ...(await settingsService.getPayment()), fx: await fxService.getRate() }),
   async savePayment(req, res) {
-    const data = await settingsService.savePayment(req.validated.body, req.user);
+    const data = {
+      ...(await settingsService.savePayment(req.validated.body, req.user)),
+      fx: await fxService.getRate(),
+    };
     // không ghi key vào nhật ký
     auditService.record(req, "settings.payment", {
-      meta: { enabled: data.enabled, environment: data.environment },
+      meta: { enabled: data.enabled, depositPercent: data.depositPercent },
     });
     ok(res, data);
   },

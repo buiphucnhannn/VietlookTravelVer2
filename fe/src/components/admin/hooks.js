@@ -5,7 +5,9 @@ import { api, errorMessage, isAbort, isRetryable } from "@/lib/api";
 import { refreshPublicContent } from "@/lib/revalidate";
 import { ADMIN_LOGIN } from "@/config/urls.mjs";
 import { useUi } from "./ui";
-import { TODO_EVENT } from "./AdminShell";
+
+/** Sự kiện "có thay đổi" → AdminShell / Tổng quan / trang đơn tải lại số đơn, yêu cầu mới */
+export const TODO_EVENT = "vl-admin-todo";
 
 /* =========================================================================
  * Thông báo lỗi chuẩn: bỏ qua request bị huỷ, hết phiên → hướng dẫn rõ, lỗi mạng → nút "Thử lại"
@@ -34,12 +36,35 @@ export function toastError(toast, err, { retry, title } = {}) {
  * Danh sách có lọc / tìm / phân trang
  * ========================================================================= */
 
-// Bộ nhớ tạm kết quả gần đây (~30 giây): quay lại trang / bộ lọc vừa xem → hiện ngay, không gọi lại.
-// Xoá sạch sau mỗi thao tác lưu / xoá (useMutation) và khi bấm "Tải lại".
-const CACHE_MS = 30_000;
-const CACHE_MAX = 40;
+/*
+ * Bộ nhớ tạm dùng chung cho mọi danh sách + ô chọn (điểm đến, chủ đề, chuyên mục…) — "hiện ngay, cập nhật ngầm":
+ * - Quay lại trang / bộ lọc đã xem trong 5 phút → hiện NGAY dữ liệu đã có, đồng thời tải lại ngầm (nếu cũ hơn 10 giây)
+ *   rồi thay vào khi xong — không hiện khung chờ.
+ * - Nhiều nơi cần cùng 1 danh sách cùng lúc → chỉ 1 request (dùng chung request đang chạy).
+ * - Xoá sạch sau mỗi thao tác lưu / xoá (useMutation), khi sửa trực tiếp danh sách (setItems) và khi bấm "Tải lại".
+ * Chỉ nằm trong bộ nhớ của tab đang mở (không lưu xuống máy), mất khi tải lại trang.
+ */
+const CACHE_MS = 5 * 60_000;
+const FRESH_MS = 10_000;
+const CACHE_MAX = 60;
 const listCache = new Map();
-export const clearListCache = () => listCache.clear();
+const inflight = new Map();
+let generation = 0; // tăng mỗi lần xoá bộ nhớ → kết quả của request cũ hơn không được ghi lại vào bộ nhớ
+export const clearListCache = () => {
+  listCache.clear();
+  inflight.clear();
+  generation++;
+};
+
+/** Khoá bộ nhớ: bỏ ô trống + page=1, sắp xếp tham số → "/x?limit=20&sort=a" và "/x?page=1&sort=a&limit=20" là một */
+function cacheKey(url) {
+  const [path, qs = ""] = url.split("?");
+  const p = new URLSearchParams(qs);
+  for (const [k, v] of [...p]) if (v === "" || (k === "page" && v === "1")) p.delete(k);
+  p.sort();
+  const s = p.toString();
+  return s ? `${path}?${s}` : path;
+}
 const cacheGet = (key) => {
   const hit = listCache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit;
@@ -50,6 +75,43 @@ const cacheSet = (key, data, meta) => {
   listCache.delete(key);
   listCache.set(key, { at: Date.now(), data, meta });
   if (listCache.size > CACHE_MAX) listCache.delete(listCache.keys().next().value);
+};
+
+/** Tải 1 danh sách qua API, dùng chung request đang chạy cùng địa chỉ. force → luôn gọi mới. */
+function fetchList(url, { force = false } = {}) {
+  const key = cacheKey(url);
+  if (!force && inflight.has(key)) return inflight.get(key);
+  const gen = generation;
+  const p = api(url)
+    .then((r) => {
+      const v = { data: r.data, meta: r.meta ?? null };
+      if (gen === generation) cacheSet(key, v.data, v.meta);
+      return v;
+    })
+    .finally(() => {
+      if (inflight.get(key) === p) inflight.delete(key);
+    });
+  inflight.set(key, p);
+  return p;
+}
+
+/**
+ * Tải trước danh sách (vd. khi di chuột / chạm vào mục menu) → mở trang là có dữ liệu ngay.
+ * Bỏ qua nếu dữ liệu còn mới hoặc đang tải. Lỗi bỏ qua im lặng (trang tự tải lại khi mở).
+ */
+export function prefetchList(url) {
+  const key = cacheKey(url);
+  const hit = cacheGet(key);
+  if ((hit && Date.now() - hit.at < FRESH_MS) || inflight.has(key)) return;
+  fetchList(url).catch(() => {});
+}
+
+const buildUrl = (path, applied) => {
+  const p = new URLSearchParams();
+  Object.entries(applied).forEach(([k, v]) => {
+    if (v !== "" && v != null) p.set(k, String(v));
+  });
+  return `${path}?${p.toString()}`;
 };
 
 const TEXT_KEYS = ["q", "actions"]; // ô gõ chữ → chờ gõ xong mới tìm
@@ -64,7 +126,8 @@ const sameText = (a, b) => TEXT_KEYS.every((k) => (a[k] ?? "") === (b[k] ?? ""))
  *   list.items, list.meta, list.loading (đang tải — dữ liệu cũ vẫn giữ để làm mờ), list.reloading (đang bấm Tải lại)
  *   list.query (giá trị ô lọc đang hiện), list.setQuery({ q: "ha" }), list.reload(), list.refresh({ unit: "đơn" })
  * - Ô chữ (q, actions) chờ 350ms sau lần gõ cuối; chọn tab / ô chọn / trang → tải ngay; đổi bộ lọc → về trang 1.
- * - Request cũ bị huỷ khi có request mới (không bao giờ hiện kết quả cũ đè kết quả mới).
+ * - Kết quả của request cũ bị bỏ qua khi có request mới (không bao giờ hiện kết quả cũ đè kết quả mới).
+ * - Đã xem trong 5 phút → hiện ngay dữ liệu cũ + tải lại ngầm (xem bộ nhớ tạm ở trên).
  * - Bỏ khoảng trắng thừa; gõ lại đúng chữ đang tìm → không gọi lại.
  */
 export function useAdminList(path, initialQuery = {}) {
@@ -76,9 +139,18 @@ export function useAdminList(path, initialQuery = {}) {
     ...initialQuery,
     ...textOf(initialQuery),
   }));
-  const [state, setState] = useState({ items: [], meta: null, loading: true, error: "" });
+  // Đã có trong bộ nhớ tạm (vừa xem / vừa tải trước khi di chuột vào menu) → hiện ngay từ lần dựng đầu tiên
+  const [state, setState] = useState(() => {
+    const hit = cacheGet(
+      cacheKey(buildUrl(path, { page: 1, ...initialQuery, ...textOf(initialQuery) })),
+    );
+    return hit
+      ? { items: hit.data, meta: hit.meta, loading: false, error: "" }
+      : { items: [], meta: null, loading: true, error: "" };
+  });
   const [reloading, setReloading] = useState(false);
-  const ctrl = useRef(null);
+  const seq = useRef(0); // lượt tải mới nhất — kết quả của lượt cũ hơn bị bỏ qua
+  const background = useRef(false); // đang tải lại ngầm (dữ liệu cũ vẫn hiện)
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
@@ -104,39 +176,31 @@ export function useAdminList(path, initialQuery = {}) {
     return () => clearTimeout(t);
   }, [typedKey, applied]);
 
-  const qs = useMemo(() => {
-    const p = new URLSearchParams();
-    Object.entries(applied).forEach(([k, v]) => {
-      if (v !== "" && v != null) p.set(k, String(v));
-    });
-    return p.toString();
-  }, [applied]);
-  const url = `${path}?${qs}`;
+  const url = useMemo(() => buildUrl(path, applied), [path, applied]);
 
   const load = useCallback(
     async ({ force = false } = {}) => {
-      ctrl.current?.abort();
-      const hit = !force && cacheGet(url);
+      const id = ++seq.current;
+      const hit = !force && cacheGet(cacheKey(url));
       if (hit) {
-        ctrl.current = null;
         setState({ items: hit.data, meta: hit.meta, loading: false, error: "" });
-        return { ok: true, items: hit.data, meta: hit.meta };
-      }
-      const c = new AbortController();
-      ctrl.current = c;
-      setState((s) => ({ ...s, loading: true, error: "" }));
+        // còn mới → dùng luôn; cũ hơn 10 giây → vẫn hiện ngay, tải lại ngầm rồi thay vào
+        if (Date.now() - hit.at < FRESH_MS) return { ok: true, items: hit.data, meta: hit.meta };
+      } else setState((s) => ({ ...s, loading: true, error: "" }));
+      background.current = Boolean(hit);
       try {
-        const r = await api(url, { signal: c.signal });
-        if (c.signal.aborted) return { aborted: true };
-        cacheSet(url, r.data, r.meta ?? null);
-        setState({ items: r.data, meta: r.meta ?? null, loading: false, error: "" });
-        return { ok: true, items: r.data, meta: r.meta ?? null };
+        const r = await fetchList(url, { force });
+        if (id !== seq.current) return { aborted: true };
+        setState({ items: r.data, meta: r.meta, loading: false, error: "" });
+        return { ok: true, items: r.data, meta: r.meta };
       } catch (err) {
-        if (isAbort(err) || c.signal.aborted) return { aborted: true };
+        if (id !== seq.current || isAbort(err)) return { aborted: true };
+        // tải ngầm lỗi → giữ dữ liệu đang hiện, không báo lỗi
+        if (hit) return { ok: true, items: hit.data, meta: hit.meta };
         setState((s) => ({ ...s, loading: false, error: errorMessage(err) }));
         return { ok: false, err };
       } finally {
-        if (ctrl.current === c) ctrl.current = null;
+        if (id === seq.current) background.current = false;
       }
     },
     [url],
@@ -145,7 +209,8 @@ export function useAdminList(path, initialQuery = {}) {
   useEffect(() => {
     load();
   }, [load]);
-  useEffect(() => () => ctrl.current?.abort(), []);
+  // rời trang → bỏ qua kết quả còn đang chờ
+  useEffect(() => () => void (seq.current += 1), []);
 
   const setQuery = useCallback((patch) => {
     const keys = Object.keys(patch);
@@ -206,6 +271,11 @@ export function useAdminList(path, initialQuery = {}) {
 
   const setItems = useCallback((fn) => {
     clearListCache();
+    // đang tải lại ngầm → bỏ kết quả đó, không để dữ liệu cũ đè thay đổi vừa làm (kéo thả, ẩn / hiện…)
+    if (background.current) {
+      seq.current += 1;
+      background.current = false;
+    }
     setState((s) => ({ ...s, items: fn(s.items) }));
   }, []);
 
@@ -217,18 +287,20 @@ export function useAdminList(path, initialQuery = {}) {
  *   const { run, busy } = useMutation(["destinations", "tours"]);
  *   await run(() => api(...), "Đã lưu điểm đến");
  *   await run(fn, "Đã lưu", { retry: () => save() })   // lỗi mạng → thông báo kèm nút "Thử lại"
+ *   await run(fn, "Đã lưu", { extraTags: ["settings"] }) // xoá thêm thẻ cho riêng lần này (vd. đổi slug → trang chủ)
  * Hàm này ĐÃ tự thông báo thành công / lỗi — nơi gọi không thông báo thêm.
  */
 export function useMutation(tags = []) {
   const { toast } = useUi();
   const [busy, setBusy] = useState(false);
   const run = useCallback(
-    async (fn, success, { retry, errorTitle } = {}) => {
+    async (fn, success, { retry, errorTitle, extraTags = [] } = {}) => {
       setBusy(true);
       try {
         const result = await fn();
         clearListCache();
-        if (tags.length) await refreshPublicContent(tags).catch(() => {});
+        const all = [...tags, ...extraTags];
+        if (all.length) await refreshPublicContent(all).catch(() => {});
         if (success) toast(success);
         window.dispatchEvent(new Event(TODO_EVENT));
         return result ?? true;
@@ -244,14 +316,37 @@ export function useMutation(tags = []) {
   return { run, busy };
 }
 
-/** Nạp 1 lần danh sách lựa chọn (điểm đến, chủ đề…) cho ô chọn trong form */
-export function useOptions(path, map) {
-  const [options, setOptions] = useState([]);
+/**
+ * Danh sách lựa chọn (điểm đến, chủ đề…) cho ô chọn / bộ lọc. Dùng chung bộ nhớ tạm với useAdminList:
+ * trang danh sách tour, form sửa tour, trang chủ… cần cùng danh sách → chỉ tải 1 lần, hiện ngay khi quay lại
+ * (cũ hơn 10 giây thì tải lại ngầm). Lưu / xoá bất kỳ (useMutation) → tải mới.
+ * useOptionsState: kèm `status` "loading" | "ready" | "error" → phân biệt "đang tải" với "chưa có mục nào".
+ */
+export function useOptionsState(path, map) {
   const mapRef = useRef(map);
+  const [state, setState] = useState(() => {
+    const hit = cacheGet(cacheKey(path));
+    return hit
+      ? { options: hit.data.map(map), status: "ready" }
+      : { options: [], status: "loading" };
+  });
   useEffect(() => {
-    api(path)
-      .then((r) => setOptions(r.data.map(mapRef.current)))
-      .catch(() => setOptions([]));
+    let alive = true;
+    const hit = cacheGet(cacheKey(path));
+    if (hit) {
+      setState({ options: hit.data.map(mapRef.current), status: "ready" });
+      if (Date.now() - hit.at < FRESH_MS) return;
+    }
+    fetchList(path)
+      .then((r) => alive && setState({ options: r.data.map(mapRef.current), status: "ready" }))
+      .catch(() => alive && !hit && setState({ options: [], status: "error" }));
+    return () => {
+      alive = false;
+    };
   }, [path]);
-  return options;
+  return state;
+}
+
+export function useOptions(path, map) {
+  return useOptionsState(path, map).options;
 }

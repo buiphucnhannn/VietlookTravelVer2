@@ -48,6 +48,7 @@ import {
   useUi,
   useUnsavedGuard,
 } from "./ui";
+import { usePendingImages } from "./pendingImages";
 import { ReadOnlyArea, usePermission } from "./permissions";
 
 const TAGS = ["pages"];
@@ -84,7 +85,7 @@ const PAGES = [
   },
   {
     key: "cancellation",
-    label: "Hủy / đổi tour",
+    label: "Huỷ / đổi tour",
     icon: CalendarX2,
     url: "/policies/cancellation",
     text: "Điều kiện và phí khi khách hủy hoặc đổi tour.",
@@ -457,6 +458,7 @@ function PageCanvas({ page, initial, all = [], defaults }) {
   const [seoOpen, setSeoOpen] = useState(false);
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(d);
   const set = useCallback((patch) => setD((x) => ({ ...x, ...patch })), []);
   const setData = useCallback(
     (patch) => setD((x) => ({ ...x, data: { ...x.data, ...patch } })),
@@ -476,8 +478,11 @@ function PageCanvas({ page, initial, all = [], defaults }) {
       return toast.error("Vui lòng nhập tiêu đề trang ở ít nhất một ngôn ngữ.", {
         title: "Chưa lưu được",
       });
+    // ảnh vừa chọn (ảnh đầu trang, ảnh ghép, ảnh trong nội dung) chỉ được lưu vào kho ảnh lúc này
+    const base = await images.prepare(d);
+    if (!base) return;
     // ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết rồi mới lưu
-    const { value: v, failed } = await autoFill.fill(d, { lang });
+    const { value: v, failed } = await autoFill.fill(base, { lang });
     if (v !== d) setD(v);
     const url = `/settings/pages/${page.key}`;
     const r = await run(
@@ -495,7 +500,7 @@ function PageCanvas({ page, initial, all = [], defaults }) {
         setSaved(again);
         setD(again);
       });
-  }, [d, isAbout, defaults, page, run, toast, canEdit, autoFill, lang]);
+  }, [d, isAbout, defaults, page, run, toast, canEdit, autoFill, lang, images]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -513,8 +518,8 @@ function PageCanvas({ page, initial, all = [], defaults }) {
     if (!dirty) return;
     e.preventDefault();
     const ok = await confirm({
-      title: "Rời trang mà chưa lưu?",
-      message: "Những gì bạn vừa sửa chưa được lưu và sẽ bị mất nếu rời trang.",
+      title: "Rời trang khi chưa lưu?",
+      message: "Nội dung bạn đang soạn chưa được lưu và sẽ mất nếu rời trang này.",
       confirmText: "Rời trang",
       cancelText: "Ở lại",
       danger: true,
@@ -526,7 +531,7 @@ function PageCanvas({ page, initial, all = [], defaults }) {
   };
   const goBack = leaveTo(BASE);
 
-  // Trang chính sách: menu 4 chính sách + ảnh ghép đầu trang lấy từ các trang chính sách khác (như website)
+  // Trang chính sách: menu 4 chính sách; chưa chọn ảnh đầu trang thì website mượn ảnh của chính sách khác
   const policies = PAGES.filter((p) => p.key !== "about").map((p) => {
     const other = all.find((x) => x.key === p.key);
     const active = p.key === page.key;
@@ -597,8 +602,10 @@ function PageCanvas({ page, initial, all = [], defaults }) {
               d={d}
               lang={lang}
               set={set}
-              fallbackImage={isAbout ? ABOUT_HERO_IMAGES[0] : ""}
-              extraImages={isAbout ? ABOUT_HERO_IMAGES.slice(1) : policies.map((p) => p.image)}
+              fallbackImage={
+                isAbout ? ABOUT_HERO_IMAGES[0] : (policies.find((p) => p.image)?.image ?? "")
+              }
+              extraImages={isAbout && !d.image ? ABOUT_HERO_IMAGES.slice(1) : []}
             />
             {isAbout ? (
               <AboutBody data={d.data} lang={lang} setData={setData} />
@@ -687,12 +694,14 @@ function PageCanvas({ page, initial, all = [], defaults }) {
                 icon={Save}
                 className="px-4 sm:px-5"
                 onClick={save}
-                loading={busy || autoFill.busy}
+                loading={busy || autoFill.busy || images.busy}
                 disabled={!dirty}
               >
-                <span>
-                  Lưu<span className="hidden sm:inline"> thay đổi</span>
-                </span>
+                {images.label || (
+                  <span>
+                    Lưu<span className="hidden sm:inline"> thay đổi</span>
+                  </span>
+                )}
               </Button>
             )}
           </div>

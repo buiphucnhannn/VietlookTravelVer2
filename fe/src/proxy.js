@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { ADMIN_BASE, ADMIN_LOGIN, BACKEND_URL, backendHeaders } from "@/config/urls.mjs";
+import { ADMIN_BASE, ADMIN_LOGIN, BACKEND_URL, backendHeaders, safeNext } from "@/config/urls.mjs";
 import { defaultLocale, locales } from "@/i18n/config";
 import { regions } from "@/data/regions";
 
 /**
  * Proxy (Next 16 — thay middleware):
  * 1. /api/v1/*      → chuyển tiếp sang backend kèm mã bí mật (PROXY_SECRET) + IP thật của khách.
- * 2. Khu quản trị   → hỏi backend /auth/me bằng cookie TRƯỚC khi render (proxy không giữ secret JWT nào):
- *                     chưa đăng nhập → trang đăng nhập; access hết hạn nhưng còn phiên → /auth/resume làm mới.
+ * 2. Khu quản trị   → mở trang trực tiếp: hỏi backend /auth/me bằng cookie TRƯỚC khi render (proxy không giữ
+ *                     secret JWT nào): chưa đăng nhập → trang đăng nhập; access hết hạn nhưng còn phiên → /auth/resume.
+ *                     Chuyển tab / tải trước bên trong CMS: chỉ cần cookie phiên (xem guardAdmin).
  * 3. Website        → URL như web cũ: tiếng Anh ở gốc, /zh, /vi có tiền tố; slug không tồn tại → 404 thật;
  *                     slug cũ (CMS đã đổi đường dẫn) → 308 sang slug mới (giữ SEO).
  */
@@ -79,6 +80,7 @@ async function currentUser(request) {
     });
     if (res.status === 429)
       return { user: null, limited: true, retry: res.headers.get("retry-after") ?? "60" };
+    if (res.status >= 500) return { user: null, down: true }; // máy chủ API đang khởi động lại / lỗi
     if (!res.ok) return { user: null };
     return { user: (await res.json()).data.user };
   } catch {
@@ -86,18 +88,35 @@ async function currentUser(request) {
   }
 }
 
-/** Đường dẫn quay lại sau đăng nhập: chỉ đường dẫn nội bộ trong khu quản trị (chặn open redirect) */
-function safeNext(raw) {
-  const next = String(raw ?? "");
-  if (!next.startsWith(ADMIN_BASE) || next.startsWith("//") || next.includes("\\"))
-    return ADMIN_BASE;
-  if (next.startsWith(ADMIN_LOGIN)) return ADMIN_BASE;
-  return next;
-}
+/**
+ * Request do router của Next tự gửi bằng fetch (chuyển trang trong CMS, tải trước link) — KHÔNG phải trình duyệt
+ * mở trang (gõ địa chỉ, F5, mở tab mới). Next ẩn header nội bộ (rsc, next-router-prefetch) khỏi proxy, nên dựa vào
+ * Sec-Fetch-Dest do trình duyệt tự đặt: "empty" = fetch(). Thiếu header (trình duyệt cũ) → coi là mở trang (kiểm tra đủ).
+ */
+const isRouterFetch = (request) => request.headers.get("sec-fetch-dest") === "empty";
 
 async function guardAdmin(request) {
   const { pathname, search, searchParams } = request.nextUrl;
-  const { user, limited, retry } = await currentUser(request);
+
+  /*
+   * Chuyển tab / tải trước trong CMS: KHÔNG hỏi backend (mỗi lần hỏi = 1 vòng mạng tới máy chủ API → bấm menu bị chậm,
+   * tải trước nhiều link còn chạm giới hạn chống spam). Chỉ cần cookie đánh dấu phiên rồi cho qua. Vẫn an toàn vì:
+   *  - Khung giao diện CMS là trang dựng sẵn, giống nhau cho mọi người, KHÔNG chứa dữ liệu nào (không tên khách,
+   *    không nội dung nháp…). Mọi dữ liệu đều tải qua API backend — API kiểm tra đăng nhập + quyền từng mục ở MỌI
+   *    request (requireAuth / requirePermission), nên bước kiểm tra ở proxy chỉ để chuyển người chưa đăng nhập về
+   *    trang đăng nhập cho gọn (trải nghiệm), không phải lớp bảo vệ dữ liệu.
+   *  - Mở trang trực tiếp (F5, gõ địa chỉ, tab mới) vẫn hỏi backend đầy đủ như trước (bên dưới).
+   *  - Phiên hết hạn / bị thu hồi khi đang chuyển tab: API trả 401 → lib/api.js tự làm mới phiên, không được
+   *    → về /login; AdminShell cũng hỏi lại /auth/me (khi quay lại tab, mỗi phút, sau lỗi 403).
+   */
+  if (pathname !== ADMIN_LOGIN && isRouterFetch(request)) {
+    if (hasSession(request)) return withPrivate(NextResponse.next());
+    const login = new URL(ADMIN_LOGIN, request.url);
+    login.searchParams.set("next", pathname + search);
+    return withPrivate(NextResponse.redirect(login, 307));
+  }
+
+  const { user, limited, retry, down } = await currentUser(request);
 
   if (pathname === ADMIN_LOGIN) {
     // đã đăng nhập → về đúng trang ?next
@@ -111,6 +130,16 @@ async function guardAdmin(request) {
     url.searchParams.set("retry", retry);
     url.searchParams.set("next", pathname + search);
     return withPrivate(NextResponse.rewrite(url, { status: 429 }));
+  }
+
+  // Máy chủ API tạm không trả lời mà người dùng còn phiên → báo "tạm gián đoạn" (503), KHÔNG đẩy về đăng nhập
+  // (tránh tưởng bị đăng xuất / sai mật khẩu). Phiên thật sự hết hạn (401) vẫn đi tiếp xuống dưới như cũ.
+  if (down && hasSession(request)) {
+    const url = new URL(`${ADMIN_BASE}/unavailable`, request.url);
+    url.searchParams.set("next", pathname + search);
+    const res = NextResponse.rewrite(url, { status: 503 });
+    res.headers.set("Retry-After", "10");
+    return withPrivate(res);
   }
 
   if (user) {
@@ -232,6 +261,12 @@ export async function proxy(request) {
   const { pathname } = url;
 
   if (pathname.startsWith("/api/v1/")) return forwardApi(request);
+  // Bỏ "/" cuối (next.config: skipTrailingSlashRedirect) — 301 một bước, giữ query
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    // URL thường (không dùng nextUrl: NextURL tự thêm lại "/" cuối theo URL gốc → vòng lặp)
+    const to = new URL(`${pathname.replace(/\/+$/, "") || "/"}${url.search}`, request.url);
+    return NextResponse.redirect(to, 301);
+  }
   if (pathname === ADMIN_LOGIN || pathname === ADMIN_BASE || pathname.startsWith(`${ADMIN_BASE}/`))
     return guardAdmin(request);
 

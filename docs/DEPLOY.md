@@ -1,269 +1,163 @@
-# Deploy: Backend (Render) + Frontend (Vercel)
+# Deploy & bàn giao
 
 ## 0. Kiến trúc
 
 ```
-Trình duyệt ──▶ Vercel (Next.js, domain website)
-                   │  rewrite /api/v1/*  + header X-Proxy-Secret, X-Client-IP
+Trình duyệt ──▶ Vercel (Next.js, tên miền website)
+                   │  /api/v1/*  + header X-Proxy-Secret, X-Client-IP
                    ▼
-               Render (Express API)
+               Backend Express — Cloud VPS của khách (PM2 + Nginx, phương án bàn giao)
+                                 hoặc Render (bản chạy thử)
                    ▼
-               MongoDB Atlas / Cloudinary / Resend
+               MongoDB (Atlas hoặc trên VPS) / Cloudinary / Resend / 9Pay
 ```
 
-- Trình duyệt **chỉ** nói chuyện với domain Vercel → cookie đăng nhập (`__Host-vl_at`, `__Secure-vl_rt`) là
-  cookie first-party, không cần cấu hình cookie cross-site.
+- Trình duyệt **chỉ** nói chuyện với tên miền website → cookie đăng nhập (`__Host-vl_at`, `__Secure-vl_rt`) là
+  first-party, không cần cấu hình cookie cross-site.
 - `PROXY_SECRET` chặn truy cập thẳng vào backend (trừ `/api/v1/health`).
-- Ảnh đi thẳng Cloudinary (không qua Render/Vercel).
+- Ảnh đi thẳng Cloudinary (không qua backend / Vercel).
 
 ---
 
-## 1. Chuẩn bị (làm 1 lần, ở máy local)
+## 1. Chuẩn bị (1 lần)
 
 ### 1.1. Sinh secret
 
 ```bash
-cd be
-npm run secret
+cd be && npm run secret
 ```
 
-Copy 4 dòng in ra:
+In ra `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `DATA_ENCRYPTION_KEY` (đặt ở backend) và `PROXY_SECRET`
+(**đặt cả backend lẫn Vercel, giá trị giống hệt nhau**).
 
-| Biến | Dùng ở đâu |
-| --- | --- |
-| `JWT_ACCESS_SECRET` | Render |
-| `JWT_REFRESH_SECRET` | Render |
-| `DATA_ENCRYPTION_KEY` | Render |
-| `PROXY_SECRET` | **Cả Render và Vercel (giá trị giống hệt nhau)** |
+### 1.2. MongoDB
 
-### 1.2. MongoDB Atlas
-
-1. Tạo cluster (M0 free là đủ) + user có quyền đọc/ghi DB `vietlook`.
-2. **Network Access → Add IP Address → `0.0.0.0/0`** (Render dùng IP egress động, không whitelist cố định được).
-3. Lấy connection string: `mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority`.
+- Atlas: tạo cluster + user đọc/ghi DB `vietlook`. Network Access: IP của VPS (Render dùng IP động → `0.0.0.0/0`).
+- Hoặc MongoDB trên VPS: bind `127.0.0.1`, bật authentication (xem `be/README.md` → Deploy lên Cloud VPS).
 
 ### 1.3. Cloudinary
 
-Console → Settings → API Keys: lấy `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
-`CLOUDINARY_FOLDER` giữ `vietlook`.
+Console → Settings → API Keys: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. `CLOUDINARY_FOLDER` giữ `vietlook`.
 
-### 1.4. (Tuỳ chọn) Cloudflare Turnstile
+### 1.4. Cloudflare Turnstile (captcha)
 
-- Secret key → Render (`TURNSTILE_SECRET_KEY`)
-- Site key → Vercel (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`)
-- Trong Turnstile → Settings → **Hostnames** phải chứa domain Vercel (kể cả domain preview nếu muốn test).
+Secret key → backend (`TURNSTILE_SECRET_KEY`); site key → Vercel (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`).
+Turnstile → Hostnames phải có tên miền website. Đặt secret mà thiếu site key → mọi form bị từ chối.
 
-> Nếu đặt `TURNSTILE_SECRET_KEY` ở backend mà **không** đặt site key ở frontend, mọi form công khai sẽ bị
-> `Xác minh captcha thất bại`.
+### 1.5. Resend (email)
 
-### 1.5. (Tuỳ chọn) Resend
-
-`RESEND_API_KEY`, `MAIL_FROM`, `NOTIFY_EMAIL`. Không đặt thì form vẫn lưu DB, chỉ không gửi email.
+`RESEND_API_KEY`, `MAIL_FROM` (địa chỉ trên tên miền công ty đã xác minh, có SPF/DKIM/DMARC — xem `be/README.md`).
+Không đặt thì đơn vẫn lưu CMS, chỉ không gửi email.
 
 ---
 
-## 2. Deploy backend lên Render
+## 2. Backend
 
-### 2.1. Tạo Web Service
+### 2.1. Cloud VPS (bàn giao)
 
-Render Dashboard → **New +** → **Web Service** → connect repo GitHub.
+Theo `be/README.md` → "Deploy lên Cloud VPS": `npm ci --omit=dev`, `be/.env` (chmod 600), PM2, Nginx + HTTPS,
+tường lửa chỉ mở 22/80/443. `TRUST_PROXY=2` (Vercel → Nginx → API).
 
-| Trường | Giá trị |
+### 2.2. Render (bản chạy thử)
+
+New → Web Service → repo: Root Directory `be`, Region Singapore, Build `npm ci --omit=dev`, Start `npm start`,
+Health Check Path `/api/v1/health`. Gói Free ngủ sau ~15 phút (nên dùng Starter). Không cần đặt `PORT`.
+Không có ổ đĩa lâu dài → `npm run db:backup` phải chạy ở máy khác (hoặc dùng sao lưu của Atlas).
+
+### 2.3. Biến môi trường backend
+
+App **không khởi động** nếu thiếu / sai biến bắt buộc (log ghi rõ tên biến). Đầy đủ + chú thích: `be/.env.example`.
+
+| Biến | Production |
 | --- | --- |
-| Name | `vietlook-api` (tuỳ ý) |
-| Region | Singapore |
-| Root Directory | `be` |
-| Runtime | Node |
-| Build Command | `npm ci --omit=dev` |
-| Start Command | `npm start` |
-| Health Check Path | `/api/v1/health` |
-| Instance Type | Free (ngủ sau ~15 phút) hoặc Starter (nên dùng cho production) |
+| `NODE_ENV` | `production` |
+| `MONGODB_URI`, `MONGODB_DB_NAME` | chuỗi kết nối, `vietlook` |
+| `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `DATA_ENCRYPTION_KEY` | từ `npm run secret` (bắt buộc, ≥ 32 ký tự) |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | tài khoản admin đầu tiên (bắt buộc) |
+| `PROXY_SECRET` | **trùng với Vercel** |
+| `PUBLIC_SITE_URL` | `https://<tên-miền-website>` (link trong email, link 9Pay quay về) |
+| `CORS_ORIGINS` | `https://<tên-miền-website>` (nhiều tên miền cách nhau `,`) |
+| `TRUST_PROXY` | `2` |
+| `CLOUDINARY_*` | khoá Cloudinary |
+| `TURNSTILE_SECRET_KEY` | secret Turnstile |
+| `RESEND_API_KEY`, `MAIL_FROM`, `NOTIFY_EMAIL` | Resend; `NOTIFY_EMAIL` = email nhận thông báo dự phòng của **khách** |
+| `MAIL_REDIRECT_TO` | **để trống** (có giá trị = mọi email chỉ gửi tới 1 địa chỉ thử) |
+| `DEMO_LOGIN` | **`false`** (true = ai cũng vào được CMS bằng nút "Đăng nhập nhanh") |
+| `NINEPAY_FAKE` | `false` (production luôn bỏ qua) · `NINEPAY_ENDPOINT` để trống = cổng thật |
+| `MEDIA_CLEANUP_DAILY` | `true` nếu muốn tự xoá ảnh CMS không dùng |
+| `BACKUP_DIR`, `BACKUP_KEEP` | thư mục sao lưu ngoài thư mục code, `7` |
 
-### 2.2. Environment Variables (Render)
+Kiểm tra: `curl https://<backend>/api/v1/health` → `{"success":true,"data":{"status":"ok","database":"connected",...}}`.
+Các route khác trả 403 `DIRECT_ACCESS` khi gọi thẳng là **đúng** (đã bật `PROXY_SECRET`).
 
-| Biến | Giá trị | Bắt buộc |
-| --- | --- | --- |
-| `NODE_ENV` | `production` | ✅ |
-| `NODE_VERSION` | `22` | ✅ |
-| `MONGODB_URI` | connection string Atlas | ✅ |
-| `MONGODB_DB_NAME` | `vietlook` | ✅ |
-| `JWT_ACCESS_SECRET` | từ `npm run secret` (≥ 32 ký tự) | ✅ |
-| `JWT_REFRESH_SECRET` | từ `npm run secret` (≥ 32, khác access) | ✅ |
-| `DATA_ENCRYPTION_KEY` | từ `npm run secret` (≥ 32) | ✅ |
-| `ADMIN_USERNAME` | tài khoản admin đầu tiên | ✅ |
-| `ADMIN_PASSWORD` | mật khẩu admin đầu tiên | ✅ |
-| `ADMIN_NAME` | `Quản trị viên` | ❌ |
-| `PROXY_SECRET` | **trùng với Vercel** | ✅ |
-| `CORS_ORIGINS` | `https://<domain-vercel>` (nhiều domain cách nhau `,`) | ✅ |
-| `PUBLIC_SITE_URL` | `https://<domain-vercel>` (dùng trong email) | ✅ |
-| `COOKIE_SECURE` | `true` | ✅ |
-| `TRUST_PROXY` | `2` (Vercel → Render proxy → app) | ✅ |
-| `CLOUDINARY_CLOUD_NAME` | … | ✅ (nếu dùng ảnh) |
-| `CLOUDINARY_API_KEY` | … | ✅ |
-| `CLOUDINARY_API_SECRET` | … | ✅ |
-| `CLOUDINARY_FOLDER` | `vietlook` | ❌ |
-| `JWT_ACCESS_TTL` | `15m` | ❌ |
-| `JWT_REFRESH_TTL` | `7d` | ❌ |
-| `MAX_SESSIONS` | `5` | ❌ |
-| `RATE_LIMIT_WINDOW_MS` | `900000` | ❌ |
-| `RATE_LIMIT_MAX` | `3000` | ❌ |
-| `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCK_MINUTES` | `5` / `15` | ❌ |
-| `TURNSTILE_SECRET_KEY` | Turnstile secret | ❌ |
-| `RESEND_API_KEY` / `MAIL_FROM` / `NOTIFY_EMAIL` | Resend | ❌ |
-| `LOG_LEVEL` | `info` | ❌ |
-
-Không cần đặt `PORT` — Render tự inject và `src/config/env.js` đọc biến này.
-
-> App **không khởi động** nếu thiếu biến bắt buộc (Zod validate lúc boot, log sẽ ghi rõ tên biến thiếu).
-
-### 2.3. Kiểm tra
-
-```bash
-curl https://<service>.onrender.com/api/v1/health
-# {"success":true,"data":{"status":"ok","database":"connected","cloudinary":"configured",...}}
-```
-
-- `database: disconnected` → sai `MONGODB_URI` hoặc Atlas chưa whitelist `0.0.0.0/0`.
-- 403 `DIRECT_ACCESS` ở các route khác là **đúng** (đã bật `PROXY_SECRET`).
-
-### 2.4. Nạp dữ liệu lần đầu
-
-Render Dashboard → service → **Shell**:
+### 2.4. Dữ liệu lần đầu
 
 ```bash
 npm run seed            # chỉ thêm bản ghi còn thiếu, KHÔNG ghi đè nội dung đã sửa trong CMS
-# npm run seed -- --force   # (cẩn thận) ghi đè toàn bộ theo be/seed-data
+npm run images:upload   # ảnh có sẵn trong fe/public/images → Cloudinary (chạy lại an toàn)
 ```
 
-Tài khoản admin đầu tiên được tạo tự động khi server khởi động từ `ADMIN_USERNAME` / `ADMIN_PASSWORD`
-(`ensureFirstAdmin`). Đổi mật khẩu ngay trong CMS sau lần đăng nhập đầu.
-
-### 2.5. (Tuỳ chọn) `render.yaml`
-
-Nếu muốn tạo service bằng Blueprint thay vì click tay, thêm file `render.yaml` ở **root repo**:
-
-```yaml
-services:
-  - type: web
-    name: vietlook-api
-    runtime: node
-    rootDir: be
-    region: singapore
-    plan: free
-    buildCommand: npm ci --omit=dev
-    startCommand: npm start
-    healthCheckPath: /api/v1/health
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: NODE_VERSION
-        value: "22"
-      - key: MONGODB_URI
-        sync: false
-      - key: MONGODB_DB_NAME
-        value: vietlook
-      - key: JWT_ACCESS_SECRET
-        generateValue: true
-      - key: JWT_REFRESH_SECRET
-        generateValue: true
-      - key: DATA_ENCRYPTION_KEY
-        generateValue: true
-      - key: PROXY_SECRET
-        generateValue: true
-      # … các biến còn lại: sync: false để Render hỏi khi tạo Blueprint
-```
-
-> Với `generateValue: true`, nhớ copy `PROXY_SECRET` sang Vercel sau khi service được tạo.
+Tài khoản admin đầu tiên tự tạo khi server khởi động (từ `ADMIN_USERNAME` / `ADMIN_PASSWORD`).
 
 ---
 
-## 3. Deploy frontend lên Vercel
+## 3. Frontend lên Vercel
 
-### 3.1. Import project
+Add New → Project → repo: **Root Directory `fe`**, Framework Next.js, Node 22.x, build/install mặc định.
 
-Vercel → **Add New… → Project** → chọn repo →:
-
-| Trường | Giá trị |
+| Biến (Production) | Giá trị |
 | --- | --- |
-| Root Directory | `fe` |
-| Framework Preset | Next.js |
-| Build Command | `npm run build` (mặc định) |
-| Install Command | `npm install` (mặc định) |
-| Node.js Version | 22.x |
+| `BACKEND_URL` | `https://<backend>` (không có `/` cuối) — bắt buộc |
+| `PROXY_SECRET` | **giống hệt** backend |
+| `NEXT_PUBLIC_SITE_URL` | `https://<tên-miền-website>` (canonical, hreflang, sitemap) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | site key Turnstile |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `NEXT_PUBLIC_CLOUDINARY_FOLDER` | xem `fe/.env.example` |
 
-### 3.2. Environment Variables (Vercel)
+- `BACKEND_URL` dùng **cả lúc build** (prerender + `generateStaticParams`) → backend phải đang chạy và **đã có dữ liệu**
+  trước khi deploy; DB rỗng → build fail `empty-generate-static-params`.
+- `NEXT_PUBLIC_*` nhúng vào bundle lúc build → đổi giá trị phải **Redeploy**.
 
-Đặt cho **Production** (và Preview nếu cần):
+### Đổi sang tên miền chính
 
-| Biến | Giá trị |
-| --- | --- |
-| `BACKEND_URL` | `https://<service>.onrender.com` (không có `/` cuối) |
-| `PROXY_SECRET` | **giống hệt** giá trị trên Render |
-| `NEXT_PUBLIC_SITE_URL` | `https://<domain-website>` |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Turnstile site key (nếu dùng) |
-| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | `dzpmroj28` |
-| `NEXT_PUBLIC_CLOUDINARY_FOLDER` | `vietlook` |
-
-Lưu ý:
-
-- `BACKEND_URL` được dùng **cả lúc build** (Next fetch nội dung từ backend để prerender + `generateStaticParams`).
-- Biến `NEXT_PUBLIC_*` được **nhúng cứng vào bundle lúc build** → đổi giá trị phải **Redeploy**.
-- Không cần `NODE_ENV` (Vercel tự set).
-
-### 3.3. Trước khi bấm Deploy
-
-Backend phải đang chạy và **đã có dữ liệu** (bước 2.4). Nếu Render free đang ngủ, mở
-`https://<service>.onrender.com/api/v1/health` trước cho nó thức.
-
-Lý do: `fe/src/lib/catalog.js` gọi API khi build; với `cacheComponents: true`, một
-`generateStaticParams` trả về rỗng sẽ làm **build fail** (`empty-generate-static-params`).
-
-### 3.4. Domain
-
-1. Vercel → Project → Settings → Domains → thêm domain (hoặc dùng `*.vercel.app`).
-2. Cập nhật lại:
-   - Vercel: `NEXT_PUBLIC_SITE_URL=https://<domain-chính-thức>` → **Redeploy**.
-   - Render: `PUBLIC_SITE_URL`, `CORS_ORIGINS=https://<domain-chính-thức>` → service tự restart.
+Vercel → Settings → Domains → thêm tên miền, rồi cập nhật cùng lúc: `NEXT_PUBLIC_SITE_URL` (Vercel → Redeploy),
+`PUBLIC_SITE_URL` + `CORS_ORIGINS` (backend → khởi động lại), Turnstile Hostnames, Return/IPN URL trong trang quản lý 9Pay.
 
 ---
 
 ## 4. Checklist sau deploy
 
 - [ ] `GET /api/v1/health` → `status: ok`
-- [ ] `https://<domain>` → redirect sang `/en` (hoặc `/zh`, `/vi` theo `Accept-Language`)
-- [ ] `/tours`, `/tours/<slug>`, `/travel-guide`, `/admin` render được
-- [ ] Gửi form liên hệ → thấy đơn trong CMS (`/admin` → Đơn/yêu cầu)
-- [ ] `/login` → đăng nhập admin → vào được `/admin`
-- [ ] Upload ảnh trong CMS → ảnh lên Cloudinary
-- [ ] DevTools → Application → Cookies: có `__Host-vl_at`, `__Secure-vl_rt`, `__Host-vl_session`
-      (HttpOnly, Secure, SameSite=Strict). Không thấy cookie = lỗi HTTPS/`COOKIE_SECURE`.
-- [ ] Đổi mật khẩu admin mặc định
+- [ ] `https://<tên-miền>` mở trang tiếng Anh (không tiền tố); `/zh`, `/vi` hoạt động; `/en/...` chuyển về bản không tiền tố
+- [ ] `/tours`, `/tours/<slug>`, `/travel-guide` render được; URL web cũ chuyển hướng 301 đúng (`docs/redirect-map.csv`)
+- [ ] Gửi từng form (đặt tour, thiết kế tour, xe, visa, liên hệ, đối tác) → thấy trong CMS + email tới đúng người nhận
+- [ ] `/login` → `/admin`; upload ảnh lên Cloudinary được
+- [ ] Cookie `__Host-vl_at`, `__Secure-vl_rt`, `__Host-vl_session` (HttpOnly, Secure, SameSite=Strict)
+
+## 5. Checklist bàn giao
+
+- [ ] `DEMO_LOGIN=false`, `MAIL_REDIRECT_TO` trống, `NINEPAY_FAKE=false` / không đặt
+- [ ] CMS → Cài đặt → Email nhận thông báo = email của **khách**; `NOTIFY_EMAIL` = email khách
+- [ ] CMS → Cài đặt → Thanh toán 9Pay: admin nhập 3 mã thật **trực tiếp trên CMS / server** (không gửi qua Zalo / email);
+      đăng ký Return URL `https://<tên-miền>/api/v1/payments/return`, IPN URL `https://<tên-miền>/api/v1/payments/ipn`;
+      thanh toán thật 1 đơn thành công
+- [ ] `NEXT_PUBLIC_SITE_URL`, `PUBLIC_SITE_URL`, `CORS_ORIGINS` = tên miền chính (`https://vietlooktravel.com`)
+- [ ] UptimeRobot: theo dõi `https://<backend>/api/v1/health` (không cần `PROXY_SECRET`) + trang chủ website
+- [ ] Sao lưu: database mỗi ngày giữ 7 bản (cron `npm run db:backup`, `BACKUP_KEEP=7` — `be/README.md` → Sao lưu database);
+      toàn web mỗi tuần giữ 3 bản (snapshot VPS của nhà cung cấp, hoặc nén thư mục `be/` + `.env` + thư mục sao lưu); chép ra nơi khác
+- [ ] Đổi mật khẩu admin mặc định; tạo tài khoản nhân viên với quyền phù hợp
+- [ ] Sitemap nộp Google Search Console; mã GTM / GA4 / Ads nhập trong CMS → Cài đặt
 
 ---
 
-## 5. Lỗi thường gặp
+## 6. Lỗi thường gặp
 
 | Hiện tượng | Nguyên nhân / cách xử lý |
 | --- | --- |
-| Render deploy fail ngay khi boot, log `[env] Invalid environment variables` | Thiếu biến bắt buộc; log liệt kê chính xác biến nào |
-| `/api/v1/health` trả 503 `database: disconnected` | Sai `MONGODB_URI` hoặc Atlas chưa whitelist `0.0.0.0/0` |
-| API trả 403 `DIRECT_ACCESS` | Gọi thẳng Render không kèm `X-Proxy-Secret` — đúng thiết kế, hãy gọi qua domain Vercel |
-| Form báo `Xác minh captcha thất bại` | Đặt `TURNSTILE_SECRET_KEY` nhưng thiếu site key ở Vercel / domain chưa có trong Turnstile Hostnames |
+| Backend không khởi động, log `[env] Invalid environment variables` | Thiếu / sai biến bắt buộc; log liệt kê tên biến |
+| `/api/v1/health` trả 503 `database: disconnected` | Sai `MONGODB_URI` hoặc IP chưa được phép trong Atlas |
+| API trả 403 `DIRECT_ACCESS` | Gọi thẳng backend không kèm `X-Proxy-Secret` — đúng thiết kế, gọi qua tên miền website |
+| Form báo `Xác minh captcha thất bại` | Có `TURNSTILE_SECRET_KEY` nhưng thiếu site key ở Vercel / tên miền chưa có trong Turnstile Hostnames |
 | Đăng nhập xong bị đá về `/login` | `PROXY_SECRET` 2 bên khác nhau, hoặc cookie bị chặn (kiểm tra HTTPS) |
 | Vercel build fail `empty-generate-static-params` | Backend chưa chạy / DB rỗng lúc build → bật backend + `npm run seed` rồi redeploy |
-| Vercel build chậm/timeout vì backend Render free ngủ | Nâng Render Starter, hoặc ping `/api/v1/health` mỗi 10 phút (UptimeRobot) |
-| Request đầu tiên sau khi Render ngủ bị lỗi/timeout | Free plan spin-down 30–60s; `currentUser()` trong `fe/src/proxy.js` timeout 5s, `catalog.js` timeout 30s |
-| Đổi env trên Vercel không có tác dụng | Biến `NEXT_PUBLIC_*` chỉ đọc lúc build → Redeploy (nên Clear build cache) |
-| Font lỗi lúc build | Đã fix bằng Next 16.4.6; nếu tái diễn → Clear build cache rồi redeploy |
-
----
-
-## 6. Chi phí tối thiểu
-
-| Thành phần | Gói |
-| --- | --- |
-| Vercel | Hobby (miễn phí) |
-| Render | Free (ngủ) hoặc Starter ~7 USD/tháng |
-| MongoDB Atlas | M0 free |
-| Cloudinary | Free tier |
-| Turnstile / Resend | Free tier |
+| Request đầu tiên lỗi / chậm sau khi Render ngủ | Gói Free ngủ 30–60s; `fe/src/proxy.js` chờ 5s, `catalog.js` chờ 30s → dùng gói trả phí hoặc VPS |
+| Đổi env trên Vercel không có tác dụng | `NEXT_PUBLIC_*` chỉ đọc lúc build → Redeploy (nên Clear build cache) |

@@ -6,7 +6,7 @@ Website lữ hành 3 ngôn ngữ (EN / ZH / VI) cho Vietlook Travel — B2C & B2
 .
 ├── fe/     Website — Next.js 16 (App Router) + TailwindCSS v4   → xem fe/README.md
 ├── be/     REST API + CMS — Express 5 + MongoDB + Cloudinary    → xem be/README.md
-└── docs/   Tài liệu dự án (phạm vi, demo, bàn giao)
+└── docs/   Phạm vi, mẫu bàn giao, DEPLOY.md (deploy + checklist bàn giao), danh sách URL web cũ
 ```
 
 ## Chạy local
@@ -40,10 +40,12 @@ npm run dev
 
 ## Deploy
 
-| Phần | Nơi chạy                | Ghi chú                                                                                          |
-| ---- | ----------------------- | ------------------------------------------------------------------------------------------------ |
-| fe   | Vercel                  | **Root Directory = `fe`** · env: `BACKEND_URL`, `PROXY_SECRET`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` |
-| be   | Cloud VPS (PM2 + Nginx) | `pm2 start ecosystem.config.cjs --env production` — xem `be/README.md`                           |
+Chi tiết từng bước + checklist bàn giao: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+| Phần | Nơi chạy                | Ghi chú                                                                                                                  |
+| ---- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| fe   | Vercel                  | **Root Directory = `fe`** · env: `BACKEND_URL`, `PROXY_SECRET`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` |
+| be   | Cloud VPS (PM2 + Nginx) | `pm2 start ecosystem.config.cjs --env production` — xem `be/README.md`                                                   |
 
 ## Quy ước
 

@@ -27,7 +27,7 @@ export async function generateMetadata({ params }) {
     path: `/themes/${slug}`,
     title: fill(dict.theme.samples, { name: tr(theme.name, lang) }),
     description: tr(theme.intro, lang),
-    image: theme.banner,
+    image: theme.banner || theme.image,
   });
 }
 
@@ -45,7 +45,7 @@ async function ThemePageContent({ params }) {
       <BannerHero
         title={fill(dict.theme.samples, { name: lang === "zh" ? name : name.toUpperCase() })}
         subtitle={tr(theme.tagline, lang)}
-        images={[theme.banner, theme.image, ...toursByTheme(slug).map((x) => x.image)]}
+        images={[theme.banner || theme.image]}
         breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: name }]}
       />
       <section className="py-14 lg:py-[4.5rem]">

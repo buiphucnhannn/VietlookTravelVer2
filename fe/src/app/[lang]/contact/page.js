@@ -8,6 +8,7 @@ import { Container } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import ContactForm from "@/components/forms/ContactForm";
 import { FacebookIcon, WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
+import LazyIframe from "@/components/ui/LazyIframe";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -161,7 +162,8 @@ export default async function ContactPage({ params }) {
             </a>
           </div>
           <div className="overflow-hidden rounded-3xl shadow-lg ring-1 ring-border">
-            <iframe
+            {/* Bản đồ chỉ nạp khi khách cuộn tới (Google Maps ~600KB JS) */}
+            <LazyIframe
               title="Vietlook Travel – Google Maps"
               src={
                 lang === "zh"
@@ -171,7 +173,6 @@ export default async function ContactPage({ params }) {
                     : maps.embed
               }
               className="h-[420px] w-full"
-              loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>

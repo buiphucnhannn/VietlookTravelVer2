@@ -68,7 +68,14 @@ async function GuidePostPageContent({ params }) {
   const g = dict.guide;
   const title = tr(post.title, lang);
   const category = getGuideCategory(post.category);
-  const author = authors[post.author];
+  // Tác giả bị ẩn trong CMS → dùng "Vietlook Travel Team" (tránh lỗi trang), link về trang cẩm nang
+  const authorSlug = authors[post.author] ? post.author : "vietlook-team";
+  const author = authors[authorSlug] ?? { name: dict.common.team };
+  const authorAvatar = author.avatar || "/images/logo/vietlook-icon.png";
+  const authorHref = authors[authorSlug]
+    ? `${lp(lang)}/travel-guide/author/${authorSlug}`
+    : `${lp(lang)}/travel-guide`;
+  const absUrl = (u) => (/^https?:\/\//.test(u) ? u : `${siteConfig.url}${u}`);
   const rawBody = tr(post.body, lang);
   const { html, toc } = withAnchors(rawBody);
   const untranslated = !post.body[lang]?.trim() && !!rawBody;
@@ -84,9 +91,9 @@ async function GuidePostPageContent({ params }) {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: title,
-    ...(post.image && { image: [`${siteConfig.url}${post.image}`] }),
+    ...(post.image && { image: [absUrl(post.image)] }),
     datePublished: post.date,
-    dateModified: post.date,
+    dateModified: post.updatedAt ? String(post.updatedAt).slice(0, 10) : post.date,
     inLanguage: localeMeta[lang].hreflang,
     author: { "@type": "Organization", name: tr(author.name, lang) },
     publisher: {
@@ -124,17 +131,14 @@ async function GuidePostPageContent({ params }) {
         <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-white/85">
           <span className="flex items-center gap-2">
             <Image
-              src={author.avatar}
+              src={authorAvatar}
               alt=""
               width={32}
               height={32}
               className="size-8 rounded-full bg-white object-contain p-0.5"
             />
             {dict.common.by}{" "}
-            <Link
-              href={`${lp(lang)}/travel-guide/author/${post.author}`}
-              className="font-bold text-white hover:text-amber-brand"
-            >
+            <Link href={authorHref} className="font-bold text-white hover:text-amber-brand">
               {tr(author.name, lang)}
             </Link>
           </span>
@@ -201,7 +205,7 @@ async function GuidePostPageContent({ params }) {
 
           <div className="mt-12 flex gap-5 rounded-2xl bg-surface p-6">
             <Image
-              src={author.avatar}
+              src={authorAvatar}
               alt=""
               width={64}
               height={64}
@@ -212,7 +216,7 @@ async function GuidePostPageContent({ params }) {
                 {g.aboutAuthor}
               </p>
               <Link
-                href={`${lp(lang)}/travel-guide/author/${post.author}`}
+                href={authorHref}
                 className="mt-1 block text-lg font-bold text-ink hover:text-brand-600"
               >
                 {tr(author.name, lang)}

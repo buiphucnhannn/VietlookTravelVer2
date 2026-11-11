@@ -82,3 +82,5 @@ temp/
 *.tmp
 *.bak
 ~$*
+
+docs/

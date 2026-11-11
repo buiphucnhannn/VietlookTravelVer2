@@ -1,31 +1,26 @@
 import { env } from "../config/env.js";
-import { describeEnquiry, fieldLabel, fmtDateTime, formatValue, pickLang } from "./format.js";
+import { describeEnquiry, fmtDateTime, formatValue, pickLang } from "./format.js";
 import { COMPANY, LANG_NAME, STAFF_HEADLINE, TYPE_LABEL } from "./labels.js";
 import {
   C,
   FONT,
+  SPACE,
   button,
-  detailTable,
-  divider,
+  codeBox,
   escape,
-  factGrid,
-  footerRow,
-  heading,
-  hero,
-  panel,
-  paragraph,
-  pills,
-  priceTable,
+  link,
+  p,
   quote,
-  section,
   shell,
-  stepCards,
+  subhead,
+  table,
+  title,
 } from "./layout.js";
 
 /**
- * Mẫu email cho mọi form trên website:
- *  - companyEmail: thông báo cho nhân viên (tiếng Việt) — tóm tắt, liên hệ nhanh, nút mở trong trang quản trị.
+ * Mẫu email cho mọi form trên website — bố cục 1 cột, đơn giản, dễ đọc:
  *  - customerEmail: xác nhận cho khách (đúng ngôn ngữ khách dùng: en / zh / vi).
+ *  - companyEmail: thông báo cho nhân viên (tiếng Việt).
  * Mọi dữ liệu khách nhập đều được escape → không chèn được HTML / link độc vào email.
  * `lookups` (không bắt buộc): tên xe / gói fast-track / điểm đến / tên tour theo ngôn ngữ — enquiry.service tra DB.
  */
@@ -45,8 +40,7 @@ export const waNumber = (phone) => {
 };
 const telHref = (phone) => {
   const s = String(phone ?? "").trim();
-  const digits = s.replace(/\D/g, "");
-  return `tel:${s.startsWith("+") ? "+" : ""}${digits}`;
+  return `tel:${s.startsWith("+") ? "+" : ""}${s.replace(/\D/g, "")}`;
 };
 
 export const adminLink = (e) =>
@@ -65,287 +59,192 @@ const firstLine = (s, max = 60) => {
 
 const CUSTOMER = {
   en: {
-    title: (n) => `Thank you, ${n}!`,
-    intro: {
-      booking:
-        "We've received your booking request. Our travel expert will check availability for your departure date and get back to you within 24 hours.",
-      planner:
-        "We've received your trip details. A travel expert will email you a free tailor-made proposal within 24 hours.",
-      car: "We've received your private car request. We'll confirm the vehicle and final price within 24 hours – usually much sooner.",
-      visa: "We've received your visa & fast-track request. We'll confirm the package and the documents needed within 24 hours.",
-      contact: "We've received your message and will reply within 24 hours (usually much sooner).",
-      partner:
-        "We've received your partnership enquiry. Our B2B team will contact you within 24 hours.",
+    hello: (n) => `Dear ${n},`,
+    received: {
+      booking: "Thank you – we have received your tour booking request.",
+      planner: "Thank you – we have received your tailor-made trip request.",
+      car: "Thank you – we have received your private car request.",
+      visa: "Thank you – we have received your visa & fast-track request.",
+      contact: "Thank you – we have received your message.",
+      partner: "Thank you – we have received your partnership enquiry.",
     },
     codeLabel: "Your request code",
-    keepCode: "Just quote this code whenever you contact us.",
+    keepCode: "Please quote this code whenever you contact us.",
     summary: "Your request",
     estimate: "Estimated price",
-    priceNote:
-      "Estimate only – our team will confirm the final price with you. No online payment is needed.",
-    yourDetails: "Your contact details",
-    yourMessage: "Your message",
+    estimateNote: "This is an estimate – we will confirm the final price with you.",
     next: "What happens next",
-    steps: {
-      first: "Our travel expert reviews your request – within 24 hours.",
-      second: {
-        booking: "We confirm availability and send your booking confirmation with a payment guide.",
-        planner: "We send a day-by-day itinerary with a transparent price – free to adjust.",
-        car: "We confirm your vehicle, driver and final price.",
-        visa: "We confirm your package, price and the documents we need from you.",
-        contact: "We reply with all the information you need.",
-        partner: "We share our B2B rates and partnership terms.",
-      },
-      pay: "Confirm and pay the way that suits you – bank transfer or in person. No online payment needed.",
-      chat: "Anything else? Chat with us on WhatsApp, WeChat or Zalo any time.",
+    nextText: {
+      booking:
+        "Our travel expert will check availability and reply within 24 hours with your booking confirmation and a payment guide. No online payment is needed.",
+      planner:
+        "Within 24 hours, our travel expert will email you a day-by-day itinerary with a clear price. You can change anything before you confirm.",
+      car: "We will confirm your vehicle, driver and final price within 24 hours – usually much sooner. No online payment is needed.",
+      visa: "We will confirm your package, the price and the documents we need within 24 hours. No online payment is needed.",
+      contact: "We will reply to your message within 24 hours – usually much sooner.",
+      partner: "Our B2B team will contact you within 24 hours with our partner rates and terms.",
     },
-    help: "Need help sooner?",
-    helpText: "Our local team is here for you 24/7.",
-    call: "Call us",
-    emailUs: "Email us",
-    wechat: "WeChat / Zalo",
+    nextBookingPay:
+      "Our travel expert will check availability and reply within 24 hours with your booking confirmation. If you chose to pay online, you will receive a separate payment receipt; otherwise we will send you a payment guide.",
+    questions: "Questions? Simply reply to this email or chat with us on WhatsApp.",
+    whatsapp: "Chat on WhatsApp",
+    orCall: "Or call",
     signoff: "Warm regards,",
     team: "The Vietlook Travel team",
-    licence: "International tour operator licence",
-    why: "You're receiving this email because a request was submitted on the Vietlook Travel website with this address. If it wasn't you, simply ignore this email or reply to let us know.",
-    subject: (e) =>
-      e.type === "booking"
-        ? `Booking request received – ${e.code} | Vietlook Travel`
-        : `We've received your request – ${e.code} | Vietlook Travel`,
-    preheader: (e) => `Request code ${e.code} · our travel expert will reply within 24 hours.`,
+    why: "You received this email because a request was sent from the Vietlook Travel website with this email address. If it wasn't you, please ignore this email.",
+    subject: (e) => `Your request ${e.code} has been received`,
+    preheader: (e) => `Request code ${e.code} · we will reply within 24 hours.`,
   },
   zh: {
-    title: (n) => `${n}，感谢您的信任！`,
-    intro: {
-      booking: "我们已收到您的预订申请。旅行顾问将核实您所选出发日期的余位，并在24小时内与您联系。",
-      planner: "我们已收到您的行程需求。旅行顾问将在24小时内通过邮件发送免费的定制方案。",
-      car: "我们已收到您的包车需求，将在24小时内（通常更快）确认车型与最终价格。",
-      visa: "我们已收到您的签证与快速通关需求，将在24小时内确认套餐及所需资料。",
-      contact: "我们已收到您的留言，将在24小时内回复您（通常会更快）。",
-      partner: "我们已收到您的合作咨询，B2B团队将在24小时内与您联系。",
+    hello: (n) => `${n}，您好！`,
+    received: {
+      booking: "感谢您！我们已收到您的行程预订申请。",
+      planner: "感谢您！我们已收到您的定制行程需求。",
+      car: "感谢您！我们已收到您的包车需求。",
+      visa: "感谢您！我们已收到您的签证与快速通关需求。",
+      contact: "感谢您！我们已收到您的留言。",
+      partner: "感谢您！我们已收到您的合作咨询。",
     },
     codeLabel: "您的需求编号",
     keepCode: "联系我们时请提供此编号。",
     summary: "您的需求",
     estimate: "预估价格",
-    priceNote: "以上为预估价格，最终价格由我们的顾问与您确认。无需在线付款。",
-    yourDetails: "您的联系方式",
-    yourMessage: "您的留言",
+    estimateNote: "以上为预估价格，最终价格将由我们与您确认。",
     next: "接下来",
-    steps: {
-      first: "旅行顾问将在24小时内查看您的需求。",
-      second: {
-        booking: "我们确认余位，并发送预订确认及付款指引。",
-        planner: "我们发送逐日行程及透明报价，可随时调整。",
-        car: "我们确认车型、司机及最终价格。",
-        visa: "我们确认套餐、价格及需要您提供的资料。",
-        contact: "我们会回复您需要的所有信息。",
-        partner: "我们将提供B2B价格及合作条款。",
-      },
-      pay: "确认后按您方便的方式付款——银行转账或当面支付，无需在线付款。",
-      chat: "还有其他问题？随时通过 WhatsApp、微信或 Zalo 联系我们。",
+    nextText: {
+      booking: "旅行顾问将核实余位，并在24小时内回复预订确认及付款指引。无需在线付款。",
+      planner: "旅行顾问将在24小时内通过邮件发送逐日行程及清晰报价，确认前可随时调整。",
+      car: "我们将在24小时内（通常更快）确认车型、司机及最终价格。无需在线付款。",
+      visa: "我们将在24小时内确认套餐、价格及所需资料。无需在线付款。",
+      contact: "我们将在24小时内回复您（通常会更快）。",
+      partner: "我们的B2B团队将在24小时内与您联系，提供同业价格及合作条款。",
     },
-    help: "需要更快的帮助？",
-    helpText: "本地团队 24/7 为您服务。",
-    call: "致电我们",
-    emailUs: "发送邮件",
-    wechat: "微信 / Zalo",
+    nextBookingPay:
+      "旅行顾问将核实余位，并在24小时内回复预订确认。如您已在线付款，将另行收到付款凭证；否则我们会发送付款指引。",
+    questions: "有任何问题？直接回复此邮件，或通过 WhatsApp 联系我们。",
+    whatsapp: "WhatsApp 联系我们",
+    orCall: "或致电",
     signoff: "此致敬礼，",
     team: "Vietlook Travel 团队",
-    licence: "国际旅行社经营许可证",
-    why: "您收到此邮件，是因为有人使用此邮箱在 Vietlook Travel 网站提交了需求。如非本人操作，请忽略此邮件或回复告知我们。",
-    subject: (e) =>
-      e.type === "booking"
-        ? `已收到您的预订申请 – ${e.code} | Vietlook Travel`
-        : `我们已收到您的需求 – ${e.code} | Vietlook Travel`,
-    preheader: (e) => `需求编号 ${e.code} · 旅行顾问将在24小时内回复您。`,
+    why: "您收到此邮件，是因为有人使用此邮箱在 Vietlook Travel 网站提交了需求。如非本人操作，请忽略此邮件。",
+    subject: (e) => `您的需求 ${e.code} 已收到`,
+    preheader: (e) => `需求编号 ${e.code} · 我们将在24小时内回复。`,
   },
   vi: {
-    title: (n) => `Cảm ơn ${n}!`,
-    intro: {
-      booking:
-        "Vietlook Travel đã nhận yêu cầu đặt tour của bạn. Chuyên viên tư vấn sẽ kiểm tra chỗ cho ngày khởi hành bạn chọn và liên hệ trong vòng 24 giờ.",
-      planner:
-        "Chúng tôi đã nhận thông tin chuyến đi của bạn. Chuyên viên tư vấn sẽ gửi email đề xuất thiết kế riêng miễn phí trong vòng 24 giờ.",
-      car: "Chúng tôi đã nhận yêu cầu thuê xe riêng của bạn và sẽ xác nhận xe cùng giá cuối cùng trong vòng 24 giờ – thường sớm hơn nhiều.",
-      visa: "Chúng tôi đã nhận yêu cầu visa & fast-track của bạn và sẽ xác nhận gói dịch vụ cùng giấy tờ cần chuẩn bị trong vòng 24 giờ.",
-      contact:
-        "Chúng tôi đã nhận tin nhắn của bạn và sẽ phản hồi trong vòng 24 giờ (thường sớm hơn nhiều).",
-      partner:
-        "Chúng tôi đã nhận đề nghị hợp tác của bạn. Bộ phận B2B sẽ liên hệ trong vòng 24 giờ.",
+    hello: (n) => `Xin chào ${n},`,
+    received: {
+      booking: "Cảm ơn bạn! Vietlook Travel đã nhận được yêu cầu đặt tour của bạn.",
+      planner: "Cảm ơn bạn! Vietlook Travel đã nhận được yêu cầu thiết kế tour của bạn.",
+      car: "Cảm ơn bạn! Vietlook Travel đã nhận được yêu cầu thuê xe của bạn.",
+      visa: "Cảm ơn bạn! Vietlook Travel đã nhận được yêu cầu visa & fast-track của bạn.",
+      contact: "Cảm ơn bạn! Vietlook Travel đã nhận được tin nhắn của bạn.",
+      partner: "Cảm ơn bạn! Vietlook Travel đã nhận được đề nghị hợp tác của bạn.",
     },
     codeLabel: "Mã yêu cầu của bạn",
     keepCode: "Khi liên hệ, bạn chỉ cần đọc mã này cho chúng tôi.",
     summary: "Yêu cầu của bạn",
     estimate: "Giá tạm tính",
-    priceNote:
-      "Giá tạm tính – chuyên viên sẽ xác nhận giá cuối cùng với bạn. Không cần thanh toán trực tuyến.",
-    yourDetails: "Thông tin liên hệ của bạn",
-    yourMessage: "Lời nhắn của bạn",
-    next: "Các bước tiếp theo",
-    steps: {
-      first: "Chuyên viên tư vấn xem yêu cầu của bạn – trong vòng 24 giờ.",
-      second: {
-        booking: "Chúng tôi xác nhận còn chỗ và gửi xác nhận đặt tour kèm hướng dẫn thanh toán.",
-        planner:
-          "Chúng tôi gửi lịch trình chi tiết từng ngày với giá minh bạch – thoải mái điều chỉnh.",
-        car: "Chúng tôi xác nhận xe, tài xế và giá cuối cùng.",
-        visa: "Chúng tôi xác nhận gói dịch vụ, giá và giấy tờ cần bạn cung cấp.",
-        contact: "Chúng tôi phản hồi đầy đủ thông tin bạn cần.",
-        partner: "Chúng tôi gửi bảng giá B2B và điều khoản hợp tác.",
-      },
-      pay: "Xác nhận và thanh toán theo cách thuận tiện – chuyển khoản hoặc trực tiếp, không cần thanh toán trực tuyến.",
-      chat: "Cần thêm gì? Nhắn cho chúng tôi qua WhatsApp, WeChat hoặc Zalo bất cứ lúc nào.",
+    estimateNote: "Đây là giá tạm tính – chúng tôi sẽ xác nhận giá cuối cùng với bạn.",
+    next: "Tiếp theo",
+    nextText: {
+      booking:
+        "Chuyên viên tư vấn sẽ kiểm tra chỗ và phản hồi trong vòng 24 giờ kèm xác nhận đặt tour và hướng dẫn thanh toán. Bạn không cần thanh toán trực tuyến.",
+      planner:
+        "Trong vòng 24 giờ, chuyên viên tư vấn sẽ gửi email lịch trình chi tiết từng ngày kèm giá rõ ràng. Bạn có thể điều chỉnh mọi thứ trước khi xác nhận.",
+      car: "Chúng tôi sẽ xác nhận xe, tài xế và giá cuối cùng trong vòng 24 giờ – thường sớm hơn nhiều. Bạn không cần thanh toán trực tuyến.",
+      visa: "Chúng tôi sẽ xác nhận gói dịch vụ, giá và giấy tờ cần chuẩn bị trong vòng 24 giờ. Bạn không cần thanh toán trực tuyến.",
+      contact: "Chúng tôi sẽ trả lời bạn trong vòng 24 giờ – thường sớm hơn nhiều.",
+      partner: "Bộ phận B2B sẽ liên hệ bạn trong vòng 24 giờ kèm bảng giá và điều khoản hợp tác.",
     },
-    help: "Cần hỗ trợ sớm hơn?",
-    helpText: "Đội ngũ tại Việt Nam luôn sẵn sàng 24/7.",
-    call: "Gọi hotline",
-    emailUs: "Gửi email",
-    wechat: "WeChat / Zalo",
+    nextBookingPay:
+      "Chuyên viên tư vấn sẽ kiểm tra chỗ và phản hồi trong vòng 24 giờ kèm xác nhận đặt tour. Nếu bạn đã thanh toán online, bạn sẽ nhận thêm email biên nhận; nếu chưa, chúng tôi sẽ gửi hướng dẫn thanh toán.",
+    questions: "Có câu hỏi? Bạn chỉ cần trả lời email này hoặc nhắn cho chúng tôi qua WhatsApp.",
+    whatsapp: "Nhắn qua WhatsApp",
+    orCall: "Hoặc gọi",
     signoff: "Trân trọng,",
     team: "Đội ngũ Vietlook Travel",
-    licence: "Giấy phép lữ hành quốc tế",
-    why: "Bạn nhận được email này vì địa chỉ email này đã được dùng để gửi yêu cầu trên website Vietlook Travel. Nếu không phải bạn, hãy bỏ qua email này hoặc trả lời để chúng tôi biết.",
-    subject: (e) =>
-      e.type === "booking"
-        ? `Đã nhận yêu cầu đặt tour – ${e.code} | Vietlook Travel`
-        : `Vietlook Travel đã nhận yêu cầu của bạn – ${e.code}`,
-    preheader: (e) => `Mã yêu cầu ${e.code} · chuyên viên sẽ phản hồi trong vòng 24 giờ.`,
+    why: "Bạn nhận được email này vì địa chỉ email này đã được dùng để gửi yêu cầu trên website Vietlook Travel. Nếu không phải bạn, vui lòng bỏ qua email này.",
+    subject: (e) => `Yêu cầu ${e.code} của bạn đã được tiếp nhận`,
+    preheader: (e) => `Mã yêu cầu ${e.code} · chúng tôi sẽ phản hồi trong vòng 24 giờ.`,
   },
 };
-
-/** Chân email chung (thông tin công ty), căn giữa */
-function footer(lang, note) {
-  const t = CUSTOMER[lang];
-  const link = (href, label) =>
-    `<a class="lnk" href="${escape(href)}" target="_blank" style="color:${C.brand};text-decoration:none;font-weight:600">${escape(label)}</a>`;
-  const dot = ` <span style="color:#a9b7c3">&nbsp;·&nbsp;</span> `;
-  const small = (html, margin = "0 0 4px") =>
-    `<p class="mu" style="margin:${margin};font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}">${html}</p>`;
-  return footerRow(`<p class="tx" style="margin:0 0 8px;font-family:${FONT};font-size:14px;line-height:20px;font-weight:700;color:${C.navy}">${escape(COMPANY.legalName[lang])}</p>
-${small(escape(COMPANY.address[lang]))}
-${small(`Hotline / WhatsApp / Zalo: ${link(telHref(COMPANY.hotline), COMPANY.hotline)}${dot}${link(`mailto:${COMPANY.email}`, COMPANY.email)}`)}
-${small(`${escape(t.licence)}: ${escape(COMPANY.licence)}`, "0 0 16px")}
-<p style="margin:0 0 18px;font-family:${FONT};font-size:13px;line-height:20px">${COMPANY.social.map(([n, h]) => link(h, n)).join(dot)}</p>
-${note ? `<p class="mu" style="margin:0 auto;max-width:460px;font-family:${FONT};font-size:12px;line-height:18px;color:${C.faint}">${escape(note)}</p>` : ""}`);
-}
 
 export function customerEmail(e, lookups = {}) {
   const lang = pickLang(e.lang);
   const t = CUSTOMER[lang];
   const type = TYPE_LABEL[lang][e.type] ? e.type : "contact";
-  const { facts, rows, long, price } = describeEnquiry(e, lang, lookups);
+  const { facts, price } = describeEnquiry(e, lang, lookups);
   const name = String(e.name ?? "").trim();
 
-  const contactRows = [
-    ["name", name],
-    ["email", e.email],
-    ["phone", e.phone],
-    ["nationality", e.nationality],
-  ]
-    .filter(([, v]) => v)
-    .map(([k, v]) => ({ key: k, label: fieldLabel(k, lang, e.type), text: String(v) }));
-
-  const nextSteps = [
-    t.steps.first,
-    t.steps.second[type],
-    ["contact", "partner"].includes(type) ? t.steps.chat : t.steps.pay,
+  // Chỉ thông tin chính (tour / tuyến, ngày, số khách, hạng khách sạn, giá tạm tính)
+  const summary = [
+    ...facts.map((f) => (f.key === "priceUSD" ? { ...f, strong: true } : f)),
+    ...(price ? [{ key: "estimate", label: t.estimate, text: price.total, strong: true }] : []),
   ];
+  const hasEstimate = summary.some((r) => r.key === "estimate");
+  // 9Pay đang bật → không nói "không cần thanh toán trực tuyến"
+  const nextText =
+    type === "booking" && lookups.paymentOnline ? t.nextBookingPay : t.nextText[type];
 
   const body = [
-    facts.length || rows.length
-      ? section(
-          `${heading(t.summary)}${factGrid(facts)}${rows.length ? `<div style="height:12px;line-height:12px;font-size:0">&nbsp;</div>${detailTable(rows)}` : ""}`,
-          { top: 32 },
-        )
+    // lời chào → câu xác nhận (12) → ô mã (24) → chú thích (8) → các mục (32, tiêu đề → nội dung 10)
+    p(escape(t.hello(name)), { margin: `0 0 ${SPACE.para}px` }),
+    p(escape(t.received[type]), { margin: "0 0 24px" }),
+    codeBox(t.codeLabel, e.code),
+    p(escape(t.keepCode), {
+      size: 13,
+      muted: true,
+      margin: `${SPACE.tight}px 0 0`,
+      align: "center",
+    }),
+    summary.length
+      ? `${subhead(t.summary)}${table(summary)}${hasEstimate ? p(escape(t.estimateNote), { size: 13, muted: true, margin: `${SPACE.tight}px 0 0` }) : ""}`
       : "",
-    price
-      ? section(
-          `${heading(t.estimate)}${priceTable(price.lines, t.estimate, price.total, t.priceNote)}`,
-        )
-      : "",
-    ...long.map((l) =>
-      section(`${heading(l.key === "message" ? t.yourMessage : l.label)}${quote(l.text)}`),
+    subhead(t.next),
+    p(escape(nextText), { margin: "0" }),
+    // nhóm liên hệ liền nhau: câu hỏi → nút (16) → "Hoặc gọi" (12)
+    p(escape(t.questions), { margin: "24px 0 0" }),
+    button(COMPANY.whatsapp, t.whatsapp, { top: 16 }),
+    p(
+      `${escape(t.orCall)} ${link(telHref(COMPANY.hotline), COMPANY.hotline)} · ${link(`mailto:${COMPANY.email}?subject=${encodeURIComponent(e.code)}`, COMPANY.email)}`,
+      { size: 14, muted: true, margin: `${SPACE.para}px 0 0`, align: "center" },
     ),
-    contactRows.length ? section(`${heading(t.yourDetails)}${detailTable(contactRows)}`) : "",
-    divider(),
-    section(`${heading(t.next)}${stepCards(nextSteps)}`, { top: 30 }),
-    section(
-      panel(
-        `<p class="tx" style="margin:0 0 4px;font-family:${FONT};font-size:17px;line-height:24px;font-weight:700;color:${C.navy}">${escape(t.help)}</p>
-<p class="mu" style="margin:0 0 16px;font-family:${FONT};font-size:14px;line-height:21px;color:${C.muted}">${escape(t.helpText)}</p>
-${pills([
-  {
-    href: telHref(COMPANY.hotline),
-    label: `${t.call} ${COMPANY.hotline}`,
-    bg: C.brand,
-    color: "#ffffff",
-  },
-  { href: COMPANY.whatsapp, label: "WhatsApp", bg: "#ffffff", color: C.brandDark },
-  {
-    href: `mailto:${COMPANY.email}?subject=${encodeURIComponent(e.code)}`,
-    label: t.emailUs,
-    bg: "#ffffff",
-    color: C.brandDark,
-  },
-])}
-<p class="mu" style="margin:8px 0 0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}">${escape(t.wechat)}: <b>${escape(COMPANY.wechatId)}</b><br>${escape(COMPANY.hours[lang])}</p>`,
-        { bg: C.brandSoft },
-      ),
-      { top: 30 },
-    ),
-    section(
-      paragraph(
-        `${escape(t.signoff)}<br><b class="tx" style="color:${C.navy}">${escape(t.team)}</b>`,
-        {
-          margin: "0",
-          align: "center",
-        },
-      ),
-      { top: 28, bottom: 34, align: "center" },
-    ),
+    p(`${escape(t.signoff)}<br>${escape(t.team)}`, { margin: `${SPACE.section}px 0 0` }),
   ].join("\n");
+
+  const footer = `<p class="mu" style="margin:0 0 4px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><b>${escape(COMPANY.legalName[lang])}</b><br>${escape(COMPANY.address[lang])}</p>
+<p class="mu" style="margin:10px 0 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted}">${escape(t.why)}</p>`;
 
   const html = shell({
     lang,
     title: t.subject(e),
     preheader: t.preheader(e),
-    hero: hero({
-      eyebrow: typeLabel(e.type, lang),
-      title: t.title(name || "you"),
-      text: escape(t.intro[type]),
-      codeLabel: t.codeLabel,
-      code: e.code,
-      caption: t.keepCode,
-    }),
     body,
-    footer: footer(lang, t.why),
+    footer,
   });
 
   const text = [
-    t.title(name),
+    t.hello(name),
     "",
-    t.intro[type],
+    t.received[type],
     "",
     `${t.codeLabel}: ${e.code}`,
+    t.keepCode,
     "",
-    ...(facts.length || rows.length
-      ? [`— ${t.summary} —`, ...[...facts, ...rows].map((r) => `${r.label}: ${r.text}`), ""]
-      : []),
-    ...(price
+    ...(summary.length
       ? [
-          `— ${t.estimate} —`,
-          ...price.lines.map((l) => `${l.label}: ${l.amount}`),
-          `${t.estimate}: ${price.total}`,
-          t.priceNote,
+          `${t.summary}:`,
+          ...summary.map((r) => `- ${r.label}: ${r.text}`),
+          ...(hasEstimate ? [t.estimateNote] : []),
           "",
         ]
       : []),
-    ...long.flatMap((l) => [`— ${l.label} —`, l.text, ""]),
-    `— ${t.next} —`,
-    ...nextSteps.map((s, i) => `${i + 1}. ${s}`),
+    `${t.next}:`,
+    nextText,
     "",
-    `${t.help} WhatsApp: ${COMPANY.whatsapp} · Hotline: ${COMPANY.hotline} · ${COMPANY.email}`,
+    t.questions,
+    `WhatsApp: ${COMPANY.whatsapp}`,
+    `${t.orCall} ${COMPANY.hotline} · ${COMPANY.email}`,
     "",
     t.signoff,
     t.team,
@@ -356,7 +255,8 @@ ${pills([
     t.why,
   ].join("\n");
 
-  return { subject: t.subject(e), html, text };
+  // Thư giao dịch: mã riêng chống gộp luồng; KHÔNG List-Unsubscribe / Precedence (dấu hiệu thư hàng loạt)
+  return { subject: t.subject(e), html, text, headers: { "X-Entity-Ref-ID": e.code } };
 }
 
 /* =========================================================================
@@ -370,116 +270,107 @@ export function companyEmail(e, lookups = {}) {
   const name = String(e.name ?? "").trim();
   const customerLang = pickLang(e.lang);
   const langName = LANG_NAME.vi[customerLang];
-  const link = adminLink(e);
+  const link_ = adminLink(e);
   const sent = fmtDateTime(e.createdAt ?? new Date(), "vi");
   const headFact = ["booking", "car", "visa", "planner"].includes(e.type) ? facts[0]?.text : "";
-  const subject = `[${e.code}] ${headline} · ${firstLine(name, 40)}${headFact ? ` · ${firstLine(headFact, 50)}` : ""}`;
+  const subject = `${headline} ${e.code} – ${firstLine(name, 40)}`;
 
   const phone = String(e.phone ?? "").trim();
   const email = String(e.email ?? "").trim();
   const wa = waNumber(phone);
-  const contactLines = [
-    phone &&
-      `<a class="lnk" href="${escape(telHref(phone))}" style="color:${C.brand};text-decoration:none;font-weight:600;white-space:nowrap">${escape(phone)}</a>`,
-    email &&
-      `<a class="lnk" href="mailto:${escape(email)}" style="color:${C.brand};text-decoration:none;font-weight:600">${escape(email)}</a>`,
-    e.nationality && `${escape(fieldLabel("nationality", lang))}: <b>${escape(e.nationality)}</b>`,
-  ].filter(Boolean);
   const replySubject = encodeURIComponent(`Re: [${e.code}] Vietlook Travel`);
+  const dot = ` <span class="mu" style="color:${C.muted}">·</span> `;
+  const contactLinks = [
+    phone && link(telHref(phone), phone),
+    wa && link(`https://wa.me/${wa}`, "WhatsApp"),
+    wa && link(`https://zalo.me/${wa}`, "Zalo"),
+  ].filter(Boolean);
 
-  const customerCard = panel(
-    `<p class="mu" style="margin:0 0 4px;font-family:${FONT};font-size:11px;line-height:15px;letter-spacing:1.4px;text-transform:uppercase;font-weight:700;color:${C.muted}">Khách hàng</p>
-<p class="tx" style="margin:0 0 6px;font-family:${FONT};font-size:20px;line-height:27px;font-weight:700;color:${C.navy};word-break:break-word">${escape(name)}</p>
-${contactLines.length ? `<p class="tx" style="margin:0 0 16px;font-family:${FONT};font-size:14px;line-height:22px;color:${C.ink}">${contactLines.join(` <span style="color:#a9b7c3">&nbsp;·&nbsp;</span> `)}</p>` : ""}
-${pills([
-  phone && { href: telHref(phone), label: "Gọi điện", bg: C.brand, color: "#ffffff" },
-  wa && { href: `https://wa.me/${wa}`, label: "WhatsApp", bg: "#ffffff", color: C.brandDark },
-  wa && { href: `https://zalo.me/${wa}`, label: "Zalo", bg: "#ffffff", color: C.brandDark },
-  email && {
-    href: `mailto:${email}?subject=${replySubject}`,
-    label: "Gửi email",
-    bg: "#ffffff",
-    color: C.brandDark,
-  },
-])}
-${customerLang !== "vi" ? `<p class="mu" style="margin:8px 0 0;font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted}">Khách dùng trang <b>${escape(langName)}</b> — nên trả lời bằng ${escape(langName.replace(/^T/, "t"))}.</p>` : ""}`,
-    { bg: C.brandSoft },
-  );
+  const customer = [
+    `<p class="tx" style="margin:0 0 4px;text-align:center;font-family:${FONT};font-size:18px;line-height:26px;font-weight:700;color:${C.text}">${escape(name)}</p>`,
+    contactLinks.length ? p(contactLinks.join(dot), { margin: "0", align: "center" }) : "",
+    email
+      ? p(link(`mailto:${email}?subject=${replySubject}`, email), { margin: "0", align: "center" })
+      : "",
+    e.nationality ? p(`Quốc tịch: ${escape(e.nationality)}`, { margin: "0", align: "center" }) : "",
+    customerLang !== "vi"
+      ? p(
+          `Khách dùng trang ${escape(langName)} — nên trả lời bằng ${escape(langName.replace(/^T/, "t"))}.`,
+          {
+            size: 14,
+            muted: true,
+            margin: `${SPACE.tight}px 0 0`,
+            align: "center",
+          },
+        )
+      : "",
+  ].join("\n");
 
-  const meta = [
-    { key: "createdAt", label: fieldLabel("createdAt", lang), text: sent },
-    { key: "lang", label: fieldLabel("lang", lang), text: langName },
+  const details = [
+    ...facts,
+    ...(price
+      ? [
+          ...price.lines.map((l) => ({ label: l.label, text: l.amount })),
+          { label: "Tổng tạm tính", text: price.total, strong: true },
+        ]
+      : []),
+    ...rows,
     e.page && {
-      key: "page",
-      label: fieldLabel("page", lang),
+      label: "Gửi từ trang",
       text: String(e.page).replace(/^https?:\/\/[^/]+/, "") || "/",
     },
   ].filter(Boolean);
 
   const body = [
-    section(customerCard, { top: 30 }),
-    facts.length ? section(`${heading("Thông tin chính")}${factGrid(facts)}`, { top: 30 }) : "",
-    price
-      ? section(
-          `${heading("Giá tạm tính")}${priceTable(price.lines, "Tổng tạm tính", price.total, "Tính theo bảng giá trong trang quản trị tại thời điểm khách gửi.")}`,
-          { top: 30 },
-        )
+    title(`${headline} –`, e.code),
+    p(`Gửi lúc ${escape(sent)}`, { size: 14, muted: true, margin: "0 0 24px", align: "center" }),
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="ln" align="center" style="border:1px solid ${C.line};border-radius:10px;padding:16px 16px 18px;text-align:center">${customer}</td></tr></table>`,
+    subhead("Chi tiết"),
+    table(details),
+    ...long.map(
+      (l) => `${subhead(l.key === "message" ? "Lời nhắn của khách" : l.label)}${quote(l.text)}`,
+    ),
+    button(link_, "Mở trong trang quản trị"),
+    email
+      ? p("Bấm Trả lời trong hộp thư để email thẳng cho khách.", {
+          size: 13,
+          muted: true,
+          margin: "12px 0 0",
+          align: "center",
+        })
       : "",
-    ...long.map((l) =>
-      section(
-        `${heading(l.label === "Lời nhắn" ? "Lời nhắn của khách" : l.label)}${quote(l.text)}`,
-        { top: 30 },
-      ),
-    ),
-    section(`${heading("Chi tiết")}${detailTable([...rows, ...meta])}`, { top: 30 }),
-    section(
-      `${button(link, "Mở trong trang quản trị")}${email ? `<p class="mu" style="margin:14px 0 0;text-align:center;font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted}">Bấm <b>Trả lời</b> trong hộp thư để email thẳng cho khách.</p>` : ""}`,
-      { top: 26, bottom: 32 },
-    ),
   ].join("\n");
 
   const html = shell({
     lang,
     title: subject,
     preheader: `${name}${headFact ? ` · ${headFact}` : ""}${phone ? ` · ${phone}` : ""}`,
-    hero: hero({
-      eyebrow: `${typeLabel(e.type, "vi")} · ${sent}`,
-      title: headline,
-      text: `Từ <b style="color:#ffffff">${escape(name)}</b>${headFact ? ` · ${escape(firstLine(headFact, 70))}` : ""}`,
-      codeLabel: "Mã yêu cầu",
-      code: e.code,
-    }),
     body,
-    footer: footerRow(
-      `<p class="mu" style="margin:0 auto;max-width:440px;font-family:${FONT};font-size:12px;line-height:18px;color:${C.faint}">Email tự động từ website Vietlook Travel, gửi tới email nhận thông báo trong <b>Cài đặt</b> của trang quản trị.</p>`,
-    ),
   });
 
   const text = [
-    `${headline} — ${e.code}`,
+    `${headline} – ${e.code}`,
     "",
     `Khách hàng: ${name}`,
     phone ? `Điện thoại: ${phone}` : null,
     email ? `Email: ${email}` : null,
     e.nationality ? `Quốc tịch: ${e.nationality}` : null,
+    customerLang !== "vi" ? `Ngôn ngữ khách dùng: ${langName}` : null,
     "",
-    ...[...facts, ...rows, ...meta].map((r) => `${r.label}: ${r.text}`),
-    ...(price
-      ? [
-          "",
-          "Giá tạm tính:",
-          ...price.lines.map((l) => `  ${l.label}: ${l.amount}`),
-          `  Tổng: ${price.total}`,
-        ]
-      : []),
+    ...details.map((r) => `${r.label}: ${r.text}`),
     ...long.flatMap((l) => ["", `${l.label}:`, l.text]),
     "",
-    `Mở trong trang quản trị: ${link}`,
+    `Mở trong trang quản trị: ${link_}`,
   ]
     .filter((x) => x != null)
     .join("\n");
 
-  return { subject, html, text };
+  return {
+    subject,
+    html,
+    text,
+    headers: { "X-Entity-Ref-ID": e.code, "Auto-Submitted": "auto-generated" },
+  };
 }
 
 /** Dùng cho test / xem trước: định dạng 1 giá trị lẻ */

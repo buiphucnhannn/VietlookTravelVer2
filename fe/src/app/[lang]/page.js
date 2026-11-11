@@ -25,6 +25,7 @@ import PartnersBlock from "@/components/home/PartnersBlock";
 import PartnerStrip from "@/components/home/PartnerStrip";
 import DrumStats from "@/components/home/DrumStats";
 import { withHomeCopy } from "@/components/home/copy";
+import { homeImages } from "@/components/home/images";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -58,6 +59,8 @@ export default async function HomePage({ params }) {
   // Câu chữ các khối: bản đã sửa trong CMS → Trang chủ đè lên câu mặc định của từ điển (ô trống → mặc định)
   const dict = { ...baseDict, home: withHomeCopy(baseDict.home, home.copy, lang) };
   const labels = cardLabels(dict);
+  // Ảnh các khối: ảnh nhân viên thay trong CMS → Trang chủ, ô trống → ảnh có sẵn
+  const images = homeImages(home.images);
 
   // Bản đồ Bắc → Nam: mọi điểm đến có toạ độ + 2 tour nổi bật
   const mapItems = destinations
@@ -68,7 +71,7 @@ export default async function HomePage({ params }) {
       name: tr(d.name, lang),
       region: tr(getRegion(d.region)?.name, lang),
       intro: tr(d.intro, lang),
-      image: d.hero || d.image,
+      image: d.image || d.hero,
       href: `${lp(lang)}/destinations/${d.slug}`,
       count: countFor(d.slug),
       tours: toursByDestination(d.slug)
@@ -112,9 +115,9 @@ export default async function HomePage({ params }) {
         destinations={destinations}
       />
       <TrustStrip items={dict.home.trust} />
-      <ServicesTrio lang={lang} dict={dict} />
+      <ServicesTrio lang={lang} dict={dict} images={images.services} />
       <FeaturedTours lang={lang} dict={dict} labels={labels} cards={featured} />
-      <B2BBlock lang={lang} dict={dict} />
+      <B2BBlock lang={lang} dict={dict} images={images} />
       <section className="bg-cream-100 py-14 lg:py-[4.5rem]" id="map">
         <Container>
           <SectionHeading
@@ -150,7 +153,7 @@ export default async function HomePage({ params }) {
       />
       <BookingSteps dict={dict} />
       <ThemesMasonry lang={lang} dict={dict} themes={homeThemes()} />
-      <CustomTrip lang={lang} dict={dict} />
+      <CustomTrip lang={lang} dict={dict} starImages={images.star} starLabels={home.starLabels} />
 
       <WhyUs dict={dict} />
       <PartnerStrip title={dict.home.partnerStrip} />
@@ -158,7 +161,7 @@ export default async function HomePage({ params }) {
       <Reviews lang={lang} dict={dict} reviews={reviews} />
       <GuideAndMonths lang={lang} dict={dict} posts={latestPosts} months={monthPosts()} />
       <PlannerBlock lang={lang} dict={dict} destinationOptions={plannerOptions(lang)} />
-      <AboutBlob lang={lang} dict={dict} />
+      <AboutBlob lang={lang} dict={dict} image={images.about} />
     </>
   );
 }

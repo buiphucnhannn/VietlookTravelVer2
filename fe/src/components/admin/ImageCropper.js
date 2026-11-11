@@ -9,21 +9,29 @@
  *   const url = await crop.recrop(currentUrl);              // cắt lại ảnh đang dùng
  *   …  {crop.dialog}                                        // đặt 1 lần trong JSX
  *
- * - Ảnh lệch khung (> 3%) → tự mở hộp cắt; vừa khung → tải thẳng (ảnh quá lớn thì thu nhỏ, giữ chất lượng).
+ * - KHÔNG tải gì lên kho ảnh ở đây: kết quả là link tạm "chờ lưu" (./pendingImages.js) — ảnh chỉ được lưu khi
+ *   nhân viên bấm Lưu (usePendingImages().prepare). Huỷ form → không tốn lượt tải.
+ * - Ảnh lệch khung (> 3%) → tự mở hộp cắt; vừa khung → giữ nguyên (ảnh quá lớn thì thu nhỏ, giữ chất lượng).
  * - Ảnh lệch khung BẮT BUỘC chọn vùng (không có "dùng nguyên ảnh"). Nhiều ảnh → cắt lần lượt ("Ảnh 2/5"), có "Bỏ qua ảnh này".
- * - Ảnh từ link: backend lưu về Cloudinary trước (trình duyệt không gọi tới link lạ), sau đó mới đọc bản
- *   Cloudinary (có CORS) để cắt; cắt xong tải bản mới lên rồi xoá bản vừa nhập.
+ * - Ảnh từ link: hệ thống lấy ảnh về giúp (kiểm tra link là ảnh thật, công khai) rồi xử lý như ảnh từ máy.
+ * - Cắt lại ảnh chưa lưu → cắt từ ẢNH GỐC (không cắt chồng lên bản đã cắt).
  * - Ảnh ra luôn vẽ từ ẢNH GỐC đủ độ phân giải (đúng chiều EXIF), thu nhỏ từng nửa / phóng to từng bước ≤ 2×,
  *   làm nét nhẹ sau khi phóng to; xuất WebP 0.92 (JPEG nếu trình duyệt không hỗ trợ), ảnh có nền trong suốt → PNG.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Cropper from "react-easy-crop";
+import dynamic from "next/dynamic";
 import { Check, Crop, ImageIcon, RotateCw, SkipForward, ZoomIn, ZoomOut } from "lucide-react";
-import { api } from "@/lib/api";
+import { ApiError, refreshSession } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { Button, Modal, uploadImages, useUi } from "./ui";
+import { addPendingImage, isPendingImage, pendingOriginal } from "./pendingImages";
+import { Button, Modal, useUi } from "./ui";
+// Bộ cắt ảnh chỉ tải khi mở hộp cắt (giảm dung lượng tải ban đầu của trang quản trị)
+const Cropper = dynamic(() => import("react-easy-crop"), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0 animate-pulse bg-slate-800" />,
+});
 
 /* =========================================================================
  * Khung khuyến nghị cho từng ô ảnh
@@ -108,11 +116,13 @@ const MAX_CANVAS_AREA = 16_000_000; // an toàn cho Safari iOS
 
 const CLOUDINARY = /^https:\/\/res\.cloudinary\.com\/[\w-]+\/image\/upload\//;
 export const isCloudinaryUrl = (u) => typeof u === "string" && CLOUDINARY.test(u);
-/** Ảnh có thể cắt lại: ảnh trên kho ảnh của website hoặc ảnh có sẵn trong /images */
+/** Ảnh có thể cắt lại: ảnh trên kho ảnh của website, ảnh có sẵn trong /images, ảnh vừa chọn (chưa lưu) */
 export const canRecrop = (u) =>
   typeof u === "string" &&
-  (isCloudinaryUrl(u) || /^\/images\/[\w./ ()-]+\.(jpe?g|png|webp|avif)$/i.test(u)) &&
-  !/\.(svg|gif|mp4|webm)(\?|$)/i.test(u);
+  (isPendingImage(u)
+    ? pendingOriginal(u)?.type !== "image/gif"
+    : (isCloudinaryUrl(u) || /^\/images\/[\w./ ()-]+\.(jpe?g|png|webp|avif)$/i.test(u)) &&
+      !/\.(svg|gif|mp4|webm)(\?|$)/i.test(u));
 
 /** Giải mã ảnh ĐẦY ĐỦ độ phân giải, đúng chiều xoay EXIF */
 async function decode(blob) {
@@ -304,32 +314,36 @@ async function fetchOwnImage(url) {
   return r.blob();
 }
 
-/** Biến đổi Cloudinary (dùng khi trình duyệt không đọc được ảnh): xoay → cắt → thu/phóng */
-function cloudinaryTransform(url, src, decision, spec) {
-  const area = areaPixels(src, decision.area, decision.rotation);
-  const { w } = outSize(spec, decision.ratio);
-  const r = Math.round;
-  const parts = [
-    decision.rotation ? `a_${decision.rotation}` : null,
-    `c_crop,x_${r(area.x)},y_${r(area.y)},w_${r(area.width)},h_${r(area.height)}`,
-    `c_scale,w_${w}`,
-    "q_95",
-  ].filter(Boolean);
-  return url.replace("/image/upload/", `/image/upload/${parts.join("/")}/`);
+/**
+ * Ảnh từ link: hệ thống lấy ảnh về giúp (chặn link nội bộ, chỉ nhận file ảnh thật) → File trên máy.
+ * CHƯA lưu vào kho ảnh — chỉ lưu khi bấm Lưu.
+ */
+async function fetchLinkImage(link) {
+  const go = () =>
+    fetch("/api/v1/uploads/images/link-preview", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        Accept: "image/*, application/json",
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
+      body: JSON.stringify({ url: link.trim() }),
+      signal: AbortSignal.timeout(60_000),
+    }).catch(() => null);
+  let r = await go();
+  if (r?.status === 401 && (await refreshSession())) r = await go();
+  if (!r) throw new ApiError(0, null);
+  if (!r.ok) throw new ApiError(r.status, await r.json().catch(() => null));
+  const blob = await r.blob();
+  let name = "anh";
+  try {
+    name = decodeURIComponent(new URL(link).pathname.split("/").pop() || "") || "anh";
+  } catch {
+    // tên file lạ → dùng tên mặc định
+  }
+  return new File([blob], name.slice(0, 80), { type: blob.type });
 }
-
-async function importRaw(url, folder) {
-  const r = await api("/uploads/images/from-url", {
-    method: "POST",
-    body: { url: url.trim(), folder },
-    timeout: 90_000,
-  });
-  return r.data; // { url, publicId, width, height }
-}
-const removeImported = (publicId) =>
-  publicId
-    ? api("/uploads/images", { method: "DELETE", body: { publicId } }).catch(() => {})
-    : Promise.resolve();
 
 /* =========================================================================
  * Hook dùng trong các ô ảnh
@@ -363,160 +377,97 @@ export function useImageCrop(spec, folder = "misc") {
 
   const startRatio = (w, h) => (spec.ratio ? spec.ratio : closestOption(spec, w / h));
 
-  /** Ảnh từ máy → danh sách URL đã tải lên (ảnh bị bỏ qua không có trong danh sách) */
-  const uploadFiles = async (files, { max = 10 } = {}) => {
-    const list = [];
-    for (const f of [...(files ?? [])]) {
-      if (!ACCEPT.includes(f.type))
-        toast(`"${f.name}" không phải ảnh JPG / PNG / WebP / AVIF / GIF`, "error");
-      else if (f.size > (f.type === "image/gif" ? SERVER_LIMIT : MAX_INPUT))
-        toast(`"${f.name}" quá nặng — hãy chọn ảnh nhỏ hơn`, "error");
-      else list.push(f);
+  /** Lọc định dạng / dung lượng (ảnh lỗi báo ngay, không chặn các ảnh khác) */
+  const acceptable = (f) => {
+    if (!ACCEPT.includes(f.type))
+      toast(`"${f.name}" không phải ảnh JPG / PNG / WebP / AVIF / GIF`, "error");
+    else if (f.size > (f.type === "image/gif" ? SERVER_LIMIT : MAX_INPUT))
+      toast(`"${f.name}" quá nặng — hãy chọn ảnh nhỏ hơn`, "error");
+    else return true;
+    return false;
+  };
+
+  /**
+   * 1 ảnh trên máy → { file (bản sẽ lưu), original } | "skip" | "cancel".
+   * Lệch khung → hỏi vùng cắt; quá lớn → thu nhỏ; còn lại giữ nguyên file.
+   */
+  const processFile = async (f, index, total, beforeCrop) => {
+    // GIF (có thể là ảnh động) giữ nguyên
+    if (f.type === "image/gif") return { file: f, original: f };
+    let src;
+    try {
+      src = await decode(f);
+    } catch {
+      if (f.size <= SERVER_LIMIT) return { file: f, original: f }; // để hệ thống kiểm tra lại khi lưu
+      toast(`Không đọc được ảnh "${f.name}"`, "error");
+      return "skip";
     }
-    const picked = list.slice(0, max);
-    const out = [];
+    try {
+      const alpha = hasAlpha(src, f.type);
+      let decision = { type: "original" };
+      if (needsCrop(src.width, src.height, spec)) {
+        beforeCrop?.();
+        const url = URL.createObjectURL(f);
+        try {
+          decision = await ask({
+            src: url,
+            name: f.name,
+            index,
+            total,
+            natural: { w: src.width, h: src.height },
+            ratio: startRatio(src.width, src.height),
+            auto: true,
+          });
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+      if (decision.type === "cancel" || decision.type === "skip") return decision.type;
+      if (decision.type === "crop")
+        return { file: await cropToFile(src, alpha, decision, spec, f.name), original: f };
+      if (isHuge(src.width, src.height) || f.size > SERVER_LIMIT)
+        return { file: await shrinkToFile(src, alpha, f.name), original: f };
+      return { file: f, original: f };
+    } finally {
+      src.close();
+    }
+  };
+
+  const keep = ({ file, original }) => addPendingImage(file, { folder, original });
+
+  /** Ảnh từ máy → danh sách link tạm "chờ lưu" (ảnh bị bỏ qua không có trong danh sách) */
+  const uploadFiles = async (files, { max = 10 } = {}) => {
+    const picked = [...(files ?? [])].filter(acceptable).slice(0, max);
+    const urls = [];
     try {
       for (let i = 0; i < picked.length; i++) {
-        const f = picked[i];
-        // GIF (có thể là ảnh động) giữ nguyên
-        if (f.type === "image/gif") {
-          out.push(f);
-          continue;
-        }
-        let src;
-        try {
-          src = await decode(f);
-        } catch {
-          if (f.size <= SERVER_LIMIT)
-            out.push(f); // để hệ thống kiểm tra lại
-          else toast(`Không đọc được ảnh "${f.name}"`, "error");
-          continue;
-        }
-        try {
-          const alpha = hasAlpha(src, f.type);
-          let decision = { type: "original" };
-          if (needsCrop(src.width, src.height, spec)) {
-            const url = URL.createObjectURL(f);
-            try {
-              decision = await ask({
-                src: url,
-                name: f.name,
-                index: i,
-                total: picked.length,
-                natural: { w: src.width, h: src.height },
-                ratio: startRatio(src.width, src.height),
-                auto: true,
-              });
-            } finally {
-              URL.revokeObjectURL(url);
-            }
-          }
-          if (decision.type === "cancel") break;
-          if (decision.type === "skip") continue;
-          if (decision.type === "crop")
-            out.push(await cropToFile(src, alpha, decision, spec, f.name));
-          else if (isHuge(src.width, src.height) || f.size > SERVER_LIMIT)
-            out.push(await shrinkToFile(src, alpha, f.name));
-          else out.push(f);
-        } finally {
-          src.close();
-        }
+        const r = await processFile(picked[i], i, picked.length);
+        if (r === "cancel") break;
+        if (r !== "skip") urls.push(keep(r));
       }
     } finally {
       close();
     }
-    const urls = [];
-    for (let i = 0; i < out.length; i += 10)
-      urls.push(...(await uploadImages(out.slice(i, i + 10), folder)));
     return urls;
   };
 
-  /** Xử lý 1 ảnh vừa nhập từ link (đã nằm trên Cloudinary) → URL cuối cùng | null (bỏ qua) | "cancel" */
-  const finishImported = async (img, index, total, beforeCrop) => {
-    const crop = needsCrop(img.width, img.height, spec);
-    if (!crop && !isHuge(img.width, img.height)) return img.url;
-    let src = null;
-    let blob = null;
-    try {
-      blob = await fetchOwnImage(img.url);
-      src = await decode(blob);
-    } catch {
-      src = null; // trình duyệt không đọc được → để Cloudinary cắt giúp
-    }
-    try {
-      const natural = { w: src?.width ?? img.width, h: src?.height ?? img.height };
-      let decision = { type: "original" };
-      let objectUrl = null;
-      if (crop) {
-        beforeCrop?.();
-        objectUrl = blob && src ? URL.createObjectURL(blob) : null;
-        try {
-          decision = await ask({
-            src: objectUrl ?? img.url,
-            remote: !objectUrl,
-            index,
-            total,
-            natural,
-            ratio: startRatio(natural.w, natural.h),
-            auto: true,
-          });
-        } finally {
-          if (objectUrl) URL.revokeObjectURL(objectUrl);
-        }
-      }
-      if (decision.type === "cancel" || decision.type === "skip") {
-        await removeImported(img.publicId);
-        return decision.type === "cancel" ? "cancel" : null;
-      }
-      if (decision.type === "original" && !isHuge(natural.w, natural.h)) return img.url;
-      let url;
-      if (src) {
-        const alpha = hasAlpha(src, blob?.type);
-        const file =
-          decision.type === "crop"
-            ? await cropToFile(src, alpha, decision, spec, "anh")
-            : await shrinkToFile(src, alpha, "anh");
-        [url] = await uploadImages([file], folder);
-      } else {
-        const t =
-          decision.type === "crop"
-            ? cloudinaryTransform(img.url, { width: natural.w, height: natural.h }, decision, spec)
-            : img.url.replace(
-                "/image/upload/",
-                `/image/upload/c_limit,w_${HUGE_TARGET},h_${HUGE_TARGET}/`,
-              );
-        url = (await importRaw(t, folder)).url;
-      }
-      await removeImported(img.publicId);
-      return url;
-    } finally {
-      src?.close();
-    }
-  };
-
-  /** Ảnh từ link → { urls, failed } */
+  /** Ảnh từ link → { urls (link tạm "chờ lưu"), failed }. 1 link lỗi → ném lỗi để báo rõ lý do. */
   const importLinks = async (links, { beforeCrop } = {}) => {
     const urls = [];
     let failed = 0;
     try {
-      for (let i = 0; i < links.length; i++) {
-        let img;
-        try {
-          img = await importRaw(links[i], folder);
-        } catch (err) {
+      // lấy song song mọi link (nhanh hơn), sau đó mới cắt lần lượt
+      const files = await Promise.allSettled(links.map((l) => fetchLinkImage(l)));
+      if (links.length === 1 && files[0].status === "rejected") throw files[0].reason;
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i].status === "fulfilled" ? files[i].value : null;
+        if (!f || !acceptable(f)) {
           failed++;
-          if (links.length === 1) throw err;
           continue;
         }
-        try {
-          const url = await finishImported(img, i, links.length, beforeCrop);
-          if (url === "cancel") break;
-          if (url) urls.push(url);
-        } catch {
-          // cắt không được → vẫn giữ ảnh đã nhập
-          urls.push(img.url);
-          if (links.length === 1) toast("Không cắt được ảnh này, đã giữ nguyên ảnh", "error");
-        }
+        const r = await processFile(f, i, links.length, beforeCrop);
+        if (r === "cancel") break;
+        if (r !== "skip") urls.push(keep(r));
       }
     } finally {
       close();
@@ -524,13 +475,13 @@ export function useImageCrop(spec, folder = "misc") {
     return { urls, failed };
   };
 
-  /** Cắt lại ảnh đang dùng → URL mới | null (huỷ). Ảnh cũ giữ nguyên (có thể đang dùng ở chỗ khác). */
+  /** Cắt lại ảnh đang dùng → link tạm mới | null (huỷ). Ảnh cũ giữ nguyên (có thể đang dùng ở chỗ khác). */
   const recrop = async (url) => {
     if (!canRecrop(url)) return null;
     let src;
     let blob;
     try {
-      blob = await fetchOwnImage(url);
+      blob = pendingOriginal(url) ?? (await fetchOwnImage(url));
       src = await decode(blob);
     } catch {
       toast("Không mở được ảnh này để cắt — hãy tải ảnh lên lại", "error");
@@ -547,9 +498,8 @@ export function useImageCrop(spec, folder = "misc") {
         auto: false,
       });
       if (decision.type !== "crop") return null;
-      const file = await cropToFile(src, hasAlpha(src, blob.type), decision, spec, "anh");
-      const [next] = await uploadImages([file], folder);
-      return next;
+      const file = await cropToFile(src, hasAlpha(src, blob.type), decision, spec, blob.name);
+      return keep({ file, original: blob });
     } finally {
       URL.revokeObjectURL(objectUrl);
       src.close();
@@ -678,7 +628,7 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
         <div className="min-w-0 space-y-3">
-          <div className="relative h-[44svh] min-h-[240px] overflow-hidden rounded-2xl bg-slate-900 sm:h-[400px]">
+          <div className="relative h-[min(44svh,360px)] min-h-[220px] overflow-hidden rounded-2xl bg-slate-900 sm:h-[400px]">
             <Cropper
               image={job.src}
               crop={crop}
@@ -703,7 +653,7 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
                 type="button"
                 aria-label="Thu nhỏ"
                 onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
-                className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 sm:size-9"
               >
                 <ZoomOut className="size-4" />
               </button>
@@ -721,7 +671,7 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
                 type="button"
                 aria-label="Phóng to"
                 onClick={() => setZoom((z) => Math.min(6, z + 0.25))}
-                className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 sm:size-9"
               >
                 <ZoomIn className="size-4" />
               </button>

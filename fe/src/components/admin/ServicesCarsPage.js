@@ -40,6 +40,7 @@ import {
   usePaged,
   useUi,
 } from "./ui";
+import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { slugSource, useAutoFill } from "./translate";
 
@@ -104,6 +105,9 @@ export default function ServicesCarsPage() {
   const areas = useAdminList(AREAS, { limit: 100, sort: "order" });
   const [car, setCar] = useState(null);
   const [area, setArea] = useState(null);
+  // mục vừa lưu → thẻ đó được đưa vào tầm nhìn (sang đúng trang) và nháy viền
+  const [savedCar, setSavedCar] = useState(null);
+  const [savedArea, setSavedArea] = useState(null);
 
   return (
     <>
@@ -119,6 +123,7 @@ export default function ServicesCarsPage() {
           addLabel="Thêm loại xe"
           onAdd={() => setCar(EMPTY_CAR)}
           list={cars}
+          reveal={savedCar}
           path={CARS}
           label="loại xe"
           unit="loại xe"
@@ -151,6 +156,7 @@ export default function ServicesCarsPage() {
           addLabel="Thêm khu vực"
           onAdd={() => setArea(EMPTY_AREA)}
           list={areas}
+          reveal={savedArea}
           path={AREAS}
           label="khu vực"
           unit="khu vực"
@@ -179,8 +185,9 @@ export default function ServicesCarsPage() {
           initial={car}
           nextOrder={cars.items.length + 1}
           onClose={() => setCar(null)}
-          onSaved={() => {
+          onSaved={(id) => {
             setCar(null);
+            setSavedCar({ id });
             cars.reload();
           }}
         />
@@ -190,8 +197,9 @@ export default function ServicesCarsPage() {
           initial={area}
           nextOrder={areas.items.length + 1}
           onClose={() => setArea(null)}
-          onSaved={() => {
+          onSaved={(id) => {
             setArea(null);
+            setSavedArea({ id });
             areas.reload();
           }}
         />
@@ -216,12 +224,18 @@ function CardSection({
   image,
   badges,
   render,
+  reveal,
 }) {
   const { canEdit } = usePermission("cars");
   const remove = useRemove(path, label, TAGS, list.reload);
   const reorder = useReorder(list, path, TAGS);
   const paged = usePaged(list.items, PAGE_SIZE);
   const sort = usePagedSort({ all: list.items, paged, onReorder: reorder });
+  const [revealed, setRevealed] = useState(null);
+  if (reveal && reveal !== revealed) {
+    setRevealed(reveal);
+    sort.reveal(reveal.id);
+  }
   const patch = (doc) => list.setItems((xs) => xs.map((y) => (y.id === doc.id ? doc : y)));
 
   return (
@@ -293,17 +307,24 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
   const [keyTouched, setKeyTouched] = useState(!isNew);
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(d);
   const { toast } = useUi();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
+  // Số khách tối đa không vượt số chỗ (VD xe 4 chỗ chở tối đa 4 khách)
+  const paxError =
+    Number(d.pax) > Number(d.seats) ? "Số khách không được nhiều hơn số chỗ của xe" : null;
 
   const save = async () => {
     if (!anyLang(d.name)) return toast("Vui lòng nhập tên loại xe ở ít nhất một ngôn ngữ", "error");
+    if (paxError) return toast(`${paxError}.`, "error");
     const { value: v, failed } = await autoFill.fill(d, { lang });
     if (v !== d) setD(v);
     const key = v.key || slugify(slugSource(v.name));
     if (!key) return toast("Vui lòng nhập mã loại xe", "error");
     if (key !== v.key) set({ key });
-    const body = carPayload({ ...v, key });
+    // ảnh vừa chọn chỉ được lưu vào kho ảnh lúc này
+    const body = await images.prepare(carPayload({ ...v, key }));
+    if (!body) return;
     if (isNew) body.order = nextOrder;
     const ok = await run(
       () =>
@@ -320,16 +341,18 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
           body: { ...carPayload({ ...t, key }), order: body.order },
         }),
       );
-    onSaved();
+    onSaved(ok.data?.id ?? d.id);
   };
 
   return (
     <EditorModal
       size="xl"
       title={isNew ? "Thêm loại xe" : `${editVerb}: ${locText(initial.name)}`}
+      value={d}
       onClose={onClose}
       onSave={save}
-      busy={busy || autoFill.busy}
+      busy={busy || autoFill.busy || images.busy}
+      saveLabel={images.label}
     >
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
         <div className="space-y-4">
@@ -379,7 +402,7 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
                   onChange={(e) => set({ seats: e.target.value })}
                 />
               </Field>
-              <Field label="Số khách">
+              <Field label="Số khách" error={paxError}>
                 <Input
                   type="number"
                   min={1}
@@ -472,6 +495,7 @@ function AreaEditor({ initial, nextOrder, onClose, onSaved }) {
   const [keyTouched, setKeyTouched] = useState(!isNew);
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(d);
   const { toast } = useUi();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
@@ -482,7 +506,9 @@ function AreaEditor({ initial, nextOrder, onClose, onSaved }) {
     const key = v.key || slugify(slugSource(v.name));
     if (!key) return toast("Vui lòng nhập mã khu vực", "error");
     if (key !== v.key) set({ key });
-    const body = areaPayload({ ...v, key });
+    // ảnh vừa chọn chỉ được lưu vào kho ảnh lúc này
+    const body = await images.prepare(areaPayload({ ...v, key }));
+    if (!body) return;
     if (isNew) body.order = nextOrder;
     const ok = await run(
       () =>
@@ -499,15 +525,17 @@ function AreaEditor({ initial, nextOrder, onClose, onSaved }) {
           body: { ...areaPayload({ ...t, key }), order: body.order },
         }),
       );
-    onSaved();
+    onSaved(ok.data?.id ?? d.id);
   };
 
   return (
     <EditorModal
       title={isNew ? "Thêm khu vực phục vụ" : `${editVerb}: ${locText(initial.name)}`}
+      value={d}
       onClose={onClose}
       onSave={save}
-      busy={busy || autoFill.busy}
+      busy={busy || autoFill.busy || images.busy}
+      saveLabel={images.label}
     >
       <div className="space-y-5">
         <LangBar title="Tên theo ngôn ngữ" lang={lang} onLang={setLang} form={d} onForm={setD} />

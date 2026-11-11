@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  cloneElement,
   createContext,
+  isValidElement,
   useCallback,
   useContext,
   useEffect,
@@ -36,8 +38,10 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { canonicalVideo, embedUrl, parseVideo, videoLinkError, videoThumb } from "@/lib/video";
 import { cn } from "@/lib/utils";
+import { useVisualViewport } from "@/lib/use-visual-viewport";
 import { DragHandle, Sortable } from "./Sortable";
 import { CROP_PRESETS, canRecrop, cropSpec, useImageCrop } from "./ImageCropper";
+import { isPendingImage } from "./pendingImages";
 
 /* =========================================================================
  * Ngôn ngữ nội dung
@@ -155,13 +159,22 @@ export const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-ink shadow-[0_1px_1px_rgba(15,23,42,0.03)] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-400 focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-sun-400 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-sun-50";
 
 export function Field({ label, hint, error, required, children, className, htmlFor, aside }) {
+  // Nhãn gắn với ô nhập (bấm nhãn → con trỏ vào ô; trình đọc màn hình đọc đúng tên ô) khi ô là Input/Select…
+  const autoId = useId();
+  const linkable =
+    !htmlFor &&
+    label &&
+    isValidElement(children) &&
+    (LINKABLE_TAGS.includes(children.type) || LINKABLE.has(children.type));
+  const ownId = linkable ? (children.props.id ?? autoId) : undefined;
+  const control = linkable && !children.props.id ? cloneElement(children, { id: autoId }) : children;
   return (
     <div className={className}>
       {(label || aside) && (
         <div className="mb-1.5 flex items-end justify-between gap-3">
           {label && (
             <label
-              htmlFor={htmlFor}
+              htmlFor={htmlFor ?? ownId}
               className="flex items-center gap-1 text-[13px] font-semibold text-slate-700"
             >
               {label}
@@ -171,7 +184,7 @@ export function Field({ label, hint, error, required, children, className, htmlF
           {aside && <span className="text-xs text-slate-400">{aside}</span>}
         </div>
       )}
-      {children}
+      {control}
       {error ? (
         <p className="mt-1.5 flex items-start gap-1 text-xs font-medium text-sun-600">
           <AlertTriangle className="mt-px size-3.5 shrink-0" /> {error}
@@ -265,6 +278,10 @@ export function LocInput({ value, onChange, lang, multiline, rows, placeholder, 
     <Input value={v} placeholder={ph} onChange={(e) => set(e.target.value)} {...props} />
   );
 }
+
+/** Ô nhập mà <Field> tự gắn nhãn (truyền id xuống thẻ input / textarea / select) */
+const LINKABLE_TAGS = ["input", "textarea", "select"];
+const LINKABLE = new Set([Input, Textarea, Select, LocInput]);
 
 /* =========================================================================
  * Khung trang
@@ -627,7 +644,9 @@ export function usePaged(items, pageSize = 12) {
 
 /* =========================================================================
  * Popup (Modal)
- * - Máy tính: hộp giữa màn hình, phóng nhẹ khi mở. Điện thoại: trượt lên từ dưới (bottom sheet).
+ * - Mọi màn hình: hộp nằm giữa (ngang + dọc), phóng nhẹ khi mở. Điện thoại: cách mép 12px, không bao giờ
+ *   cao quá màn hình (kể cả khi bàn phím bật — xem useVisualViewport); tiêu đề + hàng nút luôn hiện,
+ *   chỉ phần thân cuộn. Hàng nút: 2 nút ngắn nằm cạnh nhau, dài quá thì xuống dòng, nút chính ở phải/dưới.
  * - Esc / bấm nền để đóng, khoá cuộn trang, tự đưa con trỏ vào ô nhập đầu tiên,
  *   giữ phím Tab trong popup, trả con trỏ về chỗ cũ khi đóng.
  * ========================================================================= */
@@ -649,6 +668,9 @@ export function Modal({
   tone = "brand",
 }) {
   const panelRef = useRef(null);
+  const overlayRef = useRef(null);
+  const titleId = useId();
+  useVisualViewport(overlayRef, open);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -708,7 +730,10 @@ export function Modal({
   };
   // Gắn thẳng vào <body>: popup luôn nằm trên cùng, không bị thanh dính / khung có hiệu ứng của trang đè lên
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-6">
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-[80] flex items-center justify-center px-3 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] sm:p-6"
+    >
       <div
         className="absolute inset-0 animate-[admin-fade_.18s_ease-out] bg-slate-950/50 backdrop-blur-[3px]"
         onClick={onClose}
@@ -717,10 +742,10 @@ export function Modal({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={typeof title === "string" ? title : undefined}
+        aria-labelledby={titleId}
         className={cn(
-          "relative flex max-h-[94svh] w-full flex-col overflow-hidden bg-white shadow-[0_24px_80px_-20px_rgba(10,37,60,0.45)]",
-          "animate-[admin-sheet_.28s_cubic-bezier(.2,.8,.2,1)] rounded-t-[28px] sm:animate-[admin-pop_.22s_cubic-bezier(.2,.8,.2,1)] sm:rounded-[24px] sm:ring-1 sm:ring-slate-900/5",
+          "relative flex max-h-full w-full flex-col overflow-hidden bg-white shadow-[0_24px_80px_-20px_rgba(10,37,60,0.45)]",
+          "animate-[admin-pop_.22s_cubic-bezier(.2,.8,.2,1)] rounded-[22px] ring-1 ring-slate-900/5 sm:rounded-[24px]",
           size === "sm"
             ? "sm:max-w-md"
             : size === "lg"
@@ -730,13 +755,11 @@ export function Modal({
                 : "sm:max-w-xl",
         )}
       >
-        {/* tay nắm kéo (điện thoại) */}
-        <span className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-slate-200 sm:hidden" />
-        <header className="flex items-center gap-3.5 border-b border-slate-100 px-5 py-4 sm:px-6">
+        <header className="flex shrink-0 items-center gap-3 border-b border-slate-100 py-3 pr-2.5 pl-4 sm:gap-3.5 sm:px-6 sm:py-4">
           {Icon && (
             <span
               className={cn(
-                "grid size-10 shrink-0 place-items-center rounded-xl ring-1",
+                "grid size-9 shrink-0 place-items-center rounded-xl ring-1 sm:size-10",
                 ICON_TONE[tone] ?? ICON_TONE.brand,
               )}
             >
@@ -744,7 +767,12 @@ export function Modal({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <h3 className="text-[17px] leading-snug font-bold text-slate-900">{title}</h3>
+            <h3
+              id={titleId}
+              className="text-base leading-snug font-bold text-slate-900 sm:text-[17px]"
+            >
+              {title}
+            </h3>
             {description && (
               <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500">{description}</p>
             )}
@@ -753,16 +781,16 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="-mr-2 grid size-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="grid size-10 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 sm:-mr-2"
           >
             <X className="size-5" />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           {children}
         </div>
         {footer && (
-          <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-3.5 sm:flex-row sm:justify-end sm:px-6 [&>button]:w-full sm:[&>button]:w-auto">
+          <footer className="flex shrink-0 flex-wrap gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:justify-end sm:px-6 sm:py-3.5 max-sm:[&>a]:min-w-[8.5rem] max-sm:[&>a]:flex-1 max-sm:[&>button]:min-w-[8.5rem] max-sm:[&>button]:flex-1">
             {footer}
           </footer>
         )}
@@ -1051,7 +1079,7 @@ export function AdminProviders({ children }) {
 
       {/* Hộp xác nhận: biểu tượng lớn ở giữa, nút rõ ràng; Esc = huỷ */}
       {confirmState && (
-        <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-6">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-3 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))] sm:p-6">
           <div
             className="absolute inset-0 animate-[admin-fade_.18s_ease-out] bg-slate-950/50 backdrop-blur-[3px]"
             onClick={() => close(false)}
@@ -1066,6 +1094,7 @@ export function AdminProviders({ children }) {
 function ConfirmPanel({ state, danger, onClose }) {
   const okRef = useRef(null);
   const cancelRef = useRef(null);
+  const labelId = useId();
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -1098,7 +1127,9 @@ function ConfirmPanel({ state, danger, onClose }) {
     <div
       role="alertdialog"
       aria-modal="true"
-      className="relative w-full animate-[admin-sheet_.28s_cubic-bezier(.2,.8,.2,1)] rounded-t-[28px] bg-white px-6 pt-7 pb-6 text-center shadow-[0_24px_80px_-20px_rgba(10,37,60,0.45)] sm:max-w-[420px] sm:animate-[admin-pop_.22s_cubic-bezier(.2,.8,.2,1)] sm:rounded-[24px]"
+      aria-labelledby={`${labelId}-t`}
+      aria-describedby={state.message ? `${labelId}-m` : undefined}
+      className="relative max-h-full w-full max-w-[420px] animate-[admin-pop_.22s_cubic-bezier(.2,.8,.2,1)] overflow-y-auto overscroll-contain rounded-[22px] bg-white px-5 pt-6 pb-5 text-center shadow-[0_24px_80px_-20px_rgba(10,37,60,0.45)] sm:rounded-[24px] sm:px-6 sm:pt-7 sm:pb-6"
     >
       <span
         className={cn(
@@ -1110,13 +1141,18 @@ function ConfirmPanel({ state, danger, onClose }) {
       >
         <Icon className="size-7" />
       </span>
-      <h3 className="mt-5 text-lg font-bold text-slate-900">{state.title ?? "Xác nhận"}</h3>
+      <h3 id={`${labelId}-t`} className="mt-5 text-lg font-bold text-slate-900">
+        {state.title ?? "Xác nhận"}
+      </h3>
       {state.message && (
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
+        <p
+          id={`${labelId}-m`}
+          className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500"
+        >
           {state.message}
         </p>
       )}
-      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row">
+      <div className="mt-6 flex flex-wrap gap-2 [&>button]:min-w-[8rem] [&>button]:flex-1">
         <Button
           ref={cancelRef}
           variant="secondary"
@@ -1160,28 +1196,7 @@ export function useUi() {
  * Ảnh (Cloudinary)
  * ========================================================================= */
 
-/** Tải ảnh lên Cloudinary qua backend (POST /uploads/images) → danh sách URL */
-export async function uploadImages(files, folder = "misc") {
-  const fd = new FormData();
-  [...files].forEach((f) => fd.append("files", f));
-  const r = await api(`/uploads/images?folder=${encodeURIComponent(folder)}`, {
-    method: "POST",
-    body: fd,
-    timeout: 180_000,
-  });
-  return r.data.map((x) => x.url);
-}
-
-/** Thêm ảnh từ link: backend nhờ Cloudinary tải ảnh về (lưu bản sao, không nhúng thẳng ảnh ngoài) → URL */
-export async function importImageUrl(url, folder = "misc") {
-  const r = await api("/uploads/images/from-url", {
-    method: "POST",
-    body: { url: url.trim(), folder },
-    timeout: 90_000,
-  });
-  return r.data.url;
-}
-
+// Ảnh chỉ được tải lên kho ảnh khi bấm Lưu: xem ./pendingImages.js (usePendingImages().prepare)
 export const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/avif,image/gif";
 const isHttpUrl = (v) => /^https?:\/\/\S+$/i.test(v.trim());
 // Lọc định dạng / dung lượng, cắt ảnh lệch khung, thu nhỏ ảnh quá lớn: xem ./ImageCropper.js (useImageCrop)
@@ -1191,6 +1206,12 @@ function Thumb({ src, alt = "", className, sizes = "(min-width: 1024px) 320px, 5
   return (
     <span className={cn("relative block overflow-hidden bg-slate-100", className)}>
       <Image src={src} alt={alt} fill sizes={sizes} draggable={false} className="object-cover" />
+      {/* ảnh vừa chọn, chỉ được lưu khi bấm Lưu */}
+      {isPendingImage(src) && (
+        <span className="absolute top-1.5 right-1.5 rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-bold text-amber-950 shadow-sm">
+          Chưa lưu
+        </span>
+      )}
     </span>
   );
 }
@@ -1215,7 +1236,7 @@ export function ImageUrlDialog({ open, onClose, onSubmit, multiple = false, busy
       size="sm"
       icon={Link2}
       title={multiple ? "Thêm ảnh từ link" : "Dán link ảnh"}
-      description="Ảnh sẽ được lưu vào kho ảnh của website, nên link gốc có bị xoá thì ảnh vẫn còn."
+      description="Khi bấm Lưu, ảnh được lưu vào kho ảnh của website, nên link gốc có bị xoá thì ảnh vẫn còn."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -1306,7 +1327,7 @@ export function ImageField({
       const [url] = await cropper.uploadFiles(list, { max: 1 });
       if (url) {
         onChange(url);
-        toast("Đã tải ảnh lên");
+        toast("Đã chọn ảnh — bấm Lưu để lưu lại");
       }
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -1321,7 +1342,7 @@ export function ImageField({
       setLinkOpen(false);
       if (urls[0]) {
         onChange(urls[0]);
-        toast("Đã thêm ảnh từ link");
+        toast("Đã thêm ảnh từ link — bấm Lưu để lưu lại");
       }
       return true;
     } catch (err) {
@@ -1469,13 +1490,13 @@ export function GalleryField({ value = [], onChange, folder, max = 40, onSetCove
     if (input.current) input.current.value = "";
     if (room <= 0) return toast(`Tối đa ${max} ảnh`, "error");
     if (!list.length) return;
-    if (list.length > room) toast(`Album tối đa ${max} ảnh — chỉ thêm ${room} ảnh đầu`, "error");
+    if (list.length > room) toast(`Album tối đa ${max} ảnh — chỉ thêm ${room} ảnh đầu`, "warning");
     setBusy(true);
     try {
       const urls = await cropper.uploadFiles(list, { max: room });
       if (urls.length) {
         onChange([...value, ...urls]);
-        toast(`Đã thêm ${urls.length} ảnh`);
+        toast(`Đã thêm ${urls.length} ảnh — bấm Lưu để lưu lại`);
       }
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -1502,7 +1523,7 @@ export function GalleryField({ value = [], onChange, folder, max = 40, onSetCove
     if (urls.length) onChange([...value, ...urls]);
     if (failed)
       toast(`${failed} link không lấy được ảnh (link hỏng hoặc không phải ảnh công khai)`, "error");
-    if (urls.length) toast(`Đã thêm ${urls.length} ảnh từ link`);
+    if (urls.length) toast(`Đã thêm ${urls.length} ảnh từ link — bấm Lưu để lưu lại`);
     if (!failed) setLinkOpen(false);
     return !failed;
   };
@@ -1704,15 +1725,8 @@ export function VideoChip({ provider, className }) {
 /**
  * 1 video: dán link YouTube hoặc Google Drive → nhận diện ngay (nhãn nguồn + ảnh xem trước + phát thử tại chỗ).
  * allowSite: cho phép giữ video có sẵn của website (/videos/*.mp4).
- * youtubeOnly: chỉ giữ để tương thích ngược — không nơi nào cần nữa (mọi ô video đều nhận cả Drive).
  */
-export function VideoField({
-  value,
-  onChange,
-  youtubeOnly = false,
-  allowSite = false,
-  placeholder,
-}) {
+export function VideoField({ value, onChange, allowSite = false, placeholder }) {
   const [text, setText] = useState(value ?? "");
   const [lastValue, setLastValue] = useState(value ?? "");
   if ((value ?? "") !== lastValue) {
@@ -1722,14 +1736,7 @@ export function VideoField({
   const t = text.trim();
   const site = allowSite && /^\/videos\/[\w./-]+\.(mp4|webm)$/i.test(t) && !t.includes("..");
   const parsed = parseVideo(t);
-  const error =
-    !t || site
-      ? ""
-      : !parsed
-        ? videoLinkError(t)
-        : youtubeOnly && parsed.provider !== "youtube"
-          ? "Ô này chỉ nhận link YouTube"
-          : "";
+  const error = !t || site || parsed ? "" : videoLinkError(t);
   const commit = (v) => {
     setText(v);
     const s = v.trim();
@@ -1737,7 +1744,7 @@ export function VideoField({
     if (!s) onChange("");
     else if (allowSite && /^\/videos\/[\w./-]+\.(mp4|webm)$/i.test(s) && !s.includes(".."))
       onChange(s);
-    else if (p && (!youtubeOnly || p.provider === "youtube")) onChange(canonicalVideo(s));
+    else if (p) onChange(canonicalVideo(s));
   };
   return (
     <div className="space-y-2">
@@ -1746,10 +1753,7 @@ export function VideoField({
         <Input
           value={text}
           onChange={(e) => commit(e.target.value)}
-          placeholder={
-            placeholder ??
-            (youtubeOnly ? "Dán link video YouTube…" : "Dán link video YouTube hoặc Google Drive…")
-          }
+          placeholder={placeholder ?? "Dán link video YouTube hoặc Google Drive…"}
           inputMode="url"
           aria-label="Link video"
           aria-invalid={!!error}
@@ -2110,6 +2114,7 @@ export function ChipSelect({ options, value = [], onChange, max }) {
           <button
             key={o.value}
             type="button"
+            aria-pressed={on}
             onClick={() => toggle(o.value)}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition",

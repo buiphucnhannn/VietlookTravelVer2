@@ -21,6 +21,9 @@ export const imageFromUrlSchema = z.object({
   folder,
 });
 
+/** Xem trước ảnh từ link (chưa lưu kho ảnh) */
+export const linkPreviewSchema = imageFromUrlSchema.pick({ url: true });
+
 export const deleteImageSchema = z.object({
   // chỉ được xoá ảnh trong thư mục của website (không đụng ảnh khác trên tài khoản Cloudinary)
   publicId: z

@@ -8,6 +8,8 @@ import { siteConfig } from "@/constants/site";
 import { Container } from "@/components/ui";
 import { WhatsAppIcon } from "@/components/ui/BrandIcons";
 import ThankYouCode from "@/components/forms/ThankYouCode";
+import LeadEvent from "@/components/forms/LeadEvent";
+import PaymentResult from "@/components/forms/PaymentResult";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -42,6 +44,14 @@ export default async function ThankYouPage({ params }) {
         <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink/75 sm:text-lg short:mt-4">
           {t.text}
         </p>
+        <Suspense fallback={null}>
+          {/* Sự kiện chuyển đổi (generate_lead) — chỉ gửi khi khách đã đồng ý cookie */}
+          <LeadEvent />
+        </Suspense>
+        <Suspense fallback={null}>
+          {/* Kết quả thanh toán 9Pay (?payment=…) — không có thì không hiện gì */}
+          <PaymentResult lang={lang} p={dict.payment} contactHref={siteConfig.messaging.whatsapp} />
+        </Suspense>
         <Suspense fallback={null}>
           <ThankYouCode
             labels={{ yourRequestCode: dict.common.yourRequestCode, copy: dict.common.copy }}

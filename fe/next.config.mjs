@@ -1,9 +1,17 @@
+import { readFileSync } from "node:fs";
 import { BACKEND_URL } from "./src/config/urls.mjs";
+
+const oldSiteRedirects = JSON.parse(
+  readFileSync(new URL("./src/data/old-site-redirects.json", import.meta.url), "utf8"),
+);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
   cacheComponents: true,
+  // URL web cũ có "/" cuối (WordPress): khớp thẳng redirects() bên dưới → 1 bước 301, không qua bước 308 bỏ "/"
+  // (các URL "/" cuối khác do proxy.js chuyển 301 sang bản không "/")
+  skipTrailingSlashRedirect: true,
   // Ẩn nút "N" (dev tools) ở góc màn hình khi chạy dev
   devIndicators: false,
   partialPrefetching: true,
@@ -27,7 +35,6 @@ const nextConfig = {
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${BACKEND_URL}/api/v1/:path*` }];
   },
-  // Giữ SEO website cũ (WordPress): chuyển hướng 301 các đường dẫn cũ sang cấu trúc mới
   // Header bảo mật. Khu quản trị: cấm nhúng iframe (chống clickjacking), không cache, không index.
   async headers() {
     const base = [
@@ -50,14 +57,23 @@ const nextConfig = {
     ];
   },
   async redirects() {
+    // Giữ SEO website cũ (WordPress): chuyển hướng vĩnh viễn 301 (đúng yêu cầu tiến độ) sang cấu trúc mới.
+    // Mọi URL web cũ: src/data/old-site-redirects.json (sinh lúc chuyển dữ liệu — xem docs/redirect-map.csv):
+    // bài viết /<slug>/ → /travel-guide/<slug>, tour tiếng Việt → /vi/tours/…, tour / dịch vụ không chuyển → trang gần nhất…
+    // Đặt TRƯỚC quy tắc chung bên dưới (Next khớp theo thứ tự).
+    // Tour cũ còn lại /tour/<slug>/ → /tours/<slug> (slug tour giữ nguyên như web cũ).
     return [
-      { source: "/tour/:slug", destination: "/tours/:slug", permanent: true },
-      { source: "/tour-packages", destination: "/tours", permanent: true },
-      { source: "/fast-track-and-visa", destination: "/visa-fast-track", permanent: true },
-      { source: "/about-us", destination: "/about", permanent: true },
-      { source: "/contact-us", destination: "/contact", permanent: true },
-      { source: "/tailor-made", destination: "/group-tailor-made-tours", permanent: true },
-      { source: "/blog", destination: "/travel-guide", permanent: true },
+      ...Object.entries(oldSiteRedirects).map(([source, destination]) => ({
+        source,
+        destination,
+        statusCode: 301,
+      })),
+      { source: "/tour/:slug", destination: "/tours/:slug", statusCode: 301 },
+      // Link cũ còn nằm trong nội dung bài / tour nhập từ web cũ (cấu trúc URL đời trước của WordPress)
+      { source: "/vi/tour/:slug", destination: "/tour/:slug", statusCode: 301 },
+      { source: "/our-tours/:cat", destination: "/tour-packages/:cat", statusCode: 301 },
+      { source: "/vi/our-tours/:cat", destination: "/tour-packages/:cat", statusCode: 301 },
+      { source: "/tour-packages/:cat", destination: "/tours", statusCode: 301 },
     ];
   },
   turbopack: {

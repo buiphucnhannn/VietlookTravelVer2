@@ -15,11 +15,17 @@ import {
   useEnquiry,
   validate,
 } from "./fields";
+import ConsentCheckbox, {
+  consentError,
+  dropConsentError,
+  focusFirstError,
+  hasFieldErrors,
+} from "./ConsentCheckbox";
 
 /** Form liên hệ (kiểu "Send us a request" của localvietnam). Dùng chung cho trang Đối tác (type="partner"). */
 export default function ContactForm({ lang, t, c, type = "contact", extraFields = [] }) {
   const formRef = useRef(null);
-  const { status, code, submit, reset } = useEnquiry(type, lang);
+  const { status, code, submit, reset, error: sendError } = useEnquiry(type, lang);
   const [errs, setErrs] = useState({});
   const [d, setD] = useState({
     subject: t.subjects?.[0] || "",
@@ -27,8 +33,13 @@ export default function ContactForm({ lang, t, c, type = "contact", extraFields 
     email: "",
     phone: "",
     message: "",
+    consent: false,
   });
   const set = (k) => (e) => setD({ ...d, [k]: e.target.value });
+  const setConsent = (v) => {
+    setD({ ...d, consent: v });
+    if (v) setErrs(dropConsentError);
+  };
 
   if (status === "success")
     return (
@@ -43,9 +54,9 @@ export default function ContactForm({ lang, t, c, type = "contact", extraFields 
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    const v = validate(d, lang);
+    const v = { ...validate(d, lang), ...consentError(d.consent, c) };
     setErrs(v);
-    if (Object.keys(v).length) return;
+    if (Object.keys(v).length) return focusFirstError(formRef.current);
     await submit(d, formRef.current);
   };
 
@@ -119,8 +130,16 @@ export default function ContactForm({ lang, t, c, type = "contact", extraFields 
           <Textarea id="cf-msg" rows={5} value={d.message} onChange={set("message")} />
         </Field>
       </div>
-      <FormError show={Object.keys(errs).length > 0} text={formMsg(lang).fix} />
-      <FormError show={status === "error"} text={c.errorGeneric} />
+      <ConsentCheckbox
+        id="cf-consent"
+        lang={lang}
+        c={c}
+        checked={d.consent}
+        onChange={setConsent}
+        error={errs.consent}
+      />
+      <FormError show={hasFieldErrors(errs)} text={formMsg(lang).fix} />
+      <FormError show={status === "error"} text={sendError || c.errorGeneric} />
       <button
         type="submit"
         disabled={status === "sending"}

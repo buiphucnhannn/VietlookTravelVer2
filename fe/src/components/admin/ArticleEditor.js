@@ -8,7 +8,7 @@ import { api, errorMessage } from "@/lib/api";
 import { cn, slugify } from "@/lib/utils";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { useMutation, useOptions } from "./hooks";
-import RichText from "./RichText";
+import RichText from "./RichTextLazy";
 import { AutoTranslate, slugSource, useAutoFill } from "./translate";
 import {
   Button,
@@ -31,6 +31,7 @@ import {
   useUi,
   useUnsavedGuard,
 } from "./ui";
+import { usePendingImages } from "./pendingImages";
 import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
 
 const PATH = "/admin/articles";
@@ -160,6 +161,7 @@ function EditorForm({ initial, back }) {
   const [errors, setErrors] = useState({});
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(d);
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
   const categories = useOptions("/admin/categories?limit=200&sort=order", (c) => ({
@@ -186,14 +188,19 @@ function EditorForm({ initial, back }) {
     if (!canEdit) return;
     const errs = {};
     if (!anyLang(d.title)) errs.title = "Nhập tiêu đề ở ít nhất một ngôn ngữ";
+    // ảnh vừa chọn (ảnh bìa, ảnh chèn trong bài) chỉ được lưu vào kho ảnh lúc này — trước khi dịch,
+    // để bản dịch dùng đúng link ảnh đã lưu
+    const base = errs.title ? d : await images.prepare(d);
+    if (!base) return;
+    if (base !== d) setD(base);
     // ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết rồi mới lưu
     const { value: tr, failed } = errs.title
       ? { value: null, failed: false }
       : await autoFill.fill(
-          { title: d.title, excerpt: d.excerpt, body: d.body, seo: d.seo },
+          { title: base.title, excerpt: base.excerpt, body: base.body, seo: base.seo },
           { lang },
         );
-    const v = tr ? { ...d, ...tr } : d;
+    const v = tr ? { ...base, ...tr } : base;
     if (tr) setD(v);
     const slug = v.slug.trim() || (isNew ? slugify(slugSource(v.title)) : "");
     if (!slug) errs.slug = "Cần nhập đường dẫn trang";
@@ -231,7 +238,7 @@ function EditorForm({ initial, back }) {
         setD(again);
       });
     if (isNew) router.replace(`${BASE}/${r.data.id}`);
-  }, [d, isNew, router, run, toast, canEdit, autoFill, lang]);
+  }, [d, isNew, router, run, toast, canEdit, autoFill, lang, images]);
 
   // Ctrl/⌘ + S để lưu nhanh
   const saveRef = useRef(save);
@@ -254,9 +261,10 @@ function EditorForm({ initial, back }) {
     if (!dirty) return;
     e.preventDefault();
     const ok = await confirm({
-      title: "Bỏ thay đổi?",
-      message: "Bài viết đang soạn chưa được lưu. Nếu rời trang, các thay đổi sẽ mất.",
+      title: "Rời trang khi chưa lưu?",
+      message: "Nội dung bạn đang soạn chưa được lưu và sẽ mất nếu rời trang này.",
       confirmText: "Rời trang",
+      cancelText: "Ở lại",
       danger: true,
     });
     if (ok) {
@@ -428,7 +436,7 @@ function EditorForm({ initial, back }) {
             </Card>
 
             <Card title="Ảnh bìa">
-              <Field hint="Ảnh ngang 16:10, tối thiểu 1200px. Hiện ở thẻ bài viết và đầu bài.">
+              <Field hint="Ảnh ngang, tối thiểu 1200px. Hiện ở thẻ bài viết và phủ ngang đầu bài (đầu bài chỉ hiện phần giữa ảnh).">
                 <ImageField
                   value={d.image}
                   onChange={(image) => set({ image })}
@@ -513,10 +521,10 @@ function EditorForm({ initial, back }) {
               <Button
                 icon={Save}
                 onClick={save}
-                loading={busy || autoFill.busy}
+                loading={busy || autoFill.busy || images.busy}
                 disabled={!dirty && !isNew}
               >
-                {isNew ? "Tạo bài viết" : "Lưu thay đổi"}
+                {images.label || (isNew ? "Tạo bài viết" : "Lưu thay đổi")}
               </Button>
             </div>
           </div>

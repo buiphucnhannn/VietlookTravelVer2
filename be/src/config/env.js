@@ -43,6 +43,8 @@ const schema = z
       .trim()
       .regex(/^[a-z0-9_-]+$/i, "letters, digits, - and _ only")
       .default("vietlook"),
+    // Mỗi ngày tự xoá ảnh CMS không còn dùng (cũ hơn 24 giờ) — xem services/media-cleanup.service.js
+    MEDIA_CLEANUP_DAILY: z.enum(["true", "false"]).default("false"),
 
     JWT_ACCESS_SECRET: z.string().default(""),
     JWT_REFRESH_SECRET: z.string().default(""),
@@ -90,7 +92,7 @@ const schema = z
     // Địa chỉ website (link trong email, nút "Mở trong CMS")
     PUBLIC_SITE_URL: z.string().trim().default("https://vietlooktravel.vercel.app"),
 
-    // Tài khoản admin chính — server tự tạo / cập nhật mỗi lần khởi động (xem admin-bootstrap.service.js)
+    // Tài khoản admin đầu tiên — server chỉ tạo khi CHƯA có (không ghi đè); quên mật khẩu: npm run admin:reset
     ADMIN_USERNAME: z
       .string()
       .trim()
@@ -102,6 +104,22 @@ const schema = z
 
     // Nút "Đăng nhập nhanh" ở trang đăng nhập — CHỈ bật cho bản demo (vào thẳng tài khoản ADMIN_USERNAME)
     DEMO_LOGIN: z.enum(["true", "false"]).default("false"),
+
+    // Cổng thanh toán 9Pay: địa chỉ cổng (production mặc định; thử nghiệm: https://sand-payment.9pay.vn)
+    NINEPAY_ENDPOINT: z.string().trim().default(""), // trống → https://payment.9pay.vn
+    // Tỷ giá USD → VND DỰ PHÒNG — chỉ dùng khi máy chủ chưa từng lấy được tỷ giá tự động (Vietcombank)
+    PAYMENT_USD_VND_RATE: z.preprocess(
+      (v) => (v === "" ? undefined : v),
+      z.coerce.number().min(15_000).max(40_000).default(25_500),
+    ),
+    // CHỈ máy dev: giả lập 9Pay (key giả + trang cổng thanh toán giả trên chính API). Production luôn tắt.
+    NINEPAY_FAKE: z.preprocess(
+      (v) => (v === "" ? undefined : v),
+      z.enum(["true", "false"]).default("false"),
+    ),
+
+    // CHỈ máy dev: làm chậm mọi request N ms để giả lập độ trễ mạng khi deploy (đo tốc độ CMS). Production luôn = 0.
+    DEV_LATENCY_MS: z.coerce.number().int().min(0).max(5000).default(0),
   })
   .superRefine((e, ctx) => {
     const need = (cond, path, message) =>
@@ -171,6 +189,7 @@ export const env = Object.freeze({
     apiSecret: e.CLOUDINARY_API_SECRET,
     folder: e.CLOUDINARY_FOLDER,
     enabled: Boolean(e.CLOUDINARY_CLOUD_NAME && e.CLOUDINARY_API_KEY && e.CLOUDINARY_API_SECRET),
+    dailyCleanup: e.MEDIA_CLEANUP_DAILY === "true" && e.NODE_ENV !== "test",
   },
   jwt: {
     accessSecret: e.JWT_ACCESS_SECRET || devSecret(),
@@ -199,4 +218,11 @@ export const env = Object.freeze({
     enabled: Boolean(e.ADMIN_USERNAME && e.ADMIN_PASSWORD),
   },
   demoLogin: e.DEMO_LOGIN === "true" && Boolean(e.ADMIN_USERNAME),
+  devLatencyMs: e.NODE_ENV === "development" ? e.DEV_LATENCY_MS : 0,
+  payment: {
+    endpoint: (e.NINEPAY_ENDPOINT || "https://payment.9pay.vn").replace(/\/+$/, ""),
+    fallbackUsdVnd: e.PAYMENT_USD_VND_RATE,
+    // Giả lập 9Pay: KHÔNG BAO GIỜ chạy ở production
+    fake: e.NINEPAY_FAKE === "true" && e.NODE_ENV !== "production",
+  },
 });

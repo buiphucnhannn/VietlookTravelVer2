@@ -1,15 +1,14 @@
 // Thông tin doanh nghiệp – lấy từ hồ sơ khách hàng & website hiện tại vietlooktravel.com
+// Domain chính thức mặc định khi chưa đặt NEXT_PUBLIC_SITE_URL.
+// KHÔNG tự lấy VERCEL_URL / VERCEL_PROJECT_PRODUCTION_URL: Vercel trả tên mặc định của dự án
+// (VD vietlooktravelv2.vercel.app) hoặc link preview từng lần deploy → canonical/sitemap sai domain.
+const PRIMARY_SITE_URL = "https://vietlooktravel.vercel.app";
+
 function siteUrl() {
-  const strip = (u) => u.replace(/\/+$/, "");
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
-  if (explicit) return strip(explicit.startsWith("http") ? explicit : `https://${explicit}`);
-  const vercel =
-    process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ||
-    process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  if (vercel) return `https://${strip(vercel)}`;
-  return process.env.NODE_ENV === "production"
-    ? "https://vietlooktravel.vercel.app"
-    : "http://localhost:3000";
+  const strip = (u) => u.trim().replace(/\/+$/, "");
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return strip(/^https?:\/\//.test(explicit) ? explicit : `https://${explicit}`);
+  return process.env.NODE_ENV === "production" ? PRIMARY_SITE_URL : "http://localhost:3000";
 }
 
 const MAP_QUERY = "58 Ngõ 159 Quyết Thắng, Yên Nghĩa, Hà Nội, Việt Nam";
@@ -21,8 +20,8 @@ export const siteConfig = {
   // Mã số doanh nghiệp (masothue.com) & giấy phép lữ hành quốc tế (Cục Du lịch Quốc gia VN, cấp lại 23/01/2026)
   legal: { businessNo: "0104189511", licenceNo: "01-176/2022/CDLQGVN-GP LHQT" },
   // Domain gốc cho canonical / hreflang / og / sitemap / robots / JSON-LD.
-  // Ưu tiên biến NEXT_PUBLIC_SITE_URL (domain chính thức); trên Vercel tự lấy domain production
-  // của dự án; chỉ khi chạy dev ở máy mới dùng localhost.
+  // Nguồn DUY NHẤT: NEXT_PUBLIC_SITE_URL (domain chính thức) → mặc định PRIMARY_SITE_URL;
+  // chỉ khi chạy dev ở máy mới dùng localhost.
   url: siteUrl(),
   since: 2009,
   contact: {

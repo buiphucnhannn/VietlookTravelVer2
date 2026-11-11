@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Car, Map, Stamp } from "lucide-react";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { lp } from "@/i18n/config";
+import { DEFAULT_HOME_IMAGES } from "./images";
 
 /**
  * 3 danh mục chính của web (yêu cầu khách 31/10, mục 2 + 9): rõ ràng, ẢNH THẬT, dễ bấm.
@@ -12,31 +13,31 @@ import { lp } from "@/i18n/config";
  * Ảnh đã cắt sẵn đúng khung 16:10 của thẻ và phóng to/làm nét (public/images/services/svc-*.webp).
  * - Cả thẻ là 1 liên kết lớn; nút hành động màu đỏ thương hiệu luôn hiển thị.
  */
-export default function ServicesTrio({ lang, dict }) {
+export default function ServicesTrio({ lang, dict, images = DEFAULT_HOME_IMAGES.services }) {
   const s = dict.home.services;
+  // Ảnh: nhân viên thay được trong CMS → Trang chủ (images = homeImages(home.images).services)
   const items = [
     {
       key: "tours",
       icon: Map,
       href: `${lp(lang)}/tours`,
-      image: "/images/services/svc-tour-cao-bang.webp",
       position: "object-center",
     },
     {
       key: "car",
       icon: Car,
       href: `${lp(lang)}/car-rental`,
-      image: "/images/services/svc-car-vietlook-carnival.webp",
       position: "object-center",
     },
     {
       key: "visa",
       icon: Stamp,
       href: `${lp(lang)}/visa-fast-track`,
-      image: "/images/services/svc-visa-welcome.webp",
-      position: "object-[50%_30%]",
+      // ảnh có sẵn: giữ khuôn mặt + biển chào trong khung; ảnh CMS đã được cắt đúng khung → căn giữa
+      position:
+        images.visa === DEFAULT_HOME_IMAGES.services.visa ? "object-[50%_30%]" : "object-center",
     },
-  ];
+  ].map((it) => ({ ...it, image: images[it.key] }));
 
   return (
     <section className="bg-cream-50 py-14 lg:py-[4.5rem]">
@@ -60,7 +61,8 @@ export default function ServicesTrio({ lang, dict }) {
                       src={it.image}
                       alt={data.title}
                       fill
-                      sizes="(min-width: 768px) 33vw, 85vw"
+                      // thẻ rộng tối đa ~420px (1/3 khung 1400px); điện thoại: gần hết bề ngang
+                      sizes="(min-width: 1440px) 430px, (min-width: 768px) 31vw, 92vw"
                       className={`object-cover transition-transform duration-700 group-hover:scale-105 ${it.position}`}
                     />
                     <span className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />

@@ -10,6 +10,8 @@
 .env
 .env.*
 !.env.example
+# Cờ giả lập 9Pay chỉ cho máy dev (xem README — Thanh toán 9Pay)
+/.ninepay-fake
 
 # ----- Build output (nếu sau này dùng bundler / TypeScript) -----
 /dist

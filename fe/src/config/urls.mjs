@@ -37,3 +37,15 @@ export const BACKEND_URL = resolveBackendUrl();
  */
 export const ADMIN_BASE = "/admin";
 export const ADMIN_LOGIN = "/login";
+
+/**
+ * Đường dẫn quay lại (?next=) sau đăng nhập / trang chờ: chỉ nhận đường dẫn nội bộ trong khu quản trị
+ * (chặn open redirect "//evil.com", "/admin\\…"); còn lại → ADMIN_BASE. Dùng chung cho proxy, LoginForm, trang chờ.
+ */
+export function safeNext(raw) {
+  const next = String(raw ?? "");
+  const inAdmin =
+    next.startsWith(ADMIN_BASE) && ["", "/", "?", "#"].includes(next.charAt(ADMIN_BASE.length));
+  if (!inAdmin || next.startsWith("//") || next.includes("\\")) return ADMIN_BASE;
+  return next;
+}

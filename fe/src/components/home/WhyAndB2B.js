@@ -14,6 +14,7 @@ import {
 import { Button, Container, Reveal, SectionHeading } from "@/components/ui";
 import { lp } from "@/i18n/config";
 import { defaultHomeCopy } from "./copy";
+import { DEFAULT_HOME_IMAGES } from "./images";
 
 const whyIcons = [Layers, Wallet, MapPinned, ShieldCheck, Headphones, Handshake];
 
@@ -45,19 +46,9 @@ export function WhyUs({ dict }) {
   );
 }
 
-// Ảnh di sản Bắc → Nam cho 2 khung viền cọ (ảnh từ thư viện Vietlook, ≥1920px)
-// Mỗi khung một bộ ảnh RIÊNG (không ảnh nào chung) → 2 khung không bao giờ trùng ảnh.
+// Ảnh di sản Bắc → Nam cho 2 khung viền cọ: mặc định ở components/home/images.js (b2bNorth / b2bSouth),
+// nhân viên thay được trong CMS → Trang chủ. Mỗi khung một bộ ảnh RIÊNG → 2 khung không trùng ảnh.
 // Khung lớn: miền Bắc · khung nhỏ: miền Trung & Nam – thể hiện dịch vụ toàn Việt Nam.
-const northImages = [
-  "/images/b2b/tam-coc-bich-dong.webp",
-  "/images/tours/hd/bai-dinh.jpg",
-  "/images/tours/v2/sapa-235925.jpg",
-];
-const centralSouthImages = [
-  "/images/b2b/hoi-an-9-copy.webp",
-  "/images/b2b/da-nang.webp",
-  "/images/b2b/phu-quoc.webp",
-];
 
 /**
  * Khối B2B theo phong cách Demo 1: NỀN SÁNG (yêu cầu khách 05/11 – bỏ ảnh du thuyền Hạ Long vì sản phẩm
@@ -65,8 +56,10 @@ const centralSouthImages = [
  * 2 khung ảnh viền cọ đổi ảnh luân phiên + 2 huy hiệu số liệu; bên phải thông điệp B2B rõ ràng:
  * đối tượng (agencies, OTA, MICE), giá net, báo giá trong 24h.
  */
-export function B2BBlock({ lang, dict }) {
+export function B2BBlock({ lang, dict, images = DEFAULT_HOME_IMAGES }) {
   const t = dict.home;
+  const northImages = images.b2bNorth;
+  const centralSouthImages = images.b2bSouth;
   // Nhóm đối tác: câu mặc định ở components/home/copy.js, sửa trong CMS → Trang chủ
   const audiences = t.b2bAudiences ?? defaultHomeCopy(t, lang).b2bAudiences;
   return (

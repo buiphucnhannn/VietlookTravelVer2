@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Eye, GripVertical, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -7,7 +8,16 @@ import { cn } from "@/lib/utils";
 import { useMutation } from "./hooks";
 import { DragHandle, PositionBadge, Sortable } from "./Sortable";
 import { AutoTranslate } from "./translate";
-import { Button, Input, LangTabs, Modal, filledOf, locText, useUi } from "./ui";
+import {
+  Button,
+  Input,
+  LangTabs,
+  Modal,
+  filledOf,
+  locText,
+  useUi,
+  useUnsavedGuard,
+} from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
 import { ReadOnlyArea, usePermission } from "./permissions";
 
@@ -51,27 +61,64 @@ export function FormSection({ title, children, className }) {
   );
 }
 
-/** Popup tạo / sửa: nút Huỷ – Lưu luôn ở góc dưới phải */
-export function EditorModal({ title, size = "lg", onClose, onSave, busy, children }) {
+/**
+ * Đóng popup form (bấm nền mờ, Esc, nút Huỷ / Đóng): form đã sửa mà chưa lưu → hỏi trước, chưa sửa → đóng ngay.
+ * `value` = toàn bộ dữ liệu form đang soạn (so với lúc mở popup). Lưu xong, trang cha tự đóng popup → không hỏi.
+ * Trong lúc popup có thay đổi: tải lại / đóng tab hoặc bấm link sang trang khác cũng được hỏi (useUnsavedGuard).
+ *   const close = useConfirmClose(form, onClose);   <Modal onClose={close} …>
+ */
+export function useConfirmClose(value, onClose) {
+  const { confirm } = useUi();
+  const [initial] = useState(() => JSON.stringify(value ?? null));
+  const dirty = value !== undefined && JSON.stringify(value) !== initial;
+  useUnsavedGuard(dirty);
+  return async () => {
+    if (
+      dirty &&
+      !(await confirm({
+        title: "Bỏ thay đổi?",
+        message: "Nội dung bạn vừa nhập chưa được lưu và sẽ mất nếu đóng cửa sổ này.",
+        confirmText: "Bỏ thay đổi",
+        cancelText: "Sửa tiếp",
+        danger: true,
+      }))
+    )
+      return;
+    onClose();
+  };
+}
+
+/** Popup tạo / sửa: nút Huỷ – Lưu luôn ở góc dưới phải. `value` = dữ liệu form (để hỏi trước khi đóng mất thay đổi) */
+export function EditorModal({
+  title,
+  size = "lg",
+  value,
+  onClose,
+  onSave,
+  busy,
+  saveLabel,
+  children,
+}) {
   const { canEdit } = usePermission(); // chỉ xem → form chỉ đọc, chỉ có nút Đóng
+  const close = useConfirmClose(value, onClose);
   return (
     <Modal
       open
       size={size}
-      onClose={onClose}
+      onClose={close}
       title={title}
       footer={
         canEdit ? (
           <>
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={close}>
               Huỷ
             </Button>
             <Button onClick={onSave} loading={busy}>
-              Lưu
+              {saveLabel || "Lưu"}
             </Button>
           </>
         ) : (
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={close}>
             Đóng
           </Button>
         )
@@ -126,12 +173,12 @@ export function useRemove(path, label, tags, reload, note) {
   };
 }
 
-/** Cụm thao tác của 1 mục: ẩn/hiện bên trái — sửa, xoá bên phải */
 /** Tiêu đề popup sửa: "Sửa" khi có quyền sửa, "Xem" khi chỉ được xem (mục của trang đang mở) */
 export function useEditVerb() {
   return usePermission().canEdit ? "Sửa" : "Xem";
 }
 
+/** Cụm thao tác của 1 mục: ẩn/hiện bên trái — sửa, xoá bên phải */
 export function ItemActions({ path, item, tags, onDone, onEdit, onRemove, className }) {
   const { canEdit, canDelete } = usePermission();
   return (
@@ -153,6 +200,7 @@ export function ItemActions({ path, item, tags, onDone, onEdit, onRemove, classN
             size="icon"
             onClick={onRemove}
             aria-label="Xoá"
+            title="Xoá"
             className="text-sun-600"
           >
             <Trash2 className="size-4" />

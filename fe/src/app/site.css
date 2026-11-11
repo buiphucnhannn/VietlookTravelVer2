@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+/*
+ * CSS của website (app/[lang]): KHÔNG quét mã khu quản trị → file CSS tải về nhẹ hơn nhiều,
+ * trình duyệt điện thoại hiển thị trang nhanh hơn. Khu quản trị dùng globals.css.
+ */
+@source not "../components/admin";
+@source not "./(system)";
+
+/* Viền focus chung khi dùng bàn phím (Tab) — chuột bấm không hiện; ô nào tự có kiểu focus riêng thì giữ kiểu đó */
+@layer base {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}

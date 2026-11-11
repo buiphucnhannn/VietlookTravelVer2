@@ -37,12 +37,14 @@ import {
   usePaged,
   useUi,
 } from "./ui";
+import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { slugSource, useAutoFill } from "./translate";
 
 const PATH = "/admin/themes";
 // chủ đề thay đổi → menu, trang chủ, trang chủ đề, bộ lọc tour đều đổi
 const TAGS = ["themes", "tours"];
+const REMOVE_TAGS = [...TAGS, "settings"]; // xoá → trang chủ cũng bỏ chủ đề này
 const MAX = 8;
 const PAGE_SIZE = 8; // 2 hàng × 4 cột
 
@@ -77,7 +79,7 @@ export default function ThemesPage() {
   const remove = useRemove(
     PATH,
     "chủ đề",
-    TAGS,
+    REMOVE_TAGS,
     list.reload,
     "Chủ đề đang gắn với tour thì không xoá được — hãy ẩn thay vì xoá.",
   );
@@ -176,8 +178,9 @@ export default function ThemesPage() {
           initial={editing}
           nextOrder={list.items.length + 1}
           onClose={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(id) => {
             setEditing(null);
+            sort.reveal(id); // mục vừa lưu: sang đúng trang + nháy viền
             list.reload();
           }}
         />
@@ -194,12 +197,16 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(d);
   const { toast } = useUi();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
   const save = async () => {
     if (!anyLang(d.name)) return toast("Vui lòng nhập tên chủ đề ở ít nhất một ngôn ngữ", "error");
-    const { value: v, failed } = await autoFill.fill(d, { lang });
+    // ảnh vừa chọn chỉ được lưu vào kho ảnh lúc này
+    const withImages = await images.prepare(d);
+    if (!withImages) return;
+    const { value: v, failed } = await autoFill.fill(withImages, { lang });
     if (v !== d) setD(v);
     const slug = v.slug || slugify(slugSource(v.name));
     if (!slug) return toast("Vui lòng nhập đường dẫn trang", "error");
@@ -212,6 +219,8 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
           ? api(PATH, { method: "POST", body })
           : api(`${PATH}/${d.id}`, { method: "PUT", body }),
       isNew ? "Đã thêm chủ đề" : "Đã lưu chủ đề",
+      // đổi đường dẫn → máy chủ sửa luôn danh sách trên trang chủ → xoá cache trang chủ
+      { extraTags: !isNew && slug !== initial.slug ? ["settings"] : [] },
     );
     if (!ok) return;
     if (failed)
@@ -221,16 +230,18 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
           body: { ...toPayload({ ...t, slug }), order: body.order },
         }),
       );
-    onSaved();
+    onSaved(ok.data?.id ?? d.id);
   };
 
   return (
     <EditorModal
       size="xl"
       title={isNew ? "Thêm chủ đề" : `${editVerb}: ${locText(initial.name)}`}
+      value={d}
       onClose={onClose}
       onSave={save}
-      busy={busy || autoFill.busy}
+      busy={busy || autoFill.busy || images.busy}
+      saveLabel={images.label}
     >
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
         <div className="space-y-4">
@@ -261,15 +272,21 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
         <div className="space-y-6">
           <FormSection title="Hình ảnh">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Ảnh thẻ" hint="Ảnh ngang, tối thiểu 1200px">
+              <Field
+                label="Ảnh thẻ"
+                hint="Hiện ở thẻ chủ đề (trang chủ, menu, danh sách). Ảnh ngang, chủ thể ở giữa."
+              >
                 <ImageField value={d.image} onChange={(image) => set({ image })} folder="themes" />
               </Field>
-              <Field label="Ảnh lớn đầu trang" hint="Để trống thì dùng ảnh thẻ">
+              <Field
+                label="Ảnh lớn đầu trang"
+                hint="Phủ ngang đầu trang chủ đề. Để trống thì dùng ảnh thẻ."
+              >
                 <ImageField
                   value={d.banner}
                   onChange={(banner) => set({ banner })}
                   folder="themes"
-                  crop={{ ratio: 16 / 9, width: 1920 }}
+                  crop={{ ratio: 12 / 5, width: 2400 }}
                 />
               </Field>
             </div>

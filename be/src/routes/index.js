@@ -3,6 +3,7 @@ import { healthController } from "../controllers/health.controller.js";
 import auditLogRoutes from "./audit-log.routes.js";
 import authRoutes from "./auth.routes.js";
 import contentRoutes from "./content.routes.js";
+import paymentRoutes from "./payment.routes.js";
 import { enquiryRoutes, publicRoutes, settingsRoutes } from "./site.routes.js";
 import translateRoutes from "./translate.routes.js";
 import uploadRoutes from "./upload.routes.js";
@@ -14,6 +15,7 @@ import userRoutes from "./user.routes.js";
  *   /enquiries    khách gửi form (POST công khai) + CMS quản lý đơn / yêu cầu
  *   /admin/*      CMS quản lý nội dung (tour, điểm đến, chủ đề, bài viết, xe, visa…)
  *   /settings/*   trang chủ, trang nội dung, email thông báo, 9Pay
+ *   /payments/*   thanh toán online 9Pay (bắt đầu, khách quay về, IPN)
  */
 const router = Router();
 
@@ -26,6 +28,7 @@ router.get("/health", healthController.check);
 router.use("/public", publicRoutes);
 router.use("/auth", noStore, authRoutes);
 router.use("/enquiries", noStore, enquiryRoutes);
+router.use("/payments", noStore, paymentRoutes);
 router.use("/admin", noStore, contentRoutes);
 router.use("/settings", noStore, settingsRoutes);
 router.use("/users", noStore, userRoutes);

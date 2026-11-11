@@ -26,8 +26,16 @@ export const ENQUIRY_TYPES = Object.freeze({
 });
 export const ENQUIRY_TYPE_VALUES = Object.keys(ENQUIRY_TYPES);
 
+/**
+ * Phiên bản Chính sách bảo mật / Điều khoản mà khách đồng ý khi gửi form (lưu kèm từng yêu cầu làm bằng chứng
+ * theo Nghị định 13/2023/NĐ-CP & GDPR). Đổi ngày này mỗi khi nội dung chính sách thay đổi đáng kể.
+ */
+export const PRIVACY_POLICY_VERSION = "2026-11-11";
+
 /** Trạng thái đơn / yêu cầu (hợp đồng mục 3) */
 export const ENQUIRY_STATUS = ["new", "contacted", "confirmed", "completed", "cancelled"];
+// Thanh toán của đơn đặt tour: chưa trả · đã đặt cọc (trả 1 phần qua 9Pay) · đã trả đủ
+export const PAYMENT_STATUS = ["unpaid", "deposit", "paid"];
 
 /** Trang nội dung sửa được trong CMS: giới thiệu + 4 trang chính sách */
 export const PAGE_KEYS = ["about", "terms", "privacy", "payment", "cancellation"];

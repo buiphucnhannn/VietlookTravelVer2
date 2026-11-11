@@ -249,7 +249,8 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
             <p className="text-sm font-bold text-slate-900">
               Slide {cur + 1}
               <span className="ml-2 text-xs font-normal text-slate-500">
-                Máy tính phát video, điện thoại hiện ảnh.
+                Máy tính phát video. Điện thoại: video YouTube → hiện ảnh nền; video Google Drive →
+                phát bản nhẹ. Slide không có video thì hiện ảnh.
               </span>
             </p>
             <Button variant="danger" size="sm" icon={Trash2} onClick={removeSlide}>
@@ -529,7 +530,7 @@ function SlideImage({ icon, label, hint, portrait, value, onChange }) {
   const fromFiles = (files) => {
     const file = [...(files ?? [])].find((f) => f.type.startsWith("image/"));
     if (input.current) input.current.value = "";
-    if (file) run(async () => (await cropper.uploadFiles([file], { max: 1 }))[0], "Đã tải ảnh lên");
+    if (file) run(async () => (await cropper.uploadFiles([file], { max: 1 }))[0], "Đã chọn ảnh");
   };
   const fromLinks = async ([link]) => {
     setBusy(true);
@@ -538,7 +539,7 @@ function SlideImage({ icon, label, hint, portrait, value, onChange }) {
       setLinkOpen(false);
       if (urls[0]) {
         onChange(urls[0]);
-        toast("Đã thêm ảnh từ link");
+        toast("Đã thêm ảnh từ link — bấm Lưu để lưu lại");
       }
       return true;
     } catch (err) {

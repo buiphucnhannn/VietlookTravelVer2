@@ -12,11 +12,48 @@ const subscribeMq = (cb) => {
 };
 const getMq = () => window.matchMedia(MQ).matches;
 
+/** Điện thoại: chờ thêm sau khi trang tải xong (hoặc tới khi khách chạm / cuộn) rồi mới tải video */
+const MOBILE_DELAY = 3000;
+const WAKE_EVENTS = ["pointerdown", "touchstart", "scroll", "keydown"];
+
+/**
+ * Trang đã tải xong (sự kiện load) + trình duyệt rảnh → mới bắt đầu tải video nền.
+ * Trước đó chỉ hiện ảnh poster (nhẹ) → video không giành băng thông/CPU với ảnh, chữ, JS lúc mở trang
+ * (điện thoại 4G: video ~0,7MB làm chậm hiển thị nội dung chính vài giây). Điện thoại chờ thêm
+ * MOBILE_DELAY (hoặc tới lần chạm/cuộn đầu tiên) để trang kịp phản hồi thao tác trước.
+ */
+function useAfterLoad() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let idle;
+    let timer;
+    const done = () => setReady(true);
+    const go = () => {
+      const ric = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 200));
+      idle = ric(done, { timeout: 1500 });
+    };
+    const afterLoad = () => {
+      if (!getMq()) return go();
+      timer = setTimeout(go, MOBILE_DELAY);
+      WAKE_EVENTS.forEach((e) => window.addEventListener(e, done, { once: true, passive: true }));
+    };
+    if (document.readyState === "complete") afterLoad();
+    else window.addEventListener("load", afterLoad, { once: true });
+    return () => {
+      window.removeEventListener("load", afterLoad);
+      WAKE_EVENTS.forEach((e) => window.removeEventListener(e, done));
+      clearTimeout(timer);
+      if (idle) (window.cancelIdleCallback ?? clearTimeout)(idle);
+    };
+  }, []);
+  return ready;
+}
+
 /**
  * Video nền hero chạy luân phiên (cross-fade).
- * - Clip ĐẦU: có sẵn trong HTML (autoPlay + <source media>) → trình duyệt tự chọn bản mobile/desktop
- *   và phát NGAY khi đủ dữ liệu, không chờ JavaScript hay trang tải xong. Poster <picture> nằm dưới
- *   làm ảnh LCP cho tới khi khung hình đầu hiện.
+ * - Poster <picture> (nhẹ, chọn bản mobile/desktop ngay từ HTML) hiện trước, làm ảnh LCP.
+ * - Clip ĐẦU: gắn khi trang đã tải xong (useAfterLoad), tự phát bản mobile/desktop theo màn hình
+ *   → video không làm chậm lúc mở trang; khung hình đầu hiện đè lên poster.
  * - Clip sau: chỉ tải khi clip trước đã chạy (không giành băng thông với clip đầu); clip kế tiếp được
  *   tải sẵn → chuyển cảnh không khựng.
  * - Chuyển khi clip hiện tại còn ~1.1s → 2 video chồng mờ lúc cả hai đang chạy.
@@ -31,15 +68,19 @@ export default function HeroVideos({ videos, maxMs = 14000 }) {
   const [looped, setLooped] = useState(false);
   // Clip đầu đã chạy được ~1.5s → mới bắt đầu tải clip kế tiếp (dồn băng thông cho clip đầu)
   const [warm, setWarm] = useState(false);
+  // Chỉ gắn video sau khi trang tải xong (xem useAfterLoad)
+  const loaded = useAfterLoad();
+  // Clip đầu đã có khung hình → hiện dần đè lên poster (không nháy đen)
+  const [playing, setPlaying] = useState(false);
   const refs = useRef([]);
   const n = videos.length;
   const next = (i + 1) % n;
 
   useEffect(() => {
     // Chỉ 1 clip mp4: thẻ <video loop> tự lặp, không cần hẹn giờ chuyển slide
-    if (n === 1 && !videos[0]?.yt) return;
-    // Slide YouTube: không đọc được thời lượng → chuyển sau maxMs
-    if (videos[i]?.yt) {
+    if (!loaded || (n === 1 && !videos[0]?.yt)) return;
+    // Slide YouTube / slide chỉ có ảnh: không đọc được thời lượng → chuyển sau maxMs
+    if (videos[i]?.yt || !videos[i]?.src) {
       const t = setTimeout(() => {
         if (i === n - 1) setLooped(true);
         setWarm(true);
@@ -49,7 +90,7 @@ export default function HeroVideos({ videos, maxMs = 14000 }) {
     }
     const v = refs.current[i];
     if (!v) return;
-    // Clip đầu lần đầu: đã tự phát từ HTML → KHÔNG tua lại (tránh giật); chỉ đảm bảo đang chạy
+    // Clip đầu lần đầu: đang tự phát (autoPlay) → KHÔNG tua lại (tránh giật); chỉ đảm bảo đang chạy
     if (i === 0 && !looped) {
       if (v.paused) v.play().catch(() => {});
     } else {
@@ -76,7 +117,7 @@ export default function HeroVideos({ videos, maxMs = 14000 }) {
       v.removeEventListener("ended", advance);
       clearTimeout(t);
     };
-  }, [i, n, maxMs, small, looped, videos]);
+  }, [i, n, maxMs, small, looped, videos, loaded]);
 
   const first = videos[0];
   return (
@@ -93,39 +134,42 @@ export default function HeroVideos({ videos, maxMs = 14000 }) {
         />
       </picture>
 
-      {/* Clip đầu: render sẵn từ server, tự phát (YouTube → iframe) */}
-      {first.yt ? (
-        <YouTubeBg vid={first} active={i === 0} mount={small === false} />
+      {/* Clip đầu: gắn sau khi trang tải xong, tự phát (YouTube → iframe); trước đó poster ở trên */}
+      {first.yt || !first.src ? (
+        <YouTubeBg vid={first} active={i === 0} mount={!!first.yt && small === false && loaded} />
       ) : (
-        <video
-          ref={(el) => (refs.current[0] = el)}
-          className={cn(
-            "absolute inset-0 size-full object-cover transition-opacity duration-[1400ms] ease-out",
-            i === 0 ? "opacity-100" : "opacity-0",
-          )}
-          autoPlay
-          muted
-          loop={n === 1} // chỉ 1 slide → tự lặp (nhiều slide: chuyển sang clip kế tiếp)
-          playsInline
-          preload="auto"
-          aria-hidden
-        >
-          <source media={MQ} src={first.srcMobile} type="video/mp4" />
-          <source src={first.src} type="video/mp4" />
-        </video>
+        loaded &&
+        small !== null && (
+          <video
+            ref={(el) => (refs.current[0] = el)}
+            className={cn(
+              "absolute inset-0 size-full object-cover transition-opacity duration-[1400ms] ease-out",
+              i === 0 && playing ? "opacity-100" : "opacity-0",
+            )}
+            onPlaying={() => setPlaying(true)}
+            autoPlay
+            muted
+            loop={n === 1} // chỉ 1 slide → tự lặp (nhiều slide: chuyển sang clip kế tiếp)
+            playsInline
+            preload="auto"
+            src={small ? first.srcMobile : first.src}
+            aria-hidden
+          />
+        )
       )}
 
       {/* Các clip sau: gắn nguồn khi tới lượt (đang phát hoặc kế tiếp) */}
       {videos.slice(1).map((vid, k) => {
         const idx = k + 1;
-        const load = small !== null && (idx === i || (idx === next && warm));
-        if (vid.yt)
+        const load = loaded && small !== null && (idx === i || (idx === next && warm));
+        // slide YouTube, hoặc slide chỉ có ảnh (không có video) → lớp ảnh nền
+        if (vid.yt || !vid.src)
           return (
             <YouTubeBg
-              key={vid.yt}
+              key={vid.yt || `img-${idx}`}
               vid={vid}
               active={idx === i}
-              mount={small === false && idx === i}
+              mount={!!vid.yt && small === false && loaded && idx === i}
             />
           );
         return (

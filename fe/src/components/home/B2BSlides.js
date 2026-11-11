@@ -42,7 +42,7 @@ export default function B2BSlides({ images, mask, interval = 4800, startDelay = 
       >
         {images.map((src, i) => (
           <Image
-            key={src}
+            key={`${i}-${src}`}
             src={src}
             alt=""
             fill

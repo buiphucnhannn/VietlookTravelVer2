@@ -80,7 +80,7 @@ const text = (banner, key, lang, fallback) =>
 export default function Hero({ lang, dict, banner, regions, destinations }) {
   const t = dict.home;
   const destinationsByRegion = (slug) => destinations.filter((d) => d.region === slug);
-  const slides = (banner?.slides ?? []).filter((s) => s.video || s.poster);
+  const slides = (banner?.slides ?? []).filter((s) => s.video || s.poster || s.posterMobile);
   const videos = (slides.length ? slides : DEFAULT_VIDEOS).map((s) => toVideo(s, lang));
   const copy = {
     eyebrow: text(banner, "eyebrow", lang, t.heroEyebrow),

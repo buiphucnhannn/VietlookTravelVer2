@@ -17,6 +17,37 @@ import {
   useEnquiry,
   validate,
 } from "./fields";
+import ConsentCheckbox, {
+  consentError,
+  dropConsentError,
+  focusFirstError,
+  hasFieldErrors,
+} from "./ConsentCheckbox";
+
+/**
+ * Ô "Gói" chỉ hiện gói hợp với ô "Dịch vụ" (theo thứ tự t.services — giống nhau ở 3 ngôn ngữ), tránh yêu cầu
+ * mâu thuẫn kiểu "E-visa support" + "Departure VIP lane":
+ *   0 Fast-track only / 3 Fast-track + airport transfer → gói đến (không kèm visa tại sân bay), gói đi, cộng thêm
+ *   1 E-visa support → gói đến (không kèm visa tại sân bay) + cộng thêm
+ *   2 Visa on arrival + fast-track → gói đến CÓ visa tại sân bay + cộng thêm
+ */
+const isVoa = (l) => /voa/i.test(l.key) || /visa on arrival/i.test(l.name?.en ?? "");
+const plainArrivalOr =
+  (...groups) =>
+  (l) =>
+    (l.group === "arrival" && !isVoa(l)) || groups.includes(l.group);
+const SERVICE_FITS = [
+  plainArrivalOr("departure", "addons"),
+  plainArrivalOr("addons"),
+  (l) => (l.group === "arrival" && isVoa(l)) || l.group === "addons",
+  plainArrivalOr("departure", "addons"),
+];
+function levelsFor(levels, services, service) {
+  const fits = SERVICE_FITS[services.indexOf(service)];
+  const list = fits ? levels.filter(fits) : levels;
+  return list.length ? list : levels;
+}
+const defaultLevel = (list) => (list.find((l) => l.popular) ?? list[0])?.key;
 
 /**
  * Form đặt dịch vụ visa/fast-track (yêu cầu 24): quốc tịch, số người, ngày nhập cảnh, sân bay,
@@ -24,11 +55,11 @@ import {
  */
 export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) {
   const formRef = useRef(null);
-  const { status, code, submit, reset } = useEnquiry("visa", lang);
+  const { status, code, submit, reset, error: sendError } = useEnquiry("visa", lang);
   const [errs, setErrs] = useState({});
   const [d, setD] = useState({
     service: t.services[0],
-    level: levels.find((l) => l.popular)?.key || levels[0].key,
+    level: defaultLevel(levelsFor(levels, t.services, t.services[0])),
     nationality: "",
     travellers: 2,
     entryDate: "",
@@ -37,18 +68,41 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
     name: "",
     email: "",
     phone: "",
+    consent: false,
   });
   const set = (k) => (e) => setD({ ...d, [k]: e?.target ? e.target.value : e });
+  const setConsent = (v) => {
+    setD({ ...d, consent: v });
+    if (v) setErrs(dropConsentError);
+  };
 
-  // Nút "Book this package" trên thẻ gói → chọn sẵn gói trong form
+  // Đổi dịch vụ → gói đang chọn không hợp thì chọn lại gói đầu tiên hợp lệ
+  const setService = (service) =>
+    setD((x) => {
+      const list = levelsFor(levels, t.services, service);
+      return {
+        ...x,
+        service,
+        level: list.some((l) => l.key === x.level) ? x.level : defaultLevel(list),
+      };
+    });
+  const shownLevels = levelsFor(levels, t.services, d.service);
+
+  // Nút "Book this package" trên thẻ gói → chọn sẵn gói trong form (dịch vụ không hợp → đổi sang dịch vụ hợp)
   useEffect(() => {
     const onClick = (e) => {
       const a = e.target.closest?.("a[data-package]");
-      if (a) setD((x) => ({ ...x, level: a.dataset.package }));
+      if (!a) return;
+      const level = a.dataset.package;
+      setD((x) => {
+        const fits = (s) => levelsFor(levels, t.services, s).some((l) => l.key === level);
+        const service = fits(x.service) ? x.service : (t.services.find(fits) ?? x.service);
+        return { ...x, service, level };
+      });
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
-  }, []);
+  }, [levels, t.services]);
 
   if (status === "success")
     return (
@@ -63,9 +117,12 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    const v = validate(d, lang, { dates: { entryDate: false }, required: ["nationality"] });
+    const v = {
+      ...validate(d, lang, { dates: { entryDate: false }, required: ["nationality"] }),
+      ...consentError(d.consent, c),
+    };
     setErrs(v);
-    if (Object.keys(v).length) return;
+    if (Object.keys(v).length) return focusFirstError(formRef.current);
     await submit(d, formRef.current);
   };
 
@@ -81,24 +138,25 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
         <Chips
           options={t.services.map((s) => ({ value: s, label: s }))}
           value={d.service}
-          onChange={set("service")}
+          onChange={setService}
         />
       </Field>
       <Field label={t.package} htmlFor="vs-level">
         <Select id="vs-level" value={d.level} onChange={set("level")}>
           {groupLabels
-            ? Object.entries(groupLabels).map(([g, label]) => (
-                <optgroup key={g} label={label}>
-                  {levels
-                    .filter((l) => l.group === g)
-                    .map((l) => (
+            ? Object.entries(groupLabels).map(([g, label]) => {
+                const items = shownLevels.filter((l) => l.group === g);
+                return items.length ? (
+                  <optgroup key={g} label={label}>
+                    {items.map((l) => (
                       <option key={l.key} value={l.key}>
                         {l.label}
                       </option>
                     ))}
-                </optgroup>
-              ))
-            : levels.map((l) => (
+                  </optgroup>
+                ) : null;
+              })
+            : shownLevels.map((l) => (
                 <option key={l.key} value={l.key}>
                   {l.label}
                 </option>
@@ -176,8 +234,16 @@ export default function VisaForm({ lang, t, c, airports, levels, groupLabels }) 
         />
       </Field>
       <div className="space-y-3 sm:col-span-2">
-        <FormError show={Object.keys(errs).length > 0} text={formMsg(lang).fix} />
-        <FormError show={status === "error"} text={c.errorGeneric} />
+        <ConsentCheckbox
+          id="vs-consent"
+          lang={lang}
+          c={c}
+          checked={d.consent}
+          onChange={setConsent}
+          error={errs.consent}
+        />
+        <FormError show={hasFieldErrors(errs)} text={formMsg(lang).fix} />
+        <FormError show={status === "error"} text={sendError || c.errorGeneric} />
         <button
           type="submit"
           disabled={status === "sending"}

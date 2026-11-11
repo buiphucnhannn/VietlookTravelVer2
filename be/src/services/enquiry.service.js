@@ -1,4 +1,4 @@
-import { ENQUIRY_TYPES } from "../constants/content.js";
+import { ENQUIRY_TYPES, PRIVACY_POLICY_VERSION } from "../constants/content.js";
 import { logger } from "../config/logger.js";
 import { companyEmail, customerEmail } from "../emails/templates.js";
 import {
@@ -13,10 +13,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { formMessage } from "../utils/form-messages.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
 import { estimatePrice } from "../utils/pricing.js";
+import { searchRegex } from "../utils/search.js";
 import { mailService } from "./mail.service.js";
+import { paymentService } from "./payment/payment.service.js";
 import { settingsService } from "./settings.service.js";
-
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // bỏ 0/O, 1/I dễ nhầm
 
 /** Mã yêu cầu: VL-BK260512-7QX2 (loại + ngày theo giờ VN + hậu tố từ bộ đếm, không trùng) */
@@ -75,10 +75,10 @@ export async function emailLookups(e) {
 }
 
 /** Gửi email (khách + doanh nghiệp) rồi lưu kết quả để CMS đánh dấu đơn chưa gửi được email */
-async function deliver(enquiry) {
+async function deliver(enquiry, { paymentOnline = false } = {}) {
   const settings = await settingsService.getNotifications();
   const recipients = await settingsService.recipients();
-  const lookups = await emailLookups(enquiry);
+  const lookups = { ...(await emailLookups(enquiry)), paymentOnline };
   const status = { customer: "skipped", company: "skipped", error: "" };
   const errors = [];
 
@@ -163,16 +163,25 @@ export const enquiryService = {
         !tour && Number(data.children) > 0
           ? { ...data.details, children: Number(data.children) }
           : data.details,
+      // validator đã bắt buộc consent === true
+      consent: { agreedAt: new Date(), policyVersion: PRIVACY_POLICY_VERSION, lang: data.lang },
+      marketingConsentAt: data.marketingConsent ? new Date() : null,
       lang: data.lang,
       page: data.page,
       ip: meta.ip ?? "",
       userAgent: String(meta.userAgent ?? "").slice(0, 300),
     });
     const enquiry = doc.toObject();
-    deliver(enquiry).catch((err) =>
+    // 9Pay đang bật + đơn có giá → website hiện bước "Thanh toán" (đơn ĐÃ lưu; khách có thể trả sau)
+    const payment = tour ? await paymentService.offerFor(enquiry) : null;
+    deliver(enquiry, { paymentOnline: Boolean(payment) }).catch((err) =>
       logger.error({ err, code: enquiry.code }, "[enquiry] lỗi gửi email"),
     );
-    return { code: enquiry.code, estimate: tour ? estimate : undefined };
+    return {
+      code: enquiry.code,
+      estimate: tour ? estimate : undefined,
+      ...(payment && { payment }),
+    };
   },
 
   /* ---------- CMS ---------- */
@@ -189,8 +198,9 @@ export const enquiryService = {
     if (query.paymentStatus) filter.paymentStatus = query.paymentStatus;
     if (query.emailFailed)
       filter.$or = [{ "emailStatus.company": "failed" }, { "emailStatus.customer": "failed" }];
-    if (query.q) {
-      const rx = new RegExp(escapeRegex(query.q), "i");
+    // không phân biệt dấu / hoa thường / khoảng trắng: "ha giang" = "hà giang" = "Hà Giang"
+    const rx = searchRegex(query.q);
+    if (rx) {
       const search = [
         { code: rx },
         { name: rx },
@@ -237,12 +247,14 @@ export const enquiryService = {
     return enquiryRepository.removeNote(id, noteId);
   },
 
-  /** Gửi lại email (đơn bị đánh dấu chưa gửi được) */
+  /** Gửi lại email (đơn bị đánh dấu chưa gửi được) → { status, enquiry } (enquiry để ghi nhật ký theo mã đơn) */
   async resendEmail(id) {
     const e = await enquiryRepository.findById(id);
     if (!e) throw ApiError.notFound("Không tìm thấy đơn / yêu cầu");
     if (!mailService.enabled) throw mailOff();
-    return deliver(e);
+    // giống email lúc nhận đơn: còn trả online được (9Pay bật, chưa trả đủ…) → giữ phần nhắc thanh toán
+    const payment = e.type === "booking" ? await paymentService.offerFor(e) : null;
+    return { status: await deliver(e, { paymentOnline: Boolean(payment) }), enquiry: e };
   },
 
   async remove(id) {

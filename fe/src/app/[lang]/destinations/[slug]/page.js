@@ -85,7 +85,7 @@ async function DestinationPageContent({ params }) {
                 : `${name} Tours`
         }
         text={tr(item.intro, lang)}
-        images={[item.hero || item.image, item.image, ...tours.flatMap((x) => x.gallery)]}
+        images={[item.hero || item.image]}
         link={{ href: "#tours", label: dict.destination.viewTours }}
         breadcrumbs={[
           { label: "Vietlook", href: href(lang) },

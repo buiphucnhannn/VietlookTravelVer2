@@ -18,10 +18,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "emails:preview": "node --env-file-if-exists=.env scripts/preview-emails.js",
+    "media:cleanup": "node --env-file-if-exists=.env src/scripts/media-cleanup.js",
     "images:upload": "node --env-file-if-exists=.env scripts/upload-site-images.js",
     "seed": "node --env-file-if-exists=.env src/scripts/seed-content.js",
     "admin:reset": "node --env-file-if-exists=.env src/scripts/reset-admin.js",
-    "i18n:fill-vi": "node --env-file-if-exists=.env src/scripts/fill-vietnamese.js"
+    "db:backup": "node --env-file-if-exists=.env src/scripts/db-backup.js",
+    "db:restore": "node --env-file-if-exists=.env src/scripts/db-restore.js",
+    "i18n:fill": "node --env-file-if-exists=.env src/scripts/fill-translations.js",
+    "migrate:old-site": "node --env-file-if-exists=.env src/scripts/migrate-old-site.js"
   },
   "dependencies": {
     "cloudinary": "^2.11.0",
@@ -31,6 +35,7 @@
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.2",
     "helmet": "^8.3.0",
+    "htmlparser2": "^12.0.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.11.4",
     "multer": "^2.5.0",

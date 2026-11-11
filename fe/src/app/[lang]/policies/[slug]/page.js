@@ -39,6 +39,7 @@ export async function generateMetadata({ params }) {
       tr(p.body, lang)
         .replace(/<[^>]+>/g, " ")
         .slice(0, 155),
+    image: p.image || undefined,
   });
 }
 
@@ -64,7 +65,7 @@ async function PolicyPageContent({ params }) {
       <BannerHero
         title={tr(policy.title, lang)}
         subtitle={tr(policy.subtitle, lang)}
-        images={[policy.image, ...Object.values(policies).map((x) => x.image)]}
+        images={[policy.image || Object.values(policies).find((x) => x.image)?.image]}
         breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: tr(policy.title, lang) }]}
       />
       <Container className="grid gap-10 py-12 lg:grid-cols-[270px_minmax(0,1fr)] lg:py-14 xl:grid-cols-[270px_minmax(0,1fr)_290px] xl:gap-12">

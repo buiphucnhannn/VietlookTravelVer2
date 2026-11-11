@@ -183,18 +183,31 @@ export function moveItem(list, from, to) {
  *   all        : danh sách đầy đủ đang xếp (vd. mọi điểm đến của 1 miền)
  *   paged      : kết quả usePaged(all, cỡTrang)
  *   onReorder  : (danhSáchĐầyĐủMới) => lưu thứ tự
- * Trả về { onPageReorder, moveTo, flash, badge(item, i) }.
+ * Trả về { onPageReorder, moveTo, reveal(id), flash, badge(item, i) }.
+ *   reveal(id): vừa thêm mới → khi danh sách tải lại có mục đó thì sang đúng trang, cuộn tới và nháy viền.
  */
 export function usePagedSort({ all, paged, onReorder, getId = (x) => x.id }) {
   const [flash, setFlash] = useState(null);
-  const timer = useRef(null);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const [pending, setPending] = useState(null);
+  // nháy viền ~2 giây rồi tắt
+  useEffect(() => {
+    if (flash == null) return;
+    const t = setTimeout(() => setFlash(null), 2200);
+    return () => clearTimeout(t);
+  }, [flash]);
 
-  const pulse = (id) => {
-    clearTimeout(timer.current);
-    setFlash(id);
-    timer.current = setTimeout(() => setFlash(null), 1800);
-  };
+  const pulse = (id) => setFlash(id);
+
+  // mục vừa thêm đã có trong danh sách → chuyển tới trang chứa nó (điều chỉnh state ngay khi render)
+  if (pending != null) {
+    const at = all.findIndex((x) => String(getId(x)) === pending);
+    if (at >= 0) {
+      setPending(null);
+      paged.setPage(Math.floor(at / (paged.meta?.limit || all.length || 1)) + 1);
+      setFlash(pending);
+    }
+  }
+  const reveal = useCallback((id) => id != null && setPending(String(id)), []);
 
   /** kéo – thả trong trang đang xem → ghép trang vào đúng chỗ trong danh sách đầy đủ */
   const onPageReorder = (pageItems) =>
@@ -221,7 +234,7 @@ export function usePagedSort({ all, paged, onReorder, getId = (x) => x.id }) {
     onMove: (p) => moveTo(item, p),
   });
 
-  return { onPageReorder, moveTo, flash, badge };
+  return { onPageReorder, moveTo, reveal, flash, badge };
 }
 
 // chặn sự kiện để bấm vào số thứ tự / ô nhập không kích hoạt kéo – thả của thẻ bên ngoài
@@ -364,7 +377,7 @@ function MovePopover({ anchor, position, total, onClose, onMove }) {
           onChange={(e) => setValue(e.target.value)}
           aria-label={`Vị trí mới (1 – ${total})`}
           aria-invalid={value !== "" && !valid}
-          className="h-9 w-0 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm tabular-nums outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100 aria-[invalid=true]:border-sun-400"
+          className="h-10 w-0 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-base tabular-nums outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100 aria-[invalid=true]:border-sun-400 sm:h-9 sm:text-sm"
         />
         <button
           type="submit"

@@ -18,6 +18,7 @@ import {
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAdminList, useMutation } from "./hooks";
+import { useConfirmClose } from "./catalogShared";
 import {
   LEVELS,
   PERMISSION_GROUPS,
@@ -565,6 +566,7 @@ function CreateUser({ onClose, onSaved }) {
   });
   const { run, busy } = useMutation([]);
   const { toast } = useUi();
+  const close = useConfirmClose(d, onClose);
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
   const save = async () => {
@@ -587,12 +589,12 @@ function CreateUser({ onClose, onSaved }) {
     <Modal
       open
       size="xl"
-      onClose={onClose}
+      onClose={close}
       title="Thêm tài khoản"
       icon={UserCog}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={close}>
             Huỷ
           </Button>
           <Button onClick={save} loading={busy}>
@@ -654,6 +656,7 @@ function EditUser({ user, isMe, onClose, onSaved }) {
   });
   const { run, busy } = useMutation([]);
   const { toast } = useUi();
+  const close = useConfirmClose(d, onClose);
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
   const save = async () => {
@@ -681,12 +684,12 @@ function EditUser({ user, isMe, onClose, onSaved }) {
     <Modal
       open
       size={d.role === "editor" ? "xl" : "md"}
-      onClose={onClose}
+      onClose={close}
       title={`${d.role === "editor" ? "Phân quyền" : "Sửa tài khoản"}: ${user.name || user.username}`}
       icon={d.role === "editor" ? ShieldCheck : Pencil}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={close}>
             Huỷ
           </Button>
           <Button onClick={save} loading={busy}>
@@ -748,6 +751,7 @@ function ResetPassword({ user, onClose }) {
   const [pw, setPw] = useState("");
   const { run, busy } = useMutation([]);
   const { toast } = useUi();
+  const close = useConfirmClose(pw, onClose);
 
   const save = async () => {
     if (!pw) return toast("Vui lòng nhập mật khẩu mới", "error");
@@ -761,11 +765,11 @@ function ResetPassword({ user, onClose }) {
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={close}
       title={`Đặt lại mật khẩu: ${user.username}`}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={close}>
             Huỷ
           </Button>
           <Button onClick={save} loading={busy}>

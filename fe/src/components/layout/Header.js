@@ -314,8 +314,12 @@ function CardsPanel({ item, contact, onNavigate }) {
 
 // Trang mở đầu bằng banner ảnh/video → ở đầu trang header trong suốt, "ăn" nền banner.
 // Ngoại lệ: chi tiết tour (album ảnh nền sáng) và trang cảm ơn (nền kem) → luôn nền trắng.
-const SOLID = [/^(\/(en|zh))?\/tours\/[^/]+\/?$/, /^(\/(en|zh))?\/thank-you\/?$/];
+// (gồm cả /vi: trước đây thiếu → trang tour tiếng Việt bị header trong suốt đè lên đường dẫn & album ảnh)
+const TOUR_DETAIL = /^(\/(en|zh|vi))?\/tours\/[^/]+\/?$/;
+const SOLID = [TOUR_DETAIL, /^(\/(en|zh|vi))?\/thank-you\/?$/];
 const isOverlayRoute = (p) => !SOLID.some((re) => re.test(p || ""));
+// Ngôn ngữ có nhãn menu dài (không vừa 1 hàng ở 1024–1279px) → menu ngang chỉ hiện từ 1280px
+const LONG_NAV_LANGS = new Set(["vi"]);
 
 /**
  * Header cố định (yêu cầu khách 31/10 + góp ý 02/11):
@@ -386,6 +390,10 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
   const overlayRoute = isOverlayRoute(pathname);
   // Chỉ phụ thuộc vị trí cuộn (không đổi khi rê chuột/mở menu)
   const clear = overlayRoute && !scrolled;
+  // Menu tiếng Việt dài nhất → 1024–1279px không đủ chỗ: dùng nút ☰ tới 1280px (en / zh hiện menu từ 1024px)
+  const bp = LONG_NAV_LANGS.has(lang)
+    ? { show: "xl:flex", hide: "xl:hidden", block: "xl:block" }
+    : { show: "lg:flex", hide: "lg:hidden", block: "lg:block" };
 
   return (
     <>
@@ -448,13 +456,16 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
               lang={lang}
               compact
               light={clear}
-              taglineClassName="lg:hidden xl:flex"
+              taglineClassName="lg:hidden min-[90rem]:flex"
               className="min-w-0"
             />
 
             {/* Trải đều các mục từ sau logo đến mép phải → khoảng cách giữa các mục bằng nhau, 2 bên cân đối */}
             <nav
-              className="hidden flex-1 items-center justify-between lg:ml-4 lg:flex xl:ml-10 2xl:ml-12"
+              className={cn(
+                "hidden flex-1 items-center justify-between lg:ml-4 xl:ml-6 min-[90rem]:ml-10 2xl:ml-12",
+                bp.show,
+              )}
               aria-label={labels.menu}
             >
               {nav.map((item) => (
@@ -495,7 +506,7 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
               ))}
             </nav>
 
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:hidden">
+            <div className={cn("flex shrink-0 items-center gap-1 sm:gap-2", bp.hide)}>
               <Link
                 href={`${lp(lang)}/plan-your-trip`}
                 className="hidden h-10 items-center rounded-md bg-sun-500 px-5 text-[0.95rem] font-semibold whitespace-nowrap text-white shadow-sm shadow-sun-500/30 transition-colors hover:bg-sun-600 sm:flex lg:hidden"
@@ -513,7 +524,8 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
               <button
                 type="button"
                 className={cn(
-                  "grid size-11 place-items-center rounded-md lg:hidden",
+                  "grid size-11 place-items-center rounded-md",
+                  bp.hide,
                   clear ? "text-white hover:bg-white/10" : "text-ink hover:bg-surface",
                 )}
                 aria-label={labels.menu}
@@ -528,7 +540,10 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
           {/* Mega menu desktop */}
           {current && (
             <div
-              className="absolute inset-x-0 top-full hidden border-t border-border bg-white shadow-[0_24px_40px_-24px_rgba(15,62,95,0.35)] lg:block"
+              className={cn(
+                "absolute inset-x-0 top-full hidden border-t border-border bg-white shadow-[0_24px_40px_-24px_rgba(15,62,95,0.35)]",
+                bp.block,
+              )}
               onMouseEnter={() => open(current.key)}
             >
               <Container className="py-8">
@@ -569,7 +584,8 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
         {/* Ngăn kéo menu di động */}
         <div
           className={cn(
-            "fixed inset-0 z-50 lg:hidden",
+            "fixed inset-0 z-50",
+            bp.hide,
             mobileOpen ? "pointer-events-auto" : "pointer-events-none",
           )}
           aria-hidden={!mobileOpen}
@@ -640,7 +656,7 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
                                 <li key={l.href + l.label}>
                                   <Link
                                     href={l.href}
-                                    className="block py-1.5 text-sm text-muted hover:text-sun-500"
+                                    className="block py-2.5 text-sm leading-snug text-muted hover:text-sun-500"
                                   >
                                     {l.label}
                                   </Link>
@@ -655,7 +671,7 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
                 );
               })}
             </nav>
-            <div className="space-y-3 border-t border-border p-5">
+            <div className="space-y-3 border-t border-border px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <Link
                 href={`${lp(lang)}/plan-your-trip`}
                 className="flex h-12 items-center justify-center rounded-md bg-sun-500 font-semibold text-white"
@@ -672,8 +688,11 @@ function HeaderView({ lang, nav, labels, contact, pathname }) {
           </div>
         </div>
       </header>
-      {/* Trang không có banner ở đầu: chừa chỗ cho header cố định */}
-      {!overlayRoute && <div aria-hidden className="h-16 lg:h-[108px]" />}
+      {/* Trang không có banner ở đầu: chừa chỗ cho header cố định. Trang chi tiết tour tự chừa chỗ ngay trong
+          khung tĩnh (app/[lang]/tours/[slug]/page.js) → không bị xô trang khi header thật thay bản dựng sẵn. */}
+      {!overlayRoute && !TOUR_DETAIL.test(pathname) && (
+        <div aria-hidden className="h-16 lg:h-[108px]" />
+      )}
     </>
   );
 }

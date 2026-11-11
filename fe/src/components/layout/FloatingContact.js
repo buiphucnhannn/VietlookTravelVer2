@@ -5,9 +5,11 @@ import { ArrowUp, MessageCircle, Phone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { smoothScrollTo } from "@/components/fx/SmoothScroll";
 import { WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
+import { useA11y } from "./A11y";
 
 /** Nút liên hệ nhanh nổi: WhatsApp, WeChat, Zalo, hotline + về đầu trang. */
 export default function FloatingContact({ labels, contact, messaging }) {
+  const a11y = useA11y();
   const [open, setOpen] = useState(false);
   const [wechat, setWechat] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -76,7 +78,9 @@ export default function FloatingContact({ labels, contact, messaging }) {
 
   return (
     <>
-      <div className="fixed right-4 bottom-[calc(1rem+var(--mobile-bar,0px))] z-40 flex flex-col items-end gap-2.5 transition-[bottom] duration-300 sm:right-5 sm:bottom-[calc(1.25rem+var(--mobile-bar,0px))]">
+      {/* Điện thoại, khung đặt tour đang trên màn hình (MobileBookBar đặt html[data-book-in-view]) → tạm ẩn để
+          không che nút 5★ / ô nhập ở mép phải */}
+      <div className="fixed right-4 bottom-[calc(1rem+var(--mobile-bar,0px))] z-40 flex flex-col items-end gap-2.5 transition-[bottom,opacity,translate,visibility] duration-300 sm:right-5 sm:bottom-[calc(1.25rem+var(--mobile-bar,0px))] max-lg:[html[data-book-in-view]_&]:invisible max-lg:[html[data-book-in-view]_&]:translate-y-4 max-lg:[html[data-book-in-view]_&]:opacity-0">
         {/* Lên đầu trang: sát trên nút chat, ẩn khi danh sách liên hệ đang mở */}
         <button
           type="button"
@@ -160,20 +164,20 @@ export default function FloatingContact({ labels, contact, messaging }) {
 
       {wechat && (
         <div
-          className="fixed inset-0 z-[70] grid place-items-center bg-brand-950/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] grid place-items-center bg-brand-950/60 px-3 py-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           onClick={() => setWechat(false)}
         >
           <div
-            className="relative w-full max-w-sm rounded-2xl bg-white p-7 text-center shadow-2xl"
+            className="relative max-h-full w-full max-w-sm overflow-y-auto overscroll-contain rounded-3xl bg-white px-5 pt-7 pb-6 text-center shadow-2xl sm:p-7"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => setWechat(false)}
-              className="absolute top-3 right-3 grid size-9 place-items-center rounded-full hover:bg-surface"
-              aria-label="Close"
+              className="absolute top-2.5 right-2.5 grid size-10 place-items-center rounded-full hover:bg-surface"
+              aria-label={a11y.close}
             >
               <X className="size-5" />
             </button>
@@ -183,13 +187,13 @@ export default function FloatingContact({ labels, contact, messaging }) {
             <h3 className="mt-4 text-xl font-bold text-ink">{labels.addWeChat}</h3>
             <p className="mt-1 text-sm text-muted">{labels.wechatHint}</p>
             <div className="mt-5 flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
-              <span className="font-mono text-lg font-semibold tracking-wide text-ink">
+              <span className="min-w-0 font-mono text-lg font-semibold tracking-wide break-all text-ink">
                 {messaging.wechatId}
               </span>
               <button
                 type="button"
                 onClick={copy}
-                className="rounded-lg bg-[#07c160] px-3 py-1.5 text-sm font-semibold text-white"
+                className="h-10 shrink-0 rounded-lg bg-[#07c160] px-3.5 text-sm font-semibold text-white"
               >
                 {copied ? labels.copied : labels.copy}
               </button>

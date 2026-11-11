@@ -1,15 +1,16 @@
 import { ApiError } from "../utils/ApiError.js";
+import { afterSave as cleanupMedia } from "./media-cleanup.service.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
-
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+import { searchRegex } from "../utils/search.js";
 
 const SORTS = {
-  newest: { createdAt: -1 },
-  oldest: { createdAt: 1 },
+  newest: { createdAt: -1, _id: -1 },
+  oldest: { createdAt: 1, _id: 1 },
   order: { order: 1, createdAt: 1 },
   rank: { rank: 1, createdAt: -1 },
   price: { price: 1 },
-  name: { "name.en": 1 },
+  // CMS hiển thị tên tiếng Việt trước → sắp theo tên tiếng Việt, rồi tiếng Anh
+  name: { "name.vi": 1, "name.en": 1 },
 };
 
 /**
@@ -20,7 +21,7 @@ const SORTS = {
  *   afterUpdate(next, prev)   đồng bộ chỗ khác khi đổi slug…
  *   beforeRemove(doc)         chặn xoá khi đang được dùng
  *   filters(query)            điều kiện lọc riêng của trang danh sách
- * Tuỳ chọn: listSelect (chỉ lấy các trường cần cho trang danh sách — nhẹ hơn),
+ * Tuỳ chọn: sorts (ghi đè cách sắp xếp mặc định, vd. bài viết "Mới nhất" theo ngày đăng), listSelect (chỉ lấy các trường cần cho trang danh sách — nhẹ hơn),
  *   trackOldSlugs (loại có slug cũ để chuyển hướng 301: tour, bài viết).
  */
 export function createContentService({
@@ -29,6 +30,7 @@ export function createContentService({
   idField = "slug",
   searchFields = [],
   defaultSort = "order",
+  sorts = {},
   listSelect,
   trackOldSlugs = false,
   prepare = (d) => d,
@@ -65,12 +67,17 @@ export function createContentService({
       const page = getPagination(query, { defaultLimit: 50, maxLimit: 200 });
       const filter = { ...(filters?.(query) ?? {}) };
       if (query.status) filter.isActive = query.status === "active";
-      if (query.q) {
-        const rx = new RegExp(escapeRegex(query.q), "i");
-        filter.$or = [{ [idField]: rx }, ...searchFields.map((f) => ({ [f]: rx }))];
-      }
-      const sort = SORTS[query.sort ?? defaultSort] ?? SORTS[defaultSort];
-      const { items, total } = await repo.paginate(filter, { ...page, sort, select: listSelect });
+      // không phân biệt dấu / hoa thường / khoảng trắng: "ha noi" = "hà nội" = "hanoi"
+      const rx = searchRegex(query.q);
+      if (rx) filter.$or = [{ [idField]: rx }, ...searchFields.map((f) => ({ [f]: rx }))];
+      const sortKey = query.sort ?? defaultSort;
+      const sort = sorts[sortKey] ?? SORTS[sortKey] ?? SORTS[defaultSort];
+      const { items, total } = await repo.paginate(filter, {
+        ...page,
+        sort,
+        select: listSelect,
+        ...(sortKey === "name" && { collation: { locale: "vi" } }), // A → Z đúng thứ tự tiếng Việt
+      });
       return { items, meta: buildPageMeta(page, total) };
     },
 
@@ -90,6 +97,7 @@ export function createContentService({
       const next = await repo.updateById(id, { $set: await prepare(data, prev) });
       if (next.slug !== prev.slug) await releaseOldSlug(next);
       await afterUpdate?.(next, prev);
+      cleanupMedia(prev, next); // ảnh bị thay / bỏ → dọn nền nếu không còn chỗ nào dùng
       return next;
     },
 
@@ -102,6 +110,7 @@ export function createContentService({
       const doc = await getOr404(id);
       await beforeRemove?.(doc);
       await repo.deleteById(id);
+      cleanupMedia(doc, null);
       return doc;
     },
 

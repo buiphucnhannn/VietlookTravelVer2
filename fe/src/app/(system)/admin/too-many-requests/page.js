@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Hourglass } from "lucide-react";
-import { ADMIN_BASE } from "@/config/urls.mjs";
+import { ADMIN_BASE, safeNext } from "@/config/urls.mjs";
 import RetryButton from "./RetryButton";
 
 export const metadata = { title: "Thao tác quá nhanh" };
@@ -8,9 +8,7 @@ export const metadata = { title: "Thao tác quá nhanh" };
 /** Proxy trả trang này (HTTP 429) khi backend tạm giới hạn yêu cầu của khu quản trị */
 async function Retry({ searchParams }) {
   const { next, retry } = await searchParams;
-  const safe =
-    String(next ?? "").startsWith(ADMIN_BASE) && !String(next).startsWith("//") ? next : ADMIN_BASE;
-  return <RetryButton seconds={retry} href={safe} />;
+  return <RetryButton seconds={retry} href={safeNext(next)} />;
 }
 
 export default function TooManyRequestsPage({ searchParams }) {

@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { lp, tr } from "@/i18n/config";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, dateLocale, formatDate } from "@/lib/utils";
 
 /** Thẻ bài viết cẩm nang. */
 export default function PostCard({ post, lang, categoryName, className, large }) {
@@ -33,14 +33,19 @@ export default function PostCard({ post, lang, categoryName, className, large })
             className="object-cover transition-transform duration-700 group-hover:scale-105"
           />
         )}
-        <span className="absolute top-3 left-3 flex flex-col items-center rounded-lg bg-white px-2.5 py-1 text-brand-700 shadow ring-1 ring-brand-100">
-          <span className="text-lg leading-none font-bold">{new Date(post.date).getDate()}</span>
-          <span className="text-[0.65rem] font-semibold uppercase">
-            {new Date(post.date).toLocaleString({ zh: "zh-CN", vi: "vi-VN" }[lang] || "en", {
-              month: "short",
-            })}
+        {post.date && (
+          <span className="absolute top-3 left-3 flex flex-col items-center rounded-lg bg-white px-2.5 py-1 text-brand-700 shadow ring-1 ring-brand-100">
+            <span className="text-lg leading-none font-bold">
+              {new Date(post.date).getUTCDate()}
+            </span>
+            <span className="text-[0.65rem] font-semibold uppercase">
+              {new Date(post.date).toLocaleString(dateLocale(lang), {
+                month: "short",
+                timeZone: "UTC",
+              })}
+            </span>
           </span>
-        </span>
+        )}
       </div>
       <div className="flex flex-1 flex-col p-5">
         {categoryName && (
@@ -61,9 +66,11 @@ export default function PostCard({ post, lang, categoryName, className, large })
         <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted">
           {tr(post.excerpt, lang)}
         </p>
-        <span className="mt-auto flex items-center gap-1.5 pt-4 text-xs text-muted">
-          <CalendarDays className="size-3.5" /> {formatDate(post.date, lang)}
-        </span>
+        {post.date && (
+          <span className="mt-auto flex items-center gap-1.5 pt-4 text-xs text-muted">
+            <CalendarDays className="size-3.5" /> {formatDate(post.date, lang)}
+          </span>
+        )}
       </div>
     </article>
   );

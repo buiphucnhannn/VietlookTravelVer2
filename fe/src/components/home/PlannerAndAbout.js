@@ -9,6 +9,7 @@ import SpinBadge from "@/components/ui/SpinBadge";
 import YouTubeLite from "@/components/ui/YouTubeLite";
 import { WhatsAppIcon } from "@/components/ui/BrandIcons";
 import { lp } from "@/i18n/config";
+import { DEFAULT_HOME_IMAGES } from "./images";
 
 /** Form lên kế hoạch chuyến đi trên trang chủ. */
 export function PlannerBlock({ lang, dict, destinationOptions }) {
@@ -67,7 +68,7 @@ export function PlannerBlock({ lang, dict, destinationOptions }) {
 }
 
 /** Khối "About us" kiểu localvietnam: ảnh blob + video giới thiệu. */
-export function AboutBlob({ lang, dict }) {
+export function AboutBlob({ lang, dict, image = DEFAULT_HOME_IMAGES.about }) {
   const t = dict.home;
   return (
     <section className="relative isolate overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
@@ -89,10 +90,11 @@ export function AboutBlob({ lang, dict }) {
           <SpinBadge className="absolute top-[8%] right-0 z-10 sm:right-2" />
           <div className="blob relative aspect-square overflow-hidden shadow-2xl">
             <Image
-              src="/images/tours/v2/vietnam-12674100.jpg"
+              src={image}
               alt=""
               fill
-              sizes="(min-width: 1024px) 40vw, 90vw"
+              // khung vòm tối đa 576px (max-w-xl)
+              sizes="(min-width: 640px) 576px, 92vw"
               className="object-cover"
             />
           </div>

@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Eye, ShieldOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "@/components/admin/Link";
@@ -188,14 +195,52 @@ export const grantedModules = (permissions) =>
 
 /* ---------- Ngữ cảnh: tài khoản đang đăng nhập (AdminShell cung cấp) ---------- */
 
+/*
+ * Ngữ cảnh chứa 1 "kho" cố định (không đổi giá trị ngữ cảnh khi tài khoản tải xong), đọc qua useSyncExternalStore
+ * với giá trị phía server = null. Lý do: trang CMS được dựng sẵn với tài khoản = null; /auth/me có thể trả về khi một
+ * phần trang CHƯA hydrate xong — nếu đổi giá trị ngữ cảnh lúc đó, React hydrate phần còn lại với tài khoản đã có →
+ * lệch nội dung server (lỗi hydration). Với kho này, phần đang hydrate luôn thấy null, xong rồi mới cập nhật.
+ */
 const CurrentUserContext = createContext(undefined);
 
+function createUserStore() {
+  let value = null;
+  const subs = new Set();
+  return {
+    get: () => value,
+    set: (next) => {
+      if (next === value) return;
+      value = next;
+      subs.forEach((fn) => fn());
+    },
+    subscribe: (fn) => {
+      subs.add(fn);
+      return () => subs.delete(fn);
+    },
+  };
+}
+
 export function CurrentUserProvider({ user, children }) {
-  return <CurrentUserContext.Provider value={user}>{children}</CurrentUserContext.Provider>;
+  const [store] = useState(createUserStore);
+  useEffect(() => store.set(user ?? null), [store, user]);
+  return <CurrentUserContext.Provider value={store}>{children}</CurrentUserContext.Provider>;
+}
+
+const noSubscribe = () => () => {};
+const getUndefined = () => undefined;
+const getNull = () => null;
+/** undefined = ngoài AdminShell (không có ngữ cảnh); null = đang tải; object = tài khoản */
+function useUserFromContext() {
+  const store = useContext(CurrentUserContext);
+  return useSyncExternalStore(
+    store ? store.subscribe : noSubscribe,
+    store ? store.get : getUndefined,
+    store ? getNull : getUndefined,
+  );
 }
 
 /** Tài khoản đang đăng nhập (null khi đang tải) */
-export const useCurrentUser = () => useContext(CurrentUserContext) ?? null;
+export const useCurrentUser = () => useUserFromContext() ?? null;
 
 /** Mục của trang đang mở (AdminShell đặt theo đường dẫn) → usePermission() không cần truyền tên mục */
 const ModuleScopeContext = createContext(null);
@@ -210,7 +255,7 @@ export function ModuleScope({ module, children }) {
  * Ngoài AdminShell (không có ngữ cảnh) → cho phép tất cả (backend vẫn kiểm tra).
  */
 export function usePermission(moduleKey) {
-  const ctx = useContext(CurrentUserContext);
+  const ctx = useUserFromContext();
   const scope = useContext(ModuleScopeContext);
   const mod = moduleKey ?? scope;
   return useMemo(() => {

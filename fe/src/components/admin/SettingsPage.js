@@ -102,6 +102,7 @@ const paymentForm = (d) => ({
   accountName: d.accountName ?? "",
   secretKey: "",
   checksumKey: "",
+  depositPercent: String(d.depositPercent ?? 100),
 });
 
 const trackingForm = (d) => ({
@@ -238,16 +239,69 @@ function SecretInput({ label, isSet, masked, value, onChange }) {
   );
 }
 
+const FX_SOURCE = {
+  vietcombank: "Vietcombank",
+  "er-api": "tỷ giá quốc tế",
+  default: "tỷ giá dự phòng",
+};
+
+/** Tỷ giá tự động (chỉ xem) — dùng để đổi giá tour (USD) sang tiền Việt khi khách thanh toán */
+function FxRate({ fx }) {
+  const rate = Math.round(Number(fx?.rate) || 0);
+  // "10:42, 11/11" (giờ Việt Nam)
+  const parts = fx?.fetchedAt
+    ? Object.fromEntries(
+        new Intl.DateTimeFormat("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          day: "2-digit",
+          month: "2-digit",
+          hour12: false,
+          timeZone: "Asia/Ho_Chi_Minh",
+        })
+          .formatToParts(new Date(fx.fetchedAt))
+          .map((x) => [x.type, x.value]),
+      )
+    : null;
+  const at = parts ? `${parts.hour}:${parts.minute}, ${parts.day}/${parts.month}` : "";
+  return (
+    <Field
+      label="Tỷ giá USD → VND hôm nay"
+      hint="Tự cập nhật nhiều lần mỗi ngày. Số tiền khách trả được làm tròn lên tới 1.000đ."
+    >
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">
+        <span className="font-semibold whitespace-nowrap text-slate-900 tabular-nums">
+          {rate ? `${rate.toLocaleString("vi-VN")}đ` : "—"}
+        </span>
+        <span className="text-slate-500">
+          ({FX_SOURCE[fx?.source] ?? "tự động"}
+          {at && `, cập nhật ${at}`})
+        </span>
+      </div>
+    </Field>
+  );
+}
+
 function PaymentCard() {
   const { data, form, setForm, error, reload } = useSetting("/settings/payment", paymentForm);
-  const { run, busy } = useMutation([]);
-  const { confirm } = useUi();
+  // "settings": website đọc lại cấu hình thanh toán ngay sau khi lưu
+  const { run, busy } = useMutation(["settings"]);
+  const { confirm, toast } = useUi();
 
   if (error || !form) return <CardState title="Thanh toán 9Pay" error={error} reload={reload} />;
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+  const deposit = Number(form.depositPercent);
+  const depositOk = Number.isInteger(deposit) && deposit >= 10 && deposit <= 100;
+  const missingKey =
+    !form.merchantKey.trim() ||
+    (!data.secretKeySet && !form.secretKey.trim()) ||
+    (!data.checksumKeySet && !form.checksumKey.trim());
 
   const save = async () => {
+    if (!depositOk) return toast.error("Tỷ lệ đặt cọc là số từ 10 đến 100.");
+    if (form.enabled && missingKey)
+      return toast.error("Nhập đủ Merchant Key, Secret Key và Checksum Key trước khi bật.");
     const turningOn = form.enabled && !data.enabled;
     if (turningOn) {
       const ok = await confirm({
@@ -265,6 +319,7 @@ function PaymentCard() {
       accountName: form.accountName.trim(),
       ...(form.secretKey.trim() && { secretKey: form.secretKey.trim() }),
       ...(form.checksumKey.trim() && { checksumKey: form.checksumKey.trim() }),
+      depositPercent: deposit,
     };
     const r = await run(
       () => api("/settings/payment", { method: "PUT", body }),
@@ -278,8 +333,8 @@ function PaymentCard() {
       icon={CreditCard}
       title="Thanh toán 9Pay"
       description={
-        form.enabled
-          ? "Khách có thể thanh toán trực tuyến bằng thẻ khi đặt tour."
+        data.ready && data.enabled
+          ? "Đang nhận tiền — khách thấy bước thanh toán qua 9Pay ngay sau khi đặt tour."
           : "Đang tắt — khách chỉ gửi yêu cầu đặt tour, nhân viên liên hệ thanh toán sau."
       }
       actions={
@@ -320,15 +375,48 @@ function PaymentCard() {
           value={form.checksumKey}
           onChange={(checksumKey) => set({ checksumKey })}
         />
+        <Field
+          label="Tỷ lệ đặt cọc (%)"
+          hint="100 = khách trả toàn bộ. Ví dụ 30 = khách đặt cọc 30%, phần còn lại thu sau."
+          error={depositOk ? "" : "Nhập số từ 10 đến 100"}
+        >
+          <div className="relative">
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={10}
+              max={100}
+              step={5}
+              value={form.depositPercent}
+              onChange={(e) => set({ depositPercent: e.target.value })}
+              className="pr-10"
+            />
+            <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-sm text-slate-400">
+              %
+            </span>
+          </div>
+        </Field>
+        <FxRate fx={data.fx} />
       </div>
 
-      {form.enabled && (!form.merchantKey.trim() || (!data.secretKeySet && !form.secretKey)) && (
+      {form.enabled && missingKey && (
         <Notice tone="warn" className="mt-6">
-          Đã bật 9Pay nhưng còn thiếu Merchant Key hoặc Secret Key nên khách chưa thanh toán được.
+          Còn thiếu mã 9Pay nên khách chưa thanh toán được. Nhập đủ Merchant Key, Secret Key và
+          Checksum Key rồi bấm Lưu.
         </Notice>
       )}
 
-      <CardFooter note={data.updatedAt ? `Cập nhật lần cuối: ${fmtDateTime(data.updatedAt)}` : ""}>
+      <CardFooter
+        note={
+          <>
+            Khi bật và nhập đủ 3 mã, khách sẽ thấy bước thanh toán sau khi đặt tour; khi tắt, khách
+            chỉ gửi yêu cầu như hiện tại.
+            {data.updatedAt && (
+              <span className="mt-0.5 block">Cập nhật lần cuối: {fmtDateTime(data.updatedAt)}</span>
+            )}
+          </>
+        }
+      >
         <Button icon={Save} onClick={save} loading={busy}>
           Lưu
         </Button>

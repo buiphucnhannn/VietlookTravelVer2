@@ -37,11 +37,12 @@ export default function TourCard({ card, lang, labels, badge, className, priorit
           fill
           priority={priority}
           // Ảnh nguồn đa số ngang 3:2 mà khung dọc (4:5) / vuông → object-cover phóng ảnh theo
-          // chiều cao: bề rộng ảnh cần ≈ 1.9× (vuông: 1.5×) bề rộng thẻ, nếu không sẽ bị mờ
+          // chiều cao: bề rộng ảnh cần ≈ 1.9× (vuông: 1.5×) bề rộng thẻ, nếu không sẽ bị mờ.
+          // Điện thoại (< 640px) khung NGANG 5:4 → chỉ cần ≈ 1.2× bề rộng thẻ (không tải ảnh 1280px).
           sizes={
             compact
-              ? "(min-width: 1280px) 600px, (min-width: 768px) 70vw, 150vw"
-              : "(min-width: 1280px) 760px, (min-width: 768px) 90vw, 170vw"
+              ? "(min-width: 1280px) 600px, (min-width: 768px) 70vw, 75vw" // điện thoại: lưới 2 cột
+              : "(min-width: 1280px) 760px, (min-width: 640px) 90vw, 110vw"
           }
           className="object-cover transition-transform duration-700 group-hover:scale-105"
         />

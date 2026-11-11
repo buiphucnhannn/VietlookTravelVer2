@@ -3,6 +3,7 @@
 import { Children, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useA11y } from "@/components/layout/A11y";
 
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -23,6 +24,7 @@ export default function Carousel({
   autoplay = 0,
   label = "carousel",
 }) {
+  const a11y = useA11y();
   const items = Children.toArray(children);
   const n = items.length;
   const loop = n > 1;
@@ -278,7 +280,7 @@ export default function Carousel({
           <>
             <button
               type="button"
-              aria-label="Previous"
+              aria-label={a11y.previous}
               onClick={() => go(-1)}
               className={cn(
                 btn,
@@ -289,7 +291,7 @@ export default function Carousel({
             </button>
             <button
               type="button"
-              aria-label="Next"
+              aria-label={a11y.next}
               onClick={() => go(1)}
               className={cn(
                 btn,
@@ -308,7 +310,7 @@ export default function Carousel({
             <button
               key={i}
               type="button"
-              aria-label={`Slide ${i + 1}`}
+              aria-label={a11y.slide.replace("{n}", i + 1)}
               onClick={() => goTo(i)}
               className={cn(
                 "relative h-2.5 rounded-full transition-all duration-300 after:absolute after:-inset-x-1 after:-inset-y-3 after:content-['']",

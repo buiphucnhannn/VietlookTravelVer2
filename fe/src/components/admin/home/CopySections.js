@@ -1,5 +1,6 @@
 "use client";
 
+import { useContext, useState } from "react";
 import Image from "next/image";
 import {
   ArrowRight,
@@ -31,9 +32,12 @@ import {
   Wallet,
 } from "lucide-react";
 import { partners } from "@/components/home/PartnerStrip";
-import RibbonStar from "@/components/home/RibbonStar";
+import { tr } from "@/i18n/config";
+import RibbonStar, { STAR_DEFAULT_NAMES } from "@/components/home/RibbonStar";
 import { cn } from "@/lib/utils";
 import { AutoNote, InlineText, MiniHeading, Pic, Sec, T } from "./shared";
+import { HOME_IMAGE_CROPS } from "@/components/home/images";
+import { HomeImagesContext, ImageSlot, useHomeImage } from "./ImageSlot";
 
 /**
  * Các khối chữ của trang chủ (thu nhỏ): bố cục, màu và thứ tự như trang thật;
@@ -78,9 +82,9 @@ export function TrustSection() {
 /* ---------- 3 dịch vụ chính ---------- */
 
 const services = [
-  { key: "tours", icon: Map, image: "/images/services/svc-tour-cao-bang.webp" },
-  { key: "car", icon: Car, image: "/images/services/svc-car-vietlook-carnival.webp" },
-  { key: "visa", icon: Stamp, image: "/images/services/svc-visa-welcome.webp" },
+  { key: "tours", icon: Map },
+  { key: "car", icon: Car },
+  { key: "visa", icon: Stamp },
 ];
 
 export function ServicesSection() {
@@ -93,10 +97,14 @@ export function ServicesSection() {
             key={s.key}
             className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-[0_18px_36px_-26px_rgba(60,40,10,0.55)] ring-1 ring-sand-300/60"
           >
-            <div className="relative aspect-[16/10] bg-sand-300/40">
-              <Pic src={s.image} sizes="360px" />
-              <span className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-              <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-white/95 py-1 pr-3 pl-1 text-[11px] font-bold text-ink shadow">
+            {/* Ảnh thẻ: bấm "Đổi ảnh / Dán link / Cắt ảnh" ngay trên ảnh (khung 16:10 như web) */}
+            <div className="relative [&_.rounded-2xl]:rounded-none">
+              <ImageSlot
+                path={`services.${s.key}`}
+                aspect="aspect-[16/10]"
+                label="Ảnh thẻ dịch vụ"
+              />
+              <span className="pointer-events-none absolute top-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-white/95 py-1 pr-3 pl-1 text-[11px] font-bold text-ink shadow">
                 <span className="grid size-6 place-items-center rounded-full bg-sun-500 text-white">
                   <s.icon className="size-3" />
                 </span>
@@ -125,11 +133,65 @@ export function ServicesSection() {
           </article>
         ))}
       </div>
+      <AutoNote className="mt-5">
+        Ảnh nào trên trang chủ cũng đổi được bằng các nút ngay trên ảnh. Bấm “Bỏ ảnh” để dùng lại
+        ảnh có sẵn.
+      </AutoNote>
     </Sec>
   );
 }
 
 /* ---------- Khối đối tác B2B ---------- */
+
+/** 1 khung ảnh của khối đối tác: 3 ảnh đổi luân phiên trên web — chọn số ảnh rồi đổi / cắt ngay trên khung */
+function B2BFrame({ group, className }) {
+  const [i, setI] = useState(0);
+  return (
+    // khung lớn nằm trên để nút đổi ảnh của cả 2 khung luôn bấm được; rê chuột / bấm vào khung → khung nổi lên trên
+    <div
+      className={cn(
+        "absolute overflow-hidden rounded-[2rem] shadow-lg focus-within:z-[4] hover:z-[4]",
+        className,
+      )}
+    >
+      <ImageSlot
+        path={`${group}.${i}`}
+        aspect="aspect-[6/5]"
+        label={group === "b2bNorth" ? "Ảnh khung lớn" : "Ảnh khung nhỏ"}
+      />
+      <div
+        role="group"
+        aria-label="Chọn ảnh để đổi (trên web 3 ảnh đổi luân phiên)"
+        className="absolute top-2 right-3 flex gap-1 rounded-full bg-slate-950/55 p-1 backdrop-blur-sm"
+      >
+        {[0, 1, 2].map((k) => (
+          <B2BThumb key={k} group={group} k={k} on={k === i} onClick={() => setI(k)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function B2BThumb({ group, k, on, onClick }) {
+  const src = useHomeImage(`${group}.${k}`);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      title={`Ảnh ${k + 1}`}
+      className={cn(
+        "relative size-7 overflow-hidden rounded-full ring-2 transition",
+        on ? "ring-white" : "opacity-70 ring-transparent hover:opacity-100",
+      )}
+    >
+      <Pic src={src} sizes="64px" />
+      <span className="absolute inset-0 grid place-items-center bg-black/25 text-[10px] font-bold text-white">
+        {k + 1}
+      </span>
+    </button>
+  );
+}
 
 export function B2BSection() {
   return (
@@ -139,19 +201,15 @@ export function B2BSection() {
       </span>
       <span className="absolute inset-0 -z-10 bg-gradient-to-l from-cream-50/95 via-cream-50/85 to-cream-50/50" />
       <div className="grid items-center gap-8 lg:grid-cols-2">
-        {/* 2 khung ảnh + 2 huy hiệu của trang thật — minh hoạ */}
-        <div aria-hidden className="relative mx-auto h-56 w-full max-w-md select-none sm:h-64">
-          <span className="absolute top-0 left-0 h-[66%] w-[70%] overflow-hidden rounded-[2rem] shadow-lg">
-            <Pic src="/images/b2b/tam-coc-bich-dong.webp" sizes="320px" />
-          </span>
-          <span className="absolute right-0 bottom-0 h-[60%] w-[64%] overflow-hidden rounded-[2rem] shadow-lg ring-4 ring-cream-50">
-            <Pic src="/images/b2b/hoi-an-9-copy.webp" sizes="300px" />
-          </span>
-          <span className="absolute bottom-[8%] left-[2%] flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-ink shadow-xl">
+        {/* 2 khung ảnh (mỗi khung 3 ảnh đổi luân phiên) + 2 huy hiệu của trang thật — sửa ảnh ngay tại chỗ */}
+        <div className="relative mx-auto aspect-[113/100] w-full max-w-md">
+          <B2BFrame group="b2bNorth" className="top-0 left-0 z-[2] w-[70%] ring-4 ring-cream-50" />
+          <B2BFrame group="b2bSouth" className="right-0 bottom-0 z-[1] w-[64%]" />
+          <span className="pointer-events-none absolute bottom-[8%] left-[2%] z-[3] flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-ink shadow-xl select-none">
             <Clock4 className="size-5 text-sun-500" />
             <span className="text-sm leading-none font-extrabold">24h</span>
           </span>
-          <span className="absolute top-[8%] right-[2%] rounded-xl bg-sun-500 px-3 py-2 text-sm leading-none font-extrabold text-white shadow-xl">
+          <span className="pointer-events-none absolute top-[8%] right-[2%] z-[3] rounded-xl bg-sun-500 px-3 py-2 text-sm leading-none font-extrabold text-white shadow-xl select-none">
             2–200+
           </span>
         </div>
@@ -355,6 +413,86 @@ export function StepsSection() {
 
 const customIcons = [Hotel, MessageCircle, SlidersHorizontal, Layers, BadgeDollarSign];
 
+/** 6 cánh ngôi sao dải lụa (thứ tự như home.images.star) + lớp tỉ lệ khung đúng hộp cánh trên web */
+const STAR_PETALS = [
+  { name: "Cánh trên", aspect: "aspect-[0.909]" },
+  { name: "Cánh trái trên", aspect: "aspect-square" },
+  { name: "Cánh phải trên", aspect: "aspect-[1.602]" },
+  { name: "Cánh phải dưới", aspect: "aspect-[1.536]" },
+  { name: "Cánh trái dưới", aspect: "aspect-[1.767]" },
+  { name: "Cánh dưới", aspect: "aspect-[2.86]" },
+];
+
+function StarThumb({ k, on, onClick }) {
+  const src = useHomeImage(`star.${k}`);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      title={STAR_PETALS[k].name}
+      className={cn(
+        "relative h-9 overflow-hidden rounded-lg ring-2 transition",
+        on ? "ring-clay-500" : "opacity-75 ring-sand-300/60 hover:opacity-100",
+      )}
+    >
+      <Pic src={src} sizes="64px" />
+      <span className="absolute inset-0 grid place-items-center bg-black/25 text-[10px] font-bold text-white">
+        {k + 1}
+      </span>
+    </button>
+  );
+}
+
+/** Ngôi sao dải lụa + ô đổi ảnh cho cánh đang chọn (trên web mỗi cánh là 1 ảnh điểm đến) */
+function StarEditor({ lang }) {
+  const [k, setK] = useState(0);
+  const ctx = useContext(HomeImagesContext);
+  return (
+    <div className="mx-auto flex w-full max-w-[300px] flex-col items-center gap-3">
+      <div aria-hidden inert className="pointer-events-none w-full max-w-[280px] select-none">
+        <RibbonStar lang={lang} images={ctx?.images?.star} labels={ctx?.starLabels} />
+      </div>
+      <div className="w-full rounded-2xl bg-white/80 p-2.5 shadow-sm ring-1 ring-sand-300/60">
+        <p className="mb-2 text-center text-[11px] font-semibold text-slate-600">
+          Ảnh trong ngôi sao — chọn cánh để đổi
+        </p>
+        <div className="mb-2.5 grid grid-cols-6 gap-1.5">
+          {STAR_PETALS.map((_, i) => (
+            <StarThumb key={i} k={i} on={i === k} onClick={() => setK(i)} />
+          ))}
+        </div>
+        {/* khung cánh đúng tỉ lệ, cao tối đa ~170px để cánh dọc không kéo dài cả cột */}
+        <ImageSlot
+          key={k}
+          path={`star.${k}`}
+          aspect={STAR_PETALS[k].aspect}
+          label={STAR_PETALS[k].name}
+          className="mx-auto [&>div>div]:rounded-xl"
+          style={{ maxWidth: Math.round(170 * HOME_IMAGE_CROPS.star[k].ratio) }}
+        />
+        <p className="mt-1.5 text-center text-[11px] text-slate-500">{STAR_PETALS[k].name}</p>
+        <label className="mt-2.5 block text-left">
+          <span className="mb-1 block text-[11px] font-semibold text-slate-600">
+            Tên địa điểm (hiện khi rê chuột vào cánh)
+          </span>
+          <input
+            value={ctx?.starLabels?.[k]?.[lang] ?? ""}
+            maxLength={60}
+            placeholder={tr(STAR_DEFAULT_NAMES[k], lang)}
+            onChange={(e) =>
+              ctx?.setStarLabels((list) =>
+                (list ?? []).map((l, i) => (i === k ? { ...l, [lang]: e.target.value } : l)),
+              )
+            }
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export function CustomTripSection({ lang }) {
   return (
     <Sec
@@ -362,13 +500,7 @@ export function CustomTripSection({ lang }) {
       className="bg-cream-50 bg-[radial-gradient(circle_at_28%_50%,rgba(255,255,255,0.9),rgba(255,255,255,0)_55%),repeating-radial-gradient(circle_at_28%_50%,rgba(160,130,80,0.09)_0_1px,transparent_1px_26px)]"
     >
       <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr]">
-        <div
-          aria-hidden
-          inert
-          className="pointer-events-none mx-auto w-full max-w-[280px] select-none"
-        >
-          <RibbonStar lang={lang} />
-        </div>
+        <StarEditor lang={lang} />
         <div className="flex min-w-0 flex-col items-start">
           <T
             k="customEyebrow"
@@ -558,9 +690,6 @@ export function ReviewsSection() {
           </li>
         ))}
       </ul>
-      <AutoNote dark className="mt-5">
-        Các thẻ đánh giá của khách được hiện tự động, chưa sửa được tại đây.
-      </AutoNote>
     </Sec>
   );
 }
@@ -655,9 +784,6 @@ export function PlannerSection() {
           <span className="block h-8 w-28 rounded-lg bg-sun-500" />
         </div>
       </div>
-      <AutoNote dark className="mt-5" href="/admin/settings" linkText="Mở Cài đặt">
-        Mẫu đăng ký và thông tin liên hệ bên cạnh lấy từ phần cài đặt chung của website.
-      </AutoNote>
     </Sec>
   );
 }
@@ -693,11 +819,9 @@ export function AboutSection() {
             className="mt-4 text-sm font-medium text-forest-700 underline underline-offset-4"
           />
         </div>
-        <div
-          aria-hidden
-          className="relative mx-auto aspect-square w-full max-w-[260px] overflow-hidden rounded-[42%_58%_55%_45%/48%_42%_58%_52%] shadow-xl select-none"
-        >
-          <Pic src="/images/tours/v2/vietnam-12674100.jpg" sizes="320px" />
+        {/* khung vòm như trang thật, góc dưới bớt cong để các nút đổi ảnh không bị che */}
+        <div className="relative mx-auto w-full max-w-[280px] overflow-hidden rounded-[42%_58%_30%_34%/48%_42%_24%_26%] shadow-xl [&_.rounded-2xl]:rounded-none">
+          <ImageSlot path="about" aspect="aspect-square" label="Ảnh giới thiệu" />
         </div>
       </div>
     </Sec>

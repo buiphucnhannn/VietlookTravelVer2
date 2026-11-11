@@ -1,10 +1,10 @@
 "use client";
 
-import { createContext, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Check, ImageOff, Plus, Sparkles } from "lucide-react";
+import { Check, ImageOff, Plus } from "lucide-react";
 import { cloudinaryVideo, parseVideo, videoThumb } from "@/lib/video";
-import { cn } from "@/lib/utils";
+import { cn, foldSearch } from "@/lib/utils";
 import Link from "../Link";
 import { Badge, Button, Modal, SearchBox } from "../ui";
 
@@ -12,7 +12,7 @@ import { Badge, Button, Modal, SearchBox } from "../ui";
 
 export const L = () => ({ en: "", zh: "", vi: "" });
 export const MAX_SLIDES = 8;
-export const MAX_TOURS = 24;
+export const MAX_TOURS = 8; // khối tour trên trang chủ hiện tối đa 8 thẻ
 export const MAX_THEMES = 8;
 export const MAX_DESTINATIONS = 5;
 export const EMPTY_SLIDE = {
@@ -25,9 +25,10 @@ export const EMPTY_SLIDE = {
 
 const isVideoFile = (v) => /\.(mp4|webm|mov|m4v)(\?|$)/i.test(v) || /\/video\/upload\//.test(v);
 export const isImage = (v) => !!v && !isVideoFile(v) && !/\.svg(\?|$)/i.test(v);
-/** Cùng quy tắc với máy chủ: ảnh trong kho ảnh / ảnh có sẵn của website */
+/** Cùng quy tắc với máy chủ: ảnh trong kho ảnh / ảnh có sẵn của website / ảnh vừa chọn (lưu khi bấm Lưu) */
 export const validImage = (v) =>
   !v ||
+  v.startsWith("blob:") ||
   /^https:\/\/res\.cloudinary\.com\/[\w-]+\/image\/upload\//.test(v) ||
   /^\/(images|videos)\/[\w./ ()-]+\.(jpe?g|png|webp|avif|gif|svg)$/i.test(v);
 /**
@@ -74,6 +75,12 @@ export function useTap(onTap) {
 /** Ảnh phủ kín khung cha (cha cần `relative`). Ảnh không hợp lệ → không vẽ gì. */
 export function Pic({ src, sizes = "240px", className }) {
   if (!src) return null;
+  // ảnh vừa chọn, chưa bấm Lưu (nằm tạm trên máy) → hiện thẳng, không qua bộ chuyển ảnh CDN
+  if (src.startsWith("blob:"))
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- ảnh tạm trên máy, chưa có trên CDN
+      <img src={src} alt="" className={cn("absolute inset-0 size-full object-cover", className)} />
+    );
   if (showable(src))
     return <Image src={src} alt="" fill sizes={sizes} className={cn("object-cover", className)} />;
   // ảnh bìa YouTube / ảnh xem trước Drive / khung hình đầu của video nền đã chép về
@@ -114,6 +121,8 @@ export function InlineText({ value, onChange, placeholder, label, multiline, cla
       </span>
       <textarea
         rows={1}
+        // giữ đúng cỡ chữ của trang thật (không bị quy tắc "ô nhập 16px trên điện thoại" trong theme.css ghi đè)
+        data-inline
         // cols=1: bề rộng do dòng chữ "bóng" phía trên quyết định (mặc định 20 cột làm nút / nhãn ngắn bị kéo dài)
         cols={1}
         value={value}
@@ -219,11 +228,17 @@ function PickerThumb({ src }) {
  * Hộp tìm & chọn. `multi`: tích nhiều mục rồi bấm "Thêm"; không `multi`: bấm 1 mục là chọn luôn.
  * `taken`: các mục đã có sẵn (multi → ẩn khỏi danh sách; đơn → ghi chú "Đang ở ô số n").
  * Chỉ dựng khi cần mở (cha: `{picker && <PickerModal … />}`) để mỗi lần mở là một lần chọn mới.
+ * `onSearch(q)` (tuỳ chọn, trả Promise<options>): `options` chỉ là phần tải sẵn (vd. 200 tour đầu) → gõ tìm thì
+ * hỏi thêm máy chủ (chờ gõ xong 300ms), kết quả ghép với các mục tải sẵn khớp từ khoá.
+ * `status` ("loading" | "ready" | "error", từ useOptionsState) + `emptyHref` (trang thêm mục) → báo đúng khi danh
+ * sách trống: đang tải / tải lỗi / chưa có mục nào / đã chọn hết / không khớp từ khoá.
  */
 export function PickerModal({
   title,
   description,
   options,
+  status = "ready",
+  emptyHref,
   taken = [],
   multi,
   room = 1,
@@ -231,16 +246,39 @@ export function PickerModal({
   searchPlaceholder,
   onClose,
   onPick,
+  onSearch,
 }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState([]);
+  const term = q.trim();
+  const [remote, setRemote] = useState({ q: "", items: [] });
+  const searching = Boolean(onSearch && term && remote.q !== term);
+  useEffect(() => {
+    if (!onSearch || !term) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      onSearch(term)
+        .catch(() => [])
+        .then((items) => alive && setRemote({ q: term, items }));
+    }, 300);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [term, onSearch]);
 
   const list = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return options
-      .filter((o) => !multi || !taken.includes(o.value))
-      .filter((o) => !s || o.label.toLowerCase().includes(s) || o.value.includes(s));
-  }, [q, options, taken, multi]);
+    // không phân biệt dấu / hoa thường / khoảng trắng: "ha noi" = "Hà Nội"
+    const s = foldSearch(q);
+    const local = options.filter(
+      (o) => !s || foldSearch(o.label).includes(s) || foldSearch(o.value).includes(s),
+    );
+    const more = remote.q && remote.q === term ? remote.items : [];
+    const seen = new Set(local.map((o) => o.value));
+    return [...local, ...more.filter((o) => !seen.has(o.value))].filter(
+      (o) => !multi || !taken.includes(o.value),
+    );
+  }, [q, term, remote, options, taken, multi]);
 
   const toggle = (v) =>
     setPicked((p) => (p.includes(v) ? p.filter((x) => x !== v) : p.length < room ? [...p, v] : p));
@@ -317,9 +355,37 @@ export function PickerModal({
           );
         })}
       </ul>
+      {searching && list.length > 0 && (
+        <p className="py-3 text-center text-xs text-slate-400">Đang tìm thêm…</p>
+      )}
       {!list.length && (
         <p className="py-8 text-center text-sm text-slate-500">
-          {options.length ? "Không tìm thấy kết quả phù hợp." : "Đang tải danh sách…"}
+          {searching ? (
+            "Đang tìm…"
+          ) : term ? (
+            "Không tìm thấy kết quả phù hợp."
+          ) : options.length ? (
+            `Tất cả ${unit} đều đã được chọn.`
+          ) : status === "loading" ? (
+            "Đang tải danh sách…"
+          ) : status === "error" ? (
+            "Chưa tải được danh sách — vui lòng kiểm tra mạng rồi tải lại trang."
+          ) : (
+            <>
+              Chưa có {unit} nào.
+              {emptyHref && (
+                <>
+                  {" "}
+                  <Link
+                    href={emptyHref}
+                    className="font-semibold text-brand-700 underline underline-offset-2"
+                  >
+                    Thêm {unit} mới
+                  </Link>
+                </>
+              )}
+            </>
+          )}
         </p>
       )}
     </Modal>
@@ -441,7 +507,6 @@ export function AutoNote({ children, href, linkText, dark, className }) {
         className,
       )}
     >
-      <Sparkles className={cn("size-3.5 shrink-0", dark ? "text-amber-brand" : "text-brand-600")} />
       <span>{children}</span>
       {href && (
         <Link

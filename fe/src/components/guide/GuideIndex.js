@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { href, lp, tr } from "@/i18n/config";
 import { cn } from "@/lib/utils";
@@ -12,11 +13,15 @@ export default async function GuideIndex({ lang, dict, category }) {
   const { guideCategories, allPosts } = await getCatalog();
   const g = dict.guide;
   const cats = guideCategories.map((c) => ({ slug: c.slug, name: tr(c.name, lang) }));
+  // Chỉ gửi xuống trình duyệt đúng các trường thẻ bài viết cần, chữ đã chọn sẵn theo ngôn ngữ
+  // (hàng trăm bài × 3 ngôn ngữ → giảm mạnh dung lượng trang)
   const posts = allPosts.map((p) => ({
-    ...p,
-    titleText: tr(p.title, lang),
-    excerptText: tr(p.excerpt, lang),
-    body: undefined,
+    slug: p.slug,
+    category: p.category,
+    image: p.image,
+    date: p.date,
+    title: tr(p.title, lang),
+    excerpt: tr(p.excerpt, lang),
   }));
   const inCat = category ? posts.filter((p) => p.category === category.slug) : posts;
   const title = category ? tr(category.name, lang) : g.title;
@@ -53,20 +58,24 @@ export default async function GuideIndex({ lang, dict, category }) {
 
       <section className="py-14 lg:py-[4.5rem]">
         <Container>
-          <GuideExplorer
-            lang={lang}
-            posts={posts}
-            categories={cats}
-            t={g}
-            initialCategory={category?.slug || ""}
-          />
-          <noscript>
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {posts.slice(0, 12).map((p) => (
-                <PostCard key={p.slug} post={p} lang={lang} />
-              ))}
-            </div>
-          </noscript>
+          {/* Phần dựng sẵn trên server (đọc ?q= chỉ có ở trình duyệt): liệt kê bài để công cụ tìm kiếm đọc được */}
+          <Suspense
+            fallback={
+              <div className="mt-[4.5rem] grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {inCat.slice(0, 8).map((p) => (
+                  <PostCard key={p.slug} post={p} lang={lang} />
+                ))}
+              </div>
+            }
+          >
+            <GuideExplorer
+              lang={lang}
+              posts={posts}
+              categories={cats}
+              t={g}
+              initialCategory={category?.slug || ""}
+            />
+          </Suspense>
         </Container>
       </section>
     </>

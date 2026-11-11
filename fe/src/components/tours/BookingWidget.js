@@ -20,19 +20,30 @@ import {
   useEnquiry,
   validate,
 } from "@/components/forms/fields";
+import ConsentCheckbox, {
+  consentError,
+  dropConsentError,
+  focusFirstError,
+  hasFieldErrors,
+} from "@/components/forms/ConsentCheckbox";
+import PaymentStep from "@/components/tours/PaymentStep";
+import { fill } from "@/lib/payment";
 
 const noopSubscribe = () => () => {};
+// "1 adult" / "2 adults", "1 child" / "2 children" (zh/vi giống nhau ở 2 dạng)
+const pax = (n, one, many) => `${n} ${(n === 1 && one ? one : many).toLowerCase()}`;
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 /**
  * Ngày sớm nhất có thể đặt (+2 ngày) và 6 ngày gợi ý để chọn nhanh.
  * Tour có lịch khởi hành cố định (CMS: "Ngày cố định") → gợi ý đúng các ngày đó;
  * khởi hành các thứ trong tuần (CMS) → gợi ý các ngày rơi vào đúng thứ đó.
+ * Tính hoàn toàn theo giờ UTC (ngày "YYYY-MM-DD" = 00:00 UTC): khách ở châu Mỹ không bị lệch sang thứ khác.
  */
 function buildDepartures(today, days, fixedDates = [], weekdays = []) {
   if (!today) return { minDate: "", departures: [] };
   const min = new Date(today);
-  min.setDate(min.getDate() + 2);
+  min.setUTCDate(min.getUTCDate() + 2);
   if (fixedDates.length) {
     const minISO = min.toISOString().slice(0, 10);
     return { minDate: minISO, departures: fixedDates.filter((d) => d >= minISO).slice(0, 6) };
@@ -41,16 +52,16 @@ function buildDepartures(today, days, fixedDates = [], weekdays = []) {
   const d = new Date(min);
   if (weekdays.length) {
     for (let k = 0; k < 60 && list.length < 6; k++) {
-      d.setDate(d.getDate() + 1);
-      if (weekdays.includes(d.getDay())) list.push(d.toISOString().slice(0, 10));
+      d.setUTCDate(d.getUTCDate() + 1);
+      if (weekdays.includes(d.getUTCDay())) list.push(d.toISOString().slice(0, 10));
     }
     return { minDate: min.toISOString().slice(0, 10), departures: list };
   }
   while (list.length < 6) {
-    d.setDate(d.getDate() + 1);
-    if (days >= 4 ? d.getDay() === 1 || d.getDay() === 4 : d.getDay() !== 0)
+    d.setUTCDate(d.getUTCDate() + 1);
+    if (days >= 4 ? d.getUTCDay() === 1 || d.getUTCDay() === 4 : d.getUTCDay() !== 0)
       list.push(d.toISOString().slice(0, 10));
-    if (days < 4 && list.length) d.setDate(d.getDate() + 2);
+    if (days < 4 && list.length) d.setUTCDate(d.getUTCDate() + 2);
   }
   return { minDate: min.toISOString().slice(0, 10), departures: list };
 }
@@ -68,9 +79,13 @@ const EXTRA_LABEL = {
 };
 
 /** Đặt tour online: chọn ngày, người lớn, trẻ em (độ tuổi) → giá tạm tính → gửi yêu cầu. */
-export default function BookingWidget({ lang, tour, t, c }) {
+export default function BookingWidget({ lang, tour, t, c, payment }) {
   const formRef = useRef(null);
-  const { status, code, submit, reset } = useEnquiry("booking", lang);
+  const { status, code, submit, reset, error: sendError } = useEnquiry("booking", lang);
+  // 9Pay bật (CMS) + đơn có giá → máy chủ trả "offer" (số tiền + payToken) → hiện bước thanh toán
+  const [offer, setOffer] = useState(null);
+  const p = payment?.labels;
+  const payOnline = Boolean(payment?.enabled && p);
   const [step, setStep] = useState(0);
   const [date, setDate] = useState("");
   const [adults, setAdults] = useState(2);
@@ -85,6 +100,7 @@ export default function BookingWidget({ lang, tour, t, c }) {
     phone: "",
     nationality: "",
     notes: "",
+    consent: false,
   });
   const [error, setError] = useState("");
   const [errs, setErrs] = useState({});
@@ -127,6 +143,11 @@ export default function BookingWidget({ lang, tour, t, c }) {
     return { adults: unit * adults, kids, extras, total };
   }, [unit, adults, ages, date, tour]);
 
+  // Chọn lại ngày → bỏ lỗi cũ của ô ngày (không để "chọn ngày trong tương lai" khi đã chọn đúng)
+  const pickDate = (v) => {
+    setDate(v);
+    setErrs((e) => (e.date ? { ...e, date: undefined } : e));
+  };
   const setChildren = (n) =>
     setAges((a) => (n > a.length ? [...a, ...Array(n - a.length).fill(8)] : a.slice(0, n)));
   const fmtDate = (iso) =>
@@ -134,7 +155,31 @@ export default function BookingWidget({ lang, tour, t, c }) {
       weekday: "short",
       day: "numeric",
       month: "short",
+      timeZone: "UTC",
     }).format(new Date(iso));
+
+  if (offer && code && p) {
+    const guests = [
+      pax(adults, c.adult, c.adults),
+      ages.length > 0 && pax(ages.length, c.child, c.children),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <PaymentStep
+        lang={lang}
+        code={code}
+        offer={offer}
+        p={p}
+        summary={{
+          tour: tour.title,
+          date: date && fmtDate(date),
+          guests,
+          hotel: classes.length > 1 && cls ? `${cls}★` : "",
+        }}
+      />
+    );
+  }
 
   if (status === "success") {
     return (
@@ -163,9 +208,12 @@ export default function BookingWidget({ lang, tour, t, c }) {
       setError("");
       return setStep(1);
     }
-    const v = validate(contact, lang);
+    const v = { ...validate(contact, lang), ...consentError(contact.consent, c) };
     setErrs(v);
-    if (Object.keys(v).length) return setError(m.fix);
+    if (Object.keys(v).length) {
+      setError(hasFieldErrors(v) ? m.fix : "");
+      return focusFirstError(formRef.current);
+    }
     setError("");
     await submit(
       {
@@ -181,6 +229,14 @@ export default function BookingWidget({ lang, tour, t, c }) {
         estimateUSD: estimate?.total ?? "on request",
       },
       formRef.current,
+      {
+        // cùng lượt cập nhật với "đã gửi" → không nháy khung cảm ơn trước bước thanh toán
+        stay: (d) => {
+          if (!payOnline || !d?.payment) return false;
+          setOffer(d.payment);
+          return true;
+        },
+      },
     );
   };
 
@@ -204,7 +260,7 @@ export default function BookingWidget({ lang, tour, t, c }) {
                 type="date"
                 min={minDate}
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => pickDate(e.target.value)}
                 aria-invalid={!!errs.date}
                 className="pl-11 short:h-11"
               />
@@ -223,7 +279,7 @@ export default function BookingWidget({ lang, tour, t, c }) {
                   <button
                     key={d}
                     type="button"
-                    onClick={() => setDate(d)}
+                    onClick={() => pickDate(d)}
                     className={cn(
                       "rounded-full border px-3 py-0.5 text-xs font-medium transition",
                       date === d
@@ -296,9 +352,9 @@ export default function BookingWidget({ lang, tour, t, c }) {
                     }
                     className="h-10 px-3 text-sm"
                   >
-                    {Array.from({ length: 17 }, (_, k) => k).map((k) => (
+                    {Array.from({ length: 18 }, (_, k) => k).map((k) => (
                       <option key={k} value={k}>
-                        {k || "< 1"} {c.age}
+                        {k || "< 1"} {k <= 1 && c.ageOne ? c.ageOne : c.age}
                       </option>
                     ))}
                   </Select>
@@ -313,14 +369,14 @@ export default function BookingWidget({ lang, tour, t, c }) {
                 <div className="space-y-1 text-sm text-muted">
                   <p className="flex justify-between">
                     <span>
-                      {adults} × {c.adults.toLowerCase()} ({formatUSD(unit)})
+                      {pax(adults, c.adult, c.adults)} × {formatUSD(unit)}
                     </span>
                     <span>{formatUSD(estimate.adults)}</span>
                   </p>
                   {ages.map((a, i) => (
                     <p key={i} className="flex justify-between">
                       <span>
-                        {c.child} {a} {c.age}
+                        {c.child} {a} {a <= 1 && c.ageOne ? c.ageOne : c.age}
                       </span>
                       <span>{estimate.kids[i] ? formatUSD(estimate.kids[i]) : c.free}</span>
                     </p>
@@ -361,9 +417,9 @@ export default function BookingWidget({ lang, tour, t, c }) {
               <ArrowLeft className="size-4" />
             </button>
             <p className="min-w-0">
-              <strong className="text-ink">{date && fmtDate(date)}</strong> · {adults}{" "}
-              {c.adults.toLowerCase()}
-              {ages.length > 0 && ` · ${ages.length} ${c.children.toLowerCase()}`}
+              <strong className="text-ink">{date && fmtDate(date)}</strong> ·{" "}
+              {pax(adults, c.adult, c.adults)}
+              {ages.length > 0 && ` · ${pax(ages.length, c.child, c.children)}`}
               {estimate && (
                 <>
                   {" "}
@@ -413,20 +469,36 @@ export default function BookingWidget({ lang, tour, t, c }) {
           <Field label={t.notes} htmlFor="bk-notes">
             <Textarea
               id="bk-notes"
-              rows={4}
-              className="min-h-32"
+              rows={3}
+              className="min-h-24"
               value={contact.notes}
               onChange={(e) => setContact({ ...contact, notes: e.target.value })}
             />
           </Field>
           <p className="flex gap-2 text-xs leading-snug text-muted">
-            <ShieldCheck className="size-4 shrink-0 text-brand-500" /> {c.noOnlinePayment}
+            <ShieldCheck className="size-4 shrink-0 text-brand-500" />{" "}
+            {payOnline
+              ? payment.depositPercent < 100
+                ? fill(p.noteDeposit, { percent: payment.depositPercent })
+                : p.note
+              : c.noOnlinePayment}
           </p>
+          <ConsentCheckbox
+            id="bk-consent"
+            lang={lang}
+            c={c}
+            checked={contact.consent}
+            onChange={(v) => {
+              setContact({ ...contact, consent: v });
+              if (v) setErrs(dropConsentError);
+            }}
+            error={errs.consent}
+          />
         </>
       )}
 
       <FormError show={!!error} text={error} />
-      <FormError show={status === "error"} text={c.errorGeneric} />
+      <FormError show={status === "error"} text={sendError || c.errorGeneric} />
       <button
         type="submit"
         disabled={status === "sending"}

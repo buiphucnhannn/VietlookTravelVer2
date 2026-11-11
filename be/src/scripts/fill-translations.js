@@ -1,10 +1,12 @@
 /**
- * Điền bản TIẾNG VIỆT còn trống cho nội dung trong database bằng dịch tự động (từ bản tiếng Anh).
- *   npm run i18n:fill-vi -- --dry                 chỉ đếm, không ghi
- *   npm run i18n:fill-vi -- --backup <thư mục>    sao lưu JSON trước rồi ghi
- *   npm run i18n:fill-vi -- --only tours,articles chỉ chạy vài nhóm
+ * Điền bản dịch còn trống (TIẾNG VIỆT hoặc TIẾNG TRUNG) cho nội dung trong database bằng dịch tự động
+ * (từ bản tiếng Anh).
+ *   npm run i18n:fill -- --to zh --dry              chỉ đếm, không ghi
+ *   npm run i18n:fill -- --to zh --backup <thư mục> sao lưu JSON trước rồi ghi
+ *   npm run i18n:fill -- --to vi --only tours,articles   chỉ chạy vài nhóm
+ *   npm run i18n:fill -- --from vi --to zh          mục chỉ có bản tiếng Việt (nhập từ web cũ) → tiếng Trung
  *
- * - CHỈ điền ô tiếng Việt đang TRỐNG; ô đã có chữ (kể cả do nhân viên tự soạn) giữ nguyên.
+ * - CHỈ điền ô ngôn ngữ đích đang TRỐNG; ô đã có chữ (kể cả do nhân viên tự soạn) giữ nguyên.
  * - Không dịch: đường dẫn, link, ảnh, video, mã, giá, ngày, bữa ăn (B/L/D)…
  * - HTML (nội dung bài viết, chính sách): chỉ dịch phần chữ, giữ nguyên thẻ (xem translate.service.js).
  * - Danh sách (lịch trình, bao gồm…) tiếng Việt đã có nhưng khác số dòng với bản tiếng Anh → giữ nguyên.
@@ -32,9 +34,18 @@ const argValue = (name) => {
 const BACKUP = argValue("--backup");
 const ONLY = argValue("--only")?.split(",");
 
-const FROM = "en";
-const TO = "vi";
+// Nguồn mặc định: tiếng Anh. `--from vi` dùng cho nội dung chỉ có bản tiếng Việt (tour / bài nhập từ web cũ):
+// chỉ điền ô đích còn trống ở những mục CÓ bản tiếng Việt mà chưa có bản đích.
+const FROM = argValue("--from") ?? "en";
+const TO = argValue("--to") ?? "vi";
 const LANGS = ["en", "zh", "vi"];
+const LANG_NAME = { vi: "TIẾNG VIỆT", zh: "TIẾNG TRUNG", en: "TIẾNG ANH" };
+if (!LANG_NAME[TO] || !LANGS.includes(FROM) || FROM === TO) {
+  console.error(
+    `[i18n:fill] --to vi | zh | en, --from en | vi | zh và khác nhau (nhận: ${FROM} → ${TO})`,
+  );
+  process.exit(1);
+}
 
 const GROUPS = {
   tours: { model: Tour },
@@ -192,6 +203,7 @@ async function runGroup(name, { model, filter = {}, skipKeys = [] }) {
       }
       ok = await translateDoc();
     }
+    if (ok) console.log(`  ✓ ${name} ${doc.slug ?? doc.key ?? doc._id} (${ctx.jobs.length} đoạn)`);
     if (!ok) {
       stats.failed++;
       console.warn(
@@ -244,7 +256,7 @@ async function runGroup(name, { model, filter = {}, skipKeys = [] }) {
 
 try {
   await connectDatabase();
-  console.log(DRY ? "CHẠY THỬ (không ghi)\n" : "ĐANG ĐIỀN TIẾNG VIỆT\n");
+  console.log(DRY ? `CHẠY THỬ ${LANG_NAME[TO]} (không ghi)\n` : `ĐANG ĐIỀN ${LANG_NAME[TO]}\n`);
   for (const [name, g] of Object.entries(GROUPS)) {
     if (ONLY && !ONLY.includes(name)) continue;
     await runGroup(name, g);
@@ -254,7 +266,7 @@ try {
       (DRY ? "" : ` · cập nhật ${stats.changed} mục · lỗi ${stats.failed}`),
   );
 } catch (err) {
-  console.error("[i18n:fill-vi] thất bại:", err.message);
+  console.error("[i18n:fill] thất bại:", err.message);
   process.exitCode = 1;
 } finally {
   await disconnectDatabase();

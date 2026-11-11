@@ -164,6 +164,46 @@ class EnquiryRepository extends BaseRepository {
     return this.model.updateOne({ _id: id }, { $set: { emailStatus } });
   }
 
+  /* ----- Thanh toán online (9Pay) ----- */
+
+  findByInvoice(invoiceNo) {
+    return this.model.findOne({ "payments.invoiceNo": invoiceNo }).lean();
+  }
+
+  pushPayment(id, payment) {
+    return this.model
+      .findByIdAndUpdate(id, { $push: { payments: payment } }, { returnDocument: "after" })
+      .lean();
+  }
+
+  /**
+   * Cập nhật 1 lượt thanh toán theo mã hoá đơn — NGUYÊN TỬ: chỉ khi lượt đó đang ở 1 trong `from`
+   * (vd. chưa "paid") → 9Pay gửi kết quả nhiều lần (return + IPN) cũng chỉ ghi nhận 1 lần.
+   * Trả true nếu đã cập nhật.
+   */
+  async updatePayment(id, invoiceNo, fields, from) {
+    const $set = Object.fromEntries(
+      Object.entries({ ...fields, updatedAt: new Date() }).map(([k, v]) => [
+        `payments.$[p].${k}`,
+        v,
+      ]),
+    );
+    const r = await this.model.updateOne(
+      { _id: id },
+      { $set },
+      {
+        arrayFilters: [{ "p.invoiceNo": invoiceNo, "p.status": trusted({ $in: from }) }],
+      },
+    );
+    return r.modifiedCount > 0;
+  }
+
+  setPaymentStatus(id, paymentStatus) {
+    return this.model
+      .findByIdAndUpdate(id, { $set: { paymentStatus } }, { returnDocument: "after" })
+      .lean();
+  }
+
   recentSince(date, extra = {}) {
     return this.model.countDocuments({ ...extra, createdAt: trusted({ $gte: date }) });
   }

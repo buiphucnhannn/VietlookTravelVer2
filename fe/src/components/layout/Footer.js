@@ -16,8 +16,9 @@ import {
   ZaloIcon,
 } from "@/components/ui/BrandIcons";
 import Logo from "./Logo";
+import { CookieSettingsLink } from "./ConsentBanner";
 
-export default function Footer({ lang, dict }) {
+export default function Footer({ lang, dict, policies }) {
   const f = dict.footer;
   const n = dict.nav;
   const h = (p) => href(lang, p);
@@ -55,12 +56,15 @@ export default function Footer({ lang, dict }) {
     },
   ];
   // Link pháp lý (mục 27): Điều khoản · Bảo mật · Thanh toán & hoàn tiền · Hủy/đổi
+  // Chỉ hiện trang đang bật "Hiện trên website" trong CMS (policies: các trang đã xuất bản)
   const legalLinks = [
-    { label: n.termsPolicy, href: h("/policies/terms") },
-    { label: n.privacyPolicy, href: h("/policies/privacy") },
-    { label: n.paymentPolicy, href: h("/policies/payment") },
-    { label: n.cancelPolicy, href: h("/policies/cancellation") },
-  ];
+    { key: "terms", label: n.termsPolicy },
+    { key: "privacy", label: n.privacyPolicy },
+    { key: "payment", label: n.paymentPolicy },
+    { key: "cancellation", label: n.cancelPolicy },
+  ]
+    .filter((l) => !policies || policies[l.key])
+    .map(({ key, label }) => ({ label, href: h(`/policies/${key}`) }));
   const legal = siteConfig.legal || {};
 
   return (
@@ -314,6 +318,11 @@ export default function Footer({ lang, dict }) {
           <span className="break-words md:whitespace-nowrap">
             {f.licenceNo}: {legal.licenceNo || f.updating}
           </span>
+          {/* chỉ hiện khi website có cài mã Google (banner cookie đang bật) */}
+          <CookieSettingsLink
+            label={dict.consent.reopen}
+            className="underline-offset-2 hover:text-ink hover:underline md:ml-2"
+          />
         </Container>
       </div>
     </footer>

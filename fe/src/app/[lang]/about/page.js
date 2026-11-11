@@ -80,7 +80,7 @@ export default async function AboutPage({ params }) {
       <BrushHero
         title={a.title}
         subtitle={a.subtitle}
-        images={[aboutPage?.image || ABOUT_HERO_IMAGES[0], ...ABOUT_HERO_IMAGES.slice(1)]}
+        images={aboutPage?.image ? [aboutPage.image] : ABOUT_HERO_IMAGES}
         breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: a.title }]}
       />
 

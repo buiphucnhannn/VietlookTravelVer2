@@ -1,9 +1,10 @@
 import { Container } from "@/components/ui";
+import { A11yBusy } from "@/components/layout/A11y";
 
 /** Khung chờ (skeleton) khi chuyển trang – giúp điều hướng hiển thị tức thì. */
 export default function PageSkeleton() {
   return (
-    <div className="animate-pulse" aria-busy="true" aria-label="Loading">
+    <A11yBusy className="animate-pulse">
       <div className="h-[340px] bg-gradient-to-br from-brand-100 via-surface to-brand-50" />
       <Container className="py-12">
         <div className="mx-auto h-10 w-2/3 max-w-xl rounded-full bg-surface" />
@@ -21,6 +22,6 @@ export default function PageSkeleton() {
           ))}
         </div>
       </Container>
-    </div>
+    </A11yBusy>
   );
 }

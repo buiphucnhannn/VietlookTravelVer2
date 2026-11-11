@@ -51,6 +51,9 @@ export function redirectToLogin() {
   return true;
 }
 
+/** API báo không đủ quyền (403) → khung CMS tải lại quyền của tài khoản (admin có thể vừa đổi quyền) */
+export const FORBIDDEN_EVENT = "vl-admin-forbidden";
+
 /** Request bị huỷ có chủ đích (AbortController — vd. đã có lượt tìm kiếm mới hơn) → không báo lỗi */
 export const isAbort = (err) => err?.name === "AbortError";
 
@@ -107,6 +110,8 @@ export async function api(
       },
     });
   }
+  if (res.status === 403 && typeof window !== "undefined")
+    window.dispatchEvent(new Event(FORBIDDEN_EVENT));
   if (!res.ok) throw new ApiError(res.status, data);
   return data;
 }

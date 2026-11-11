@@ -10,6 +10,7 @@ import {
   driveVideoSchema,
   folderQuery,
   imageFromUrlSchema,
+  linkPreviewSchema,
 } from "../validators/upload.validator.js";
 
 /** Ảnh (Cloudinary) — admin, hoặc nhân viên có quyền sửa ít nhất 1 mục nội dung website */
@@ -31,6 +32,15 @@ router.post(
   limiter({ windowMs: 60 * 1000, limit: 20, message: "Thêm ảnh từ link quá nhanh, chờ 1 phút" }),
   validate({ body: imageFromUrlSchema }),
   uploadController.fromUrl,
+);
+
+// POST /api/v1/uploads/images/link-preview   body: { url } — lấy ảnh từ link về để xem trước / cắt (CHƯA lưu kho ảnh;
+// ảnh chỉ được lưu khi nhân viên bấm Lưu, qua POST /images)
+router.post(
+  "/images/link-preview",
+  limiter({ windowMs: 60 * 1000, limit: 30, message: "Thêm ảnh từ link quá nhanh, chờ 1 phút" }),
+  validate({ body: linkPreviewSchema }),
+  uploadController.linkPreview,
 );
 // (Không có endpoint chữ ký upload thẳng từ trình duyệt: mọi ảnh đều qua kiểm tra chữ ký file ở máy chủ.)
 

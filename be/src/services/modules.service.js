@@ -15,6 +15,8 @@ import {
 import { ApiError } from "../utils/ApiError.js";
 import { cleanHtml } from "../utils/sanitize.js";
 import { createContentService } from "./content.service.js";
+import { afterSave as cleanupMedia } from "./media-cleanup.service.js";
+import { settingsService } from "./settings.service.js";
 
 const LANGS = ["en", "zh", "vi"];
 const mapLangs = (obj, fn) => Object.fromEntries(LANGS.map((l) => [l, fn(obj?.[l] ?? "", l)]));
@@ -65,8 +67,13 @@ export const tourService = createContentService({
   label: "tour",
   searchFields: ["content.en.title", "content.zh.title", "content.vi.title", "code"],
   defaultSort: "rank",
+  // Tour không có trường name → "Tên A → Z" theo tên tour tiếng Việt (CMS hiển thị tiếng Việt trước)
+  sorts: { name: { "content.vi.title": 1, "content.en.title": 1, _id: 1 } },
   prepare: prepareTour,
   trackOldSlugs: true,
+  // tour nổi bật / dài ngày ở trang chủ lưu theo đường dẫn → đổi đường dẫn / xoá tour thì cập nhật theo
+  afterUpdate: (next, prev) => settingsService.renameHomeRef("tour", prev.slug, next.slug),
+  beforeRemove: (doc) => settingsService.renameHomeRef("tour", doc.slug, null),
   // danh sách tour trong CMS (tới 200 tour / lần) không cần lịch trình, bảng giá, đánh giá… của 3 ngôn ngữ
   listSelect:
     "slug code days nights halfDay regions destinations themes cruise tourType price originalPrice image rank featured featuredLong departure isActive createdAt updatedAt content.en.title content.zh.title content.vi.title content.en.summary",
@@ -91,6 +98,7 @@ export const destinationService = createContentService({
       await tourRepository.renameRef("destinations", prev.slug, next.slug);
     if (next.slug !== prev.slug)
       await articleRepository.renameRef("destination", prev.slug, next.slug);
+    await settingsService.renameHomeRef("destination", prev.slug, next.slug);
   },
   beforeRemove: async (doc) => {
     const n = await tourRepository.countUsing("destinations", doc.slug);
@@ -98,6 +106,7 @@ export const destinationService = createContentService({
       throw ApiError.conflict(
         `Điểm đến đang gắn với ${n} tour — hãy ẩn điểm đến hoặc bỏ gắn khỏi các tour trước khi xoá`,
       );
+    await settingsService.renameHomeRef("destination", doc.slug, null);
   },
 });
 
@@ -111,9 +120,11 @@ export const themeService = createContentService({
   },
   afterUpdate: async (next, prev) => {
     if (next.slug !== prev.slug) await tourRepository.renameRef("themes", prev.slug, next.slug);
+    await settingsService.renameHomeRef("theme", prev.slug, next.slug);
   },
   beforeRemove: async (doc) => {
     await tourRepository.pullRef("themes", doc.slug); // tour vẫn còn, chỉ bỏ gắn chủ đề
+    await settingsService.renameHomeRef("theme", doc.slug, null);
   },
 });
 
@@ -130,8 +141,34 @@ export const articleService = createContentService({
   label: "bài viết",
   searchFields: ["title.en", "title.zh", "title.vi"],
   defaultSort: "newest",
+  // "Mới nhất" / "Cũ nhất" theo NGÀY ĐĂNG (ngày hiện trong danh sách), không theo ngày nhập vào CMS
+  // (bài chuyển từ web cũ được nhập cùng lúc → createdAt không phản ánh ngày đăng thật)
+  sorts: {
+    newest: { publishedAt: -1, createdAt: -1, _id: -1 },
+    oldest: { publishedAt: 1, createdAt: 1, _id: 1 },
+  },
   prepare: prepareArticle,
   trackOldSlugs: true,
+  // Danh sách bài viết trong CMS: KHÔNG gửi nội dung HTML (nặng) của 3 ngôn ngữ — chỉ cần biết ngôn ngữ nào
+  // đã có nội dung (body.{lang} = true / false) để báo "Thiếu bản …"
+  listSelect: {
+    slug: 1,
+    title: 1,
+    image: 1,
+    category: 1,
+    author: 1,
+    destination: 1,
+    publishedAt: 1,
+    isActive: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    ...Object.fromEntries(
+      LANGS.map((l) => [
+        `body.${l}`,
+        { $gt: [{ $strLenCP: { $trim: { input: { $ifNull: [`$body.${l}`, ""] } } } }, 0] },
+      ]),
+    ),
+  },
   filters: (q) => (q.category ? { category: q.category } : {}),
 });
 // danh sách bài viết mới nhất trước theo ngày đăng
@@ -216,10 +253,13 @@ export const pageService = {
   },
 
   async save(key, data) {
-    return pageRepository.upsertByIdent(key, {
+    const prev = await pageRepository.findByIdent(key);
+    const next = await pageRepository.upsertByIdent(key, {
       ...data,
       key,
       body: mapLangs(data.body, (h) => cleanHtml(h)),
     });
+    cleanupMedia(prev, next); // ảnh bị thay / bỏ → dọn nền
+    return next;
   },
 };

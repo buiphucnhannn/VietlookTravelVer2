@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { MapPin, Plus, SearchX } from "lucide-react";
 import { api } from "@/lib/api";
-import { cn, slugify } from "@/lib/utils";
+import { cn, foldSearch as fold, slugify } from "@/lib/utils";
 import {
   CARD_GRID,
   EditorModal,
@@ -40,12 +40,14 @@ import {
   usePaged,
   useUi,
 } from "./ui";
+import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { slugSource, useAutoFill } from "./translate";
 
 const PATH = "/admin/destinations";
 // điểm đến thay đổi → trang điểm đến, menu, trang chủ, thẻ tour (tên điểm đến) đều đổi
 const TAGS = ["destinations", "tours"];
+const REMOVE_TAGS = [...TAGS, "settings"]; // xoá → trang chủ cũng bỏ điểm đến này
 const PAGE_SIZE = 12; // lấp đầy hàng ở lưới 1 – 2 – 3 – 4 cột
 
 export const REGIONS = [
@@ -84,14 +86,6 @@ const toPayload = (d) => ({
   isActive: d.isActive,
 });
 
-/** Bỏ dấu + chữ thường để tìm "ha noi" ra "Hà Nội" */
-const fold = (s) =>
-  String(s ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/g, "d");
-
 export default function DestinationsPage() {
   const { canEdit } = usePermission("destinations");
   const list = useAdminList(PATH, { limit: 200, sort: "order" });
@@ -101,7 +95,7 @@ export default function DestinationsPage() {
   const remove = useRemove(
     PATH,
     "điểm đến",
-    TAGS,
+    REMOVE_TAGS,
     list.reload,
     "Điểm đến đang gắn với tour thì không xoá được — hãy ẩn thay vì xoá.",
   );
@@ -159,7 +153,7 @@ export default function DestinationsPage() {
     <>
       <PageHeader
         title="Điểm đến"
-        description="Điểm đến theo 3 miền Bắc – Trung – Nam. Hiện trên menu, trang chủ, bộ lọc tour và trang điểm đến. Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất kỳ."
+        description={`Điểm đến theo 3 miền Bắc – Trung – Nam. Hiện trên menu, trang chủ, bộ lọc tour và trang điểm đến.${canEdit ? " Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất kỳ." : ""}`}
         actions={
           canEdit && (
             <Button icon={Plus} onClick={() => setEditing({ ...EMPTY, region })}>
@@ -283,6 +277,7 @@ export default function DestinationsPage() {
               setQ("");
               setRegion(doc.region);
             }
+            sort.reveal(doc?.id); // mục vừa lưu: sang đúng trang + nháy viền
             list.reload();
           }}
         />
@@ -300,14 +295,19 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
   const [kw, setKw] = useState((initial.keywords ?? []).join(", "));
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
+  const images = usePendingImages(d);
   const { toast } = useUi();
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
 
   const save = async () => {
     if (!anyLang(d.name))
       return toast("Vui lòng nhập tên điểm đến ở ít nhất một ngôn ngữ", "error");
-    const { value: v, failed } = await autoFill.fill(d, { lang });
-    if (v !== d) setD(v);
+    // ảnh vừa chọn chỉ được lưu vào kho ảnh lúc này
+    const withImages = await images.prepare(d);
+    if (!withImages) return;
+    if (withImages !== d) setD(withImages);
+    const { value: v, failed } = await autoFill.fill(withImages, { lang });
+    if (v !== withImages) setD(v);
     const slug = v.slug || slugify(slugSource(v.name));
     if (!slug) return toast("Vui lòng nhập đường dẫn trang", "error");
     if (slug !== v.slug) set({ slug });
@@ -321,6 +321,8 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
           ? api(PATH, { method: "POST", body })
           : api(`${PATH}/${d.id}`, { method: "PUT", body }),
       isNew ? "Đã thêm điểm đến" : "Đã lưu điểm đến",
+      // đổi đường dẫn → máy chủ sửa luôn danh sách trên trang chủ → xoá cache trang chủ
+      { extraTags: !isNew && slug !== initial.slug ? ["settings"] : [] },
     );
     if (!ok) return;
     if (failed)
@@ -330,16 +332,18 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
           body: { ...toPayload({ ...t, slug }), order: body.order },
         }),
       );
-    onSaved(body);
+    onSaved({ ...body, id: ok.data?.id ?? d.id });
   };
 
   return (
     <EditorModal
       size="xl"
       title={isNew ? "Thêm điểm đến" : `${editVerb}: ${locText(initial.name)}`}
+      value={{ d, kw }}
       onClose={onClose}
       onSave={save}
-      busy={busy || autoFill.busy}
+      busy={busy || autoFill.busy || images.busy}
+      saveLabel={images.label}
     >
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
         <div className="space-y-4">
@@ -380,19 +384,25 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
         <div className="space-y-6">
           <FormSection title="Hình ảnh">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Ảnh thẻ" hint="Ảnh ngang, tối thiểu 1200px">
+              <Field
+                label="Ảnh thẻ"
+                hint="Hiện ở thẻ điểm đến (trang chủ, menu, danh sách). Ảnh ngang, chủ thể ở giữa."
+              >
                 <ImageField
                   value={d.image}
                   onChange={(image) => set({ image })}
                   folder="destinations"
                 />
               </Field>
-              <Field label="Ảnh lớn đầu trang" hint="Để trống thì dùng ảnh thẻ">
+              <Field
+                label="Ảnh lớn đầu trang"
+                hint="Phủ ngang đầu trang điểm đến. Để trống thì dùng ảnh thẻ."
+              >
                 <ImageField
                   value={d.hero}
                   onChange={(hero) => set({ hero })}
                   folder="destinations"
-                  crop={{ ratio: 16 / 9, width: 1920 }}
+                  crop={{ ratio: 12 / 5, width: 2400 }}
                 />
               </Field>
             </div>

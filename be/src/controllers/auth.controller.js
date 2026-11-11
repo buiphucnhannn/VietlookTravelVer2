@@ -1,6 +1,7 @@
 import { env } from "../config/env.js";
 import { auditService } from "../services/audit.service.js";
 import { authService } from "../services/auth.service.js";
+import { toPublicUser } from "../services/user.service.js";
 import { REFRESH_COOKIE, clearAuthCookies, setAuthCookies } from "../utils/auth-cookies.js";
 import { ok } from "../utils/response.js";
 
@@ -86,7 +87,10 @@ export const authController = {
   },
 
   async me(req, res) {
-    ok(res, { user: await authService.me(req.user.id) });
+    // requireAuth vừa đọc tài khoản (còn hoạt động, đúng phiên) → trả luôn, không truy vấn DB lần 2
+    ok(res, {
+      user: req.authUser ? toPublicUser(req.authUser) : await authService.me(req.user.id),
+    });
   },
 
   async changePassword(req, res) {

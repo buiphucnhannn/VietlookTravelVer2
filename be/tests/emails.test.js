@@ -168,7 +168,7 @@ describe("email: nhãn dễ đọc, không lộ tên trường thô", () => {
     assert.match(planner, /越南北部/);
     assert.match(planner, /4★/);
     assert.match(planner, /\$1,000 – \$2,000/);
-    assert.match(planner, /Some new field: abc/); // trường lạ → nhãn chữ thường dễ đọc
+    assert.match(companyEmail({ ...SAMPLES.planner, lang: "zh" }).text, /Some new field: abc/); // trường lạ → nhãn chữ thường dễ đọc (email nhân viên đủ mọi trường)
     const booking = customerEmail({ ...SAMPLES.booking, lang: "en" }).text;
     assert.match(booking, /2 adults · 1 child \(age 5\)/);
     assert.match(booking, /\$1,000/);
@@ -242,5 +242,27 @@ describe("email: MAIL_REDIRECT_TO", () => {
     const out = applyRedirect({ to: "a@example.com", ...mail }, "dev@example.com");
     assert.ok(!out.html.includes("<!--DEV_BANNER-->"));
     assert.ok(out.html.indexOf("a@example.com") < out.html.indexOf("vietlook-logo"));
+  });
+});
+
+describe("email: dạng thư giao dịch (tránh tab Quảng cáo)", () => {
+  it("tiêu đề ngắn, không đuôi thương hiệu; header đúng cho khách / nhân viên", () => {
+    const cust = customerEmail({ ...SAMPLES.booking, lang: "en" });
+    assert.equal(cust.subject, "Your request VL-BK261110-7QX2 has been received");
+    assert.ok(!cust.subject.includes("|"));
+    assert.deepEqual(cust.headers, { "X-Entity-Ref-ID": "VL-BK261110-7QX2" });
+    const staff = companyEmail({ ...SAMPLES.booking, lang: "en" });
+    assert.equal(staff.subject, "Đơn đặt tour mới VL-BK261110-7QX2 – Emily Carter");
+    assert.equal(staff.headers["Auto-Submitted"], "auto-generated");
+    for (const m of [cust, staff]) {
+      assert.ok(!("List-Unsubscribe" in m.headers) && !("Precedence" in m.headers));
+      assert.equal((m.html.match(/<img\b/g) ?? []).length, 1); // chỉ 1 ảnh (logo)
+    }
+  });
+
+  it("chuyển hướng dev giữ nguyên header", () => {
+    const m = customerEmail({ ...SAMPLES.contact, lang: "en" });
+    const out = applyRedirect({ to: "a@example.com", ...m }, "dev@example.com");
+    assert.deepEqual(out.headers, m.headers);
   });
 });

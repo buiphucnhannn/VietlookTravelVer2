@@ -19,3 +19,6 @@ process.env.CLOUDINARY_API_SECRET = "";
 process.env.ADMIN_USERNAME = "";
 process.env.ADMIN_PASSWORD = "";
 process.env.DATA_ENCRYPTION_KEY = "test-data-encryption-key-0123456789";
+// 9Pay: test luôn dùng cổng mặc định, không giả lập — dù máy dev đang cấu hình sandbox / NINEPAY_FAKE
+process.env.NINEPAY_ENDPOINT = "";
+process.env.NINEPAY_FAKE = "false";

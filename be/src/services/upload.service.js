@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import dns from "node:dns";
+import http from "node:http";
+import https from "node:https";
 import { isIP } from "node:net";
 import { cloudinary } from "../config/cloudinary.js";
 import { env } from "../config/env.js";
@@ -112,7 +115,110 @@ export function checkImageUrl(raw) {
   return !isPrivateHost(url.hostname);
 }
 
+/** Ảnh lấy từ link để xem trước / cắt trên máy nhân viên: tối đa 25MB, 3 lần chuyển hướng, 20 giây */
+export const LINK_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const LINK_REDIRECTS = 3;
+const LINK_TIMEOUT_MS = 20_000;
+const LINK_ERROR =
+  "Không lấy được ảnh từ link này — kiểm tra link mở được công khai và là file ảnh (JPG, PNG, WebP…)";
+
+/**
+ * Phân giải tên miền rồi CHẶN nếu ra IP nội bộ. Dùng làm `lookup` của chính kết nối → IP đã kiểm tra là IP được
+ * kết nối tới (không bị lừa bằng DNS đổi IP giữa lúc kiểm tra và lúc tải).
+ */
+export function safeLookup(hostname, options, callback) {
+  const cb = typeof options === "function" ? options : callback;
+  const opts = typeof options === "object" && options ? options : {};
+  dns.lookup(hostname, { all: true, family: opts.family ?? 0 }, (err, addrs) => {
+    if (err) return cb(err);
+    if (!addrs?.length || addrs.some((a) => isPrivateHost(a.address)))
+      return cb(Object.assign(new Error("blocked address"), { code: "EBLOCKED" }));
+    if (opts.all) return cb(null, addrs);
+    cb(null, addrs[0].address, addrs[0].family);
+  });
+}
+
+/** Tải 1 lần (không tự theo chuyển hướng) → { status, location?, type?, buffer? } */
+function getOnce(url, signal) {
+  return new Promise((resolve, reject) => {
+    const mod = url.protocol === "https:" ? https : http;
+    const req = mod.get(
+      url,
+      {
+        lookup: safeLookup,
+        signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; ImageFetcher/1.0)",
+          Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif,image/*;q=0.8",
+        },
+      },
+      (res) => {
+        const status = res.statusCode ?? 0;
+        if (status >= 300 && status < 400) {
+          res.resume();
+          return resolve({ status, location: res.headers.location });
+        }
+        if (status !== 200) {
+          res.resume();
+          return resolve({ status });
+        }
+        if (Number(res.headers["content-length"] ?? 0) > LINK_IMAGE_MAX_BYTES) {
+          res.destroy();
+          return reject(new Error("too large"));
+        }
+        const chunks = [];
+        let size = 0;
+        res.on("data", (c) => {
+          size += c.length;
+          if (size > LINK_IMAGE_MAX_BYTES) res.destroy(new Error("too large"));
+          else chunks.push(c);
+        });
+        res.on("error", reject);
+        res.on("end", () => resolve({ status, buffer: Buffer.concat(chunks) }));
+      },
+    );
+    req.on("error", reject);
+  });
+}
+
 export const uploadService = {
+  /**
+   * Lấy ảnh từ link về để nhân viên xem trước / cắt ngay trên máy — CHƯA lưu vào kho ảnh (chỉ lưu khi bấm Lưu).
+   * Chống SSRF: chỉ http(s) cổng chuẩn, kiểm tra IP thật lúc kết nối (safeLookup), kiểm tra lại mỗi lần chuyển hướng,
+   * giới hạn dung lượng / thời gian, chỉ trả về file có chữ ký ảnh thật.
+   * @returns {Promise<{ buffer: Buffer, format: string }>}
+   */
+  async fetchLinkImage(raw) {
+    let url;
+    const signal = AbortSignal.timeout(LINK_TIMEOUT_MS);
+    try {
+      url = new URL(String(raw ?? "").trim());
+      for (let hop = 0; hop <= LINK_REDIRECTS; hop++) {
+        if (!checkImageUrl(url.href)) throw new Error("bad url");
+        const r = await getOnce(url, signal);
+        if (r.location) {
+          url = new URL(r.location, url);
+          continue;
+        }
+        if (!r.buffer) throw new Error(`status ${r.status}`);
+        const format = sniffImage(r.buffer);
+        if (!format) throw new Error("not an image");
+        return { buffer: r.buffer, format };
+      }
+      throw new Error("too many redirects");
+    } catch (err) {
+      logger.info(
+        {
+          event: "media.link_fetch_failed",
+          host: url?.hostname,
+          reason: err?.message?.slice(0, 120),
+        },
+        "[upload] không lấy được ảnh từ link",
+      );
+      throw ApiError.unprocessable(LINK_ERROR);
+    }
+  },
+
   /**
    * @param {Express.Multer.File[]} files
    * @param {string} subfolder vd. "tours", "articles", "destinations"

@@ -57,7 +57,7 @@ const PAGE_LABELS = {
   terms: "Điều khoản sử dụng",
   privacy: "Chính sách bảo mật",
   payment: "Thanh toán & hoàn tiền",
-  cancellation: "Hủy / đổi tour",
+  cancellation: "Huỷ / đổi tour",
 };
 const ROLE_LABELS = { admin: "Quản trị viên", editor: "Nhân viên" };
 const STATUS_LABELS = {
@@ -65,9 +65,13 @@ const STATUS_LABELS = {
   contacted: "Đã liên hệ",
   confirmed: "Đã xác nhận",
   completed: "Hoàn tất",
-  cancelled: "Hủy",
+  cancelled: "Huỷ",
 };
-const PAYMENT_LABELS = { paid: "Đã thanh toán", unpaid: "Chưa thanh toán" };
+const PAYMENT_LABELS = {
+  paid: "Đã thanh toán",
+  deposit: "Đã đặt cọc",
+  unpaid: "Chưa thanh toán",
+};
 const USER_FIELDS = {
   name: "Họ tên",
   email: "Email",
@@ -95,8 +99,10 @@ const FIXED = {
   "enquiry.create": "Khách gửi đơn / yêu cầu",
   "enquiry.update": "Cập nhật trạng thái đơn",
   "enquiry.note": "Thêm ghi chú vào đơn",
+  "enquiry.note_delete": "Xoá ghi chú của đơn",
   "enquiry.delete": "Xoá đơn",
   "enquiry.resend_email": "Gửi lại email của đơn",
+  "enquiry.payment": "Khách thanh toán online qua 9Pay",
   "media.upload": "Tải ảnh lên",
   "media.from_url": "Thêm ảnh từ link",
   "media.delete": "Xoá ảnh",
@@ -133,7 +139,9 @@ const BADGES = {
   "enquiry.create": ["Đơn mới", "amber"],
   "enquiry.update": ["Đơn", "amber"],
   "enquiry.note": ["Ghi chú", "amber"],
+  "enquiry.note_delete": ["Ghi chú", "amber"],
   "enquiry.resend_email": ["Gửi email", "amber"],
+  "enquiry.payment": ["Thanh toán", "green"],
   "enquiry.delete": ["Xoá", "red"],
   "media.upload": ["Ảnh", "blue"],
   "media.from_url": ["Ảnh", "blue"],
@@ -168,6 +176,7 @@ export function actionBadge(action = "") {
 export function anonymousActor(action) {
   if (action === "auth.login_failed" || action === "auth.locked") return "Người lạ";
   if (action === "enquiry.create") return "Khách trên website";
+  if (action === "enquiry.payment") return "9Pay";
   return "Hệ thống";
 }
 
@@ -235,9 +244,15 @@ export function describeLog(x) {
       return link("Cập nhật", changes.length ? ` → ${changes.join(", ")}` : "");
     }
     if (verb === "note") return link("Thêm ghi chú vào");
+    if (verb === "note_delete") return link("Xoá ghi chú của");
     if (verb === "resend_email") return link("Gửi lại email cho");
     if (verb === "delete") return link("Xoá");
     if (verb === "create") return link("Khách gửi");
+    if (verb === "payment") {
+      const amount = m.amount ? `${Number(m.amount).toLocaleString("vi-VN")} ₫` : "";
+      const st = m.paymentStatus === "deposit" ? "đặt cọc" : "thanh toán";
+      return link(`Khách ${st}${amount ? ` ${amount}` : ""} cho`);
+    }
   }
 
   // Tài khoản quản trị
@@ -440,7 +455,14 @@ const FILTER_GROUPS = [
   },
   {
     label: "Đơn & yêu cầu",
-    actions: ["enquiry.update", "enquiry.note", "enquiry.delete", "enquiry.resend_email"],
+    actions: [
+      "enquiry.update",
+      "enquiry.note",
+      "enquiry.note_delete",
+      "enquiry.delete",
+      "enquiry.resend_email",
+      "enquiry.payment",
+    ],
   },
   ...Object.keys(CONTENT).map((t) => ({
     label: CONTENT[t].noun,

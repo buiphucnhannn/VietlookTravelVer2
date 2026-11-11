@@ -26,13 +26,13 @@ export function notFoundMetadata() {
   };
 }
 
-/** Metadata chuẩn SEO: canonical, hreflang (en / zh-Hans / vi / x-default), Open Graph. */
 /** Tiêu đề / mô tả Google nhập trong CMS cho tour, bài viết, trang — trống thì trả "" (dùng nội dung mặc định) */
 export const seoField = (seo, lang, key) =>
   fallbackLangs(lang)
     .map((l) => seo?.[l]?.[key])
     .find((v) => v && String(v).trim()) ?? "";
 
+/** Metadata chuẩn SEO: canonical, hreflang (en / zh-Hans / vi / x-default), Open Graph. */
 export function pageMetadata({ lang, path = "", title, description, image, type = "website" }) {
   description = clampDescription(description, lang);
   // Tiếng Anh ở gốc (/tours), tiếng Trung có /zh (/zh/tours), tiếng Việt có /vi (/vi/tours)
@@ -62,7 +62,7 @@ export function pageMetadata({ lang, path = "", title, description, image, type 
 }
 
 export function JsonLd({ data }) {
-  return (
-    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
-  );
+  // Thoát "<" để nội dung CMS có "</script>" không thể đóng thẻ sớm (chống chèn mã)
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: json }} />;
 }

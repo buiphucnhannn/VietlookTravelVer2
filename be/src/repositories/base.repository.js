@@ -38,11 +38,13 @@ export class BaseRepository {
   }
 
   /** Danh sách có phân trang: trả { items, total } */
-  async paginate(filter = {}, { skip = 0, limit = 20, sort = { createdAt: -1 }, select } = {}) {
-    const [items, total] = await Promise.all([
-      this.model.find(filter).sort(sort).skip(skip).limit(limit).select(select).lean(),
-      this.model.countDocuments(filter),
-    ]);
+  async paginate(
+    filter = {},
+    { skip = 0, limit = 20, sort = { createdAt: -1 }, select, collation } = {},
+  ) {
+    const query = this.model.find(filter).sort(sort).skip(skip).limit(limit).select(select);
+    if (collation) query.collation(collation); // vd. { locale: "vi" } để sắp A → Z đúng tiếng Việt
+    const [items, total] = await Promise.all([query.lean(), this.model.countDocuments(filter)]);
     return { items, total };
   }
 

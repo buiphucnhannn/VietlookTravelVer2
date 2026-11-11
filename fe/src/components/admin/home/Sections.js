@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowRight, Clock, EyeOff, ImageOff, Plus, Repeat2, X } from "lucide-react";
+import { ADMIN_BASE } from "@/config/urls.mjs";
 import { cn } from "@/lib/utils";
 import { Sortable } from "../Sortable";
 import {
@@ -27,20 +28,53 @@ const sameId = (v) => v;
  * Lưới thẻ tour (tour dài ngày / tour nổi bật): giữ và kéo thẻ để đổi thứ tự
  * ========================================================================= */
 
-/** `tall`: thẻ vòm dọc 4:5 có mô tả ngắn, 4 thẻ một hàng — giống khối "Tour nổi bật" trên web */
-function TourCards({ title, options, value, onChange, tall }) {
+/**
+ * `tall`: thẻ vòm dọc 4:5 có mô tả ngắn, 4 thẻ một hàng — giống khối "Tour nổi bật" trên web.
+ * `auto`: các tour website đang TỰ CHỌN khi danh sách trống (lib/tour-picks.js) → hiện mờ làm bản xem trước
+ * kèm nút "Dùng gợi ý này" chép sang danh sách tự chọn để sửa tiếp.
+ */
+function TourCards({ title, options, status, value, onChange, tall, auto = [], onSearch }) {
   const [picking, setPicking] = useState(false);
   const byValue = useMemo(() => byValueOf(options), [options]);
+  const loading = status === "loading";
   const room = MAX_TOURS - value.length;
+  const preview = !value.length && auto.length > 0;
 
   return (
     <>
+      {preview && (
+        <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-2xl bg-brand-50/80 px-4 py-2.5 text-xs text-brand-900 ring-1 ring-brand-200">
+          <span>
+            <b>
+              Đang tự chọn {auto.length} tour {tall ? "nổi bật" : "dài ngày"}
+            </b>{" "}
+            — bấm “Thêm tour” hoặc “Dùng gợi ý này” để tự chọn.
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(auto.slice(0, MAX_TOURS))}
+            className="rounded-full bg-brand-700 px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-800"
+          >
+            Dùng gợi ý này
+          </button>
+        </div>
+      )}
+      {preview && (
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-3 opacity-90",
+            tall ? "sm:grid-cols-3 sm:gap-4 lg:grid-cols-4" : "sm:grid-cols-3 md:grid-cols-4",
+          )}
+        >
+          {auto.map((v, i) => (
+            <TourCard key={v} tour={byValue.get(v)} loading={loading} index={i} tall={tall} />
+          ))}
+        </div>
+      )}
       <div
         className={cn(
           "grid grid-cols-2 gap-3",
-          tall
-            ? "sm:grid-cols-3 sm:gap-4 lg:grid-cols-4"
-            : "sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6",
+          tall ? "sm:grid-cols-3 sm:gap-4 lg:grid-cols-4" : "sm:grid-cols-3 md:grid-cols-4",
         )}
       >
         <Sortable
@@ -53,7 +87,7 @@ function TourCards({ title, options, value, onChange, tall }) {
           {(v, i, drag) => (
             <TourCard
               tour={byValue.get(v)}
-              loading={!options.length}
+              loading={loading}
               index={i}
               drag={drag}
               tall={tall}
@@ -61,7 +95,7 @@ function TourCards({ title, options, value, onChange, tall }) {
             />
           )}
         </Sortable>
-        {room > 0 && !tall && (
+        {room > 0 && !tall && !preview && (
           <button
             type="button"
             onClick={() => setPicking(true)}
@@ -75,13 +109,13 @@ function TourCards({ title, options, value, onChange, tall }) {
         )}
       </div>
       {/* Thẻ cao: nút thêm nằm thành dải riêng bên dưới để các hàng thẻ luôn đều nhau */}
-      {room > 0 && tall && (
+      {room > 0 && (tall || preview) && (
         <button
           type="button"
           onClick={() => setPicking(true)}
           className={cn(
             "flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-clay-500/35 bg-cream-50/60 text-xs font-semibold text-clay-600 transition hover:border-clay-500 hover:bg-white",
-            value.length ? "mt-4 py-3" : "min-h-[160px]",
+            value.length || preview ? "mt-4 py-3" : "min-h-[160px]",
           )}
         >
           <span className="grid size-7 place-items-center rounded-full bg-cream-100 ring-1 ring-sand-300">
@@ -96,10 +130,13 @@ function TourCards({ title, options, value, onChange, tall }) {
           multi
           title={`Thêm tour vào “${title}”`}
           options={options}
+          status={status}
+          emptyHref={`${ADMIN_BASE}/tours`}
           taken={value}
           room={room}
           unit="tour"
-          searchPlaceholder="Tìm tour theo tên…"
+          searchPlaceholder="Tìm tour theo tên hoặc mã tour…"
+          onSearch={onSearch}
           onClose={() => setPicking(false)}
           onPick={(vals) => {
             onChange([...value, ...vals].slice(0, MAX_TOURS));
@@ -118,7 +155,7 @@ function TourCard({ tour, loading, index, drag, onRemove, tall }) {
       {...grab(drag)}
       className={cn(
         "group relative flex h-full flex-col rounded-t-[999px] rounded-b-2xl bg-cream-100 p-1.5 ring-1 ring-sand-300/70 transition-shadow select-none",
-        drag.dragging ? "shadow-2xl ring-clay-500" : "hover:shadow-lg",
+        drag?.dragging ? "shadow-2xl ring-clay-500" : "hover:shadow-lg",
       )}
     >
       <div
@@ -161,9 +198,11 @@ function TourCard({ tour, loading, index, drag, onRemove, tall }) {
       <span className="absolute top-0 left-0 grid size-5 place-items-center rounded-full bg-slate-900/70 text-[10px] font-bold text-white">
         {index + 1}
       </span>
-      <span className={cn("absolute top-0 right-0", HOVER_TOOLS)}>
-        <MiniBtn icon={X} label="Gỡ khỏi khối này" danger onClick={onRemove} />
-      </span>
+      {onRemove && (
+        <span className={cn("absolute top-0 right-0", HOVER_TOOLS)}>
+          <MiniBtn icon={X} label="Gỡ khỏi khối này" danger onClick={onRemove} />
+        </span>
+      )}
     </article>
   );
 }
@@ -171,7 +210,7 @@ function TourCard({ tour, loading, index, drag, onRemove, tall }) {
 const WEEK_TABS = ["Tất cả", "1 tuần", "2 tuần", "3 tuần trở lên"];
 
 /** Khối "Tour dài ngày" của trang chủ: tiêu đề + phụ đề + lưới tour + nút xem thêm */
-export function LongToursSection({ options, value, onChange }) {
+export function LongToursSection({ options, status, value, onChange, auto, onSearch }) {
   return (
     <Sec name="Tour dài ngày" className="bg-cream-50" wide>
       <header className="mx-auto mb-5 flex max-w-2xl flex-col items-center text-center">
@@ -206,8 +245,11 @@ export function LongToursSection({ options, value, onChange }) {
       <TourCards
         title="Tour dài ngày nổi bật"
         options={options}
+        status={status}
         value={value}
         onChange={onChange}
+        auto={auto}
+        onSearch={onSearch}
       />
 
       <div className="mt-6 flex flex-col items-center gap-4">
@@ -217,7 +259,7 @@ export function LongToursSection({ options, value, onChange }) {
         <AutoNote>
           {value.length
             ? `Đã chọn ${value.length}/${MAX_TOURS} tour. Giữ và kéo thẻ để đổi thứ tự — trang chủ hiện 8 tour đứng đầu của mỗi nhóm tuần; tour đã có ở khối “Tour nổi bật” được xếp sau để không lặp lại.`
-            : "Chưa chọn tour nào — trang chủ tự lấy các tour được đánh dấu “dài ngày”."}
+            : "Chưa chọn tour nào — trang chủ tự chọn tour từ 7 ngày trở lên, chia đều cho 3 nhóm 1 tuần / 2 tuần / 3 tuần trở lên (ưu tiên tour có giá, đang giảm giá, nhiều ảnh)."}
         </AutoNote>
       </div>
     </Sec>
@@ -225,25 +267,31 @@ export function LongToursSection({ options, value, onChange }) {
 }
 
 /** Khối "Tour nổi bật" của trang chủ (ngay dưới khối dịch vụ): tiêu đề + dải thẻ tour + nút xem tất cả */
-export function FeaturedToursSection({ options, value, onChange }) {
-  const flagged = options.filter((o) => o.featured && !o.hidden).length;
+export function FeaturedToursSection({ options, status, value, onChange, auto = [], onSearch }) {
   return (
     <Sec name="Tour nổi bật" className="bg-white" wide>
       <MiniHeading eyebrow="featuredEyebrow" title="featuredTitle" subtitle="featuredSubtitle" />
 
-      <TourCards title="Tour nổi bật" options={options} value={value} onChange={onChange} tall />
+      <TourCards
+        title="Tour nổi bật"
+        options={options}
+        status={status}
+        value={value}
+        onChange={onChange}
+        auto={auto}
+        onSearch={onSearch}
+        tall
+      />
 
       <div className="mt-6 flex flex-col items-center gap-4">
         <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-clay-500 px-4 py-1.5 text-xs font-semibold text-clay-600">
           <T k="featuredCta" label="Chữ trên nút" />
           <ArrowRight className="size-3.5 shrink-0" />
         </span>
-        <AutoNote href={value.length ? undefined : "/admin/tours"} linkText="Mở mục Tour">
+        <AutoNote href={value.length ? undefined : `${ADMIN_BASE}/tours`} linkText="Mở mục Tour">
           {value.length
             ? `Đã chọn ${value.length}/${MAX_TOURS} tour. Giữ và kéo thẻ để đổi thứ tự — trên web hiện 4 thẻ một lượt, khách bấm mũi tên để xem tiếp.`
-            : flagged
-              ? `Chưa chọn tour nào — trang chủ đang hiện ${Math.min(flagged, 12)} tour được đánh dấu “nổi bật” trong mục Tour.`
-              : "Chưa chọn tour nào và chưa có tour nào được đánh dấu “nổi bật” — khối này đang ẩn trên trang chủ."}
+            : "Chưa chọn tour nào — trang chủ tự chọn 8 tour đáng nổi bật nhất: tour đánh dấu “nổi bật”, có giá, đang giảm giá, nhiều ảnh, đủ các miền và không trùng lịch trình."}
         </AutoNote>
       </div>
     </Sec>
@@ -254,7 +302,7 @@ export function FeaturedToursSection({ options, value, onChange }) {
  * Chủ đề hiện ở trang chủ
  * ========================================================================= */
 
-export function ThemeTiles({ options, value, onChange }) {
+export function ThemeTiles({ options, status, value, onChange }) {
   const [picking, setPicking] = useState(false);
   const byValue = useMemo(() => byValueOf(options), [options]);
   const any = value.length > 0;
@@ -284,7 +332,13 @@ export function ThemeTiles({ options, value, onChange }) {
       </header>
 
       {!options.length ? (
-        <p className="text-center text-sm text-white/60">Chưa có chủ đề nào.</p>
+        <p className="text-center text-sm text-white/60">
+          {status === "loading"
+            ? "Đang tải chủ đề…"
+            : status === "error"
+              ? "Chưa tải được danh sách chủ đề — hãy tải lại trang."
+              : "Chưa có chủ đề nào."}
+        </p>
       ) : any ? (
         <div className={cn(tiles, "auto-cols-fr")}>
           <Sortable
@@ -347,6 +401,8 @@ export function ThemeTiles({ options, value, onChange }) {
           multi
           title="Thêm chủ đề vào trang chủ"
           options={options}
+          status={status}
+          emptyHref={`${ADMIN_BASE}/themes`}
           taken={value}
           room={room}
           unit="chủ đề"
@@ -390,7 +446,7 @@ function ThemeTile({ theme, drag, children }) {
  * Lưới điểm đến: 5 ô lớn (chọn + kéo để đổi chỗ) + dải "điểm đến khác" tự động
  * ========================================================================= */
 
-export function DestinationTiles({ options, value, onChange }) {
+export function DestinationTiles({ options, status, value, onChange }) {
   const [slot, setSlot] = useState(null);
   const byValue = useMemo(() => byValueOf(options), [options]);
   const others = options.filter((o) => !o.hidden && !value.includes(o.value));
@@ -425,7 +481,7 @@ export function DestinationTiles({ options, value, onChange }) {
             <DestinationTile
               index={i}
               dest={byValue.get(v)}
-              loading={!options.length}
+              loading={status === "loading"}
               drag={drag}
               onSwap={() => setSlot(i)}
               onRemove={() => onChange(value.filter((x) => x !== v))}
@@ -486,6 +542,9 @@ export function DestinationTiles({ options, value, onChange }) {
           title={`Chọn điểm đến cho ô số ${Math.min(slot, value.length) + 1}`}
           description="Chọn điểm đến đang nằm ở ô khác thì hai ô sẽ đổi chỗ cho nhau."
           options={options}
+          status={status}
+          emptyHref={`${ADMIN_BASE}/destinations`}
+          unit="điểm đến"
           taken={value}
           searchPlaceholder="Tìm điểm đến theo tên…"
           onClose={() => setSlot(null)}
