@@ -1,0 +1,31 @@
+# Sau mỗi lần Vercel deploy production thành công → mở trước mọi trang trong sitemap
+# để khách đầu tiên vào trang nào cũng thấy nhanh (không phải chờ dựng trang lần đầu).
+name: Warm cache after deploy
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Địa chỉ website cần làm nóng (vd. https://vietlooktravel.com)"
+        required: true
+
+jobs:
+  warm:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Warm pages
+        working-directory: fe
+        env:
+          WARM_CONCURRENCY: "4"
+        # Ưu tiên tên miền chính (biến WARM_URL trong repo): link riêng của từng bản deploy thường bị Vercel chặn bằng đăng nhập
+        run: node scripts/warm-cache.mjs "${{ github.event.inputs.url || vars.WARM_URL || github.event.deployment_status.environment_url }}"

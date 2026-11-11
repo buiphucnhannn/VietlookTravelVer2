@@ -81,7 +81,11 @@ const OFF_SCHEDULE = {
 };
 const HOTEL_LABEL = { en: "Hotel class", zh: "酒店星级", vi: "Hạng khách sạn" };
 const EXTRA_LABEL = {
-  holiday: { en: "Holiday surcharge", zh: "节假日附加费", vi: "Phụ thu lễ Tết" },
+  holiday: {
+    en: "Holiday & peak-season surcharge",
+    zh: "节假日及旺季附加费",
+    vi: "Phụ thu ngày lễ & cao điểm",
+  },
   single: { en: "Single supplement", zh: "单房差", vi: "Phụ thu phòng đơn" },
 };
 
@@ -125,7 +129,7 @@ export default function BookingWidget({ lang, tour, t, c, payment }) {
     [today, tour.days, tour.departure, tour.departureDates, tour.departureDays],
   );
 
-  // Giá tạm tính theo bảng giá trong CMS: bậc số khách, % trẻ em theo tuổi, phụ thu lễ Tết / phòng đơn
+  // Giá tạm tính theo bảng giá trong CMS: bậc số khách, % trẻ em theo tuổi, phụ thu ngày lễ & cao điểm / phòng đơn
   // (cùng công thức với máy chủ — lib/pricing.js; máy chủ tính lại khi nhận đơn)
   const unit = unitPrice(tour, adults + ages.length, cls);
 

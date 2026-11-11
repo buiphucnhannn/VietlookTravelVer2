@@ -131,9 +131,9 @@ const PL = {
   surcharges: { en: "Supplements", zh: "附加费用", vi: "Phụ thu" },
   single: { en: "Single room supplement", zh: "单房差", vi: "Phụ thu phòng đơn" },
   holiday: {
-    en: "Holiday surcharge (Tet / peak dates)",
-    zh: "节假日附加费（春节/旺季）",
-    vi: "Phụ thu lễ Tết / cao điểm",
+    en: "Holiday & peak-season surcharge",
+    zh: "节假日及旺季附加费",
+    vi: "Phụ thu ngày lễ & cao điểm",
   },
   perPax: { en: "per person", zh: "/人", vi: "/khách" },
   ofTour: { en: "{p}% of the tour price", zh: "团费的{p}%", vi: "{p}% giá tour" },
@@ -153,7 +153,7 @@ export const hasStructuredPricing = (p) =>
     p?.holidayPercent > 0
   );
 
-/** Bảng giá theo số khách × hạng khách sạn, giá trẻ em theo tuổi, phụ thu (phòng đơn, lễ Tết) */
+/** Bảng giá theo số khách × hạng khách sạn, giá trẻ em theo tuổi, phụ thu (phòng đơn, ngày lễ & cao điểm) */
 export function PricingGrid({ pricing, lang }) {
   const tiers = (pricing?.groupTiers ?? []).filter(
     (t) => t.price > 0 || t.price4 > 0 || t.price5 > 0,

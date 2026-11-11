@@ -5,7 +5,7 @@
  * 1. Giá / người lớn: bảng "giá theo số khách × hạng khách sạn" (groupTiers: price = 3★, price4, price5) theo
  *    tổng số khách và hạng khách chọn; không có bảng → giá bán `price`.
  * 2. Trẻ em: % giá người lớn theo độ tuổi (childRates). Chưa cấu hình → < 5 tuổi miễn phí, 5–10 tuổi 75%, ≥ 11 như người lớn.
- * 3. Phụ thu lễ Tết nếu ngày khởi hành nằm trong holidayDates (YYYY-MM-DD hoặc MM-DD lặp hằng năm):
+ * 3. Phụ thu ngày lễ & cao điểm nếu ngày khởi hành nằm trong holidayDates (YYYY-MM-DD hoặc MM-DD lặp hằng năm):
  *    số tiền / khách (holidaySurcharge) và / hoặc % trên tiền tour (holidayPercent).
  * 4. Phụ thu phòng đơn: khi chỉ có 1 người lớn.
  */

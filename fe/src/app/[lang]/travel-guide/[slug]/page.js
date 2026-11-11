@@ -17,9 +17,17 @@ import PostCard from "@/components/guide/PostCard";
 import TourCard from "@/components/tours/TourCard";
 import { getCatalog, getPost, readingTime } from "@/lib/catalog";
 
+/**
+ * Dựng sẵn lúc build CHỈ 30 bài mới nhất × 3 ngôn ngữ (dựng cả ~454 bài × 3 làm deploy rất lâu).
+ * Bài còn lại: lượt xem đầu hiện khung ngay rồi tự dựng & lưu bộ nhớ đệm, các lượt sau mở nhanh.
+ */
+const PRERENDER_POSTS = 30;
 export async function generateStaticParams() {
   const { allPosts } = await getCatalog();
-  return locales.flatMap((lang) => allPosts.map((p) => ({ lang, slug: p.slug })));
+  const latest = [...allPosts]
+    .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
+    .slice(0, PRERENDER_POSTS);
+  return locales.flatMap((lang) => latest.map((p) => ({ lang, slug: p.slug })));
 }
 
 export async function generateMetadata({ params }) {

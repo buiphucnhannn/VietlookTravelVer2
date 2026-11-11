@@ -9,8 +9,8 @@ const RULES = [
     (m) =>
       m[2] === "0" ? `Trẻ ${m[1]} tuổi (miễn phí)` : `Trẻ ${m[1]} tuổi (${m[2]}% giá người lớn)`,
   ],
-  [/^Holiday surcharge × (\d+)$/, (m) => `Phụ thu lễ Tết × ${m[1]} khách`],
-  [/^Holiday surcharge (\d+(?:\.\d+)?)%$/, (m) => `Phụ thu lễ Tết ${m[1]}%`],
+  [/^Holiday surcharge × (\d+)$/, (m) => `Phụ thu ngày lễ & cao điểm × ${m[1]} khách`],
+  [/^Holiday surcharge (\d+(?:\.\d+)?)%$/, (m) => `Phụ thu ngày lễ & cao điểm ${m[1]}%`],
   [/^Single supplement$/, () => "Phụ thu phòng đơn"],
 ];
 

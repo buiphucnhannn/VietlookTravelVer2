@@ -466,7 +466,8 @@ const vi = {
       "Chúng tôi đã nhận được yêu cầu đặt tour của bạn. Email xác nhận đã được gửi đến bạn và đội ngũ của chúng tôi sẽ liên hệ để xác nhận và hướng dẫn thanh toán.",
     askTitle: "Có câu hỏi? Chat với chuyên gia bản địa",
     tripadvisor: "Travellers' Choice",
-    holidaySurcharge: "Có thể áp dụng phụ thu ngày lễ (Tết/cao điểm) và phụ thu phòng đơn.",
+    holidaySurcharge:
+      "Có thể áp dụng phụ thu vào các ngày lễ, Tết, mùa cao điểm và phụ thu phòng đơn.",
     inclusionsOnRequest:
       "Các dịch vụ bao gồm được điều chỉnh theo lịch trình và hạng khách sạn – đội ngũ của chúng tôi sẽ gửi danh sách bao gồm/không bao gồm đầy đủ kèm báo giá.",
     childPolicyTitle: "Chính sách trẻ em",

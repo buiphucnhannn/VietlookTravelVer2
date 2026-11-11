@@ -465,7 +465,8 @@ const en = {
       "Your booking request has been received. A confirmation email has been sent to you and our team will contact you to confirm and guide you on payment.",
     askTitle: "Questions? Chat with our local experts",
     tripadvisor: "Travellers' Choice",
-    holidaySurcharge: "Holiday surcharge (Tet/peak dates) and single-room supplement may apply.",
+    holidaySurcharge:
+      "A surcharge may apply on public holidays, Tet and peak-season dates, plus a single-room supplement.",
     inclusionsOnRequest:
       "Inclusions are tailored to your itinerary and hotel class – our team sends the full included/excluded list with your quote.",
     childPolicyTitle: "Children policy",

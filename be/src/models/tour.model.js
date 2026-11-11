@@ -73,8 +73,8 @@ const pricing = new Schema(
       default: [],
     },
     singleSupplement: { type: Number, default: null }, // phụ thu phòng đơn / khách
-    holidaySurcharge: { type: Number, default: null }, // phụ thu lễ Tết / khách (USD)
-    holidayPercent: { type: Number, default: null }, // hoặc phụ thu lễ Tết theo % giá
+    holidaySurcharge: { type: Number, default: null }, // phụ thu ngày lễ & cao điểm / khách (USD)
+    holidayPercent: { type: Number, default: null }, // hoặc phụ thu ngày lễ & cao điểm theo % giá
     holidayDates: { type: [String], default: [] }, // các ngày áp dụng phụ thu (YYYY-MM-DD hoặc MM-DD)
   },
   { _id: false },

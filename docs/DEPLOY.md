@@ -151,6 +151,17 @@ Vercel → Settings → Domains → thêm tên miền, rồi cập nhật cùng 
 Sau khi Redeploy: kiểm `https://<tên-miền>/robots.txt` đã có dòng `Sitemap:` (không còn `Disallow: /`) rồi nộp sitemap
 lên Google Search Console. Bản chạy thử trên tên miền tạm luôn bị chặn index nên không trùng nội dung với web cũ.
 
+### Deploy nhanh + khách đầu tiên cũng mở nhanh
+
+- Lúc build chỉ dựng sẵn ~450 trang (trang chính, tour nổi bật/dài ngày, 40 tour đầu, 30 bài mới nhất × 3 ngôn ngữ)
+  → build khoảng 1–2 phút thay vì ~10 phút.
+- Trang còn lại: lượt xem đầu hiện khung trang ngay rồi tự dựng, lưu lại; các lượt sau mở tức thì.
+- Để khách thật không phải là "lượt đầu": workflow `.github/workflows/warm-cache.yml` tự chạy sau mỗi lần Vercel
+  deploy **Production** thành công, mở trước mọi trang trong sitemap (~2.500 trang, 4 trang cùng lúc, vài phút).
+  Cần: repo nối với Vercel qua GitHub (Vercel tự báo trạng thái deploy về GitHub) + biến `WARM_URL` = tên miền chính (GitHub → Settings → Secrets and variables → Actions → Variables). Chạy tay: GitHub → Actions →
+  "Warm cache after deploy" → Run workflow → nhập tên miền; hoặc trên máy: `cd fe && npm run warm -- https://<tên-miền>`.
+- Sửa nội dung trong CMS không cần deploy lại: website tự cập nhật đúng trang liên quan.
+
 ---
 
 ## 4. Checklist sau deploy

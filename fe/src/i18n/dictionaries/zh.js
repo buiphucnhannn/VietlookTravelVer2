@@ -415,7 +415,7 @@ const zh = {
       "我们已收到您的预订需求，确认邮件已发送至您的邮箱。我们的团队将尽快联系您确认并指导付款。",
     askTitle: "有疑问？与本地专家聊聊",
     tripadvisor: "旅行者之选",
-    holidaySurcharge: "节假日（春节/旺季）附加费及单房差可能另计。",
+    holidaySurcharge: "法定节假日、春节及旺季可能收取附加费，单房差另计。",
     inclusionsOnRequest:
       "费用包含项目将根据您的行程与酒店等级定制——我们会在报价中附上完整的包含/不含清单。",
     childPolicyTitle: "儿童政策",

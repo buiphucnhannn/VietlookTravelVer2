@@ -33,9 +33,22 @@ import { parseVideo } from "@/lib/video";
 import { GoogleIcon, TripAdvisorIcon, WeChatIcon, WhatsAppIcon } from "@/components/ui/BrandIcons";
 import { getCatalog, getPaymentConfig, getTour, tourText } from "@/lib/catalog";
 
+/**
+ * Dựng sẵn lúc build CHỈ các tour quan trọng (nổi bật + dài ngày ở trang chủ + 40 tour đầu danh sách) × 3 ngôn ngữ
+ * — dựng sẵn cả ~315 tour × 3 làm mỗi lần deploy mất ~10 phút. Tour còn lại: lượt xem đầu hiện khung trang ngay
+ * rồi tự dựng & lưu vào bộ nhớ đệm (ISR + Partial Prefetching), các lượt sau mở nhanh như trang dựng sẵn.
+ */
+const PRERENDER_TOURS = 40;
 export async function generateStaticParams() {
-  const { allTours } = await getCatalog();
-  return locales.flatMap((lang) => allTours.map((t) => ({ lang, slug: t.slug })));
+  const { allTours, featuredTours, longTours } = await getCatalog();
+  const slugs = [
+    ...new Set([
+      ...featuredTours().map((t) => t.slug),
+      ...longTours().map((t) => t.slug),
+      ...allTours.slice(0, PRERENDER_TOURS).map((t) => t.slug),
+    ]),
+  ];
+  return locales.flatMap((lang) => slugs.map((slug) => ({ lang, slug })));
 }
 
 export async function generateMetadata({ params }) {

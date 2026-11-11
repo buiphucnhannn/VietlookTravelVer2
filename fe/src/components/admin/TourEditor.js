@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   CalendarDays,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   CircleHelp,
   Columns3,
   Compass,
@@ -14,6 +16,7 @@ import {
   Image as ImageIcon,
   Info,
   ListChecks,
+  ListOrdered,
   ListPlus,
   MessageSquareQuote,
   Plane,
@@ -390,7 +393,7 @@ function validate(p) {
   if (p.departureDates.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d)))
     return "Có ngày khởi hành không hợp lệ — vui lòng xoá và chọn lại.";
   if (p.pricing.holidayDates.some((d) => !/^(\d{4}-)?\d{2}-\d{2}$/.test(d)))
-    return "Có ngày lễ Tết không hợp lệ — vui lòng xoá và chọn lại.";
+    return "Có ngày tính phụ thu không hợp lệ — vui lòng xoá và chọn lại.";
   return null;
 }
 
@@ -1409,7 +1412,7 @@ function RowsEditor({ rows, onChange, columns, addLabel, makeRow }) {
   );
 }
 
-/** Danh sách ngày dạng thẻ: thêm / xoá. `holiday` = ngày lễ Tết, có thể lặp lại hằng năm */
+/** Danh sách ngày dạng thẻ: thêm / xoá. `holiday` = ngày tính phụ thu (lễ, Tết, cao điểm…), có thể lặp lại hằng năm */
 function DateChips({ value, onChange, holiday }) {
   const [draft, setDraft] = useState("");
   const [yearly, setYearly] = useState(false);
@@ -1675,7 +1678,7 @@ const PricingSection = memoOn(
                       onChange={(singleSupplement) => setP({ singleSupplement })}
                     />
                   </Field>
-                  <Field label="Lễ Tết / khách">
+                  <Field label="Ngày lễ, cao điểm / khách">
                     <NumInput
                       value={p.holidaySurcharge}
                       prefix="$"
@@ -1683,7 +1686,7 @@ const PricingSection = memoOn(
                       onChange={(holidaySurcharge) => setP({ holidaySurcharge })}
                     />
                   </Field>
-                  <Field label="Lễ Tết theo %">
+                  <Field label="Ngày lễ, cao điểm theo %">
                     <NumInput
                       value={p.holidayPercent}
                       suffix="%"
@@ -1694,10 +1697,12 @@ const PricingSection = memoOn(
                   </Field>
                 </div>
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-                  Phòng đơn: khi khách đi một mình. Lễ Tết: điền số tiền hoặc %, tuỳ cách tính.
+                  Phòng đơn: khi khách đi một mình. Ngày lễ, cao điểm: áp dụng cho mọi ngày chọn bên
+                  dưới (Tết, 30/4, 2/9, Giáng sinh, mùa cao điểm…) — điền số tiền hoặc %, tuỳ cách
+                  tính.
                 </p>
               </div>
-              <Field label={`Các ngày lễ Tết tính phụ thu (${p.holidayDates.length})`}>
+              <Field label={`Các ngày tính phụ thu — lễ, Tết, cao điểm (${p.holidayDates.length})`}>
                 <DateChips
                   holiday
                   value={p.holidayDates}
@@ -2112,18 +2117,36 @@ const ItineraryEditor = memo(function ItineraryEditor({
 
   return (
     <div>
+      {/* Thanh công cụ: số ngày (trái) · Mở/Thu gọn + Đánh số lại (phải) — thẳng mép với danh sách ngày bên dưới */}
       {value.length > 1 && (
-        <div className="mb-3 flex flex-wrap justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setOpen(allOpen ? new Set() : new Set(value.map((d) => d._k)))}
-          >
-            {allOpen ? "Thu gọn tất cả" : "Mở tất cả"}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={renumber}>
-            Đánh số lại 1, 2, 3…
-          </Button>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[13px] text-slate-500">
+            {value.length} ngày · bấm vào từng ngày để mở và viết nội dung
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setOpen(allOpen ? new Set() : new Set(value.map((d) => d._k)))}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-brand-700"
+            >
+              {allOpen ? (
+                <ChevronsDownUp className="size-3.5" />
+              ) : (
+                <ChevronsUpDown className="size-3.5" />
+              )}
+              {allOpen ? "Thu gọn tất cả" : "Mở tất cả"}
+            </button>
+            {/* chỉ cần khi số ngày đang lệch (vd. sau khi xoá / tự đặt số) */}
+            {!sequential && (
+              <button
+                type="button"
+                onClick={renumber}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-brand-700"
+              >
+                <ListOrdered className="size-3.5" /> Đánh số lại 1, 2, 3…
+              </button>
+            )}
+          </div>
         </div>
       )}
       {!value.length && enDays?.length > 0 && (
