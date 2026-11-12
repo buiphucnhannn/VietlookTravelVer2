@@ -15,14 +15,15 @@ export const COMPANY = Object.freeze({
   licence: "01-176/2022/CDLQGVN-GP LHQT",
   hotline: "+84 98 339 3588",
   hotlineRaw: "+84983393588",
-  email: "infovietlooktravel@gmail.com",
+  // Email liên hệ hiển thị cho khách (KHÔNG phải hộp thư gửi/nhận thông báo – xem MAIL_FROM & cài đặt "notifications")
+  email: "info@vietlooktravel.com",
   whatsapp: "https://wa.me/84983393588",
   zalo: "https://zalo.me/84983393588",
-  wechatId: "+84983393588",
+  wechatId: "TA14102014",
   address: {
-    en: "No. 58, Lane 159 Quyet Thang Street, Yen Nghia Ward, Hanoi, Vietnam",
-    zh: "越南河内市安义坊决胜街159巷58号",
-    vi: "Số 58, ngõ 159 phố Quyết Thắng, phường Yên Nghĩa, Hà Nội, Việt Nam",
+    en: "01 Lien Ke 20, Van Khe Urban Area, Ha Dong, Hanoi 12113, Vietnam",
+    zh: "越南河内市河东文溪新区LK20区01号（邮编12113）",
+    vi: "01 Liền Kề 20, Khu đô thị Văn Khê, Hà Đông, Hà Nội 12113, Việt Nam",
   },
   hours: {
     en: "Mon – Sat: 9:00 – 18:00 (GMT+7) · Hotline 24/7",
@@ -35,8 +36,7 @@ export const COMPANY = Object.freeze({
       "Tripadvisor",
       "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
     ],
-    ["YouTube", "https://www.youtube.com/@VietlookTravel"],
-    ["Google Maps", "https://maps.app.goo.gl/ar5pqAHXgeW42U7W9"],
+    ["Google Maps", "https://maps.google.com/?cid=12890319484623913190"],
   ],
 });
 
@@ -592,6 +592,7 @@ export const WORDS = {
     adultLine: (n, unit) => `${n} người lớn × ${unit}`,
     holiday: "Phụ thu ngày lễ & cao điểm",
     single: "Phụ thu phòng đơn",
+    smallGroup: (n, pct) => `Phụ thu nhóm nhỏ (${n} khách) +${pct}%`,
     weekday: "vi-VN",
   },
   en: {
@@ -608,6 +609,7 @@ export const WORDS = {
     adultLine: (n, unit) => `${n} adult${n === 1 ? "" : "s"} × ${unit}`,
     holiday: "Holiday & peak-season surcharge",
     single: "Single supplement",
+    smallGroup: (n, pct) => `Small-group supplement (${n} guest${n === 1 ? "" : "s"}) +${pct}%`,
     weekday: "en-GB",
   },
   zh: {
@@ -624,6 +626,7 @@ export const WORDS = {
     adultLine: (n, unit) => `${n}位成人 × ${unit}`,
     holiday: "节假日及旺季附加费",
     single: "单房差",
+    smallGroup: (n, pct) => `小团附加费（${n}人）+${pct}%`,
     weekday: "zh-CN",
   },
 };

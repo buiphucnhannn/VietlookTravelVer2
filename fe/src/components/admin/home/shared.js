@@ -14,7 +14,7 @@ export const L = () => ({ en: "", zh: "", vi: "" });
 export const MAX_SLIDES = 8;
 export const MAX_TOURS = 8; // khối tour trên trang chủ hiện tối đa 8 thẻ
 export const MAX_THEMES = 8;
-export const MAX_DESTINATIONS = 5;
+export const MAX_DESTINATIONS = 6; // 6 ô ảnh của lưới điểm đến (data/destination-grid.js)
 export const EMPTY_SLIDE = {
   video: "",
   videoMobile: "",

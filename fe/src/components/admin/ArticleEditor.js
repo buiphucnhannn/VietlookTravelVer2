@@ -191,7 +191,7 @@ function EditorForm({ initial, back }) {
     const errs = {};
     if (!anyLang(d.title)) errs.title = "Nhập tiêu đề ở ít nhất một ngôn ngữ";
     if (d.publishedAt && !isISODate(d.publishedAt))
-      errs.publishedAt = "Ngày đăng không hợp lệ (định dạng mm/dd/yyyy)";
+      errs.publishedAt = "Ngày đăng không hợp lệ (định dạng dd/mm/yyyy)";
     // ảnh vừa chọn (ảnh bìa, ảnh chèn trong bài) chỉ được lưu vào kho ảnh lúc này — trước khi dịch,
     // để bản dịch dùng đúng link ảnh đã lưu
     const base = errs.title ? d : await images.prepare(d);

@@ -17,6 +17,10 @@
 
 /* Màn hình thấp (laptop nhỏ, trình duyệt có nhiều thanh công cụ): gọn các khung dính bên cạnh */
 @custom-variant short (@media (min-width: 1024px) and (max-height: 900px));
+/* Khung đặt tour dính bên phải: gọn dần theo chiều cao màn hình — mid: ≤ 1100px (1920×1080),
+   shorter: ≤ 900px (1440×900, 1536×864, 1366×768, 1280×720…) */
+@custom-variant mid (@media (min-width: 1024px) and (max-height: 1100px));
+@custom-variant shorter (@media (min-width: 1024px) and (max-height: 900px));
 
 @theme inline {
   --color-background: var(--background);
@@ -288,6 +292,50 @@ body {
   }
   .prose-guide strong {
     @apply font-semibold text-ink;
+  }
+  /* Ảnh trong nội dung (bài viết, lịch trình tour, trang chính sách) — cùng quy tắc với trình soạn
+     (globals.css .admin-prose img): giữ cỡ thật, ảnh nhỏ không bị phóng to, ảnh lớn thu vừa khung
+     (ngang ≤ 720px, cao ≤ 600px / 70% màn hình), căn giữa. Bỏ qua width/height ghi sẵn trong HTML cũ
+     (tránh ảnh méo khi bị giới hạn chiều cao). */
+  .prose-guide {
+    display: flow-root; /* chứa ảnh nằm bên trái / phải chữ (bài cũ) */
+  }
+  .prose-guide img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(100%, 720px);
+    max-height: min(70vh, 600px);
+    margin: 1.75rem auto;
+    border-radius: 0.75rem;
+  }
+  .prose-guide figure {
+    margin: 1.75rem auto;
+  }
+  .prose-guide figure img {
+    margin-block: 0;
+  }
+  .prose-guide figcaption {
+    @apply mt-2 text-center text-sm leading-6 text-muted;
+  }
+  /* bài cũ: ảnh có lớp alignleft / alignright nằm bên trái / phải chữ (màn hẹp: căn giữa như mọi ảnh) */
+  @media (min-width: 40rem) {
+    .prose-guide .alignleft {
+      float: left;
+      max-width: min(45%, 360px);
+      margin: 0.4rem 1.5rem 1rem 0;
+    }
+    .prose-guide .alignright {
+      float: right;
+      max-width: min(45%, 360px);
+      margin: 0.4rem 0 1rem 1.5rem;
+    }
+    .prose-guide figure:is(.alignleft, .alignright) img {
+      max-width: 100%;
+    }
+    .prose-guide :is(h2, h3) {
+      clear: both;
+    }
   }
 }
 

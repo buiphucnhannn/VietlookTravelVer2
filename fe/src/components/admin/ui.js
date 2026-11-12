@@ -207,7 +207,7 @@ export function Input({ className, ...props }) {
   return <input {...props} className={cn(inputClass, className)} />;
 }
 
-/** Ô ngày của CMS: hiện mm/dd/yyyy (không theo ngôn ngữ máy), giá trị ISO — xem components/ui/DatePicker.js */
+/** Ô ngày của CMS: hiện dd/mm/yyyy (CMS luôn tiếng Việt, không theo máy), giá trị ISO — xem components/ui/DatePicker.js */
 export function DateInput({ className, ...props }) {
   return <DatePicker lang="vi" {...props} className={cn(inputClass, className)} />;
 }
@@ -2206,9 +2206,9 @@ export function useUnsavedGuard(dirty) {
  * Định dạng
  * ========================================================================= */
 
-/** "mm/dd/yyyy HH:mm" / "mm/dd/yyyy" (giờ Việt Nam) — dùng chung với website: lib/dates.js */
-export const fmtDateTime = fmtDateTimeShared;
-export const fmtDate = fmtDateShared;
+/** CMS luôn tiếng Việt: "dd/mm/yyyy HH:mm" / "dd/mm/yyyy" (giờ Việt Nam) — dùng chung với website: lib/dates.js */
+export const fmtDateTime = (v) => fmtDateTimeShared(v, "vi");
+export const fmtDate = (v) => fmtDateShared(v, "vi");
 export const fmtUSD = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("en-US")}`);
 
 /** Chuỗi đa ngôn ngữ → tiếng Việt / Anh để hiển thị trong CMS */

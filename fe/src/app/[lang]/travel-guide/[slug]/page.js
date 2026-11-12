@@ -153,7 +153,7 @@ async function GuidePostPageContent({ params }) {
             </Link>
           </span>
           <span className="flex items-center gap-1.5">
-            <CalendarDays className="size-4" /> {fmtDate(post.date)}
+            <CalendarDays className="size-4" /> {fmtDate(post.date, lang)}
           </span>
           <span className="flex items-center gap-1.5">
             <Clock className="size-4" /> {readingTime(rawBody)} {dict.common.minRead}
@@ -170,7 +170,7 @@ async function GuidePostPageContent({ params }) {
           )}
           <p className="text-xl leading-relaxed text-ink/85">{tr(post.excerpt, lang)}</p>
           <p className="mt-4 text-sm text-muted italic">
-            {dict.common.lastUpdated}: {fmtDate(post.date)}
+            {dict.common.lastUpdated}: {fmtDate(post.date, lang)}
           </p>
 
           {toc.length > 1 && (

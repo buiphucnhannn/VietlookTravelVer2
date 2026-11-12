@@ -5,7 +5,7 @@
  *   api("/admin/tours?limit=20")                    → { success, data, meta }
  *   api("/auth/login", { method: "POST", body })
  */
-import { ADMIN_BASE, ADMIN_LOGIN } from "@/config/urls.mjs";
+import { ADMIN_BASE } from "@/config/urls.mjs";
 
 export class ApiError extends Error {
   constructor(status, payload) {
@@ -37,17 +37,48 @@ export const refreshSession = () =>
     .catch(() => false)
     .finally(() => (refreshing = null)));
 
+/*
+ * Đường dẫn trang đăng nhập là BÍ MẬT (ADMIN_LOGIN_PATH, chỉ server biết — không đưa vào JS của website).
+ * Trình duyệt tự nhớ đường dẫn mà nhân viên vừa dùng để đăng nhập thành công → đăng xuất / hết phiên quay lại
+ * đúng trang đó. Chưa nhớ (trình duyệt khác, đã xoá dữ liệu) → về trang chủ; nhân viên mở lại link đã lưu.
+ */
+const LOGIN_PATH_KEY = "vl_admin_login";
+
+/** Gọi ở trang đăng nhập sau khi đăng nhập thành công */
+export function rememberAdminLoginPath() {
+  try {
+    const path = window.location.pathname;
+    // Đăng nhập ở /login (chưa bật link riêng) → xoá link riêng cũ đã nhớ, tránh lần sau bị đưa tới link đã tắt
+    if (path === "/login") localStorage.removeItem(LOGIN_PATH_KEY);
+    else localStorage.setItem(LOGIN_PATH_KEY, path);
+  } catch {
+    // chế độ ẩn danh / chặn lưu trữ → bỏ qua
+  }
+}
+
+/** Link đăng nhập riêng đã nhớ, hoặc /login (mặc định khi chưa bật link riêng) */
+export function adminLoginPath() {
+  try {
+    const path = localStorage.getItem(LOGIN_PATH_KEY);
+    if (path && /^\/[a-z0-9-]+$/.test(path)) return path;
+  } catch {
+    // không đọc được → dùng /login
+  }
+  return "/login";
+}
+
 /** Đang ở khu quản trị → chuyển về trang đăng nhập (kèm đường dẫn để quay lại) */
 export function redirectToLogin() {
   if (typeof window === "undefined" || !window.location.pathname.startsWith(ADMIN_BASE))
     return false;
   // Form còn nội dung chưa lưu → mở đăng nhập ở tab mới, giữ nguyên trang (không mất bài đang soạn)
   if (window.__vlHasUnsaved?.()) {
-    window.open(`${ADMIN_LOGIN}?expired=1`, "_blank", "noopener");
+    window.open(`${adminLoginPath()}?expired=1`, "_blank", "noopener");
     return false;
   }
   const next = encodeURIComponent(window.location.pathname + window.location.search);
-  window.location.replace(`${ADMIN_LOGIN}?next=${next}&expired=1`);
+  const login = adminLoginPath();
+  window.location.replace(login === "/" ? login : `${login}?next=${next}&expired=1`);
   return true;
 }
 

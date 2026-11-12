@@ -9,13 +9,18 @@ import { afterSave as cleanupMedia } from "./media-cleanup.service.js";
 import { uploadService } from "./upload.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js";
+import { SMALL_GROUP_DEFAULT } from "../utils/pricing.js";
 
 const KEYS = {
   home: "home",
   notifications: "notifications",
   payment: "payment",
   tracking: "tracking",
+  smallGroup: "smallGroup",
 };
+
+/** % phụ thu nhóm nhỏ đã lưu → số nguyên 0–200; thiếu / sai → mặc định */
+const pctOr = (v, d) => (Number.isInteger(v) && v >= 0 && v <= 200 ? v : d);
 
 const EMPTY_HOME = {
   banner: { slides: [] },
@@ -126,6 +131,24 @@ export const settingsService = {
   async saveTracking(data, actor) {
     await settingRepository.set(KEYS.tracking, data, actor?.username);
     return this.getTracking();
+  },
+
+  /* ----- Phụ thu nhóm nhỏ: % cộng thêm khi đoàn ít khách — CHỈ tour chưa có bảng giá theo số khách ----- */
+  async getSmallGroup() {
+    const v = (await settingRepository.get(KEYS.smallGroup)) ?? {};
+    const d = SMALL_GROUP_DEFAULT;
+    return {
+      enabled: v.enabled ?? d.enabled,
+      one: pctOr(v.one, d.one),
+      two: pctOr(v.two, d.two),
+      threeFour: pctOr(v.threeFour, d.threeFour),
+      fivePlus: pctOr(v.fivePlus, d.fivePlus),
+    };
+  },
+
+  async saveSmallGroup(data, actor) {
+    await settingRepository.set(KEYS.smallGroup, data, actor?.username);
+    return this.getSmallGroup();
   },
 
   /* ----- 9Pay: chỉ admin; secret mã hoá AES-256-GCM, không bao giờ trả nguyên văn ra ngoài ----- */

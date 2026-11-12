@@ -25,6 +25,8 @@ import TripPlannerForm from "@/components/forms/TripPlannerForm";
 import Reviews from "@/components/home/Reviews";
 import { href } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
+import { cn } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -112,9 +114,17 @@ export default async function GroupTailorMadePage({ params }) {
             {g.included.map((x, i) => {
               const Icon = includedIcons[i];
               return (
-                <Reveal key={x.title} delay={(i % 2) * 80} className="flex items-start gap-5">
-                  <Icon className="mt-1 size-12 shrink-0 text-[#4a5a63]" strokeWidth={1.6} />
-                  <div>
+                // Từ md: subgrid 2 hàng (tiêu đề · mô tả), biểu tượng chiếm cả 2 hàng
+                <Reveal
+                  key={x.title}
+                  delay={(i % 2) * 80}
+                  className="flex items-start gap-5 md:row-span-2 md:grid md:grid-cols-[auto_1fr] md:grid-rows-subgrid md:gap-y-0"
+                >
+                  <Icon
+                    className="mt-1 size-12 shrink-0 text-[#4a5a63] md:row-span-2"
+                    strokeWidth={1.6}
+                  />
+                  <div className="md:contents">
                     <h3 className="text-2xl font-semibold text-ink">{x.title}</h3>
                     <p className="mt-1 text-lg leading-relaxed text-ink/70">{x.text}</p>
                   </div>
@@ -147,8 +157,13 @@ export default async function GroupTailorMadePage({ params }) {
             {g.groups.map((x, i) => {
               const Icon = groupIcons[i];
               return (
-                <Reveal key={x.title} delay={i * 80}>
-                  <div className="group h-full overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-border">
+                <Reveal key={x.title} delay={i * 80} className={subgrid(3, "sm")}>
+                  <div
+                    className={cn(
+                      "group h-full overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-border",
+                      subgrid(3, "sm"),
+                    )}
+                  >
                     <div className="relative h-44 overflow-hidden">
                       <Image
                         src={groupImages[i]}
@@ -161,10 +176,8 @@ export default async function GroupTailorMadePage({ params }) {
                         <Icon className="size-5" />
                       </span>
                     </div>
-                    <div className="p-5">
-                      <h3 className="text-lg font-bold text-ink">{x.title}</h3>
-                      <p className="mt-1.5 text-muted">{x.text}</p>
-                    </div>
+                    <h3 className="px-5 pt-5 text-lg font-bold text-ink">{x.title}</h3>
+                    <p className="mt-1.5 px-5 pb-5 text-muted">{x.text}</p>
                   </div>
                 </Reveal>
               );
@@ -183,7 +196,12 @@ export default async function GroupTailorMadePage({ params }) {
           <ol className="relative grid gap-8 md:grid-cols-4">
             <span className="route-dash absolute top-8 right-[12%] left-[12%] hidden h-0.5 text-brand-300 md:block" />
             {g.how.map((s, i) => (
-              <Reveal as="li" key={s.title} delay={i * 100} className="relative text-center">
+              <Reveal
+                as="li"
+                key={s.title}
+                delay={i * 100}
+                className={cn("relative text-center", subgrid(3, "md"))}
+              >
                 <span className="relative mx-auto grid size-16 place-items-center rounded-full bg-brand-600 text-2xl font-extrabold text-white shadow-lg ring-8 ring-surface">
                   {i + 1}
                 </span>

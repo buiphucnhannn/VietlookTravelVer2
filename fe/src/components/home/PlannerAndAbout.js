@@ -1,14 +1,14 @@
 import Image from "next/image";
 import BgImage from "@/components/ui/BgImage";
 import Link from "next/link";
-import { Mail, Phone } from "lucide-react";
+import { Mail } from "lucide-react";
 import { siteConfig } from "@/constants/site";
 import { Container, SectionHeading } from "@/components/ui";
 import TripPlannerForm from "@/components/forms/TripPlannerForm";
 import SpinBadge from "@/components/ui/SpinBadge";
 import YouTubeLite from "@/components/ui/YouTubeLite";
 import { WhatsAppIcon } from "@/components/ui/BrandIcons";
-import { lp } from "@/i18n/config";
+import { lp, tr } from "@/i18n/config";
 import { DEFAULT_HOME_IMAGES } from "./images";
 
 /** Form lên kế hoạch chuyến đi trên trang chủ. */
@@ -36,16 +36,25 @@ export function PlannerBlock({ lang, dict, destinationOptions }) {
             >
               <WhatsAppIcon className="size-6 text-[#25d366]" />
               <span>
-                <span className="block text-xs text-white/70">WhatsApp · WeChat · Zalo</span>
+                <span className="block text-xs text-white/70">
+                  {tr(siteConfig.contact.channels.hotline, lang)}
+                </span>
                 <span className="font-semibold">{siteConfig.contact.hotline}</span>
               </span>
             </a>
             <a
-              href={`tel:${siteConfig.contact.hotline2Raw}`}
+              href={siteConfig.messaging.whatsapp2}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 hover:bg-white/15"
             >
-              <Phone className="size-6 text-amber-brand" />
-              <span className="font-semibold">{siteConfig.contact.hotline2}</span>
+              <WhatsAppIcon className="size-6 text-[#25d366]" />
+              <span>
+                <span className="block text-xs text-white/70">
+                  {siteConfig.contact.channels.hotline2}
+                </span>
+                <span className="font-semibold">{siteConfig.contact.hotline2}</span>
+              </span>
             </a>
             <a
               href={`mailto:${siteConfig.contact.email}`}

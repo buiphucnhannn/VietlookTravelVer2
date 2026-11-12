@@ -12,6 +12,10 @@ const RULES = [
   [/^Holiday surcharge × (\d+)$/, (m) => `Phụ thu ngày lễ & cao điểm × ${m[1]} khách`],
   [/^Holiday surcharge (\d+(?:\.\d+)?)%$/, (m) => `Phụ thu ngày lễ & cao điểm ${m[1]}%`],
   [/^Single supplement$/, () => "Phụ thu phòng đơn"],
+  [
+    /^Small-group supplement \((\d+) guests?\) \+(\d+)%$/,
+    (m) => `Phụ thu nhóm nhỏ (${m[1]} khách) +${m[2]}%`,
+  ],
 ];
 
 export function priceLineVi(label) {

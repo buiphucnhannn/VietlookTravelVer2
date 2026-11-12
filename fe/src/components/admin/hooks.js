@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, errorMessage, isAbort, isRetryable } from "@/lib/api";
+import { adminLoginPath, api, errorMessage, isAbort, isRetryable } from "@/lib/api";
 import { refreshPublicContent } from "@/lib/revalidate";
-import { ADMIN_LOGIN } from "@/config/urls.mjs";
 import { useUi } from "./ui";
 
 /** Sự kiện "có thay đổi" → AdminShell / Tổng quan / trang đơn tải lại số đơn, yêu cầu mới */
@@ -22,7 +21,7 @@ export function toastError(toast, err, { retry, title } = {}) {
         title: "Phiên đăng nhập đã hết hạn",
         action: {
           label: "Đăng nhập ở tab mới",
-          onClick: () => window.open(`${ADMIN_LOGIN}?expired=1`, "_blank", "noopener"),
+          onClick: () => window.open(`${adminLoginPath()}?expired=1`, "_blank", "noopener"),
         },
       },
     );

@@ -1,5 +1,6 @@
 // Bảng giá lấy từ website cũ có cấu trúc không đều (ô gộp dọc, dòng chú thích, không có dòng tiêu đề).
 // Chuẩn hoá trước khi hiển thị để mọi bảng đều thẳng hàng, dễ đọc.
+import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Là giá khi có số đi kèm đơn vị tiền ("28 USD", "144$", "$95") hoặc số từ 3 chữ số;
@@ -58,17 +59,32 @@ export function normalizeTable(rows) {
 /** Cột có ô chữ dài (> 40 ký tự, vd. ghi chú / điều kiện) → căn trái; còn lại căn giữa */
 const longCol = (rows, k) => rows.some((r) => (r[k]?.text?.length ?? 0) > 40);
 
+/**
+ * Chú thích bảng "3★ Hotels – First Eden / Verle Lotus Classic Cruise / …" → hạng khách sạn (đậm) + danh sách
+ * khách sạn (chữ nhỏ, nhạt hơn). Chú thích không có " – " → 1 dòng như cũ.
+ */
+function splitHeading(text) {
+  const i = text.indexOf(" – ");
+  return i > 0 && i <= 80 ? [text.slice(0, i), text.slice(i + 3)] : [text, ""];
+}
+
 export default function PriceTable({ table }) {
   const { caption, header, rows } = normalizeTable(table.rows);
   const heading = [table.heading !== "Price" && table.heading, caption].filter(Boolean).join(" · ");
+  const [title, sub] = splitHeading(heading);
+  const cols = Math.max(header?.length ?? 0, ...rows.map((r) => r.length));
 
   return (
     <div className="overflow-x-auto rounded-xl ring-1 ring-border">
       {heading && (
-        <p className="bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white">{heading}</p>
+        <div className="bg-brand-600 px-4 py-2.5 text-white">
+          <p className="text-sm font-semibold">{title}</p>
+          {sub && <p className="mt-0.5 text-xs leading-relaxed text-white/80">{sub}</p>}
+        </div>
       )}
-      {/* Ô ngắn (số khách, giá, hạng…) căn giữa cho cân đối; ô chữ dài (ghi chú, điều kiện) căn trái cho dễ đọc */}
-      <table className="w-full min-w-[520px] text-sm">
+      {/* Ô ngắn (số khách, giá, hạng…) căn giữa cho cân đối; ô chữ dài (ghi chú, điều kiện) căn trái cho dễ đọc.
+          Bảng ≤ 3 cột vừa màn hình điện thoại → không ép rộng tối thiểu (khỏi phải cuộn ngang). */}
+      <table className={cn("w-full text-sm", cols > 3 && "min-w-[520px]")}>
         {header && (
           <thead className="bg-brand-50 text-brand-800">
             <tr>
@@ -114,6 +130,42 @@ export default function PriceTable({ table }) {
       </table>
     </div>
   );
+}
+
+/**
+ * Các bảng giá của tour, gom theo mùa (period). Mỗi mùa 1 tiêu đề phụ ("Travel period: 01/04 – 31/08") + ghi chú
+ * chung (phần sau " · ", vd. "Based on twin/double/triple sharing"), rồi các bảng của mùa đó (mỗi bảng có chú thích
+ * hạng khách sạn riêng) → khách phân biệt được 3★ / 4★ / 5★ và từng mùa.
+ */
+export function PriceTables({ tables }) {
+  const groups = [];
+  for (const t of tables ?? []) {
+    const key = (t.period ?? "").trim();
+    const last = groups.at(-1);
+    if (last && last.key === key) last.tables.push(t);
+    else groups.push({ key, tables: [t] });
+  }
+  return groups.map((g, gi) => {
+    const [period, ...notes] = g.key.split(" · ");
+    return (
+      <section key={gi} className="space-y-3">
+        {g.key && (
+          <div className={cn(groups.length > 1 && "border-l-4 border-brand-500 pl-3")}>
+            {period && (
+              <h3 className="flex items-center gap-2 text-base font-bold text-ink">
+                <CalendarDays aria-hidden className="size-4 shrink-0 text-brand-600" />
+                {period}
+              </h3>
+            )}
+            {notes.length > 0 && <p className="mt-0.5 text-sm text-muted">{notes.join(" · ")}</p>}
+          </div>
+        )}
+        {g.tables.map((tb, i) => (
+          <PriceTable key={i} table={tb} />
+        ))}
+      </section>
+    );
+  });
 }
 
 /* ───────── Bảng giá nhập trong CMS (theo "Mẫu thông tin tour") ───────── */

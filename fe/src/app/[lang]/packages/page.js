@@ -9,7 +9,7 @@ import {
   Headphones,
   MapPin,
   Smartphone,
-  Star,
+  Languages,
   Wrench,
 } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }) {
   });
 }
 
-const whyIcons = [Smartphone, MapPin, Wrench, DollarSign, Star, Headphones];
+const whyIcons = [Smartphone, MapPin, Languages, Wrench, DollarSign, Headphones];
 
 function PackageRow({ tour, lang, dict, getDestination }) {
   const c = dict.common;
@@ -140,12 +140,15 @@ export default async function PackagesPage({ params }) {
             {p.why.map((w, i) => {
               const Icon = whyIcons[i];
               return (
-                <Reveal key={w.title} delay={(i % 3) * 70} className="flex gap-4">
-                  <Icon className="mt-1 size-9 shrink-0 text-ink" strokeWidth={1.8} />
-                  <div>
-                    <h3 className="text-xl font-medium text-ink">{w.title}</h3>
-                    <p className="mt-1 leading-relaxed text-muted">{w.text}</p>
-                  </div>
+                // Subgrid 2 hàng (tiêu đề · mô tả): tiêu đề xuống 2 dòng không làm lệch mô tả các ô cùng hàng
+                <Reveal
+                  key={w.title}
+                  delay={(i % 3) * 70}
+                  className="row-span-2 grid grid-cols-[auto_1fr] grid-rows-subgrid gap-x-4 gap-y-1"
+                >
+                  <Icon className="row-span-2 mt-1 size-9 shrink-0 text-ink" strokeWidth={1.8} />
+                  <h3 className="text-xl font-medium text-ink">{w.title}</h3>
+                  <p className="leading-relaxed text-muted">{w.text}</p>
                 </Reveal>
               );
             })}

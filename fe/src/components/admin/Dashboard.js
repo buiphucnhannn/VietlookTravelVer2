@@ -32,7 +32,7 @@ import { LogSentence, actorText } from "./AuditLogPage";
 
 const A = (p = "") => `${ADMIN_BASE}${p}`;
 
-/** "T3 · 11/10/2026" (giờ Việt Nam) */
+/** "T3 · 10/11/2026" (giờ Việt Nam) */
 const today = () => fmtDayChip(todayVN(), "vi");
 
 const greeting = () => {

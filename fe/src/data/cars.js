@@ -158,18 +158,47 @@ export function airportFrom(priceKey) {
   return priceKey && r ? r.prices[priceKey] : null;
 }
 
-/** Địa điểm đón/trả (nhóm Sân bay / Thành phố & điểm du lịch – như ô báo giá của hltcarservice.com). */
+/**
+ * Địa điểm đón/trả (nhóm Sân bay / Thành phố & điểm du lịch – như ô báo giá của hltcarservice.com).
+ * Theo danh sách khách gửi (11 sân bay, 28 điểm đón), sắp xếp Bắc → Trung → Nam.
+ * Điểm chưa có tuyến giá cố định vẫn chọn được – ô báo giá hiện "Giá liên hệ".
+ */
 export const places = {
+  // ---- Sân bay ----
   han: {
     group: "air",
     name: { en: "Noi Bai Airport (HAN)", zh: "内排国际机场 (HAN)", vi: "Sân bay Nội Bài (HAN)" },
   },
-  sgn: {
+  hph: {
     group: "air",
     name: {
-      en: "Tan Son Nhat Airport (SGN)",
-      zh: "新山一机场 (SGN)",
-      vi: "Sân bay Tân Sơn Nhất (SGN)",
+      en: "Cat Bi Airport – Hai Phong (HPH)",
+      zh: "吉碑机场 – 海防 (HPH)",
+      vi: "Sân bay Cát Bi – Hải Phòng (HPH)",
+    },
+  },
+  vdo: {
+    group: "air",
+    name: {
+      en: "Van Don Airport – Quang Ninh (VDO)",
+      zh: "云屯机场 – 广宁 (VDO)",
+      vi: "Sân bay Vân Đồn – Quảng Ninh (VDO)",
+    },
+  },
+  vdh: {
+    group: "air",
+    name: {
+      en: "Dong Hoi Airport – Quang Binh (VDH)",
+      zh: "洞海机场 – 广平 (VDH)",
+      vi: "Sân bay Đồng Hới – Quảng Bình (VDH)",
+    },
+  },
+  hui: {
+    group: "air",
+    name: {
+      en: "Phu Bai Airport – Hue (HUI)",
+      zh: "富牌机场 – 顺化 (HUI)",
+      vi: "Sân bay Phú Bài – Huế (HUI)",
     },
   },
   dad: {
@@ -188,10 +217,24 @@ export const places = {
       vi: "Sân bay Liên Khương (DLI)",
     },
   },
+  sgn: {
+    group: "air",
+    name: {
+      en: "Tan Son Nhat Airport (SGN)",
+      zh: "新山一机场 (SGN)",
+      vi: "Sân bay Tân Sơn Nhất (SGN)",
+    },
+  },
   pqc: {
     group: "air",
     name: { en: "Phu Quoc Airport (PQC)", zh: "富国岛机场 (PQC)", vi: "Sân bay Phú Quốc (PQC)" },
   },
+  vcs: {
+    group: "air",
+    name: { en: "Con Dao Airport (VCS)", zh: "昆岛机场 (VCS)", vi: "Sân bay Côn Đảo (VCS)" },
+  },
+
+  // ---- Miền Bắc ----
   hanoi: {
     group: "city",
     name: { en: "Hanoi (city centre)", zh: "河内市区", vi: "Hà Nội (trung tâm)" },
@@ -200,31 +243,42 @@ export const places = {
     group: "city",
     name: { en: "Hanoi Railway Station", zh: "河内火车站", vi: "Ga Hà Nội" },
   },
-  halong: { group: "city", name: { en: "Halong Bay", zh: "下龙湾", vi: "Vịnh Hạ Long" } },
-  "ninh-binh": { group: "city", name: { en: "Ninh Binh", zh: "宁平", vi: "Ninh Bình" } },
-  "hai-phong": { group: "city", name: { en: "Hai Phong", zh: "海防", vi: "Hải Phòng" } },
   "bat-trang": {
     group: "city",
     name: { en: "Bat Trang", zh: "钵场陶瓷村", vi: "Làng gốm Bát Tràng" },
   },
-  "moc-chau": { group: "city", name: { en: "Moc Chau", zh: "木州", vi: "Mộc Châu" } },
+  halong: { group: "city", name: { en: "Halong Bay", zh: "下龙湾", vi: "Vịnh Hạ Long" } },
+  "hai-phong": { group: "city", name: { en: "Hai Phong", zh: "海防", vi: "Hải Phòng" } },
+  "ninh-binh": { group: "city", name: { en: "Ninh Binh", zh: "宁平", vi: "Ninh Bình" } },
+  sapa: { group: "city", name: { en: "Sapa", zh: "沙坝", vi: "Sa Pa" } },
   "mai-chau": { group: "city", name: { en: "Mai Chau", zh: "梅州", vi: "Mai Châu" } },
+  "moc-chau": { group: "city", name: { en: "Moc Chau", zh: "木州", vi: "Mộc Châu" } },
+  "son-la": { group: "city", name: { en: "Son La", zh: "山罗", vi: "Sơn La" } },
+  "dien-bien": { group: "city", name: { en: "Dien Bien", zh: "奠边府", vi: "Điện Biên" } },
+  "mu-cang-chai": { group: "city", name: { en: "Mu Cang Chai", zh: "木江界", vi: "Mù Cang Chải" } },
+  "thai-nguyen": { group: "city", name: { en: "Thai Nguyen", zh: "太原", vi: "Thái Nguyên" } },
+  "lang-son": { group: "city", name: { en: "Lang Son", zh: "谅山", vi: "Lạng Sơn" } },
   "huu-nghi": {
     group: "city",
     name: { en: "Huu Nghi Border Gate", zh: "友谊关", vi: "Cửa khẩu Hữu Nghị" },
   },
   "cao-bang": { group: "city", name: { en: "Cao Bang", zh: "高平", vi: "Cao Bằng" } },
+  "bac-kan": { group: "city", name: { en: "Bac Kan", zh: "北件", vi: "Bắc Kạn" } },
   "ha-giang": { group: "city", name: { en: "Ha Giang", zh: "河江", vi: "Hà Giang" } },
-  "mu-cang-chai": { group: "city", name: { en: "Mu Cang Chai", zh: "木江界", vi: "Mù Cang Chải" } },
   "pu-luong": { group: "city", name: { en: "Pu Luong", zh: "普隆", vi: "Pù Luông" } },
-  hcm: { group: "city", name: { en: "Ho Chi Minh City", zh: "胡志明市", vi: "TP. Hồ Chí Minh" } },
-  "mui-ne": { group: "city", name: { en: "Mui Ne", zh: "美奈", vi: "Mũi Né" } },
-  mekong: {
+  "tam-dao": { group: "city", name: { en: "Tam Dao", zh: "三岛", vi: "Tam Đảo" } },
+
+  // ---- Miền Trung ----
+  "phong-nha": { group: "city", name: { en: "Phong Nha", zh: "峰牙", vi: "Phong Nha" } },
+  hue: { group: "city", name: { en: "Hue", zh: "顺化", vi: "Huế" } },
+  "da-nang": { group: "city", name: { en: "Da Nang", zh: "岘港", vi: "Đà Nẵng" } },
+  "hoi-an": { group: "city", name: { en: "Hoi An", zh: "会安", vi: "Hội An" } },
+  "ba-na": { group: "city", name: { en: "Ba Na Hills", zh: "巴拿山", vi: "Bà Nà Hills" } },
+  "my-son": {
     group: "city",
-    name: { en: "Mekong Delta", zh: "湄公河三角洲", vi: "Đồng bằng sông Cửu Long" },
+    name: { en: "My Son Sanctuary", zh: "美山圣地", vi: "Thánh địa Mỹ Sơn" },
   },
-  "cu-chi": { group: "city", name: { en: "Cu Chi Tunnels", zh: "古芝地道", vi: "Địa đạo Củ Chi" } },
-  "vung-tau": { group: "city", name: { en: "Vung Tau", zh: "头顿", vi: "Vũng Tàu" } },
+  "quy-nhon": { group: "city", name: { en: "Quy Nhon", zh: "归仁", vi: "Quy Nhơn" } },
   "nha-trang": { group: "city", name: { en: "Nha Trang", zh: "芽庄", vi: "Nha Trang" } },
   "nha-trang-port": {
     group: "city",
@@ -235,14 +289,29 @@ export const places = {
     name: { en: "Paradise Bay", zh: "天堂湾", vi: "Vịnh Paradise" },
   },
   dalat: { group: "city", name: { en: "Dalat", zh: "大叻", vi: "Đà Lạt" } },
-  "da-nang": { group: "city", name: { en: "Da Nang", zh: "岘港", vi: "Đà Nẵng" } },
-  "hoi-an": { group: "city", name: { en: "Hoi An", zh: "会安", vi: "Hội An" } },
-  "ba-na": { group: "city", name: { en: "Ba Na Hills", zh: "巴拿山", vi: "Bà Nà Hills" } },
-  hue: { group: "city", name: { en: "Hue", zh: "顺化", vi: "Huế" } },
-  "my-son": {
+
+  // ---- Miền Nam ----
+  "mui-ne": {
     group: "city",
-    name: { en: "My Son Sanctuary", zh: "美山圣地", vi: "Thánh địa Mỹ Sơn" },
+    name: { en: "Mui Ne – Phan Thiet", zh: "美奈 – 藩切", vi: "Mũi Né – Phan Thiết" },
   },
+  hcm: { group: "city", name: { en: "Ho Chi Minh City", zh: "胡志明市", vi: "TP. Hồ Chí Minh" } },
+  "cu-chi": { group: "city", name: { en: "Cu Chi Tunnels", zh: "古芝地道", vi: "Địa đạo Củ Chi" } },
+  "tay-ninh": { group: "city", name: { en: "Tay Ninh", zh: "西宁", vi: "Tây Ninh" } },
+  "moc-bai": {
+    group: "city",
+    name: {
+      en: "Moc Bai Border Gate (Cambodia)",
+      zh: "木排口岸（柬埔寨边境）",
+      vi: "Cửa khẩu Mộc Bài (Campuchia)",
+    },
+  },
+  "vung-tau": { group: "city", name: { en: "Vung Tau", zh: "头顿", vi: "Vũng Tàu" } },
+  mekong: {
+    group: "city",
+    name: { en: "Mekong Delta", zh: "湄公河三角洲", vi: "Đồng bằng sông Cửu Long" },
+  },
+  "can-tho": { group: "city", name: { en: "Can Tho", zh: "芹苴", vi: "Cần Thơ" } },
   "phu-quoc": {
     group: "city",
     name: { en: "Phu Quoc (town centre)", zh: "富国岛市区", vi: "Phú Quốc (trung tâm)" },
@@ -259,6 +328,7 @@ export const places = {
     group: "city",
     name: { en: "Phu Quoc East Island", zh: "富国岛东岛", vi: "Đông đảo Phú Quốc" },
   },
+  "con-dao": { group: "city", name: { en: "Con Dao", zh: "昆岛", vi: "Côn Đảo" } },
 };
 
 /** Điểm đón → điểm đến của từng tuyến trên web cũ. kind: transfer | day (thuê theo ngày/tham quan). */

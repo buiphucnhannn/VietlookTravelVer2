@@ -95,7 +95,11 @@ export function focusFirstError(formEl) {
   requestAnimationFrame(() => {
     const el = formEl?.querySelector?.('[aria-invalid="true"]');
     if (!el) return;
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    // Ô lỗi đã nằm trọn trong màn hình (dưới header cố định) → không cuộn (vd. khung đặt tour dính bên phải)
+    const r = el.getBoundingClientRect();
+    const top = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+    if (r.top < top || r.bottom > window.innerHeight)
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
     el.focus({ preventScroll: true });
   });
 }

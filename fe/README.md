@@ -51,7 +51,7 @@ public/images/            Ảnh gốc (npm run images:upload ở be/ đưa lên 
 public/videos/            Video nền trang chủ mặc định
 src/
 ├── app/[lang]/           Mọi trang theo ngôn ngữ (en, zh, vi)
-├── app/(system)/         CMS (/admin) và trang đăng nhập (/login)
+├── app/(system)/         CMS (/admin) và trang đăng nhập (/login — production mở qua ADMIN_LOGIN_PATH)
 ├── proxy.js              Chọn ngôn ngữ, 404 / đổi slug, bảo vệ /admin, chuyển /api/v1 sang backend
 ├── config/urls.mjs       BACKEND_URL, đường dẫn admin
 ├── i18n/                 Cấu hình & từ điển giao diện (dictionaries/en.js, zh.js, vi.js)

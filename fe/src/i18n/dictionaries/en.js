@@ -86,8 +86,10 @@ const en = {
     readMore: "Read more",
     backHome: "Back to home",
     priceOnRequest: "Price on request",
+    labelBestseller: "Bestseller",
+    labelExclusive: "Exclusive",
     contactPrice: "Contact for price",
-    ratingText: "Excellent · 35 reviews",
+    ratingText: "Excellent · 89 reviews",
     ratingShort: "Excellent",
     mapsReviews: "4.7 · 31 reviews",
     paxGroup: "pax / group",
@@ -115,6 +117,8 @@ const en = {
     chatWhatsApp: "Chat on WhatsApp",
     addWeChat: "Add us on WeChat",
     wechatHint: "Search our WeChat ID in the app to add us",
+    addLine: "Add us on LINE",
+    lineHint: "Search one of these phone numbers in LINE to add us",
     copy: "Copy",
     copied: "Copied!",
     adults: "Adults",
@@ -152,7 +156,7 @@ const en = {
     heroTextShort:
       "Rice terraces, lantern-lit old towns and tropical islands – journeys shaped by locals who know Vietnam.",
     trust: [
-      { t: "Excellent", d: "35 Tripadvisor reviews", kind: "tripadvisor" },
+      { t: "Excellent", d: "89 Tripadvisor reviews", kind: "tripadvisor" },
       { t: "Google 4.7", d: "31 reviews on Google Maps", kind: "google" },
       { t: "Based in Hanoi", d: "Local tour operator since 2009", kind: "team" },
       { t: "24/7 local support", d: "Our team on WhatsApp & WeChat", kind: "support" },
@@ -263,7 +267,7 @@ const en = {
       "Vietlook Travel works with agencies, OTAs and MICE organisers as a full-service DMC. Send us your groups or FIT clients – we handle hotels, transport, guides and visas with net rates and fast quotations.",
     b2bPoints: [
       "Competitive net rates & series pricing",
-      "Quotes within 24 hours, English & Chinese speaking",
+      "Quotes in 15–30 minutes in office hours, English & Chinese speaking",
       "White-label itineraries and documents",
       "Groups, incentives & MICE from 2 to 200+ pax",
     ],
@@ -322,25 +326,41 @@ const en = {
     gridTitle: "Top destinations",
     gridSubtitle: "From mountains to islands.",
     gridDiscover: "Discover now",
-    gridOther: "Other locations",
+    gridOther: "more destinations",
     gridViewAll: "View all",
     gridTours: "tours",
     partnerStrip: "Trusted partners",
-    partnersEyebrow: "Trusted partners",
-    partnersSubtitle: "Agencies, cruises, hotels & airlines.",
-    projectsTitle: "Collaboration projects",
+    partnersEyebrow: "Track record",
+    partnersSubtitle: "Real events and groups our team has handled.",
+    projectsTitle: "Projects we've served",
     projects: [
       {
-        title: "FIT & group series for overseas agencies",
-        text: "Ground handling, guides and transport for partner agencies in Asia, Europe and Australia.",
+        title: "ICBC (China) – opening event",
+        size: "150 guests",
+        time: "2009",
+        place: "",
+        text: "Guest services for the opening event of the Industrial and Commercial Bank of China.",
       },
       {
-        title: "MICE & incentive programmes",
-        text: "Corporate groups from 20 to 200+ pax with gala dinners, team building and VIP airport service.",
+        title: "Vinh Tan Thermal Power Plant – contract signing",
+        size: "120 guests",
+        time: "",
+        place: "Binh Thuan",
+        text: "Arrangements for guests attending the contract signing ceremony.",
       },
       {
-        title: "Cruise & hotel allotments",
-        text: "Confirmed allotments on Halong Bay cruises and 4–5★ hotels for peak-season departures.",
+        title: "CGTC joint venture – Hanoi–Hai Phong Expressway",
+        size: "About 300 services",
+        time: "3 years",
+        place: "Hanoi – Hai Phong",
+        text: "Ongoing travel and transport services for the joint venture building the expressway.",
+      },
+      {
+        title: "Indian group of Mr Shanker Kanukala",
+        size: "80 guests",
+        time: "October 2025",
+        place: "Hanoi – Ninh Binh – Ha Long",
+        text: "A group programme through the highlights of northern Vietnam.",
       },
     ],
     partnersCta: "Partner with us",
@@ -487,6 +507,10 @@ const en = {
     samples: "Samples of {name} tours",
     browse: "Browse our private {name} tours",
     others: "Other tour styles",
+    emptyTitle: "New itineraries coming soon",
+    emptyText:
+      "Our team is preparing tours for this collection. Tell us your dates and interests and we will design a private trip just for you.",
+    emptyCta: "Plan my trip",
   },
   packages: {
     title: "Vietnam Package Tours",
@@ -499,8 +523,12 @@ const en = {
         text: "Stay connected with a free data SIM and instant contact with our local team.",
       },
       {
-        title: "Local travel agency",
-        text: "Based in Hanoi – fast communication, local insight and reliable service.",
+        title: "Local company, offices nationwide",
+        text: "A Vietnamese company with representative offices across Vietnam – local insight and fast help wherever you are.",
+      },
+      {
+        title: "Drivers who speak your language",
+        text: "Drivers who speak English, Chinese or the language you choose.",
       },
       {
         title: "Customizable packages",
@@ -509,10 +537,6 @@ const en = {
       {
         title: "Pay in your currency",
         text: "Secure payment by international card (Visa, Mastercard, JCB) or bank transfer.",
-      },
-      {
-        title: "Unique experiences",
-        text: "Real local moments blended with comfortable, well-chosen hotels.",
       },
       {
         title: "24/7 support",
@@ -681,8 +705,8 @@ const en = {
     ctaFleet: "See our fleet",
     perks: [
       "Driver waits with a name sign at arrivals",
-      "Free waiting time for delayed flights",
-      "Pay cash to the driver or by bank transfer",
+      "Free waiting up to 120 minutes for delayed flights",
+      "30–50% deposit, the rest paid to your driver",
     ],
     quickTitle: "Instant quote request",
     oneWay: "One way",
@@ -696,14 +720,14 @@ const en = {
     getQuote: "Get my quote",
     stats: [
       { value: "4–45", label: "seats per vehicle" },
-      { value: "6", label: "major airports served" },
+      { value: "11", label: "airports served" },
       { value: "34", label: "provinces & cities" },
       { value: "24/7", label: "hotline & chat" },
     ],
     fleetTitle: "Choose your ride",
     fleetSubtitle: "Tap a class to see details. Photos show typical models in each class.",
     seats: "seats",
-    luggage: "luggage",
+    luggage: "suitcases (24″)",
     idealFor: "Ideal for",
     models: "Models",
     fromPrice: "Airport transfer from",
@@ -712,7 +736,7 @@ const en = {
     services: [
       {
         title: "Airport transfers",
-        text: "Pick-up and drop-off at Noi Bai, Tan Son Nhat, Da Nang, Cam Ranh, Phu Quoc and Cat Bi airports.",
+        text: "Pick-up and drop-off at 11 airports: Noi Bai, Cat Bi, Van Don, Dong Hoi, Phu Bai, Da Nang, Cam Ranh, Lien Khuong, Tan Son Nhat, Phu Quoc and Con Dao.",
       },
       {
         title: "City & day tours",
@@ -730,7 +754,10 @@ const en = {
         title: "Groups & events",
         text: "Coaches up to 45 seats for groups, weddings, MICE and corporate events.",
       },
-      { title: "Cross-border", text: "Transfers to Cambodia and Laos borders on request." },
+      {
+        title: "Cross-border",
+        text: "Transfers to the Moc Bai border gate (Cambodia) on request.",
+      },
     ],
     routesTitle: "Popular routes",
     routesSubtitle: "Indicative one-way prices for a 4–7 seat car, tolls & fuel included.",
@@ -742,7 +769,10 @@ const en = {
     included: [
       { title: "Tolls & parking", text: "Already included in the quoted price." },
       { title: "Flight tracking", text: "We follow your flight and adjust pick-up time." },
-      { title: "Free waiting", text: "No extra charge when your flight is delayed." },
+      {
+        title: "Free waiting",
+        text: "Up to 120 minutes free if your flight is delayed, then $5 per hour. A night surcharge may apply if the wait runs into late-night hours.",
+      },
       { title: "Name-sign welcome", text: "Driver sends photo and plate number in advance." },
       { title: "On-board comfort", text: "Air-con, bottled water and phone charging." },
       { title: "Your language", text: "Hotline interprets between you and the driver." },
@@ -766,7 +796,7 @@ const en = {
     areasSubtitle: "Based in Hanoi, with partner fleets in every major city.",
     routesCount: "fixed-price routes",
     areasMore:
-      "Other provinces nationwide on request – including Ha Giang, Cao Bang, Phong Nha and border gates.",
+      "Other provinces nationwide on request – including Ha Giang, Cao Bang, Phong Nha and the Moc Bai border gate (Cambodia).",
     formTitle: "Request a car quote",
     formSubtitle: "Fill in your route and we send a fixed price – usually within 30 minutes.",
     route: "Route / itinerary",
@@ -819,7 +849,7 @@ const en = {
     faqTitle: "Frequently asked questions",
     faqSub: "Can’t find your answer? Message us anytime.",
     trust: [
-      { t: "6 airports", d: "Hanoi, Da Nang, Nha Trang, Dalat, HCMC, Phu Quoc" },
+      { t: "11 airports", d: "From Noi Bai and Van Don to Tan Son Nhat, Phu Quoc and Con Dao" },
       { t: "24/7 support", d: "Hotline and chat, any hour" },
       { t: "Your language", d: "English and Chinese speaking team" },
       { t: "Fixed prices", d: "Tolls, fuel and parking included" },
@@ -827,19 +857,23 @@ const en = {
     faq: [
       {
         q: "How do I pay?",
-        a: "After we confirm your booking, pay online by international card or by bank transfer – or in cash to the driver for short transfers.",
+        a: "Pay a 30–50% deposit by bank transfer or online on our website, and the rest directly to your driver.",
       },
       {
         q: "What if my flight is delayed?",
-        a: "We track your flight and the driver waits for you. Waiting time caused by flight delays is free.",
+        a: "We track your flight and the driver waits for you – the first 120 minutes are free. After that, waiting is charged at $5 per hour (a night surcharge may apply if the pick-up moves into late-night hours).",
       },
       {
         q: "What does the price include?",
-        a: "Car and driver, fuel, tolls and parking. Nothing extra to pay at the end of the ride.",
+        a: "Driver, fuel, parking, road and expressway tolls are all included – no extra charges for you.",
       },
       {
         q: "My route isn’t listed. Can you still help?",
-        a: "Yes. Send a quote request and we reply within 30 minutes during office hours.",
+        a: "Yes. Call our hotline or chat with us on the website and we’ll quote your route directly.",
+      },
+      {
+        q: "Can I have an English- or Chinese-speaking driver?",
+        a: "Yes – English-, Chinese- or other-language drivers are available on request. Call our hotline or message us on the website.",
       },
     ],
     reviewsTitle: "What our guests say",
@@ -856,7 +890,7 @@ const en = {
     stay: "Stay",
     fastTitle: "Airport fast-track packages",
     fastSubtitle:
-      "Our staff meet you at the aircraft gate / arrival hall, hold your name sign and escort you through priority lanes.",
+      "Arrival: our staff hold your name sign at the immigration area. Departure: we meet you at counter B after check-in. Then we escort you through the priority lane. All prices are per person.",
     perPax: "per person",
     howTitle: "How fast-track works",
     how: [
@@ -894,7 +928,7 @@ const en = {
     typeCol: "Visa type",
     popular: "Most popular",
     priceNote:
-      "Fast-track fees depend on airport, service level and group size – send a request and we reply with a fixed price.",
+      "Prices shown are our official rates in USD per person. Packages without a price are quoted on request.",
     // Gói theo nhóm (yêu cầu khách 21–25)
     groups: { arrival: "Arrival packages", departure: "Departure packages", addons: "Add-ons" },
     groupSub: {
@@ -1039,8 +1073,8 @@ const en = {
         text: "Contracted hotel, cruise and transport rates passed on to you.",
       },
       {
-        title: "Quotes within 24h",
-        text: "Detailed itineraries and costings in English or Chinese.",
+        title: "Quotes in 15–30 minutes",
+        text: "During office hours, and within 24 hours at weekends and on public holidays – in English or Chinese.",
       },
       {
         title: "White-label service",
@@ -1055,6 +1089,14 @@ const en = {
         text: "Group visa support and VIP arrival at all major airports.",
       },
       { title: "24/7 operations", text: "A dedicated operator follows every group on the ground." },
+      {
+        title: "Free tour leader for 50+ guests",
+        text: "Groups of 50 guests or more travel with a Vietlook tour leader at no extra cost.",
+      },
+      {
+        title: "Local gifts for 15+ guests",
+        text: "Groups of 15 guests or more receive a gift of local specialities from Vietlook.",
+      },
     ],
     formTitle: "Partnership enquiry",
     company: "Company name",
@@ -1094,6 +1136,7 @@ const en = {
     whatsapp: "WhatsApp",
     wechat: "WeChat",
     zalo: "Zalo",
+    line: "LINE",
     contact: "Contact us",
     top: "Back to top",
   },

@@ -62,6 +62,9 @@ function carDateErrors(q, lang) {
 
 const QuoteCtx = createContext(null);
 
+/** Số khách tối đa chọn được = sức chứa của xe lớn nhất (vd. xe 45 chỗ chở tối đa 44 khách). */
+const maxPax = (vehicles) => Math.max(1, ...vehicles.map((v) => v.pax || 0));
+
 /** Trạng thái báo giá dùng chung giữa ô báo giá (hero), sân khấu xe, bảng tuyến và form đầy đủ. */
 export function CarQuoteProvider({ children }) {
   const [quote, setQuote] = useState({
@@ -135,7 +138,10 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
   const minDate = useMinBookingDate();
   const kindFor = quote.tripType === "byDay" ? "day" : "transfer";
 
+  // Đưa đón (một chiều / khứ hồi): chọn được mọi điểm đón – tuyến chưa có giá cố định thì báo "Giá liên hệ".
+  // Theo ngày / tour: chỉ các điểm có tour trong ngày.
   const fromOptions = useMemo(() => {
+    if (kindFor === "transfer") return places;
     const keys = new Set(
       routes
         .filter((r) => r.kind === kindFor)
@@ -146,6 +152,9 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
 
   const toOptions = useMemo(() => {
     if (!quote.from) return [];
+    if (kindFor === "transfer") {
+      return [...places.filter((p) => p.key !== quote.from), { key: "__other", group: "other" }];
+    }
     const keys = new Set(
       routes
         .filter(
@@ -330,7 +339,7 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
         <Counter
           value={quote.passengers}
           min={1}
-          max={45}
+          max={maxPax(vehicles)}
           onChange={(v) => update({ passengers: v, vehicle: "" })}
           label={t.passengers}
         />
@@ -453,10 +462,10 @@ export function QuickQuote({ lang, t, c, places, routes, vehicles }) {
           onClose={() => setOpen(false)}
           summary={{
             route: `${placeName(quote.from)} → ${placeName(quote.to)}`,
-            pickup: [fmtDate(quote.date), quote.time].filter(Boolean).join(" · "),
+            pickup: [fmtDate(quote.date, lang), quote.time].filter(Boolean).join(" · "),
             back:
               quote.tripType === "roundTrip"
-                ? [fmtDate(quote.returnDate), quote.returnTime].filter(Boolean).join(" · ")
+                ? [fmtDate(quote.returnDate, lang), quote.returnTime].filter(Boolean).join(" · ")
                 : null,
             pax: quote.passengers,
             vehicle: selected?.name,
@@ -797,7 +806,7 @@ export function CarQuoteForm({ lang, t, c, vehicles }) {
         <Counter
           value={quote.passengers}
           min={1}
-          max={45}
+          max={maxPax(vehicles)}
           onChange={(v) => update({ passengers: v })}
           label={t.passengers}
         />

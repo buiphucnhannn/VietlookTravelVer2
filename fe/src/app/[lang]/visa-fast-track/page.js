@@ -10,6 +10,8 @@ import { BrushHero } from "@/components/ui/PageHero";
 import VisaForm from "@/components/forms/VisaForm";
 import PackageGroups from "@/components/visa/PackageGroups";
 import ProcessTabs from "@/components/visa/ProcessTabs";
+import { cn } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -157,7 +159,7 @@ export default async function VisaPage({ params }) {
                 as="div"
                 key={x.term.en}
                 delay={(i % 4) * 70}
-                className="rounded-2xl bg-white p-5 ring-1 ring-sand-300/70"
+                className={cn("rounded-2xl bg-white p-5 ring-1 ring-sand-300/70", subgrid(2, "sm"))}
               >
                 <dt className="font-bold text-forest-700">{tr(x.term, lang)}</dt>
                 <dd className="mt-2 text-sm leading-relaxed text-ink/75">{tr(x.def, lang)}</dd>

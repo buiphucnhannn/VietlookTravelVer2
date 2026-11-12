@@ -136,6 +136,12 @@ async function loadPaymentConfig() {
 }
 export const getPaymentConfig = cache(loadPaymentConfig);
 
+/**
+ * Phụ thu nhóm nhỏ (CMS → Cài đặt): { enabled, one, two, threeFour, fivePlus } — % theo số khách, chỉ áp dụng
+ * cho tour chưa có bảng giá theo số khách. null = máy chủ chưa có cài đặt này → khung đặt tour không cộng.
+ */
+export const getSmallGroup = cache(async () => (await loadSite()).smallGroup ?? null);
+
 /** Mã đo lường Google nhập trong CMS (Cài đặt) — { gtmId, ga4Id, adsId } */
 export const getTracking = cache(async () => (await loadSite()).tracking ?? {});
 
@@ -155,6 +161,7 @@ function normalizeTour(t) {
     regions: t.regions ?? [],
     destinations: t.destinations ?? [],
     themes: t.themes ?? [],
+    labels: t.labels ?? [],
   };
 }
 
@@ -246,6 +253,7 @@ function buildCatalog({ tours, destinations, themes, articles, taxonomy, service
       regions: t.regions,
       themes: t.themes,
       cruise: t.cruise,
+      labels: t.labels,
       rank: t.rank,
       code: t.code,
       route: (pickLang(t.route, lang) ?? []).slice(0, 6),

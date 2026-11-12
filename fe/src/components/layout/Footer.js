@@ -8,11 +8,10 @@ import { regions } from "@/data/regions";
 import { Button, Container } from "@/components/ui";
 import {
   FacebookIcon,
-  GoogleIcon,
+  GoogleMapsIcon,
   TripAdvisorIcon,
   WeChatIcon,
   WhatsAppIcon,
-  YouTubeIcon,
   ZaloIcon,
 } from "@/components/ui/BrandIcons";
 import Logo from "./Logo";
@@ -82,8 +81,8 @@ export default function Footer({ lang, dict, policies }) {
                 href: social.tripadvisor,
               },
               {
-                icon: GoogleIcon,
-                label: "Google",
+                icon: GoogleMapsIcon,
+                label: "Google Maps",
                 sub: dict.common.mapsReviews,
                 href: social.google,
               },
@@ -181,12 +180,7 @@ export default function Footer({ lang, dict, policies }) {
                 cls: "size-6 text-[#0866FF]",
               },
               { icon: TripAdvisorIcon, href: social.tripadvisor, label: "Tripadvisor", owl: true },
-              {
-                icon: YouTubeIcon,
-                href: social.youtube,
-                label: "YouTube",
-                cls: "size-6 text-[#FF0000]",
-              },
+              { icon: GoogleMapsIcon, href: social.google, label: "Google Maps", cls: "size-6" },
               {
                 icon: WhatsAppIcon,
                 href: messaging.whatsapp,
@@ -252,8 +246,15 @@ export default function Footer({ lang, dict, policies }) {
                     {contact.hotline}
                   </a>
                   <span className="block text-xs text-muted">
-                    Hotline 24/7 · Zalo · WhatsApp · WeChat
+                    {tr(contact.channels.hotline, lang)}
                   </span>
+                  <a
+                    href={`tel:${contact.hotline2Raw}`}
+                    className="mt-2 block font-semibold text-ink hover:text-sun-600"
+                  >
+                    {contact.hotline2}
+                  </a>
+                  <span className="block text-xs text-muted">{contact.channels.hotline2}</span>
                 </span>
               </li>
               <li className="flex gap-3">
@@ -264,7 +265,9 @@ export default function Footer({ lang, dict, policies }) {
               </li>
               <li className="flex gap-3">
                 <WeChatIcon className="mt-0.5 size-4 shrink-0 text-sun-500" />
-                <span>WeChat: {messaging.wechatId}</span>
+                <span>
+                  {lang === "zh" ? "微信号" : "WeChat ID"}: {messaging.wechatId}
+                </span>
               </li>
             </ul>
           </div>

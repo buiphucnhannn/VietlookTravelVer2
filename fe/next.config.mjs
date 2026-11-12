@@ -1,5 +1,10 @@
 import { readFileSync } from "node:fs";
 import { BACKEND_URL } from "./src/config/urls.mjs";
+import { resolveAdminLoginPath, warnIfAdminLoginPathMissing } from "./src/config/admin-path.mjs";
+
+// Đường dẫn bí mật của trang đăng nhập (chỉ server biết — xem src/config/admin-path.mjs)
+const ADMIN_LOGIN_PATH = resolveAdminLoginPath();
+warnIfAdminLoginPathMissing();
 
 const oldSiteRedirects = JSON.parse(
   readFileSync(new URL("./src/data/old-site-redirects.json", import.meta.url), "utf8"),
@@ -54,6 +59,8 @@ const nextConfig = {
       { source: "/admin", headers: admin },
       { source: "/admin/:path*", headers: admin },
       { source: "/login", headers: admin },
+      // Chỉ nằm trong cấu hình phía server (routes-manifest), không gửi xuống trình duyệt
+      ...(ADMIN_LOGIN_PATH ? [{ source: ADMIN_LOGIN_PATH, headers: admin }] : []),
     ];
   },
   async redirects() {
@@ -74,6 +81,12 @@ const nextConfig = {
       { source: "/our-tours/:cat", destination: "/tour-packages/:cat", statusCode: 301 },
       { source: "/vi/our-tours/:cat", destination: "/tour-packages/:cat", statusCode: 301 },
       { source: "/tour-packages/:cat", destination: "/tours", statusCode: 301 },
+      // Chủ đề "Hand-picked" đã thay bằng "Exclusive tours" (11/2026) → giữ link cũ, không 404
+      ...["", "/zh", "/vi"].map((p) => ({
+        source: `${p}/themes/hand-picked`,
+        destination: `${p}/themes/exclusive-tours`,
+        statusCode: 301,
+      })),
     ];
   },
   turbopack: {

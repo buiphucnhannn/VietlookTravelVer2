@@ -65,7 +65,7 @@ function MenuColumns({ columns, onNavigate }) {
               <Link
                 href={col.href}
                 onClick={onNavigate}
-                className="group relative mb-3 flex h-20 items-end overflow-hidden rounded-xl p-3"
+                className="group relative mb-3 flex h-16 items-end overflow-hidden rounded-xl p-3"
               >
                 <Image
                   src={col.image}
@@ -97,19 +97,34 @@ function MenuColumns({ columns, onNavigate }) {
                 ? col.gridCols === 2
                   ? "grid grid-cols-2 gap-x-6 gap-y-1"
                   : "grid grid-cols-3 gap-x-6 gap-y-1"
-                : "space-y-1",
+                : // Cột theo miền (có banner ảnh): điểm đến xếp 2 cột nhỏ → miền nhiều điểm (Bắc 12) vẫn gọn trong màn hình
+                  col.image
+                  ? "grid grid-cols-2 gap-x-3 gap-y-1"
+                  : "space-y-1",
             )}
           >
             {col.links.map((l) => (
-              <li key={l.href + l.label}>
+              // dòng "Tất cả tour miền …" (không ảnh) trong cột miền: trải hết 2 cột, không bị ngắt dòng
+              <li key={l.href + l.label} className={cn(col.image && !l.image && "col-span-2 pt-1")}>
                 {l.image ? (
                   <Link
                     href={l.href}
                     onClick={onNavigate}
-                    className="group flex items-center gap-3.5 rounded-lg py-1 text-[0.95rem] text-muted transition-colors hover:text-sun-500"
+                    className={cn(
+                      "group flex items-center rounded-lg py-1 text-muted transition-colors hover:text-sun-500",
+                      col.image ? "gap-2.5 text-sm leading-tight" : "gap-3.5 text-[0.95rem]",
+                      // Mục nổi bật (vd. "Tour độc quyền"): chữ đậm + viền vàng quanh ảnh + sao
+                      l.accent && "font-semibold text-ink",
+                    )}
                   >
                     {/* Ảnh ngang 4:3 hợp với ảnh phong cảnh hơn ô vuông */}
-                    <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg shadow-sm ring-1 ring-black/5">
+                    <span
+                      className={cn(
+                        "relative shrink-0 overflow-hidden rounded-lg shadow-sm ring-1 ring-black/5",
+                        col.image ? "h-9 w-12" : "h-12 w-16",
+                        l.accent && "ring-2 ring-amber-brand",
+                      )}
+                    >
                       <Image
                         src={l.image}
                         alt=""
@@ -118,8 +133,11 @@ function MenuColumns({ columns, onNavigate }) {
                         className="object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                     </span>
-                    <span className="transition-transform group-hover:translate-x-0.5">
+                    <span className="flex items-center gap-1.5 transition-transform group-hover:translate-x-0.5">
                       {l.label}
+                      {l.accent && (
+                        <Star className="size-3.5 fill-amber-brand text-amber-brand" aria-hidden />
+                      )}
                     </span>
                   </Link>
                 ) : (

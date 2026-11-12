@@ -28,8 +28,8 @@ import {
   History,
   ChevronDown,
 } from "lucide-react";
-import { ADMIN_BASE, ADMIN_LOGIN } from "@/config/urls.mjs";
-import { FORBIDDEN_EVENT, api, redirectToLogin, refreshSession } from "@/lib/api";
+import { ADMIN_BASE } from "@/config/urls.mjs";
+import { FORBIDDEN_EVENT, adminLoginPath, api, redirectToLogin, refreshSession } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { TODO_EVENT, prefetchList } from "./hooks";
 import { AdminProviders, LoadingBlock, useUi } from "./ui";
@@ -42,6 +42,9 @@ import {
   moduleForPath,
   useCurrentUser,
 } from "./permissions";
+
+/** Về trang đăng nhập (đường dẫn bí mật trình duyệt đã nhớ, hoặc trang chủ) — tải lại hẳn trang, xoá sạch dữ liệu CMS */
+const goLogin = () => window.location.replace(adminLoginPath());
 
 const A = (p = "") => `${ADMIN_BASE}${p}`;
 
@@ -292,26 +295,23 @@ function Shell({ children }) {
    * API báo không đủ quyền (403). Mọi API vẫn tự kiểm tra quyền ở backend — ở đây chỉ để ẩn / hiện menu, nút.
    */
   const lastMe = useRef(0);
-  const loadMe = useCallback(
-    (first) => {
-      lastMe.current = Date.now();
-      return api("/auth/me")
-        .catch(async (err) => {
-          // access token hết hạn (15 phút) → làm mới phiên 1 lần rồi hỏi lại
-          if (err?.status !== 401 || !(await refreshSession())) throw err;
-          return api("/auth/me");
-        })
-        .then((r) => setUser(r.data.user))
-        .catch((err) => {
-          if (err?.status === 401) {
-            // phiên đã hết / bị thu hồi → đăng nhập lại. Đang soạn dở → giữ nguyên trang (Lưu sẽ báo hết phiên)
-            if (first) router.replace(ADMIN_LOGIN);
-            else if (!window.__vlHasUnsaved?.()) redirectToLogin();
-          } else if (first) router.replace(ADMIN_LOGIN);
-        });
-    },
-    [router],
-  );
+  const loadMe = useCallback((first) => {
+    lastMe.current = Date.now();
+    return api("/auth/me")
+      .catch(async (err) => {
+        // access token hết hạn (15 phút) → làm mới phiên 1 lần rồi hỏi lại
+        if (err?.status !== 401 || !(await refreshSession())) throw err;
+        return api("/auth/me");
+      })
+      .then((r) => setUser(r.data.user))
+      .catch((err) => {
+        if (err?.status === 401) {
+          // phiên đã hết / bị thu hồi → đăng nhập lại. Đang soạn dở → giữ nguyên trang (Lưu sẽ báo hết phiên)
+          if (first) goLogin();
+          else if (!window.__vlHasUnsaved?.()) redirectToLogin();
+        } else if (first) goLogin();
+      });
+  }, []);
   useEffect(() => {
     loadMe(true);
     const stale = (ms) => Date.now() - lastMe.current > ms;
@@ -390,8 +390,7 @@ function Shell({ children }) {
     } catch {
       // phiên đã hết hạn sẵn → vẫn coi như đã đăng xuất
     }
-    router.replace(ADMIN_LOGIN);
-    router.refresh();
+    goLogin();
   };
 
   const initials = (user?.name || user?.username || "A").trim().charAt(0).toUpperCase();

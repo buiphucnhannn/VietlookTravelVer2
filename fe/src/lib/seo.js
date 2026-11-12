@@ -44,11 +44,34 @@ export function notFoundMetadata() {
   };
 }
 
-/** Tiêu đề / mô tả Google nhập trong CMS cho tour, bài viết, trang — trống thì trả "" (dùng nội dung mặc định) */
-export const seoField = (seo, lang, key) =>
-  fallbackLangs(lang)
-    .map((l) => seo?.[l]?.[key])
-    .find((v) => v && String(v).trim()) ?? "";
+/** Đuôi thương hiệu có sẵn trong tiêu đề SEO web cũ (Rank Math): " - VIETLOOK TRAVEL", "| Vietlook Travel"… */
+const BRAND_TAIL = /\s*[-–—|:·]\s*vietlook(\s*travel)?\s*$/i;
+/** Bỏ đuôi thương hiệu (website tự thêm " | Vietlook Travel" một lần) */
+export function cleanSeoTitle(v) {
+  let out = String(v ?? "").trim();
+  while (BRAND_TAIL.test(out)) out = out.replace(BRAND_TAIL, "").trim();
+  return out;
+}
+/** Tiêu đề viết hoa toàn bộ ("HA GIANG EASY RIDER – 3 DAYS") */
+const isShouting = (v) => {
+  const letters = String(v).replace(/[^\p{L}]/gu, "");
+  return (
+    letters.length > 8 && letters === letters.toUpperCase() && letters !== letters.toLowerCase()
+  );
+};
+
+/**
+ * Tiêu đề / mô tả Google nhập trong CMS cho tour, bài viết, trang — CHỈ lấy đúng ngôn ngữ đang xem.
+ * Trống (hoặc tiêu đề viết hoa toàn bộ từ web cũ) → trả "" để trang dùng tên / tóm tắt của chính ngôn ngữ đó,
+ * không mượn bản tiếng Anh cho trang tiếng Việt / tiếng Trung.
+ */
+export function seoField(seo, lang, key) {
+  const raw = String(seo?.[lang]?.[key] ?? "").trim();
+  if (!raw) return "";
+  if (key !== "title") return raw;
+  const t = cleanSeoTitle(raw);
+  return t && !isShouting(t) ? t : "";
+}
 
 /**
  * Các ngôn ngữ có nội dung thật (đã nhập / đã dịch) của một tour, bài viết, trang chính sách.
@@ -90,6 +113,7 @@ export function pageMetadata({
   langs = locales,
 }) {
   description = clampDescription(description, lang);
+  if (typeof title === "string") title = cleanSeoTitle(title);
   // Tiếng Anh ở gốc (/tours), tiếng Trung có /zh (/zh/tours), tiếng Việt có /vi (/vi/tours)
   const url = (l) => href(l, path || "/");
   const languages = Object.fromEntries(langs.map((l) => [localeMeta[l].hreflang, url(l)]));

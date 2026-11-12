@@ -26,6 +26,7 @@ import PartnerStrip from "@/components/home/PartnerStrip";
 import DrumStats from "@/components/home/DrumStats";
 import { withHomeCopy } from "@/components/home/copy";
 import { homeImages } from "@/components/home/images";
+import { DEFAULT_GRID, pairOf } from "@/data/destination-grid";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -95,15 +96,25 @@ export default async function HomePage({ params }) {
 
   const latestPosts = allPosts.filter((p) => p.category !== "vietnam-by-month").slice(0, 4);
 
-  // Lưới điểm đến (yêu cầu 20): 5 điểm chính (chọn trong CMS → Trang chủ) + các điểm còn lại cho thẻ "Other locations"
+  // Lưới điểm đến: 6 ô ảnh (chọn trong CMS → Trang chủ; Huế / Nha Trang tự ghép Đà Nẵng / Đà Lạt —
+  // data/destination-grid.js) + dải "điểm đến khác" (các điểm còn lại, Bắc → Nam theo thứ tự trong CMS)
   const pickedSlugs = (home.featuredDestinations ?? []).filter((s) => getDestination(s));
-  const featuredSlugs = (
-    pickedSlugs.length
-      ? pickedSlugs
-      : ["da-nang", "phu-quoc", "halong-bay", "hanoi", "ho-chi-minh-city"]
-  ).filter((s) => getDestination(s));
-  const gridFeatured = featuredSlugs.map((s) => toGridItem(getDestination(s), lang, countFor(s)));
-  const gridOthers = destinations.filter((d) => !featuredSlugs.includes(d.slug));
+  const featuredSlugs = (pickedSlugs.length ? pickedSlugs : DEFAULT_GRID).filter((s) =>
+    getDestination(s),
+  );
+  const tileCount = (slugs) =>
+    new Set(slugs.flatMap((s) => toursByDestination(s).map((t) => t.slug))).size;
+  const gridFeatured = featuredSlugs.map((s) => {
+    const pair = pairOf(s, featuredSlugs);
+    const partner = pair && getDestination(pair);
+    if (!partner) return toGridItem(getDestination(s), lang, countFor(s));
+    return toGridItem(getDestination(s), lang, tileCount([s, pair]), {
+      partner,
+      href: `${lp(lang)}/destinations/${getDestination(s).region}`,
+    });
+  });
+  const covered = new Set(featuredSlugs.flatMap((s) => [s, pairOf(s, featuredSlugs)]));
+  const gridOthers = destinations.filter((d) => !covered.has(d.slug));
 
   return (
     <>
@@ -137,13 +148,7 @@ export default async function HomePage({ params }) {
           />
         </Container>
       </section>
-      <DestinationGrid
-        lang={lang}
-        dict={dict}
-        featured={gridFeatured}
-        others={gridOthers}
-        total={destinations.length + regions.length}
-      />
+      <DestinationGrid lang={lang} dict={dict} featured={gridFeatured} others={gridOthers} />
       <DrumStats lang={lang} dict={dict} />
       <LongTours
         lang={lang}

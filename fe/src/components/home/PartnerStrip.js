@@ -2,16 +2,17 @@ import Image from "next/image";
 
 // Logo WebP lossless, nền trong suốt, đã cắt sát viền (chuẩn hoá bằng scripts/partner-logos.mjs).
 // w = bề rộng tương ứng chiều cao 160px; big = logo dạng khối/xếp chồng → cho cao hơn để cân thị giác.
-// Danh sách cần Vietlook xác nhận (tài liệu mục 9 #6).
+// Chỉ hiện đối tác QUỐC TẾ (yêu cầu khách 11/2026: không hiện đối tác trong nước — hãng bay, khu vui chơi, du thuyền).
+// Nguồn logo: trang thương hiệu / Wikimedia Commons (xem báo cáo bàn giao).
 const L = (f) => `/images/partners/${f}.webp`;
 export const partners = [
-  { name: "Vietnam Airlines", logo: L("vietnam-airlines"), w: 434, big: true },
-  { name: "VietJet Air", logo: L("vietjet"), w: 918 },
-  { name: "Bamboo Airways", logo: L("bamboo"), w: 643 },
-  { name: "Sun World", logo: L("sunworld"), w: 496 },
-  { name: "Vinpearl", logo: L("vinpearl"), w: 279, big: true },
-  { name: "Paradise Vietnam", logo: L("paradise"), w: 472 },
-  { name: "Emperor Cruises", logo: L("emperor"), w: 225, big: true },
+  { name: "Trip.com", logo: L("trip-com"), w: 662 },
+  { name: "Ctrip", logo: L("ctrip"), w: 968 },
+  { name: "Viator", logo: L("viator"), w: 629 },
+  { name: "Airbnb", logo: L("airbnb"), w: 512 },
+  { name: "GetYourGuide", logo: L("getyourguide"), w: 202, big: true },
+  { name: "Klook", logo: L("klook"), w: 573 },
+  { name: "KKday", logo: L("kkday"), w: 401 },
 ];
 
 /**

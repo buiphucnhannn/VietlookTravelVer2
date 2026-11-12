@@ -17,6 +17,7 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { fill, href, locales, lp, tr } from "@/i18n/config";
 import { cardLabels } from "@/lib/labels";
 import { cn, formatUSD } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 import { fmtDayChip, fmtMonthYear } from "@/lib/dates";
 import { JsonLd, pageMetadata, notFoundMetadata, seoField, tourLangs } from "@/lib/seo";
 import { siteConfig } from "@/constants/site";
@@ -26,12 +27,12 @@ import TourGallery from "@/components/tours/TourGallery";
 import StickyTabs from "@/components/tours/StickyTabs";
 import BookingWidget from "@/components/tours/BookingWidget";
 import StickySide from "@/components/ui/StickySide";
-import PriceTable, { PricingGrid, hasStructuredPricing } from "@/components/tours/PriceTable";
+import { PriceTables, PricingGrid, hasStructuredPricing } from "@/components/tours/PriceTable";
 import MobileBookBar from "@/components/tours/MobileBookBar";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { parseVideo } from "@/lib/video";
 import { GoogleIcon, TripAdvisorIcon, WeChatIcon, WhatsAppIcon } from "@/components/ui/BrandIcons";
-import { getCatalog, getPaymentConfig, getTour, tourText } from "@/lib/catalog";
+import { getCatalog, getPaymentConfig, getSmallGroup, getTour, tourText } from "@/lib/catalog";
 
 /**
  * Dựng sẵn lúc build CHỈ các tour quan trọng (nổi bật + dài ngày ở trang chủ + 40 tour đầu danh sách) × 3 ngôn ngữ
@@ -150,6 +151,7 @@ async function TourPageContent({ params }) {
   const tx = tourText(tour, lang);
   // 9Pay bật trong CMS → sau khi gửi đơn có bước "Thanh toán"; tắt → đặt tour như cũ
   const paymentConfig = await getPaymentConfig();
+  const smallGroup = await getSmallGroup();
   const title = tx.title;
   const destNames = tour.destinations.map((d) => tr(getDestination(d)?.name, lang)).filter(Boolean);
   const duration =
@@ -190,7 +192,7 @@ async function TourPageContent({ params }) {
     .filter((r) => r.text)
     .map((r) => ({
       title: r.name || "Vietlook guest",
-      trip: [r.country, fmtMonthYear(r.date)].filter(Boolean).join(" · "),
+      trip: [r.country, fmtMonthYear(r.date, lang)].filter(Boolean).join(" · "),
       text: r.text,
       rating: r.rating || 5,
       source: /google/i.test(r.source) ? "google" : "tripadvisor",
@@ -301,11 +303,15 @@ async function TourPageContent({ params }) {
                 : { icon: UserRound, a: t.privateTour, b: t.fullyCustom },
               { icon: Headphones, a: t.localSupport, b: t.viaWhatsApp },
             ].map((f) => (
-              <div key={f.b} className="flex items-center gap-3">
-                <span className="grid size-11 place-items-center rounded-full bg-brand-50 text-brand-600">
+              // Từ sm: subgrid 2 hàng (nhãn · chú thích), biểu tượng chiếm cả 2 hàng → 3 ô thẳng hàng
+              <div
+                key={f.b}
+                className="flex items-center gap-3 sm:row-span-2 sm:grid sm:grid-cols-[auto_1fr] sm:grid-rows-subgrid sm:items-start sm:gap-y-0"
+              >
+                <span className="grid size-11 place-items-center rounded-full bg-brand-50 text-brand-600 sm:row-span-2 sm:self-center">
                   <f.icon className="size-5" />
                 </span>
-                <span className="leading-tight">
+                <span className="leading-tight sm:contents">
                   <span className="block font-semibold text-ink">{f.a}</span>
                   <span className="text-sm text-muted">{f.b}</span>
                 </span>
@@ -517,7 +523,7 @@ async function TourPageContent({ params }) {
             <Card id="included" eyebrow={t.includedEyebrow} title={t.included}>
               {tx.included.length || tx.excluded.length ? (
                 <div className="grid gap-8 sm:grid-cols-2">
-                  <div>
+                  <div className={subgrid(2, "sm")}>
                     <h3 className="mb-3 font-bold text-brand-700">{t.includes}</h3>
                     <ul className="space-y-2.5">
                       {tx.included.map((x) => (
@@ -530,7 +536,7 @@ async function TourPageContent({ params }) {
                       ))}
                     </ul>
                   </div>
-                  <div>
+                  <div className={subgrid(2, "sm")}>
                     <h3 className="mb-3 font-bold text-sun-600">{t.excludes}</h3>
                     <ul className="space-y-2.5">
                       {tx.excluded.map((x) => (
@@ -573,9 +579,7 @@ async function TourPageContent({ params }) {
               <Card id="prices" eyebrow={t.pricingEyebrow} title={t.pricing}>
                 <div className="space-y-6">
                   {structured && <PricingGrid pricing={tour.pricing} lang={lang} />}
-                  {tx.priceTables.map((tb, i) => (
-                    <PriceTable key={i} table={tb} />
-                  ))}
+                  <PriceTables tables={tx.priceTables} />
                   {!structured && <p className="text-sm text-muted">{t.holidaySurcharge}</p>}
                 </div>
               </Card>
@@ -650,7 +654,10 @@ async function TourPageContent({ params }) {
                   {tourReviews.map((r) => (
                     <figure
                       key={tr(r.title, "en") + tr(r.text, "en").slice(0, 20)}
-                      className="flex flex-col rounded-2xl border border-sand-300/70 bg-cream-50 p-5"
+                      className={cn(
+                        "flex flex-col rounded-2xl border border-sand-300/70 bg-cream-50 p-5",
+                        subgrid(4, "md"),
+                      )}
                     >
                       <Stars value={r.rating} size={14} />
                       <p className="mt-2 font-bold text-forest-700">{tr(r.title, lang)}</p>
@@ -700,12 +707,15 @@ async function TourPageContent({ params }) {
 
           {/* Khối đặt tour dính bên phải */}
           <div id="book" className="scroll-mt-36">
+            {/* Dính ngay dưới header (108px + 12px); cao tối đa = màn hình − 132px → luôn thấy trọn khung & nút đặt
+                (nội dung xếp dọc, phần giữa chỉ cuộn khi màn hình quá thấp — xem BookingWidget) */}
             <StickySide
-              offset={176}
-              className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border xl:p-6 short:p-5"
+              offset={120}
+              gap={12}
+              className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border lg:flex lg:max-h-[calc(100dvh-8.25rem)] lg:flex-col xl:p-6 mid:p-5 shorter:p-4"
             >
               {/* leading-none: bỏ khoảng trống dòng chữ thừa → lề trên (tới chữ) bằng lề dưới (dưới nút đặt) */}
-              <h2 className="mt-0.5 mb-4 text-xl leading-none font-bold tracking-tight text-ink">
+              <h2 className="mt-0.5 mb-4 shrink-0 text-xl leading-none font-bold tracking-tight text-ink mid:mb-3.5 shorter:mb-3 shorter:text-lg">
                 {t.bookTitle}
               </h2>
               <BookingWidget
@@ -725,6 +735,7 @@ async function TourPageContent({ params }) {
                 t={t}
                 c={c}
                 payment={{ ...paymentConfig, labels: dict.payment }}
+                smallGroup={smallGroup}
               />
             </StickySide>
           </div>

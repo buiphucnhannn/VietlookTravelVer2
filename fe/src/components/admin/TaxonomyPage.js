@@ -339,6 +339,16 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
     onSaved(ok.data?.id ?? d.id);
   };
 
+  const nameField = (
+    <Field label={kind === "author" ? "Họ tên" : "Tên chuyên mục"} required>
+      <LocInput
+        value={d.name}
+        lang={lang}
+        onChange={(name) => set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })}
+      />
+    </Field>
+  );
+
   return (
     <Modal
       open
@@ -390,19 +400,10 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
               <LangTabs value={lang} onChange={setLang} filled={filledOf(d.name)} />
             </div>
           </div>
-          <Field label={kind === "author" ? "Họ tên" : "Tên chuyên mục"} required>
-            <LocInput
-              value={d.name}
-              lang={lang}
-              onChange={(name) =>
-                set({ name, ...(!slugTouched && { slug: slugify(slugSource(name)) }) })
-              }
-            />
-          </Field>
-
           {/* Thứ tự theo đầu trang chuyên mục / tác giả trên website; cài đặt hiển thị ở cuối */}
           {kind === "category" ? (
             <>
+              {nameField}
               <Field label="Mô tả" hint="Hiện ở đầu trang chuyên mục">
                 <LocInput
                   value={d.description}
@@ -415,20 +416,30 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
             </>
           ) : (
             <>
-              <Field label="Vai trò" hint="Hiện dưới họ tên. VD: Travel Writer, Tour Expert">
-                <LocInput value={d.role} lang={lang} onChange={(role) => set({ role })} />
-              </Field>
-              <Field label="Ảnh đại diện" hint="Ảnh vuông, tối thiểu 400px">
-                <div className="max-w-[180px]">
-                  <ImageField
-                    value={d.avatar}
-                    onChange={(avatar) => set({ avatar })}
-                    folder="authors"
-                    aspect="aspect-square"
-                    crop={{ width: 400 }}
-                  />
+              {/* Ảnh vuông nhỏ đặt cạnh họ tên + vai trò (điện thoại: họ tên trước, ảnh sau) — không để trống nửa phải */}
+              <div className="grid gap-x-6 gap-y-5 sm:grid-cols-[180px_minmax(0,1fr)]">
+                <Field
+                  label="Ảnh đại diện"
+                  hint="Ảnh vuông, tối thiểu 400px"
+                  className="order-2 sm:order-none"
+                >
+                  <div className="max-w-[180px]">
+                    <ImageField
+                      value={d.avatar}
+                      onChange={(avatar) => set({ avatar })}
+                      folder="authors"
+                      aspect="aspect-square"
+                      crop={{ width: 400 }}
+                    />
+                  </div>
+                </Field>
+                <div className="order-1 space-y-5 sm:order-none">
+                  {nameField}
+                  <Field label="Vai trò" hint="Hiện dưới họ tên. VD: Travel Writer, Tour Expert">
+                    <LocInput value={d.role} lang={lang} onChange={(role) => set({ role })} />
+                  </Field>
                 </div>
-              </Field>
+              </div>
               <Field label="Giới thiệu ngắn" hint="Hiện dưới ảnh đại diện và ở cuối mỗi bài viết">
                 <LocInput
                   value={d.bio}
@@ -443,25 +454,29 @@ function TaxonomyEditor({ kind, initial, onClose, onSaved }) {
 
           <section className="space-y-4 border-t border-slate-100 pt-5">
             <p className="text-sm font-bold text-slate-800">Cài đặt hiển thị</p>
-            <Field
-              label="Đường dẫn trang"
-              required
-              hint="Phần cuối của địa chỉ trang, viết không dấu"
-            >
-              <Input
-                value={d.slug}
-                className="font-mono text-[13px]"
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  set({ slug: slugify(e.target.value) });
-                }}
-              />
-            </Field>
-            <Toggle
-              checked={d.isActive}
-              onChange={(isActive) => set({ isActive })}
-              label="Hiện trên website"
-            />
+            {/* Đường dẫn + nút hiện cùng 1 hàng (giống popup loại visa, khu vực xe) */}
+            <div className="grid items-start gap-4 sm:grid-cols-2">
+              <Field
+                label="Đường dẫn trang"
+                required
+                hint="Phần cuối của địa chỉ trang, viết không dấu"
+              >
+                <Input
+                  value={d.slug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    set({ slug: slugify(e.target.value) });
+                  }}
+                />
+              </Field>
+              <div className="sm:pt-9">
+                <Toggle
+                  checked={d.isActive}
+                  onChange={(isActive) => set({ isActive })}
+                  label="Hiện trên website"
+                />
+              </div>
+            </div>
           </section>
         </div>
       </ReadOnlyArea>

@@ -24,6 +24,7 @@ import {
   pageKeyParam,
   pageSchema,
   paymentSettingsSchema,
+  smallGroupSettingsSchema,
   trackingSettingsSchema,
 } from "../validators/content.validator.js";
 import { lookupCodeParam, publicEnquirySchema } from "../validators/enquiry.validator.js";
@@ -166,6 +167,14 @@ settingsRoutes.put(
   requireAdmin,
   validate({ body: trackingSettingsSchema }),
   settingsController.saveTracking,
+);
+// Phụ thu nhóm nhỏ: nhân viên được xem (ô "Giá tạm tính thử" khi sửa tour), chỉ admin được sửa
+settingsRoutes.get("/small-group", requireStaff, settingsController.getSmallGroup);
+settingsRoutes.put(
+  "/small-group",
+  requireAdmin,
+  validate({ body: smallGroupSettingsSchema }),
+  settingsController.saveSmallGroup,
 );
 settingsRoutes.get("/payment", requireAdmin, settingsController.getPayment);
 settingsRoutes.put(

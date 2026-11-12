@@ -1,5 +1,5 @@
 import { Schema, model } from "mongoose";
-import { REGION_VALUES } from "../constants/content.js";
+import { REGION_VALUES, TOUR_LABELS } from "../constants/content.js";
 import { publishable, seoSchema, toJSONOptions } from "./shared.schema.js";
 
 /**
@@ -123,6 +123,7 @@ const tourSchema = new Schema(
     seo: { type: seoSchema(), default: () => ({}) },
     featured: { type: Boolean, default: false, index: true }, // tour nổi bật (trang chủ)
     featuredLong: { type: Boolean, default: false, index: true }, // tour dài ngày nổi bật (trang chủ)
+    labels: { type: [{ type: String, enum: TOUR_LABELS }], default: [] }, // nhãn "Bán chạy" / "Độc quyền" trên thẻ tour
     rank: { type: Number, default: 1000 }, // thứ tự gợi ý (nhỏ trước)
     sourceUrl: { type: String, default: "" }, // URL trên web cũ (đối chiếu 301)
     isActive: publishable.isActive,

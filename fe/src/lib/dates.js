@@ -1,7 +1,10 @@
 /**
- * Định dạng ngày DÙNG CHUNG toàn hệ thống (website en/zh/vi + CMS).
- * Quy ước (quyết định của chủ dự án): mọi ngày hiển thị / nhập đều dạng số **mm/dd/yyyy** (VD 11/27/2026),
- * ngày + giờ → "mm/dd/yyyy HH:mm" (24h). Không dùng tên tháng, không dùng dd/mm.
+ * Định dạng ngày DÙNG CHUNG toàn hệ thống (website en/zh/vi + CMS) — ngày theo NGÔN NGỮ:
+ *  - en: mm/dd/yyyy (11/14/2026) · thứ + ngày "Sat · 11/14/2026"
+ *  - vi (website tiếng Việt + toàn bộ CMS): dd/mm/yyyy (14/11/2026) · "T7 · 14/11/2026"
+ *  - zh: yyyy年m月d日 (2026年11月14日) · "周六 · 2026年11月14日"
+ * Ngày + giờ → thêm " HH:mm" (24h). Không dùng tên tháng.
+ * Ô nhập ngày (DatePicker) gõ dạng số: en mm/dd/yyyy · vi dd/mm/yyyy · zh yyyy/mm/dd (đọc được cả "2026年11月14日").
  * Lưu trữ / API vẫn là ISO (YYYY-MM-DD) — file này chỉ lo phần hiển thị + đọc chữ người dùng gõ.
  *
  * Múi giờ:
@@ -48,39 +51,71 @@ function vnParts(value) {
   return { y: p.year, m: p.month, d: p.day, H: p.hour === "24" ? "00" : p.hour, M: p.minute };
 }
 
+/** Ngôn ngữ hiển thị ngày: "vi" | "zh" | "en" (khác → "en") */
+const dl = (lang) => (lang === "vi" || lang === "zh" ? lang : "en");
+
+/** Ngày đầy đủ theo ngôn ngữ (y, m, d là chuỗi 2 chữ số) */
+function ymd(y, m, d, lang) {
+  const l = dl(lang);
+  if (l === "zh") return `${y}年${+m}月${+d}日`;
+  if (l === "vi") return `${d}/${m}/${y}`;
+  return `${m}/${d}/${y}`;
+}
+
+/** Ngày + tháng (không năm) theo ngôn ngữ: en "11/14" · vi "14/11" · zh "11月14日" */
+function md(m, d, lang) {
+  const l = dl(lang);
+  if (l === "zh") return `${+m}月${+d}日`;
+  if (l === "vi") return `${d}/${m}`;
+  return `${m}/${d}`;
+}
+
 /**
- * Ngày → "mm/dd/yyyy".
- * "2026-11-27" → "11/27/2026" · "12-24" (ngày lễ lặp hằng năm) → "12/24" · Date / ISO có giờ → theo giờ VN.
+ * Ngày → chữ theo ngôn ngữ: "2026-11-27" → en "11/27/2026" · vi "27/11/2026" · zh "2026年11月27日".
+ * "12-24" (ngày lễ lặp hằng năm) → en "12/24" · vi "24/12" · zh "12月24日". Date / ISO có giờ → theo giờ VN.
  * Không đọc được → trả lại nguyên chữ (không bao giờ in "Invalid Date").
  */
-export function fmtDate(value) {
+export function fmtDate(value, lang = "en") {
   if (value == null || value === "") return "";
   if (typeof value === "string") {
     const m = ISO_DAY.exec(value);
-    if (m) return `${m[2]}/${m[3]}/${m[1]}`;
-    const md = /^(\d{2})-(\d{2})$/.exec(value);
-    if (md) return `${md[1]}/${md[2]}`;
+    if (m) return ymd(m[1], m[2], m[3], lang);
+    const r = /^(\d{2})-(\d{2})$/.exec(value);
+    if (r) return md(r[1], r[2], lang);
   }
   const p = vnParts(value);
-  return p ? `${p.m}/${p.d}/${p.y}` : String(value);
+  return p ? ymd(p.y, p.m, p.d, lang) : String(value);
 }
 
-/** Thời điểm → "mm/dd/yyyy HH:mm" (giờ Việt Nam, 24h) */
-export function fmtDateTime(value) {
+/** Ngày + tháng không kèm năm: "2026-11-14" → en "11/14" · vi "14/11" · zh "11月14日" */
+export function fmtDayMonth(value, lang = "en") {
+  if (value == null || value === "") return "";
+  const m = typeof value === "string" ? ISO_DAY.exec(value) : null;
+  if (m) return md(m[2], m[3], lang);
+  const p = vnParts(value);
+  return p ? md(p.m, p.d, lang) : String(value);
+}
+
+/** Thời điểm → ngày theo ngôn ngữ + " HH:mm" (giờ Việt Nam, 24h). VD vi "27/11/2026 14:05" */
+export function fmtDateTime(value, lang = "en") {
   if (value == null || value === "") return "";
   const p = vnParts(value);
-  return p ? `${p.m}/${p.d}/${p.y} ${p.H}:${p.M}` : String(value);
+  return p ? `${ymd(p.y, p.m, p.d, lang)} ${p.H}:${p.M}` : String(value);
 }
 
-/** Tháng / năm (đánh giá khách: "2026-10", ngày đầy đủ…) → "10/2026"; chữ tự do giữ nguyên */
-export function fmtMonthYear(value) {
+/**
+ * Tháng / năm (đánh giá khách: "2026-10", ngày đầy đủ…) → en/vi "10/2026" · zh "2026年10月";
+ * chữ tự do giữ nguyên
+ */
+export function fmtMonthYear(value, lang = "en") {
   if (value == null || value === "") return "";
   const s = String(value).trim();
+  const out = (y, m) => (dl(lang) === "zh" ? `${y}年${+m}月` : `${m}/${y}`);
   const ym = /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(s);
-  if (ym) return `${ym[2]}/${ym[1]}`;
+  if (ym) return out(ym[1], ym[2]);
   if (!/^\d{4}-\d{2}-\d{2}T/.test(s)) return s;
   const p = vnParts(s);
-  return p ? `${p.m}/${p.y}` : s;
+  return p ? out(p.y, p.m) : s;
 }
 
 const WEEKDAY_SHORT = {
@@ -94,23 +129,47 @@ export function weekdayShort(iso, lang = "en") {
   const m = ISO_DAY.exec(String(iso ?? ""));
   if (!m) return "";
   const day = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
-  return (WEEKDAY_SHORT[lang] ?? WEEKDAY_SHORT.en)[day];
+  return WEEKDAY_SHORT[dl(lang)][day];
 }
 
 /**
- * Ngày khởi hành kèm thứ (chỉ dùng nơi khách chọn / xem lại ngày đi):
- * en "Mon · 11/16/2026" · zh "周一 · 11/16/2026" · vi "T2 · 11/16/2026"
+ * Ngày kèm thứ (nơi khách chọn / xem lại ngày đi):
+ * en "Mon · 11/16/2026" · vi "T2 · 16/11/2026" · zh "周一 · 2026年11月16日"
  */
 export function fmtDayChip(iso, lang = "en") {
   const wd = weekdayShort(iso, lang);
-  return wd ? `${wd} · ${fmtDate(iso)}` : fmtDate(iso);
+  return wd ? `${wd} · ${fmtDate(iso, lang)}` : fmtDate(iso, lang);
 }
 
-/** Chữ người dùng gõ "11/27/2026" (cho phép 1 chữ số tháng/ngày) → "2026-11-27" | null */
-export function parseUSDate(text) {
-  const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/.exec(String(text ?? ""));
-  if (!m) return null;
-  const [mo, d, y] = [+m[1], +m[2], +m[3]];
+/** Ô nhập ngày: mẫu gợi ý theo ngôn ngữ — en "mm/dd/yyyy" · vi "dd/mm/yyyy" · zh "yyyy/mm/dd" */
+export const datePlaceholder = (lang = "en") =>
+  ({ vi: "dd/mm/yyyy", zh: "yyyy/mm/dd" })[dl(lang)] ?? "mm/dd/yyyy";
+
+/** Ô nhập ngày: ISO → chữ dạng số để sửa — en "11/27/2026" · vi "27/11/2026" · zh "2026/11/27" */
+export function fmtDateInput(iso, lang = "en") {
+  const m = ISO_DAY.exec(String(iso ?? ""));
+  if (!m) return String(iso ?? "");
+  return dl(lang) === "zh" ? `${m[1]}/${m[2]}/${m[3]}` : ymd(m[1], m[2], m[3], lang);
+}
+
+/**
+ * Chữ người dùng gõ → "YYYY-MM-DD" | null (cho phép 1 chữ số tháng/ngày; "/", "-", "." đều được):
+ * en "11/27/2026" · vi "27/11/2026" · zh "2026/11/27" hoặc "2026年11月27日".
+ */
+export function parseDate(text, lang = "en") {
+  const s = String(text ?? "").trim();
+  let y;
+  let mo;
+  let d;
+  if (dl(lang) === "zh") {
+    const m = /^(\d{4})\s*[/.\-年]\s*(\d{1,2})\s*[/.\-月]\s*(\d{1,2})\s*日?$/.exec(s);
+    if (!m) return null;
+    [y, mo, d] = [+m[1], +m[2], +m[3]];
+  } else {
+    const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(s);
+    if (!m) return null;
+    [y, mo, d] = dl(lang) === "vi" ? [+m[3], +m[2], +m[1]] : [+m[3], +m[1], +m[2]];
+  }
   return y >= 1000 && realDay(y, mo, d) ? toISODate(y, mo, d) : null;
 }
 

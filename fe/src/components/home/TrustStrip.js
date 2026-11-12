@@ -29,14 +29,15 @@ export default function TrustStrip({ items }) {
             return (
               <li
                 key={x.kind}
-                className="px-3 max-md:last:col-span-2 max-md:last:justify-self-center lg:px-5 lg:first:pl-0"
+                // Subgrid 2 hàng (tiêu đề · mô tả): tiêu đề 2 dòng không đẩy lệch mô tả của ô bên cạnh
+                className="row-span-2 grid grid-rows-subgrid gap-y-0 px-3 max-md:last:col-span-2 max-md:last:justify-self-center lg:px-5 lg:first:pl-0"
               >
                 <Tag
                   {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
-                  className="flex items-start gap-3"
+                  className="row-span-2 grid grid-cols-[auto_1fr] grid-rows-subgrid gap-x-3 gap-y-0"
                 >
-                  <span className="shrink-0">{icons[x.kind]}</span>
-                  <span className="leading-tight">
+                  <span className="row-span-2 shrink-0">{icons[x.kind]}</span>
+                  <span className="contents leading-tight">
                     <span className="flex flex-wrap items-center gap-x-2 font-bold text-ink">
                       {x.t}
                       {rated && (

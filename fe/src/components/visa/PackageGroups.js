@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Crown, PlaneLanding, PlaneTakeoff, Plus, Star } from "lucide-react";
 import { cn, formatUSD } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 
 const groupIcons = { arrival: PlaneLanding, departure: PlaneTakeoff, addons: Plus };
 
@@ -14,6 +15,12 @@ const groupIcons = { arrival: PlaneLanding, departure: PlaneTakeoff, addons: Plu
 export default function PackageGroups({ packages, airports, labels, defaultGroup = "arrival" }) {
   const [group, setGroup] = useState(defaultGroup);
   const list = packages[group];
+  // Subgrid: tên · mô tả · giá "từ" · nhãn sân bay · bảng giá · ghi chú liên hệ · nút → các thẻ cùng hàng
+  // thẳng hàng nhau. Hàng giá / ghi chú chỉ tạo khi có ít nhất 1 thẻ cần (thẻ thiếu → ô giữ chỗ trống).
+  const hasPrice = (p) => Object.values(p.prices).some(Boolean);
+  const priceRow = list.some(hasPrice);
+  const noteRow = list.some((p) => !hasPrice(p));
+  const rows = 5 + priceRow + noteRow;
 
   return (
     <div>
@@ -63,6 +70,7 @@ export default function PackageGroups({ packages, airports, labels, defaultGroup
                 ? "bg-forest-900 text-white ring-forest-700"
                 : "bg-white ring-sand-300/70 hover:shadow-[0_24px_48px_-24px_rgba(60,40,10,0.4)]",
               p.popular && "ring-2 ring-clay-500",
+              subgrid(rows, "sm"),
             )}
           >
             {p.popular && (
@@ -87,7 +95,7 @@ export default function PackageGroups({ packages, airports, labels, defaultGroup
             {/* Giá "từ" thấp nhất + bảng giá theo 5 sân bay */}
             {(() => {
               const vals = Object.values(p.prices).filter(Boolean);
-              if (!vals.length) return null;
+              if (!vals.length) return priceRow ? <span aria-hidden /> : null;
               return (
                 <p className="mt-4 flex items-baseline gap-1.5">
                   <span className={cn("text-xs", p.vip ? "text-white/60" : "text-muted")}>
@@ -147,7 +155,9 @@ export default function PackageGroups({ packages, airports, labels, defaultGroup
                 </li>
               ))}
             </ul>
-            {!Object.values(p.prices).some(Boolean) && (
+            {hasPrice(p) ? (
+              noteRow && <span aria-hidden />
+            ) : (
               <p className={cn("mt-2 text-xs", p.vip ? "text-white/60" : "text-muted")}>
                 {labels.contactPrice} · {labels.perPax}
               </p>

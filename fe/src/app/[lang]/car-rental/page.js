@@ -31,6 +31,8 @@ import FleetStage from "@/components/car/FleetStage";
 import FleetMarquee from "@/components/car/FleetMarquee";
 import RoutesExplorer from "@/components/car/RoutesExplorer";
 import { WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
+import { cn } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -97,6 +99,7 @@ export default async function CarRentalPage({ params }) {
     ...f,
     name: { label: tr(f.name, lang) },
     tagline: tr(f.tagline, lang),
+    description: tr(f.description, lang),
     ideal: tr(f.ideal, lang),
     from: airportFrom(f.priceKey),
   }));
@@ -218,11 +221,15 @@ export default async function CarRentalPage({ params }) {
             {t.trust.map((x, i) => {
               const Icon = trustIcons[i];
               return (
-                <li key={x.t} className="flex items-center gap-4 lg:px-6 lg:first:pl-0">
-                  <span className="grid size-13 shrink-0 place-items-center rounded-2xl bg-amber-brand/15 text-[#a26a00]">
+                // Từ sm: subgrid 2 hàng (tiêu đề · mô tả), biểu tượng chiếm cả 2 hàng → các ô thẳng hàng nhau
+                <li
+                  key={x.t}
+                  className="flex items-center gap-4 sm:row-span-2 sm:grid sm:grid-cols-[auto_1fr] sm:grid-rows-subgrid sm:items-start sm:gap-y-0 lg:px-6 lg:first:pl-0"
+                >
+                  <span className="grid size-13 shrink-0 place-items-center rounded-2xl bg-amber-brand/15 text-[#a26a00] sm:row-span-2 sm:self-center">
                     <Icon className="size-5" />
                   </span>
-                  <span className="leading-tight">
+                  <span className="leading-tight sm:contents">
                     <span className="block font-bold text-ink">{x.t}</span>
                     <span className="text-sm text-muted">{x.d}</span>
                   </span>
@@ -263,8 +270,13 @@ export default async function CarRentalPage({ params }) {
             {t.services.map((s, i) => {
               const Icon = serviceIcons[i];
               return (
-                <Reveal key={s.title} delay={(i % 3) * 80}>
-                  <div className="group relative h-full overflow-hidden rounded-3xl bg-surface p-7 transition duration-300 hover:-translate-y-1 hover:bg-brand-950 hover:text-white">
+                <Reveal key={s.title} delay={(i % 3) * 80} className={subgrid(3, "sm")}>
+                  <div
+                    className={cn(
+                      "group relative h-full overflow-hidden rounded-3xl bg-surface p-7 transition duration-300 hover:-translate-y-1 hover:bg-brand-950 hover:text-white",
+                      subgrid(3, "sm"),
+                    )}
+                  >
                     <span className="absolute -top-8 -right-8 size-32 rounded-full bg-amber-brand/15 transition-transform duration-500 group-hover:scale-150" />
                     <span className="relative grid size-14 place-items-center rounded-2xl bg-white text-brand-600 shadow-sm transition group-hover:bg-amber-brand group-hover:text-ink">
                       <Icon className="size-6" />
@@ -345,7 +357,10 @@ export default async function CarRentalPage({ params }) {
               return (
                 <div
                   key={x.title}
-                  className="relative overflow-hidden rounded-3xl border border-border bg-white p-7"
+                  className={cn(
+                    "relative overflow-hidden rounded-3xl border border-border bg-white p-7",
+                    subgrid(3, "sm"),
+                  )}
                 >
                   <span className="absolute top-3 right-5 text-6xl font-extrabold text-amber-brand/15">
                     {String(i + 1).padStart(2, "0")}
@@ -391,7 +406,10 @@ export default async function CarRentalPage({ params }) {
                 <Reveal
                   key={s.title}
                   delay={i * 120}
-                  className="relative rounded-3xl bg-white/5 p-7 ring-1 ring-white/10"
+                  className={cn(
+                    "relative rounded-3xl bg-white/5 p-7 ring-1 ring-white/10",
+                    subgrid(3, "md"),
+                  )}
                 >
                   <span className="relative inline-grid size-14 place-items-center rounded-2xl bg-white/10 text-amber-brand">
                     <Icon className="size-6" />
@@ -419,7 +437,10 @@ export default async function CarRentalPage({ params }) {
             {reviews.slice(0, 3).map((r) => (
               <figure
                 key={r.title.en}
-                className="relative flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-black/5"
+                className={cn(
+                  "relative flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-black/5",
+                  subgrid(3, "md"),
+                )}
               >
                 <span className="absolute top-5 right-7 font-serif text-7xl leading-none text-amber-brand/30">
                   “
@@ -432,7 +453,7 @@ export default async function CarRentalPage({ params }) {
                 <blockquote className="mt-5 flex-1 leading-relaxed text-ink/85">
                   {tr(r.text, lang)}
                 </blockquote>
-                <figcaption className="mt-6 flex items-center gap-3 border-t border-border pt-5">
+                <figcaption className="mt-6 flex items-center gap-3 border-t border-border pt-5 md:self-start">
                   <span className="relative size-12 shrink-0 overflow-hidden rounded-full ring-2 ring-amber-brand/40">
                     <Image
                       src={r.avatar || r.photo}

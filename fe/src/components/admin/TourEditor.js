@@ -74,6 +74,21 @@ import { REGIONS } from "./DestinationsPage";
 import { usePendingImages } from "./pendingImages";
 import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
 
+/** Nhãn nổi bật trên thẻ tour (khớp TOUR_LABELS ở be/src/constants/content.js) */
+const TOUR_LABEL_OPTIONS = [
+  {
+    key: "bestseller",
+    label: "Nhãn “Bán chạy”",
+    hint: "Hiện huy hiệu Bán chạy / Bestseller / 热销 trên thẻ tour",
+  },
+  {
+    key: "exclusive",
+    label: "Nhãn “Độc quyền”",
+    hint: "Hiện huy hiệu Độc quyền / Exclusive / 独家 + viền vàng trên thẻ tour",
+  },
+];
+const TOUR_LABEL_KEYS = TOUR_LABEL_OPTIONS.map((o) => o.key);
+
 const PATH = "/admin/tours";
 const TAGS = ["tours"];
 const LANG_KEYS = LANGS.map((l) => l.key);
@@ -252,6 +267,7 @@ export function normalizeTour(d = {}) {
     ),
     featured: !!d.featured,
     featuredLong: !!d.featuredLong,
+    labels: strList(d.labels).filter((l) => TOUR_LABEL_KEYS.includes(l)),
     rank: d.rank ?? 1000,
     isActive: d.isActive ?? true,
   };
@@ -365,6 +381,7 @@ export function toTourPayload(t) {
     ),
     featured: !!t.featured,
     featuredLong: !!t.featuredLong,
+    labels: TOUR_LABEL_KEYS.filter((l) => t.labels?.includes(l)),
     rank: Math.max(0, intOr(t.rank, 1000)),
     isActive: !!t.isActive,
   };
@@ -397,8 +414,8 @@ function validate(p) {
   return null;
 }
 
-/** 2027-02-06 → 02/06/2027 · 12-24 → 12/24 hằng năm (mm/dd như toàn hệ thống) */
-const fmtDay = (d) => (d.length === 5 ? `${fmtDate(d)} hằng năm` : fmtDate(d));
+/** 2027-02-06 → 06/02/2027 · 12-24 → 24/12 hằng năm (CMS tiếng Việt: dd/mm) */
+const fmtDay = (d) => (d.length === 5 ? `${fmtDate(d, "vi")} hằng năm` : fmtDate(d, "vi"));
 
 /** Chữ của trường `key` ở một ngôn ngữ KHÁC đã có (để gợi ý trong ô đang trống) */
 const otherText = (t, lang, key) =>
@@ -1669,7 +1686,8 @@ const PricingSection = memoOn(
             <div className="space-y-4">
               <div>
                 <p className="mb-2 text-[13px] font-semibold text-slate-700">Phụ thu</p>
-                <div className="grid grid-cols-3 gap-2">
+                {/* items-end: nhãn dài xuống dòng thì 3 ô nhập vẫn thẳng hàng */}
+                <div className="grid grid-cols-3 items-end gap-2">
                   <Field label="Phòng đơn">
                     <NumInput
                       value={p.singleSupplement}
@@ -1678,7 +1696,7 @@ const PricingSection = memoOn(
                       onChange={(singleSupplement) => setP({ singleSupplement })}
                     />
                   </Field>
-                  <Field label="Ngày lễ, cao điểm / khách">
+                  <Field label="Lễ, cao điểm ($/khách)">
                     <NumInput
                       value={p.holidaySurcharge}
                       prefix="$"
@@ -1686,7 +1704,7 @@ const PricingSection = memoOn(
                       onChange={(holidaySurcharge) => setP({ holidaySurcharge })}
                     />
                   </Field>
-                  <Field label="Ngày lễ, cao điểm theo %">
+                  <Field label="Lễ, cao điểm (%)">
                     <NumInput
                       value={p.holidayPercent}
                       suffix="%"
@@ -1783,7 +1801,23 @@ const HOTEL_CLASSES = [
   { value: 5, label: "5★" },
 ];
 
+/** Phụ thu nhóm nhỏ đang cài (Cài đặt) — để ô "Giá tạm tính thử" báo đúng như website; lỗi → bỏ qua */
+function useSmallGroup() {
+  const [setting, setSetting] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api("/settings/small-group")
+      .then((r) => alive && setSetting(r.data))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return setting;
+}
+
 function PricePreview({ price, pricing }) {
+  const smallGroup = useSmallGroup();
   const [adults, setAdults] = useState("2");
   const [ages, setAges] = useState("");
   const [date, setDate] = useState("");
@@ -1802,6 +1836,7 @@ function PricePreview({ price, pricing }) {
     childAges,
     date,
     hotelClass: hasClasses ? hotelClass : 3,
+    smallGroup,
   });
 
   return (
@@ -2273,7 +2308,7 @@ const PriceTablesEditor = memo(function PriceTablesEditor({ value, onChange }) {
                 <Input
                   value={tb.period}
                   maxLength={300}
-                  placeholder="Thời gian áp dụng (VD: 01/01 – 12/31/2027)"
+                  placeholder="Thời gian áp dụng (VD: 01/01 – 31/12/2027)"
                   onChange={(e) => setTable(i, { period: e.target.value })}
                 />
               </div>
@@ -2569,6 +2604,21 @@ const ExtrasSection = memoOn(
               label="Đánh dấu “Tour dài ngày”"
               hint="Có thể hiện ở khối “Tour dài ngày” trên trang chủ"
             />
+            {TOUR_LABEL_OPTIONS.map((o) => (
+              <Toggle
+                key={o.key}
+                checked={t.labels.includes(o.key)}
+                onChange={(on) =>
+                  set({
+                    labels: TOUR_LABEL_KEYS.filter((k) =>
+                      k === o.key ? on : t.labels.includes(k),
+                    ),
+                  })
+                }
+                label={o.label}
+                hint={o.hint}
+              />
+            ))}
             <p className="text-xs leading-relaxed text-slate-500 sm:col-span-2">
               Trang chủ hiện các tour bạn chọn ở mục{" "}
               <Link
@@ -2584,7 +2634,7 @@ const ExtrasSection = memoOn(
       </Section>
     );
   },
-  ["code", "slug", "rank", "isActive", "cruise", "featured", "featuredLong"],
+  ["code", "slug", "rank", "isActive", "cruise", "featured", "featuredLong", "labels"],
 );
 
 /* =========================================================================

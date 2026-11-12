@@ -22,7 +22,11 @@ export const publicController = {
   pages: async (_req, res) => ok(res, await publicService.pages()),
   home: async (_req, res) => ok(res, await publicService.home()),
   slugs: async (_req, res) => ok(res, await publicService.slugs()),
-  site: async (_req, res) => ok(res, { tracking: await settingsService.getTracking() }),
+  site: async (_req, res) =>
+    ok(res, {
+      tracking: await settingsService.getTracking(),
+      smallGroup: await settingsService.getSmallGroup(),
+    }),
 
   /** Khách gửi form (đặt tour, thiết kế tour, xe, visa, liên hệ, đối tác) */
   async submitEnquiry(req, res) {
@@ -145,6 +149,13 @@ export const settingsController = {
   async saveTracking(req, res) {
     const data = await settingsService.saveTracking(req.validated.body, req.user);
     auditService.record(req, "settings.tracking");
+    ok(res, data);
+  },
+
+  getSmallGroup: async (_req, res) => ok(res, await settingsService.getSmallGroup()),
+  async saveSmallGroup(req, res) {
+    const data = await settingsService.saveSmallGroup(req.validated.body, req.user);
+    auditService.record(req, "settings.smallGroup", { meta: data });
     ok(res, data);
   },
 

@@ -7,6 +7,7 @@ import {
   PAGE_KEYS,
   PAYMENT_STATUS,
   REGION_VALUES,
+  TOUR_LABELS,
 } from "../constants/content.js";
 import { env } from "../config/env.js";
 import { canonicalVideo, cloudinaryVideo, cloudinaryVideoUrl, parseVideo } from "../utils/video.js";
@@ -272,6 +273,7 @@ export const tourSchema = z
     seo,
     featured: z.boolean().default(false),
     featuredLong: z.boolean().default(false),
+    labels: z.array(z.enum(TOUR_LABELS)).max(TOUR_LABELS.length).default([]), // Bán chạy / Độc quyền
     rank: z.coerce.number().int().min(0).max(100_000).default(1000),
     isActive,
   })
@@ -487,7 +489,7 @@ export const homeSettingsSchema = z.object({
     .default([])
     .transform((a) => a.slice(0, 8)), // tour dài ngày (tối đa 8)
   homeThemes: z.array(slug).max(8).default([]), // chủ đề hiện ở trang chủ (trống = tất cả)
-  featuredDestinations: z.array(slug).max(5).default([]), // 5 ô lớn của lưới điểm đến
+  featuredDestinations: z.array(slug).max(6).default([]), // 6 ô ảnh của lưới điểm đến
   // Câu chữ các khối trang chủ (cùng tên khoá với từ điển giao diện fe: dict.home) —
   // ô để trống thì website dùng câu mặc định của từ điển
   copy: z
@@ -541,7 +543,11 @@ export const homeSettingsSchema = z.object({
       partnersEyebrow: homeEyebrow,
       projectsTitle: homeTitle,
       partnersSubtitle: homeSubtitle,
-      projects: homeItems({ title: loc(120), text: homeSubtitle }, 3),
+      // Dự án đã phục vụ: tên · quy mô · thời gian · địa điểm / hành trình · mô tả ngắn (tối đa 6)
+      projects: homeItems(
+        { title: loc(120), size: loc(80), time: loc(80), place: loc(120), text: homeSubtitle },
+        6,
+      ),
       partnersCta: homeCta,
       reviewsEyebrow: homeEyebrow,
       reviewsTitle: homeTitle,
@@ -603,6 +609,20 @@ export const trackingSettingsSchema = z.object({
   gtmId: trackingId(/^GTM-[A-Z0-9]{4,12}$/, "Google Tag Manager (GTM-XXXXXXX)"),
   ga4Id: trackingId(/^G-[A-Z0-9]{6,14}$/, "Google Analytics (G-XXXXXXXXXX)"),
   adsId: trackingId(/^AW-[0-9]{6,14}$/, "Google Ads (AW-XXXXXXXXX)"),
+});
+
+/** Phụ thu nhóm nhỏ (%): số nguyên 0–200 theo số khách */
+const groupPct = z.coerce
+  .number({ error: "Nhập số từ 0 đến 200" })
+  .int("Nhập số nguyên từ 0 đến 200")
+  .min(0, "Nhập số từ 0 đến 200")
+  .max(200, "Nhập số từ 0 đến 200");
+export const smallGroupSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  one: groupPct,
+  two: groupPct,
+  threeFour: groupPct,
+  fivePlus: groupPct,
 });
 
 export const paymentSettingsSchema = z.object({

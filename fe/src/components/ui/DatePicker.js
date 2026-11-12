@@ -3,13 +3,23 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fmtDate, fmtDayChip, isISODate, parseUSDate, toISODate } from "@/lib/dates";
+import {
+  datePlaceholder,
+  fmtDate,
+  fmtDateInput,
+  fmtDayChip,
+  isISODate,
+  parseDate,
+  toISODate,
+} from "@/lib/dates";
 
 /**
  * Ô chọn ngày DÙNG CHUNG (website + CMS) thay cho <input type="date"> (trình duyệt hiện theo ngôn ngữ máy:
- * mm/dd/yyyy ở en-US nhưng dd/mm/yyyy ở vi-VN). Ô này luôn hiện **mm/dd/yyyy** ở mọi ngôn ngữ / máy.
+ * theo máy người dùng, không theo trang). Ô này hiện ngày theo NGÔN NGỮ TRANG (lib/dates.js), mọi máy như nhau:
+ * en mm/dd/yyyy · vi (website tiếng Việt + CMS) dd/mm/yyyy · zh yyyy/mm/dd.
  *
- * - Gõ tay: chỉ nhận số, tự chèn "/" (11272026 → 11/27/2026); rời ô → báo ngày sai / ngoài khoảng min–max.
+ * - Gõ tay: chỉ nhận số, tự chèn "/" (vi 14112026 → 14/11/2026; zh 20261114 → 2026/11/14);
+ *   rời ô → báo ngày sai / ngoài khoảng min–max.
  * - Lịch (nút bên phải, hoặc phím ↓ trong ô): tuần bắt đầu thứ Hai, tô hôm nay, khoá ngày ngoài khoảng;
  *   phím mũi tên / PageUp / PageDown / Home / End / Enter / Esc. Điện thoại: thẻ giữa màn hình, nền mờ.
  *   Dùng <dialog> (lớp trên cùng) → không bị khung cha overflow / transform cắt, không làm đóng popup cha.
@@ -38,7 +48,7 @@ const L = {
     today: "今天",
     clear: "清除",
     close: "关闭",
-    invalid: "请输入有效日期（mm/dd/yyyy）",
+    invalid: "请输入有效日期（yyyy/mm/dd）",
     min: (d) => `请选择 ${d} 或之后的日期`,
     max: (d) => `请选择 ${d} 或之前的日期`,
     week: ["一", "二", "三", "四", "五", "六", "日"],
@@ -51,7 +61,7 @@ const L = {
     today: "Hôm nay",
     clear: "Xoá",
     close: "Đóng",
-    invalid: "Ngày không hợp lệ (định dạng mm/dd/yyyy)",
+    invalid: "Ngày không hợp lệ (định dạng dd/mm/yyyy)",
     min: (d) => `Vui lòng chọn ngày từ ${d} trở đi`,
     max: (d) => `Vui lòng chọn ngày đến ${d} là muộn nhất`,
     week: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
@@ -59,28 +69,33 @@ const L = {
   },
 };
 
-/** Chữ gõ vào → dạng mm/dd/yyyy đang gõ dở (tự chèn "/", tối đa 10 ký tự) */
-function maskInput(raw, prev) {
+/**
+ * Chữ gõ vào → dạng số đang gõ dở (tự chèn "/", tối đa 10 ký tự):
+ * en/vi "11/27/2026" · "27/11/2026" (2-2-4 chữ số) · zh "2026/11/27" (4-2-2 chữ số; nhận cả 年 月 日)
+ */
+function maskInput(raw, prev, lang) {
   const s = String(raw)
-    .replace(/[.\-\s]/g, "/")
+    .replace(/[.\-\s年月]/g, "/")
     .replace(/[^\d/]/g, "");
   // Đang xoá → để nguyên (xoá được qua dấu "/")
   if (s.length < prev.length) return s;
+  // Số chữ số của từng phần
+  const [a, b, c] = lang === "zh" ? [4, 2, 2] : [2, 2, 4];
   const parts = s.split("/").slice(0, 3);
   if (parts.length === 1) {
-    const d = parts[0].slice(0, 8);
-    if (d.length < 2) return d;
-    if (d.length < 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
-    return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+    const d = parts[0].slice(0, a + b + c);
+    if (d.length < a) return d;
+    if (d.length < a + b) return `${d.slice(0, a)}/${d.slice(a)}`;
+    return `${d.slice(0, a)}/${d.slice(a, a + b)}/${d.slice(a + b)}`;
   }
-  const [m, d = "", y = ""] = parts;
-  const mm = m.slice(0, 2);
+  const [p0, p1 = "", p2 = ""] = parts;
+  const first = p0.slice(0, a);
   if (parts.length === 2) {
-    // "11/2712" → tháng + ngày + phần năm
-    if (d.length > 2) return `${mm}/${d.slice(0, 2)}/${d.slice(2, 6)}`;
-    return d.length === 2 ? `${mm}/${d}/` : `${mm}/${d}`;
+    // en "11/2712" → tháng + ngày + phần năm
+    if (p1.length > b) return `${first}/${p1.slice(0, b)}/${p1.slice(b, b + c)}`;
+    return p1.length === b ? `${first}/${p1}/` : `${first}/${p1}`;
   }
-  return `${mm}/${d.slice(0, 2)}/${y.slice(0, 4)}`;
+  return `${first}/${p1.slice(0, b)}/${p2.slice(0, c)}`;
 }
 
 const isoParts = (iso) => iso.split("-").map(Number);
@@ -108,7 +123,7 @@ const localToday = () => {
   return toISODate(n.getFullYear(), n.getMonth() + 1, n.getDate());
 };
 const clampISO = (iso, min, max) => (min && iso < min ? min : max && iso > max ? max : iso);
-const textOf = (v) => (isISODate(v) ? fmtDate(v) : String(v ?? ""));
+const textOf = (v, lang) => (isISODate(v) ? fmtDateInput(v, lang) : String(v ?? ""));
 
 export default function DatePicker({
   value = "",
@@ -122,7 +137,7 @@ export default function DatePicker({
   lang = "en",
   className,
   wrapperClassName,
-  placeholder = "mm/dd/yyyy",
+  placeholder,
   isDisabled,
   onKeyDown,
   onBlur,
@@ -136,13 +151,13 @@ export default function DatePicker({
   const msgId = `${autoId}-msg`;
   const titleId = `${autoId}-title`;
 
-  const [text, setText] = useState(() => textOf(value));
+  const [text, setText] = useState(() => textOf(value, lang));
   // Giá trị từ ngoài đổi (chọn nhanh, đặt lại form…) → hiện lại; giá trị do chính ô này gửi đi → giữ chữ đang gõ
   const [prevValue, setPrevValue] = useState(value);
   if (value !== prevValue) {
     setPrevValue(value);
-    const mine = isISODate(value) ? parseUSDate(text) === value : String(value ?? "") === text;
-    if (!mine) setText(textOf(value));
+    const mine = isISODate(value) ? parseDate(text, lang) === value : String(value ?? "") === text;
+    if (!mine) setText(textOf(value, lang));
   }
 
   const [touched, setTouched] = useState(false);
@@ -155,12 +170,12 @@ export default function DatePicker({
   const btnRef = useRef(null);
   const moveFocus = useRef(false);
 
-  const iso = isISODate(value) ? value : parseUSDate(text);
+  const iso = isISODate(value) ? value : parseDate(text, lang);
   let own = "";
   if (touched && text.trim()) {
     if (!iso) own = t.invalid;
-    else if (min && iso < min) own = t.min(fmtDate(min));
-    else if (max && iso > max) own = t.max(fmtDate(max));
+    else if (min && iso < min) own = t.min(fmtDate(min, lang));
+    else if (max && iso > max) own = t.max(fmtDate(max, lang));
   }
   const parentInvalid = ariaInvalid === true || ariaInvalid === "true";
   const showOwn = Boolean(own) && !parentInvalid;
@@ -184,7 +199,7 @@ export default function DatePicker({
   };
   const pick = (d) => {
     if (dayOff(d)) return;
-    setText(fmtDate(d));
+    setText(fmtDateInput(d, lang));
     setTouched(false);
     emit(d);
     closeCalendar();
@@ -284,22 +299,22 @@ export default function DatePicker({
           autoComplete="off"
           spellCheck={false}
           maxLength={10}
-          placeholder={placeholder}
+          placeholder={placeholder ?? datePlaceholder(lang)}
           required={required}
           disabled={disabled}
           value={text}
           aria-invalid={parentInvalid || Boolean(own) || undefined}
           aria-describedby={cn(describedBy, showOwn && msgId) || undefined}
           onChange={(e) => {
-            const next = maskInput(e.target.value, text);
+            const next = maskInput(e.target.value, text, lang);
             setText(next);
             setTouched(false);
-            const parsed = parseUSDate(next);
+            const parsed = parseDate(next, lang);
             emit(parsed ?? next);
           }}
           onBlur={(e) => {
             setTouched(true);
-            if (iso && text !== fmtDate(iso)) setText(fmtDate(iso)); // 1/5/2027 → 01/05/2027
+            if (iso && text !== fmtDateInput(iso, lang)) setText(fmtDateInput(iso, lang)); // vi 1/5/2027 → 01/05/2027
             onBlur?.(e);
           }}
           onKeyDown={(e) => {

@@ -73,7 +73,8 @@ export default function ProcessTabs({ processes, tabs }) {
           return (
             <li
               key={s.title}
-              className="relative flex gap-4 md:flex-col md:items-center md:text-center"
+              // Từ md: subgrid 3 hàng (biểu tượng · tiêu đề · mô tả) → mô tả các bước bắt đầu cùng một mức
+              className="relative flex gap-4 md:row-span-3 md:grid md:grid-rows-subgrid md:justify-items-center md:gap-y-0 md:text-center"
             >
               <span className="relative grid size-14 shrink-0 place-items-center rounded-full bg-forest-700 text-white shadow-lg ring-4 ring-cream-50">
                 <Icon className="size-6" />
@@ -81,8 +82,8 @@ export default function ProcessTabs({ processes, tabs }) {
                   {i + 1}
                 </span>
               </span>
-              <div>
-                <h3 className="text-base font-bold text-ink">{s.title}</h3>
+              <div className="md:contents">
+                <h3 className="text-base font-bold text-ink md:mt-4">{s.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-muted">{s.text}</p>
               </div>
             </li>

@@ -38,6 +38,7 @@ export default function FeaturedTours({ lang, dict, cards, labels }) {
                 lang={lang}
                 card={card}
                 labels={labels}
+                alignAt={false}
                 className="h-full"
               />
             ))}

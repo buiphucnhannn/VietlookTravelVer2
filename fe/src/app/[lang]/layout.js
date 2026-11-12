@@ -75,11 +75,13 @@ export default async function LangLayout({ children, params }) {
     foundingDate: String(siteConfig.since),
     address: {
       "@type": "PostalAddress",
-      streetAddress: tr(siteConfig.contact.address, "en"),
+      streetAddress: "01 Lien Ke 20, Van Khe Urban Area, Ha Dong",
       addressLocality: "Hanoi",
+      postalCode: "12113",
       addressCountry: "VN",
     },
-    sameAs: [siteConfig.social.facebook, siteConfig.social.tripadvisor, siteConfig.social.youtube],
+    hasMap: siteConfig.maps.link,
+    sameAs: [siteConfig.social.facebook, siteConfig.social.tripadvisor, siteConfig.social.google],
   };
 
   return (
@@ -143,6 +145,8 @@ export default async function LangLayout({ children, params }) {
               ...dict.floating,
               addWeChat: dict.common.addWeChat,
               wechatHint: dict.common.wechatHint,
+              addLine: dict.common.addLine,
+              lineHint: dict.common.lineHint,
               copy: dict.common.copy,
               copied: dict.common.copied,
             }}

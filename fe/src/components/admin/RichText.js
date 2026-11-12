@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import ImageExt from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import { Placeholder } from "@tiptap/extensions";
 import {
@@ -30,6 +29,7 @@ import {
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { CROP_PRESETS, useImageCrop } from "./ImageCropper";
+import ContentImage, { insertImages } from "./richTextImage";
 import { Button, Field, Input, Modal, Toggle, useUi } from "./ui";
 
 /** Nút trên thanh công cụ (giữ vùng chọn khi bấm: preventDefault ở mousedown) */
@@ -55,7 +55,8 @@ function B({ on, title, onClick, icon: Icon, disabled, off }) {
 /**
  * Trình soạn thảo nội dung (bài viết, lịch trình từng ngày, trang chính sách…).
  * Lưu HTML — backend lọc lại thẻ an toàn (chống XSS) trước khi lưu.
- * Ảnh chèn vào nội dung được tải lên Cloudinary (folder tuỳ chọn).
+ * Ảnh chèn vào nội dung hiện ngay nhưng CHỈ được lưu lên kho ảnh (Cloudinary, folder tuỳ chọn) khi bấm Lưu
+ * (./pendingImages.js). Cỡ ảnh, căn giữa, nút X xoá ảnh: ./richTextImage.js
  *   <RichText value={html} onChange={setHtml} folder="articles" minHeight={320} />
  */
 export default function RichText({
@@ -83,7 +84,7 @@ export default function RichText({
         heading: { levels: [2, 3, 4] },
         link: { openOnClick: false, autolink: true },
       }),
-      ImageExt.configure({ HTMLAttributes: { loading: "lazy" } }),
+      ContentImage.configure({ HTMLAttributes: { loading: "lazy" } }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder }),
     ],
@@ -116,7 +117,7 @@ export default function RichText({
     setBusy(true);
     try {
       const urls = await cropper.uploadFiles(list, { max: 10 });
-      urls.forEach((src) => editor.chain().focus().setImage({ src }).run());
+      insertImages(editor, urls);
     } catch (err) {
       toast(errorMessage(err), "error");
     } finally {
@@ -132,7 +133,7 @@ export default function RichText({
     setBusy(true);
     try {
       const { urls } = await cropper.importLinks([url], { beforeCrop: () => setImgOpen(false) });
-      if (urls[0]) editor.chain().focus().setImage({ src: urls[0] }).run();
+      if (urls[0]) insertImages(editor, [urls[0]]);
       setImgUrl("");
       setImgOpen(false);
     } catch (err) {
@@ -326,7 +327,7 @@ export default function RichText({
         size="sm"
         icon={ImagePlus}
         title="Chèn ảnh vào nội dung"
-        description="Tải ảnh từ máy hoặc dán link — ảnh được lưu vào kho ảnh của website và tự tối ưu."
+        description="Tải ảnh từ máy hoặc dán link. Ảnh hiện ngay trong bài, tự căn giữa và vừa khung — chỉ được lưu lên website khi bạn bấm Lưu."
       >
         <div className="space-y-5">
           <button

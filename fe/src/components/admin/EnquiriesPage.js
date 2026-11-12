@@ -86,7 +86,7 @@ function PaymentBadge({ value }) {
   return <Badge tone={s.tone}>{s.label}</Badge>;
 }
 
-/** "2026-05-12" → "05/12/2026" (không đổi múi giờ) */
+/** "2026-05-12" → "12/05/2026" (dd/mm/yyyy, không đổi múi giờ) */
 export const fmtDay = (s) => {
   if (!s) return "";
   const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(s));

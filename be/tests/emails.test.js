@@ -159,7 +159,7 @@ describe("email: nhãn dễ đọc, không lộ tên trường thô", () => {
     assert.match(car, /Loại chuyến xe: Một chiều/);
     assert.match(car, /Đón \/ tiễn sân bay: Không/);
     assert.match(car, /Giá báo: \$1,120/);
-    assert.match(car, /12\/20\/2026 · 09:00/);
+    assert.match(car, /20\/12\/2026 · 09:00/); // email nhân viên → dd/mm/yyyy
     assert.doesNotMatch(car, /Ngày giờ về/); // một chiều → không có giờ về mặc định
     const visa = companyEmail({ ...SAMPLES.visa, lang: "en" }).text;
     assert.match(visa, /Sân bay Tân Sơn Nhất \(SGN\)/);
@@ -172,10 +172,19 @@ describe("email: nhãn dễ đọc, không lộ tên trường thô", () => {
     const booking = customerEmail({ ...SAMPLES.booking, lang: "en" }).text;
     assert.match(booking, /2 adults · 1 child \(age 5\)/);
     assert.match(booking, /\$1,000/);
-    // mm/dd/yyyy cho mọi ngôn ngữ (quy ước chung toàn hệ thống)
-    for (const l of ["vi", "en", "zh"]) assert.equal(fmtDate("2026-12-20", l), "12/20/2026");
-    assert.equal(fmtDateTime("2026-11-27T07:05:00Z", "vi"), "11/27/2026 14:05");
+    // Ngày theo ngôn ngữ người đọc: vi dd/mm/yyyy · en mm/dd/yyyy · zh yyyy年m月d日
+    assert.equal(fmtDate("2026-12-20", "vi"), "20/12/2026");
+    assert.equal(fmtDate("2026-12-20", "en"), "12/20/2026");
+    assert.equal(fmtDate("2026-12-05", "zh"), "2026年12月5日");
+    assert.equal(fmtDate("2026-12-20"), "20/12/2026"); // mặc định: nhân viên (tiếng Việt)
+    assert.equal(fmtDateTime("2026-11-27T07:05:00Z", "vi"), "27/11/2026 14:05");
     assert.equal(fmtDateTime("2026-11-27T17:30:00Z", "en"), "11/28/2026 00:30 (GMT+7)");
+    assert.equal(fmtDateTime("2026-11-27T07:05:00Z", "zh"), "2026年11月27日 14:05（越南时间）");
+    assert.match(customerEmail({ ...SAMPLES.booking, lang: "vi" }).text, /\d{2}\/\d{2}\/\d{4}/);
+    assert.match(
+      customerEmail({ ...SAMPLES.booking, lang: "zh" }).text,
+      /\d{4}年\d{1,2}月\d{1,2}日/,
+    );
   });
 
   it("tên xe / gói / điểm đến tra từ DB được dùng khi có", () => {

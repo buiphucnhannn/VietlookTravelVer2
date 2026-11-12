@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Clock, Eye, MapPin } from "lucide-react";
+import { ArrowRight, Clock, Eye, Flame, MapPin, Star } from "lucide-react";
 import { cn, formatUSD } from "@/lib/utils";
 import { lp } from "@/i18n/config";
+import { subgrid } from "@/lib/subgrid";
 
 export function durationLabel(card, labels) {
   if (card.days <= 1) return card.halfDay ? labels.halfDay : `1 ${labels.day}`;
@@ -11,13 +12,39 @@ export function durationLabel(card, labels) {
 }
 
 /** Thẻ tour kiểu localvietnam: ảnh bo tròn, số ngày, tiêu đề đậm, nút viền "View tour". */
-export default function TourCard({ card, lang, labels, badge, className, priority, compact }) {
+// Nhãn nổi bật do CMS bật cho từng tour (thứ tự hiển thị: Độc quyền trước)
+const TOUR_LABELS = [
+  { key: "exclusive", Icon: Star, className: "bg-amber-brand text-ink" },
+  { key: "bestseller", Icon: Flame, className: "bg-clay-500 text-white" },
+];
+
+/**
+ * `alignAt`: thẻ nằm trong lưới → subgrid từ mốc màn hình này ("" mọi màn hình · "sm" mặc định), các thẻ
+ * cùng hàng thẳng hàng ảnh · điểm đến · tiêu đề · mô tả · giá. `false` (dải trượt Carousel – cha không phải
+ * lưới): giữ chỗ cố định 2 dòng cho tiêu đề và mô tả, điểm đến 1 dòng → các thẻ vẫn thẳng hàng.
+ */
+export default function TourCard({
+  card,
+  lang,
+  labels,
+  badge,
+  className,
+  priority,
+  compact,
+  alignAt = "sm",
+}) {
   const url = `${lp(lang)}/tours/${card.slug}`;
+  const tags = TOUR_LABELS.filter((l) => card.labels?.includes(l.key) && labels?.[l.key]);
+  const exclusive = card.labels?.includes("exclusive");
+  const fixed = alignAt === false;
   return (
     <article
       className={cn(
         // Khung bo vòm (arch) nền kem theo yêu cầu khách – đồng bộ với ô điểm đến
         "group arch-frame relative flex flex-col transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_48px_-20px_rgba(60,40,10,0.45)]",
+        // Tour độc quyền: viền vàng nhấn nhẹ (cùng kích thước thẻ, không phá lưới)
+        exclusive && "ring-2 ring-amber-brand",
+        !fixed && subgrid(compact ? 4 : 5, alignAt),
         className,
       )}
     >
@@ -46,6 +73,23 @@ export default function TourCard({ card, lang, labels, badge, className, priorit
           }
           className="object-cover transition-transform duration-700 group-hover:scale-105"
         />
+        {tags.length > 0 && (
+          // Giữa mép trên (khung vòm bo tròn 2 góc trên → đặt ở góc sẽ bị cắt)
+          <span className="absolute top-6 left-1/2 flex -translate-x-1/2 gap-1.5 whitespace-nowrap">
+            {tags.map(({ key, Icon, className: tone }) => (
+              <span
+                key={key}
+                className={cn(
+                  "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shadow",
+                  tone,
+                )}
+              >
+                <Icon className="size-3.5 fill-current" aria-hidden />
+                {labels[key]}
+              </span>
+            ))}
+          </span>
+        )}
         {badge && (
           <span className="absolute top-4 right-4 rounded-full bg-clay-500 px-2.5 py-1 text-xs font-semibold text-white shadow">
             {badge}
@@ -58,52 +102,73 @@ export default function TourCard({ card, lang, labels, badge, className, priorit
         </span>
       </Link>
 
-      <div className="flex flex-1 flex-col px-3 pt-4 pb-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8rem] text-muted">
-          {card.destinationNames?.length > 0 && (
-            <span className="flex items-center gap-1">
-              <MapPin className="size-3.5 text-forest-700" />
+      {/* Mỗi phần tử con dưới đây = 1 hàng của subgrid (điểm đến · tiêu đề · mô tả · giá) */}
+      <div
+        className={cn(
+          "flex items-center gap-x-3 gap-y-1 px-3 pt-4 text-[0.8rem] text-muted",
+          fixed ? "min-h-[calc(1lh+1rem)] flex-nowrap" : "flex-wrap",
+        )}
+      >
+        {card.destinationNames?.length > 0 && (
+          <span className="flex min-w-0 items-center gap-1">
+            <MapPin className="size-3.5 shrink-0 text-forest-700" />
+            <span className={cn(fixed && "truncate")}>
               {card.destinationNames.slice(0, 2).join(", ")}
             </span>
-          )}
-        </div>
-        <h3 className="mt-1.5 line-clamp-2 text-[1.05rem] leading-snug font-bold text-ink transition-colors group-hover:text-clay-600">
-          <Link href={url} className="after:absolute after:inset-0">
-            {card.title}
-          </Link>
-        </h3>
-        {card.summary && !compact && (
-          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted">{card.summary}</p>
+          </span>
         )}
-        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-          <div className="min-w-0 leading-tight">
-            {card.price ? (
-              <>
-                <span className="block text-xs text-muted">{labels.from}</span>
-                <span className="flex flex-wrap items-baseline gap-x-1.5">
-                  {card.originalPrice && (
-                    <span className="text-xs text-muted line-through">
-                      {formatUSD(card.originalPrice)}
-                    </span>
-                  )}
-                  <span className="text-xl font-bold text-sun-500">{formatUSD(card.price)}</span>
-                </span>
-              </>
-            ) : (
-              <span className="text-sm font-semibold text-clay-600">{labels.contactPrice}</span>
-            )}
-          </div>
-          <span
+      </div>
+      <h3
+        className={cn(
+          "mt-1.5 line-clamp-2 px-3 text-[1.05rem] leading-snug font-bold text-ink transition-colors group-hover:text-clay-600",
+          fixed && "min-h-[2lh]",
+        )}
+      >
+        <Link href={url} className="after:absolute after:inset-0">
+          {card.title}
+        </Link>
+      </h3>
+      {!compact &&
+        (card.summary ? (
+          <p
             className={cn(
-              "shrink-0 items-center gap-1.5 rounded-full border-2 border-clay-500 px-3 py-1.5 text-sm font-semibold whitespace-nowrap text-clay-600 transition-colors group-hover:bg-clay-500 group-hover:text-white",
-              // lưới 2 cột trên mobile hẹp → ẩn nút, cả thẻ vẫn bấm được
-              compact ? "hidden sm:inline-flex" : "inline-flex",
+              "mt-2 line-clamp-2 px-3 text-sm leading-relaxed text-muted",
+              fixed && "min-h-[2lh]",
             )}
           >
-            <Eye className="size-4" />
-            {labels.viewTour}
-          </span>
+            {card.summary}
+          </p>
+        ) : (
+          <span aria-hidden />
+        ))}
+      <div className="mt-auto flex items-end justify-between gap-3 px-3 pt-4 pb-3">
+        <div className="min-w-0 leading-tight">
+          {card.price ? (
+            <>
+              <span className="block text-xs text-muted">{labels.from}</span>
+              <span className="flex flex-wrap items-baseline gap-x-1.5">
+                {card.originalPrice && (
+                  <span className="text-xs text-muted line-through">
+                    {formatUSD(card.originalPrice)}
+                  </span>
+                )}
+                <span className="text-xl font-bold text-sun-500">{formatUSD(card.price)}</span>
+              </span>
+            </>
+          ) : (
+            <span className="text-sm font-semibold text-clay-600">{labels.contactPrice}</span>
+          )}
         </div>
+        <span
+          className={cn(
+            "shrink-0 items-center gap-1.5 rounded-full border-2 border-clay-500 px-3 py-1.5 text-sm font-semibold whitespace-nowrap text-clay-600 transition-colors group-hover:bg-clay-500 group-hover:text-white",
+            // lưới 2 cột trên mobile hẹp → ẩn nút, cả thẻ vẫn bấm được
+            compact ? "hidden sm:inline-flex" : "inline-flex",
+          )}
+        >
+          <Eye className="size-4" />
+          {labels.viewTour}
+        </span>
       </div>
     </article>
   );

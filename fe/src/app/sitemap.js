@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { siteConfig } from "@/constants/site";
 import { defaultLocale, href, localeMeta, locales } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
@@ -22,6 +23,9 @@ const staticPaths = [
 
 /** Sitemap XML kèm khai báo hreflang cho mọi ngôn ngữ (en / zh-Hans / vi). */
 export default async function sitemap() {
+  // Không dựng sẵn lúc build: đọc dữ liệu mới nhất mỗi lần (dữ liệu vẫn qua bộ nhớ đệm theo thẻ nên nhanh),
+  // nhờ vậy ẩn/hiện trang, tour, bài viết trong CMS là sitemap cập nhật ngay
+  await connection();
   const { destinations, regions, themes, allTours, allPosts, authors, guideCategories, policies } =
     await getCatalog();
   // Ngày sửa gần nhất của tour / bài viết → Google biết trang nào cần thu thập lại

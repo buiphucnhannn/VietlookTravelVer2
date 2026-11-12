@@ -4,15 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, MessageCircle, Phone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { smoothScrollTo } from "@/components/fx/SmoothScroll";
-import { WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
+import { LineIcon, WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
 import { useA11y } from "./A11y";
 
-/** Nút liên hệ nhanh nổi: WhatsApp, WeChat, Zalo, hotline + về đầu trang. */
+/** Nút liên hệ nhanh nổi: WhatsApp, WeChat, LINE, Zalo, hotline + về đầu trang.
+ *  WeChat / LINE không có link mở thẳng tin nhắn → hộp thoại hiện WeChat ID / số điện thoại kèm nút chép. */
 export default function FloatingContact({ labels, contact, messaging }) {
   const a11y = useA11y();
   const [open, setOpen] = useState(false);
-  const [wechat, setWechat] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [dialog, setDialog] = useState(null); // null | "wechat" | "line"
+  const [copied, setCopied] = useState(null);
   const [showTop, setShowTop] = useState(false);
   const box = useRef(null);
 
@@ -48,7 +49,14 @@ export default function FloatingContact({ labels, contact, messaging }) {
       label: labels.wechat,
       icon: WeChatIcon,
       color: "bg-[#07c160]",
-      onClick: () => setWechat(true),
+      onClick: () => setDialog("wechat"),
+    },
+    {
+      key: "line",
+      label: labels.line,
+      icon: LineIcon,
+      color: "bg-[#06c755]",
+      onClick: () => setDialog("line"),
     },
     {
       key: "zalo",
@@ -66,11 +74,30 @@ export default function FloatingContact({ labels, contact, messaging }) {
     },
   ];
 
-  const copy = async () => {
+  // LINE: chưa có LINE ID → kết bạn bằng số điện thoại (2 số đều dùng LINE)
+  const dialogs = {
+    wechat: {
+      icon: WeChatIcon,
+      color: "bg-[#07c160]",
+      title: labels.addWeChat,
+      hint: labels.wechatHint,
+      values: [messaging.wechatId],
+    },
+    line: {
+      icon: LineIcon,
+      color: "bg-[#06c755]",
+      title: labels.addLine,
+      hint: labels.lineHint,
+      values: [contact.hotline, contact.hotline2],
+    },
+  };
+  const d = dialog && dialogs[dialog];
+
+  const copy = async (value) => {
     try {
-      await navigator.clipboard.writeText(messaging.wechatId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      await navigator.clipboard.writeText(value);
+      setCopied(value);
+      setTimeout(() => setCopied(null), 1800);
     } catch {
       /* trình duyệt chặn clipboard – bỏ qua */
     }
@@ -114,7 +141,9 @@ export default function FloatingContact({ labels, contact, messaging }) {
                       it.color,
                     )}
                   >
-                    <it.icon className={it.key === "zalo" ? "size-8" : "size-5"} />
+                    <it.icon
+                      className={it.key === "zalo" || it.key === "line" ? "size-8" : "size-5"}
+                    />
                   </span>
                 </>
               );
@@ -162,12 +191,13 @@ export default function FloatingContact({ labels, contact, messaging }) {
         </div>
       </div>
 
-      {wechat && (
+      {d && (
         <div
           className="fixed inset-0 z-[70] grid place-items-center bg-brand-950/60 px-3 py-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
-          onClick={() => setWechat(false)}
+          aria-label={d.title}
+          onClick={() => setDialog(null)}
         >
           <div
             className="relative max-h-full w-full max-w-sm scrollbar-thin overflow-y-auto overscroll-contain rounded-3xl bg-white px-5 pt-7 pb-6 text-center shadow-2xl sm:p-7"
@@ -175,28 +205,43 @@ export default function FloatingContact({ labels, contact, messaging }) {
           >
             <button
               type="button"
-              onClick={() => setWechat(false)}
+              onClick={() => setDialog(null)}
               className="absolute top-2.5 right-2.5 grid size-10 place-items-center rounded-full hover:bg-surface"
               aria-label={a11y.close}
             >
               <X className="size-5" />
             </button>
-            <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#07c160] text-white">
-              <WeChatIcon className="size-9" />
+            <span
+              className={cn(
+                "mx-auto grid size-16 place-items-center rounded-2xl text-white",
+                d.color,
+              )}
+            >
+              <d.icon className={dialog === "line" ? "size-14" : "size-9"} />
             </span>
-            <h3 className="mt-4 text-xl font-bold text-ink">{labels.addWeChat}</h3>
-            <p className="mt-1 text-sm text-balance text-muted">{labels.wechatHint}</p>
-            <div className="mt-5 flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
-              <span className="min-w-0 font-mono text-lg font-semibold tracking-wide break-all text-ink">
-                {messaging.wechatId}
-              </span>
-              <button
-                type="button"
-                onClick={copy}
-                className="h-10 shrink-0 rounded-lg bg-[#07c160] px-3.5 text-sm font-semibold text-white"
-              >
-                {copied ? labels.copied : labels.copy}
-              </button>
+            <h3 className="mt-4 text-xl font-bold text-ink">{d.title}</h3>
+            <p className="mt-1 text-sm text-balance text-muted">{d.hint}</p>
+            <div className="mt-5 space-y-2.5">
+              {d.values.map((v) => (
+                <div
+                  key={v}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3"
+                >
+                  <span className="min-w-0 font-mono text-lg font-semibold tracking-wide break-all text-ink">
+                    {v}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copy(v)}
+                    className={cn(
+                      "h-10 shrink-0 rounded-lg px-3.5 text-sm font-semibold text-white",
+                      d.color,
+                    )}
+                  >
+                    {copied === v ? labels.copied : labels.copy}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>

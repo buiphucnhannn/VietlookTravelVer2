@@ -7,9 +7,23 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { fill, href, locales, lp, tr } from "@/i18n/config";
 import { pageMetadata, notFoundMetadata } from "@/lib/seo";
 import { Container } from "@/components/ui";
-import { BannerHero } from "@/components/ui/PageHero";
+import { AdviceBox, BannerHero } from "@/components/ui/PageHero";
+import { Star } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { EXCLUSIVE_THEME } from "@/constants/themes";
 import TourListing from "@/components/tours/TourListing";
 import { getCatalog } from "@/lib/catalog";
+
+/**
+ * Tên chủ đề để chèn vào mẫu câu "Samples of {name} tours": bỏ chữ "tour" / "线路" đã có sẵn trong tên
+ * (vd. "Exclusive tours" → "Exclusive") để không lặp "Exclusive tours tours".
+ */
+const inSentence = (name, lang) =>
+  lang === "zh"
+    ? name.replace(/线路$/, "")
+    : lang === "vi"
+      ? name.replace(/^tour\s+/i, "")
+      : name.replace(/\s+tours?$/i, "");
 
 export async function generateStaticParams() {
   const { themes } = await getCatalog();
@@ -25,7 +39,7 @@ export async function generateMetadata({ params }) {
   return pageMetadata({
     lang,
     path: `/themes/${slug}`,
-    title: fill(dict.theme.samples, { name: tr(theme.name, lang) }),
+    title: fill(dict.theme.samples, { name: inSentence(tr(theme.name, lang), lang) }),
     description: tr(theme.intro, lang),
     image: theme.banner || theme.image,
   });
@@ -39,11 +53,14 @@ async function ThemePageContent({ params }) {
   if (!theme) notFound();
   const dict = await getDictionary(lang);
   const name = tr(theme.name, lang);
+  const tours = toursByTheme(slug);
 
   return (
     <>
       <BannerHero
-        title={fill(dict.theme.samples, { name: lang === "zh" ? name : name.toUpperCase() })}
+        title={fill(dict.theme.samples, {
+          name: lang === "zh" ? inSentence(name, lang) : inSentence(name, lang).toUpperCase(),
+        })}
         subtitle={tr(theme.tagline, lang)}
         images={[theme.banner || theme.image]}
         breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: name }]}
@@ -52,17 +69,21 @@ async function ThemePageContent({ params }) {
         <Container>
           <header className="mx-auto mb-10 max-w-4xl text-center">
             <h2 className="text-2xl font-semibold tracking-wide text-ink uppercase sm:text-3xl">
-              {fill(dict.theme.browse, { name })}
+              {fill(dict.theme.browse, { name: inSentence(name, lang) })}
             </h2>
             <p className="mt-4 leading-relaxed text-muted sm:text-lg">{tr(theme.intro, lang)}</p>
           </header>
-          <TourListing
-            lang={lang}
-            dict={dict}
-            tours={toursByTheme(slug)}
-            hide={["theme"]}
-            variant="aurora"
-          />
+          {tours.length ? (
+            <TourListing lang={lang} dict={dict} tours={tours} hide={["theme"]} variant="aurora" />
+          ) : (
+            // Chủ đề chưa gắn tour nào (vd. "Tour độc quyền" mới tạo, chờ phòng kinh doanh gắn tour)
+            <AdviceBox
+              title={dict.theme.emptyTitle}
+              text={dict.theme.emptyText}
+              cta={dict.theme.emptyCta}
+              href={href(lang, "/plan-your-trip")}
+            />
+          )}
         </Container>
       </section>
 
@@ -78,7 +99,11 @@ async function ThemePageContent({ params }) {
                 <Link
                   key={t.slug}
                   href={`${lp(lang)}/themes/${t.slug}`}
-                  className="group relative block h-56 w-36 shrink-0 overflow-hidden sm:w-auto"
+                  className={cn(
+                    "group relative block h-56 w-36 shrink-0 overflow-hidden sm:w-auto",
+                    // "Tour độc quyền" nổi bật: viền vàng + sao
+                    t.slug === EXCLUSIVE_THEME && "ring-2 ring-amber-brand ring-inset",
+                  )}
                 >
                   <Image
                     src={t.image}
@@ -91,6 +116,12 @@ async function ThemePageContent({ params }) {
                   <span className="absolute inset-0 grid place-items-center px-2 text-center font-bold tracking-wider uppercase">
                     {tr(t.name, lang)}
                   </span>
+                  {t.slug === EXCLUSIVE_THEME && (
+                    <Star
+                      className="absolute top-3 left-1/2 size-5 -translate-x-1/2 fill-amber-brand text-amber-brand"
+                      aria-hidden
+                    />
+                  )}
                 </Link>
               ))}
           </div>

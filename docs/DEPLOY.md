@@ -139,10 +139,29 @@ Add New → Project → repo: **Root Directory `fe`**, Framework Next.js, Node 2
 | `NEXT_PUBLIC_ALLOW_INDEXING` | thường để trống; `false` = chưa cho Google index dù đã có tên miền thật; `true` = ép cho index |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | site key Turnstile |
 | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `NEXT_PUBLIC_CLOUDINARY_FOLDER` | xem `fe/.env.example` |
+| `ADMIN_LOGIN_PATH` | **đường dẫn bí mật** của trang đăng nhập quản trị, VD `/quan-tri-<chuỗi ngẫu nhiên>` — bắt buộc khi bàn giao (mục 3.1) |
 
 - `BACKEND_URL` dùng **cả lúc build** (prerender + `generateStaticParams`) → backend phải đang chạy và **đã có dữ liệu**
   trước khi deploy; DB rỗng → build fail `empty-generate-static-params`.
 - `NEXT_PUBLIC_*` nhúng vào bundle lúc build → đổi giá trị phải **Redeploy**.
+
+### 3.1. Đường dẫn đăng nhập quản trị bí mật (`ADMIN_LOGIN_PATH`)
+
+- Đặt `ADMIN_LOGIN_PATH` → trang đăng nhập **chỉ** mở ở `https://<tên-miền><ADMIN_LOGIN_PATH>`.
+  Người chưa đăng nhập mở `/login`, `/admin`, `/admin/...` → trang 404 như link không tồn tại (không chuyển hướng,
+  không lộ chỗ đăng nhập). Đã đăng nhập thì dùng `/admin` như bình thường.
+- Giá trị: 1 đoạn, chữ thường không dấu / số / gạch ngang, 8–64 ký tự, không bắt đầu bằng `admin`, `login`, `api`,
+  `en`, `vi`, `zh`. Tạo chuỗi ngẫu nhiên: `node -e "console.log('/quan-tri-' + crypto.randomBytes(5).toString('hex'))"`.
+- Biến **không** có tiền tố `NEXT_PUBLIC_` → chỉ server biết: không có trong JS của website, sitemap, robots.txt.
+  **Không** ghi giá trị thật vào repo, tài liệu, nhóm chat chung.
+- Đăng xuất / hết phiên: trình duyệt quay lại đúng trang đăng nhập bí mật đã dùng lần trước (trình duyệt tự nhớ).
+  Máy mới / đã xoá dữ liệu trình duyệt → về trang chủ; nhân viên mở link đã lưu (bookmark).
+- **Đổi đường dẫn** (lộ link, nhân viên nghỉ việc): Vercel → Settings → Environment Variables → sửa `ADMIN_LOGIN_PATH`
+  → **Redeploy** → gửi link mới cho nhân viên (link cũ thành 404). Nên kết hợp đổi mật khẩu / khoá tài khoản liên quan
+  trong CMS → Tài khoản.
+- Chưa đặt: trang đăng nhập ở `/login` như cũ (dùng cho máy dev); build production ghi cảnh báo
+  `Chưa đặt ADMIN_LOGIN_PATH` trong log.
+- Đây là lớp che bổ sung: đăng nhập vẫn do backend kiểm tra (giới hạn số lần thử, khoá tạm khi sai nhiều lần).
 
 ### Đổi sang tên miền chính
 
@@ -170,12 +189,16 @@ lên Google Search Console. Bản chạy thử trên tên miền tạm luôn b�
 - [ ] `https://<tên-miền>` mở trang tiếng Anh (không tiền tố); `/zh`, `/vi` hoạt động; `/en/...` chuyển về bản không tiền tố
 - [ ] `/tours`, `/tours/<slug>`, `/travel-guide` render được; URL web cũ chuyển hướng 301 đúng (`docs/redirect-map.csv`)
 - [ ] Gửi từng form (đặt tour, thiết kế tour, xe, visa, liên hệ, đối tác) → thấy trong CMS + email tới đúng người nhận
-- [ ] `/login` → `/admin`; upload ảnh lên Cloudinary được
+- [ ] Mở `<ADMIN_LOGIN_PATH>` → đăng nhập → vào `/admin`; upload ảnh lên Cloudinary được
+- [ ] Cửa sổ ẩn danh (chưa đăng nhập): `/login`, `/admin`, `/admin/tours` → trang 404
 - [ ] Cookie `__Host-vl_at`, `__Secure-vl_rt`, `__Host-vl_session` (HttpOnly, Secure, SameSite=Strict)
 
 ## 5. Checklist bàn giao
 
 - [ ] `DEMO_LOGIN=false`, `MAIL_REDIRECT_TO` trống, `NINEPAY_FAKE=false` / không đặt
+- [ ] `ADMIN_LOGIN_PATH` đã đặt trên Vercel (giá trị ngẫu nhiên mới, không dùng lại giá trị lúc chạy thử) → Redeploy;
+      gửi link `https://<tên-miền><ADMIN_LOGIN_PATH>` **riêng** cho khách (gặp trực tiếp / tin nhắn riêng), dặn lưu
+      bookmark và không chia sẻ; hướng dẫn cách đổi link (mục 3.1)
 - [ ] CMS → Cài đặt → Email nhận thông báo = email của **khách**; `NOTIFY_EMAIL` = email khách
 - [ ] CMS → Cài đặt → Thanh toán 9Pay: admin nhập 3 mã thật **trực tiếp trên CMS / server** (không gửi qua Zalo / email);
       đăng ký Return URL `https://<tên-miền>/api/v1/payments/return`, IPN URL `https://<tên-miền>/api/v1/payments/ipn`;
@@ -231,7 +254,8 @@ crontab -e   # thêm dòng: 3h sáng Chủ nhật (sau bản sao lưu database 2
 | `/api/v1/health` trả 503 `database: disconnected` | Sai `MONGODB_URI` hoặc IP chưa được phép trong Atlas |
 | API trả 403 `DIRECT_ACCESS` | Gọi thẳng backend không kèm `X-Proxy-Secret` — đúng thiết kế, gọi qua tên miền website |
 | Form báo `Xác minh captcha thất bại` | Có `TURNSTILE_SECRET_KEY` nhưng thiếu site key ở Vercel / tên miền chưa có trong Turnstile Hostnames |
-| Đăng nhập xong bị đá về `/login` | `PROXY_SECRET` 2 bên khác nhau, hoặc cookie bị chặn (kiểm tra HTTPS) |
+| Đăng nhập xong bị đá về trang đăng nhập / 404 | `PROXY_SECRET` 2 bên khác nhau, hoặc cookie bị chặn (kiểm tra HTTPS) |
+| Quên link đăng nhập quản trị | Xem `ADMIN_LOGIN_PATH` trong Vercel → Settings → Environment Variables (mục 3.1) |
 | Vercel build fail `empty-generate-static-params` | Backend chưa chạy / DB rỗng lúc build → bật backend + `npm run seed` rồi redeploy |
 | Request đầu tiên lỗi / chậm sau khi Render ngủ | Gói Free ngủ 30–60s; `fe/src/proxy.js` chờ 5s, `catalog.js` chờ 30s → dùng gói trả phí hoặc VPS |
 | Đổi env trên Vercel không có tác dụng | `NEXT_PUBLIC_*` chỉ đọc lúc build → Redeploy (nên Clear build cache) |

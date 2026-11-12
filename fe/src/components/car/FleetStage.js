@@ -146,6 +146,10 @@ export default function FleetStage({ fleet, t }) {
           <h3 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
             {car.name.label}
           </h3>
+          {/* Mô tả thêm (CMS) – vd. các cỡ limousine lớn hơn theo yêu cầu */}
+          {car.description && (
+            <p className="mt-3 text-sm leading-relaxed text-white/75">{car.description}</p>
+          )}
           <div className="mt-6 grid grid-cols-3 gap-3">
             {[
               { icon: Users, v: car.pax, l: t.passengersShort },

@@ -85,8 +85,10 @@ const vi = {
     readMore: "Đọc thêm",
     backHome: "Về trang chủ",
     priceOnRequest: "Giá theo yêu cầu",
+    labelBestseller: "Bán chạy",
+    labelExclusive: "Độc quyền",
     contactPrice: "Liên hệ để biết giá",
-    ratingText: "Xuất sắc · 35 đánh giá",
+    ratingText: "Xuất sắc · 89 đánh giá",
     ratingShort: "Xuất sắc",
     mapsReviews: "4.7 · 31 đánh giá",
     paxGroup: "khách / đoàn",
@@ -114,6 +116,8 @@ const vi = {
     chatWhatsApp: "Chat qua WhatsApp",
     addWeChat: "Kết bạn WeChat",
     wechatHint: "Tìm WeChat ID của chúng tôi trong ứng dụng để kết bạn",
+    addLine: "Kết bạn LINE",
+    lineHint: "Tìm một trong các số điện thoại này trên LINE để kết bạn",
     copy: "Sao chép",
     copied: "Đã sao chép!",
     adults: "Người lớn",
@@ -150,7 +154,7 @@ const vi = {
     heroTextShort:
       "Ruộng bậc thang, phố cổ đèn lồng và đảo nhiệt đới – hành trình do người bản địa am hiểu Việt Nam thiết kế.",
     trust: [
-      { t: "Xuất sắc", d: "35 đánh giá trên Tripadvisor", kind: "tripadvisor" },
+      { t: "Xuất sắc", d: "89 đánh giá trên Tripadvisor", kind: "tripadvisor" },
       { t: "Google 4.7", d: "31 đánh giá trên Google Maps", kind: "google" },
       { t: "Trụ sở tại Hà Nội", d: "Công ty lữ hành bản địa từ năm 2009", kind: "team" },
       { t: "Hỗ trợ 24/7", d: "Đội ngũ trực WhatsApp & WeChat", kind: "support" },
@@ -262,7 +266,7 @@ const vi = {
       "Vietlook Travel hợp tác với các đại lý, OTA và đơn vị tổ chức MICE với vai trò DMC trọn gói. Hãy gửi đoàn hoặc khách lẻ cho chúng tôi – chúng tôi lo khách sạn, vận chuyển, hướng dẫn viên và visa với giá net và báo giá nhanh chóng.",
     b2bPoints: [
       "Giá net cạnh tranh & giá series",
-      "Báo giá trong 24 giờ, giao tiếp tiếng Anh & tiếng Trung",
+      "Báo giá trong 15–30 phút (giờ hành chính), giao tiếp tiếng Anh & tiếng Trung",
       "Lịch trình và tài liệu white-label",
       "Đoàn, incentive & MICE từ 2 đến hơn 200 khách",
     ],
@@ -321,25 +325,41 @@ const vi = {
     gridTitle: "Điểm đến hàng đầu",
     gridSubtitle: "Từ núi rừng đến biển đảo.",
     gridDiscover: "Khám phá ngay",
-    gridOther: "Địa điểm khác",
+    gridOther: "điểm đến khác",
     gridViewAll: "Xem tất cả",
     gridTours: "tour",
     partnerStrip: "Đối tác tin cậy",
-    partnersEyebrow: "Đối tác tin cậy",
-    partnersSubtitle: "Đại lý, du thuyền, khách sạn & hãng hàng không.",
-    projectsTitle: "Dự án hợp tác",
+    partnersEyebrow: "Dấu ấn hợp tác",
+    partnersSubtitle: "Sự kiện và đoàn khách thật do đội ngũ chúng tôi phục vụ.",
+    projectsTitle: "Dự án chúng tôi đã phục vụ",
     projects: [
       {
-        title: "Khách lẻ & đoàn series cho đại lý nước ngoài",
-        text: "Điều hành tại chỗ, hướng dẫn viên và vận chuyển cho các đại lý đối tác tại châu Á, châu Âu và Úc.",
+        title: "Sự kiện khai trương ngân hàng ICBC (Trung Quốc)",
+        size: "150 khách",
+        time: "2009",
+        place: "",
+        text: "Phục vụ khách mời dự sự kiện khai trương của Ngân hàng Công thương Trung Quốc.",
       },
       {
-        title: "Chương trình MICE & incentive",
-        text: "Đoàn doanh nghiệp từ 20 đến hơn 200 khách với gala dinner, team building và dịch vụ sân bay VIP.",
+        title: "Lễ ký hợp đồng Nhà máy Nhiệt điện Vĩnh Tân",
+        size: "120 khách",
+        time: "",
+        place: "Bình Thuận",
+        text: "Tổ chức dịch vụ cho khách mời dự lễ ký kết hợp đồng.",
       },
       {
-        title: "Allotment du thuyền & khách sạn",
-        text: "Allotment đã xác nhận trên du thuyền Vịnh Hạ Long và khách sạn 4–5★ cho các ngày khởi hành mùa cao điểm.",
+        title: "Liên danh CGTC – cao tốc Hà Nội – Hải Phòng",
+        size: "Khoảng 300 lượt dịch vụ",
+        time: "3 năm",
+        place: "Hà Nội – Hải Phòng",
+        text: "Cung cấp dịch vụ đi lại và vận chuyển thường xuyên cho liên danh thi công tuyến cao tốc.",
+      },
+      {
+        title: "Đoàn khách Ấn Độ của ông Shanker Kanukala",
+        size: "80 khách",
+        time: "Tháng 10/2025",
+        place: "Hà Nội – Ninh Bình – Hạ Long",
+        text: "Chương trình đoàn qua những điểm nổi bật của miền Bắc.",
       },
     ],
     partnersCta: "Hợp tác cùng chúng tôi",
@@ -488,6 +508,10 @@ const vi = {
     samples: "Tour {name} tiêu biểu",
     browse: "Khám phá các tour {name} riêng của chúng tôi",
     others: "Loại hình tour khác",
+    emptyTitle: "Hành trình mới sắp ra mắt",
+    emptyText:
+      "Đội ngũ chúng tôi đang chuẩn bị các tour cho chủ đề này. Hãy cho chúng tôi biết ngày đi và sở thích, chúng tôi sẽ thiết kế chuyến đi riêng cho bạn.",
+    emptyCta: "Lên kế hoạch chuyến đi",
   },
   packages: {
     title: "Tour trọn gói Việt Nam",
@@ -500,8 +524,12 @@ const vi = {
         text: "Luôn kết nối với SIM data miễn phí và liên lạc tức thì với đội ngũ bản địa.",
       },
       {
-        title: "Công ty du lịch bản địa",
-        text: "Trụ sở tại Hà Nội – liên lạc nhanh, am hiểu địa phương và dịch vụ đáng tin cậy.",
+        title: "Công ty bản địa, văn phòng khắp cả nước",
+        text: "Công ty Việt Nam có văn phòng đại diện trên khắp Việt Nam – am hiểu địa phương, hỗ trợ nhanh dù bạn ở đâu.",
+      },
+      {
+        title: "Tài xế nói ngôn ngữ của bạn",
+        text: "Tài xế nói tiếng Anh, tiếng Trung hoặc ngôn ngữ bạn chọn.",
       },
       {
         title: "Gói tour tùy chỉnh",
@@ -510,10 +538,6 @@ const vi = {
       {
         title: "Thanh toán bằng tiền tệ của bạn",
         text: "Thanh toán an toàn bằng thẻ quốc tế (Visa, Mastercard, JCB) hoặc chuyển khoản ngân hàng.",
-      },
-      {
-        title: "Trải nghiệm độc đáo",
-        text: "Những khoảnh khắc bản địa chân thực kết hợp với khách sạn tiện nghi, chọn lọc kỹ.",
       },
       {
         title: "Hỗ trợ 24/7",
@@ -682,8 +706,8 @@ const vi = {
     ctaFleet: "Xem đội xe",
     perks: [
       "Tài xế cầm biển tên chờ tại sảnh đến",
-      "Miễn phí thời gian chờ khi chuyến bay trễ",
-      "Thanh toán tiền mặt cho tài xế hoặc chuyển khoản",
+      "Miễn phí chờ tới 120 phút khi chuyến bay trễ",
+      "Đặt cọc 30–50%, phần còn lại trả cho tài xế",
     ],
     quickTitle: "Yêu cầu báo giá nhanh",
     oneWay: "Một chiều",
@@ -697,7 +721,7 @@ const vi = {
     getQuote: "Nhận báo giá",
     stats: [
       { value: "4–45", label: "chỗ mỗi xe" },
-      { value: "6", label: "sân bay lớn phục vụ" },
+      { value: "11", label: "sân bay phục vụ" },
       { value: "34", label: "tỉnh & thành phố" },
       { value: "24/7", label: "tổng đài & chat hỗ trợ" },
     ],
@@ -705,7 +729,7 @@ const vi = {
     fleetSubtitle:
       "Chạm vào một hạng xe để xem chi tiết. Ảnh minh họa các mẫu xe tiêu biểu của từng hạng.",
     seats: "chỗ",
-    luggage: "hành lý",
+    luggage: "vali 24 inch",
     idealFor: "Phù hợp cho",
     models: "Mẫu xe",
     fromPrice: "Đưa đón sân bay từ",
@@ -714,7 +738,7 @@ const vi = {
     services: [
       {
         title: "Đưa đón sân bay",
-        text: "Đón và tiễn tại các sân bay Nội Bài, Tân Sơn Nhất, Đà Nẵng, Cam Ranh, Phú Quốc và Cát Bi.",
+        text: "Đón và tiễn tại 11 sân bay: Nội Bài, Cát Bi, Vân Đồn, Đồng Hới, Phú Bài, Đà Nẵng, Cam Ranh, Liên Khương, Tân Sơn Nhất, Phú Quốc và Côn Đảo.",
       },
       {
         title: "Tham quan thành phố & tour trong ngày",
@@ -732,7 +756,10 @@ const vi = {
         title: "Đoàn & sự kiện",
         text: "Xe khách đến 45 chỗ cho đoàn, đám cưới, MICE và sự kiện doanh nghiệp.",
       },
-      { title: "Xuyên biên giới", text: "Đưa đón đến cửa khẩu Campuchia và Lào theo yêu cầu." },
+      {
+        title: "Xuyên biên giới",
+        text: "Đưa đón đến cửa khẩu Mộc Bài (Campuchia) theo yêu cầu.",
+      },
     ],
     routesTitle: "Tuyến phổ biến",
     routesSubtitle: "Giá tham khảo một chiều cho xe 4–7 chỗ, đã gồm phí cầu đường & nhiên liệu.",
@@ -747,7 +774,10 @@ const vi = {
         title: "Theo dõi chuyến bay",
         text: "Chúng tôi theo dõi chuyến bay và điều chỉnh giờ đón.",
       },
-      { title: "Miễn phí chờ", text: "Không phụ thu khi chuyến bay của bạn bị trễ." },
+      {
+        title: "Miễn phí chờ",
+        text: "Miễn phí chờ tới 120 phút khi chuyến bay trễ, sau đó tính $5/giờ. Có thể phụ thu đón đêm nếu thời gian chờ kéo sang khung giờ khuya.",
+      },
       { title: "Đón bằng biển tên", text: "Tài xế gửi trước ảnh và biển số xe." },
       { title: "Tiện nghi trên xe", text: "Điều hòa, nước uống đóng chai và sạc điện thoại." },
       { title: "Ngôn ngữ của bạn", text: "Hotline phiên dịch giữa bạn và tài xế." },
@@ -771,7 +801,7 @@ const vi = {
     areasSubtitle: "Trụ sở tại Hà Nội, cùng đội xe đối tác tại mọi thành phố lớn.",
     routesCount: "tuyến giá cố định",
     areasMore:
-      "Các tỉnh khác trên toàn quốc theo yêu cầu – bao gồm Hà Giang, Cao Bằng, Phong Nha và các cửa khẩu.",
+      "Các tỉnh khác trên toàn quốc theo yêu cầu – bao gồm Hà Giang, Cao Bằng, Phong Nha và cửa khẩu Mộc Bài (Campuchia).",
     formTitle: "Yêu cầu báo giá xe",
     formSubtitle: "Điền lộ trình và chúng tôi gửi giá cố định – thường trong vòng 30 phút.",
     route: "Lộ trình / lịch trình",
@@ -825,7 +855,7 @@ const vi = {
     faqTitle: "Câu hỏi thường gặp",
     faqSub: "Không tìm thấy câu trả lời? Hãy nhắn cho chúng tôi bất cứ lúc nào.",
     trust: [
-      { t: "6 sân bay", d: "Hà Nội, Đà Nẵng, Nha Trang, Đà Lạt, TP.HCM, Phú Quốc" },
+      { t: "11 sân bay", d: "Từ Nội Bài, Vân Đồn tới Tân Sơn Nhất, Phú Quốc và Côn Đảo" },
       { t: "Hỗ trợ 24/7", d: "Hotline và chat, bất kể giờ nào" },
       { t: "Ngôn ngữ của bạn", d: "Đội ngũ nói tiếng Anh và tiếng Trung" },
       { t: "Giá cố định", d: "Đã gồm phí cầu đường, nhiên liệu và phí đỗ xe" },
@@ -833,19 +863,23 @@ const vi = {
     faq: [
       {
         q: "Tôi thanh toán như thế nào?",
-        a: "Sau khi chúng tôi xác nhận đặt xe, bạn thanh toán trực tuyến bằng thẻ quốc tế hoặc chuyển khoản ngân hàng – hoặc trả tiền mặt cho tài xế với các chuyến đưa đón ngắn.",
+        a: "Bạn đặt cọc 30–50% bằng chuyển khoản hoặc thanh toán trực tuyến trên website, phần còn lại trả trực tiếp cho tài xế.",
       },
       {
         q: "Nếu chuyến bay của tôi bị trễ thì sao?",
-        a: "Chúng tôi theo dõi chuyến bay và tài xế sẽ chờ bạn. Thời gian chờ do chuyến bay trễ được miễn phí.",
+        a: "Chúng tôi theo dõi chuyến bay và tài xế sẽ chờ bạn – miễn phí 120 phút đầu. Sau đó tính phí chờ $5/giờ (có thể phụ thu đón đêm nếu giờ đón kéo sang khung giờ khuya).",
       },
       {
         q: "Giá đã bao gồm những gì?",
-        a: "Xe và tài xế, nhiên liệu, phí cầu đường và phí đỗ xe. Không phải trả thêm gì khi kết thúc chuyến đi.",
+        a: "Đã gồm tài xế, nhiên liệu, phí đỗ xe, phí cầu đường và cao tốc – khách không phải trả thêm bất kỳ khoản nào.",
       },
       {
         q: "Tuyến của tôi không có trong danh sách. Các bạn vẫn hỗ trợ chứ?",
-        a: "Có. Hãy gửi yêu cầu báo giá và chúng tôi phản hồi trong vòng 30 phút trong giờ làm việc.",
+        a: "Có. Hãy gọi hotline hoặc chat với chúng tôi trên website để được báo giá trực tiếp.",
+      },
+      {
+        q: "Tôi có thể chọn tài xế nói tiếng Anh hoặc tiếng Trung không?",
+        a: "Có – chúng tôi bố trí tài xế nói tiếng Anh, tiếng Trung hoặc ngôn ngữ khác theo yêu cầu. Hãy gọi hotline hoặc nhắn tin cho chúng tôi trên website.",
       },
     ],
     reviewsTitle: "Khách hàng nói gì về chúng tôi",
@@ -862,7 +896,7 @@ const vi = {
     stay: "Thời gian lưu trú",
     fastTitle: "Gói fast-track sân bay",
     fastSubtitle:
-      "Nhân viên của chúng tôi đón bạn tại cửa máy bay / sảnh đến, cầm biển tên và hỗ trợ bạn đi qua làn ưu tiên.",
+      "Chiều đến: nhân viên cầm biển tên chờ tại khu nhập cảnh. Chiều đi: gặp bạn tại quầy B sau khi check-in. Sau đó dẫn bạn qua làn ưu tiên. Mọi mức giá đều tính theo người.",
     perPax: "mỗi khách",
     howTitle: "Quy trình fast-track",
     how: [
@@ -900,7 +934,7 @@ const vi = {
     typeCol: "Loại visa",
     popular: "Phổ biến nhất",
     priceNote:
-      "Phí fast-track tùy thuộc sân bay, cấp độ dịch vụ và số khách – hãy gửi yêu cầu và chúng tôi sẽ báo giá cố định.",
+      "Giá hiển thị là giá chính thức, tính bằng USD mỗi người. Gói chưa có giá vui lòng liên hệ để được báo giá.",
     // Gói theo nhóm (yêu cầu khách 21–25)
     groups: { arrival: "Gói nhập cảnh", departure: "Gói xuất cảnh", addons: "Dịch vụ bổ sung" },
     groupSub: {
@@ -1045,8 +1079,8 @@ const vi = {
         text: "Giá hợp đồng khách sạn, du thuyền và vận chuyển được chuyển trực tiếp đến bạn.",
       },
       {
-        title: "Báo giá trong 24 giờ",
-        text: "Lịch trình và bảng chi phí chi tiết bằng tiếng Anh hoặc tiếng Trung.",
+        title: "Báo giá trong 15–30 phút",
+        text: "Trong giờ hành chính; trong vòng 24 giờ vào cuối tuần và ngày lễ – bằng tiếng Anh hoặc tiếng Trung.",
       },
       {
         title: "Dịch vụ white-label",
@@ -1061,6 +1095,14 @@ const vi = {
         text: "Hỗ trợ visa đoàn và đón VIP tại tất cả sân bay lớn.",
       },
       { title: "Điều hành 24/7", text: "Điều hành viên riêng theo sát từng đoàn tại chỗ." },
+      {
+        title: "Trưởng đoàn miễn phí cho đoàn từ 50 khách",
+        text: "Đoàn từ 50 khách trở lên được Vietlook cử trưởng đoàn đi cùng, miễn phí.",
+      },
+      {
+        title: "Quà đặc sản cho đoàn từ 15 khách",
+        text: "Đoàn từ 15 khách trở lên được Vietlook tặng quà đặc sản địa phương.",
+      },
     ],
     formTitle: "Yêu cầu hợp tác",
     company: "Tên công ty",
@@ -1100,6 +1142,7 @@ const vi = {
     whatsapp: "WhatsApp",
     wechat: "WeChat",
     zalo: "Zalo",
+    line: "LINE",
     contact: "Liên hệ",
     top: "Lên đầu trang",
   },

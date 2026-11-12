@@ -245,7 +245,8 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
     >
       {/* Thứ tự theo trang chủ đề trên website: đầu trang (ảnh lớn, tên, câu giới thiệu) → đoạn giới thiệu
           → thẻ chủ đề (ảnh thẻ — ở mục “Chủ đề khác”, trang chủ, menu) → cài đặt hiển thị ở cuối */}
-      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
+      {/* Máy tính: cột phải ngắn hơn nên dính lại khi cuộn, không để khoảng trống dưới cột */}
+      <div className="grid items-start gap-x-8 gap-y-6 lg:grid-cols-2">
         <div className="space-y-4">
           <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
           <FormSection title="Đầu trang chủ đề">
@@ -290,7 +291,7 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
           </Field>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 lg:sticky lg:top-0">
           <FormSection title="Thẻ chủ đề">
             <Field
               label="Ảnh thẻ"
@@ -312,11 +313,14 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
                 }}
               />
             </Field>
-            <Toggle
-              checked={d.isActive}
-              onChange={(isActive) => set({ isActive })}
-              label="Hiện trên website"
-            />
+            <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+              <Toggle
+                checked={d.isActive}
+                onChange={(isActive) => set({ isActive })}
+                label="Hiện trên website"
+                hint="Tắt để tạm ẩn chủ đề này khỏi website."
+              />
+            </div>
           </FormSection>
         </div>
       </div>

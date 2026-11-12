@@ -29,7 +29,7 @@ npm run dev
 
 ## Trang quản trị (CMS)
 
-- Địa chỉ: `/admin` · đăng nhập tại `/login`. Bảo vệ: proxy kiểm tra đăng nhập ở server TRƯỚC khi render, mọi API quản trị bắt buộc đăng nhập + phân quyền, header chống nhúng iframe / không cache / không index, robots.txt chặn bot.
+- Địa chỉ: `/admin` · đăng nhập tại đường dẫn bí mật `ADMIN_LOGIN_PATH` (máy dev chưa đặt: `/login`; người chưa đăng nhập mở `/admin`, `/login` → 404 — xem `docs/DEPLOY.md` mục 3.1). Bảo vệ: proxy kiểm tra đăng nhập ở server TRƯỚC khi render, mọi API quản trị bắt buộc đăng nhập + phân quyền, header chống nhúng iframe / không cache / không index, robots.txt chặn bot.
 - Tài khoản admin đầu tiên: `ADMIN_USERNAME` / `ADMIN_PASSWORD` trong `be/.env` (server tạo 1 lần khi chưa có). Đổi mật khẩu và tạo tài khoản khác ngay trong CMS; quên mật khẩu → `npm run admin:reset` trong `be/`.
 - Trang chủ, Giới thiệu, Chính sách: sửa trực tiếp trên bản thu nhỏ của trang rồi bấm Lưu.
 - Tour nhập theo "Mẫu thông tin tour": tour ghép / riêng, lịch trình có bữa ăn + nơi nghỉ đêm, giá theo số khách × hạng khách sạn 3★/4★/5★, giá trẻ em, phụ thu, FAQ, ảnh, video.

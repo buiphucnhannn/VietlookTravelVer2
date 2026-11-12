@@ -167,6 +167,7 @@ export const enquiryService = {
           childAges: data.childAges ?? [],
           date: data.departureDate,
           hotelClass: data.hotelClass,
+          smallGroup: await settingsService.getSmallGroup(),
         }),
       };
     }

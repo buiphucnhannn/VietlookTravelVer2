@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, CreditCard, Eye, EyeOff, Mail, Save } from "lucide-react";
+import { BarChart3, CreditCard, Eye, EyeOff, Mail, Save, Users } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { toastError, useMutation } from "./hooks";
 import {
@@ -27,11 +27,12 @@ export default function SettingsPage() {
     <>
       <PageHeader
         title="Cài đặt"
-        description="Email nhận thông báo, thanh toán 9Pay và mã đo lường của Google."
+        description="Email nhận thông báo, thanh toán 9Pay, phụ thu nhóm nhỏ và mã đo lường của Google."
       />
       <div className="space-y-6">
         <NotificationsCard />
         <PaymentCard />
+        <SmallGroupCard />
         <TrackingCard />
       </div>
     </>
@@ -248,7 +249,7 @@ const FX_SOURCE = {
 /** Tỷ giá tự động (chỉ xem) — dùng để đổi giá tour (USD) sang tiền Việt khi khách thanh toán */
 function FxRate({ fx }) {
   const rate = Math.round(Number(fx?.rate) || 0);
-  // "11/11/2026 10:42" (giờ Việt Nam)
+  // "11/11/2026 10:42" (dd/mm/yyyy, giờ Việt Nam)
   const at = fx?.fetchedAt ? fmtDateTime(fx.fetchedAt) : "";
   return (
     <Field
@@ -327,7 +328,7 @@ function PaymentCard() {
         <Toggle
           checked={form.enabled}
           onChange={(enabled) => set({ enabled })}
-          label={form.enabled ? "Đang bật" : "Bật thanh toán"}
+          label={form.enabled ? "Đang bật" : "Đang tắt"}
         />
       }
     >
@@ -415,6 +416,105 @@ function PaymentCard() {
   );
 }
 
+/* ---------- Phụ thu nhóm nhỏ ---------- */
+
+const SMALL_GROUP_FIELDS = [
+  { name: "one", label: "1 khách" },
+  { name: "two", label: "2 khách" },
+  { name: "threeFour", label: "3–4 khách" },
+  { name: "fivePlus", label: "Từ 5 khách" },
+];
+const smallGroupForm = (d) => ({
+  enabled: d?.enabled ?? true,
+  one: String(d?.one ?? 60),
+  two: String(d?.two ?? 30),
+  threeFour: String(d?.threeFour ?? 15),
+  fivePlus: String(d?.fivePlus ?? 0),
+});
+const pctOk = (v) => /^\d{1,3}$/.test(String(v).trim()) && Number(v) <= 200;
+
+function SmallGroupCard() {
+  const title = "Phụ thu nhóm nhỏ";
+  const { form, setForm, error, reload } = useSetting("/settings/small-group", smallGroupForm);
+  // "settings": khung đặt tour trên website đọc lại % mới ngay sau khi lưu
+  const { run, busy } = useMutation(["settings"]);
+  const { toast } = useUi();
+
+  if (error || !form) return <CardState title={title} error={error} reload={reload} />;
+
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+  const save = async () => {
+    const bad = SMALL_GROUP_FIELDS.find((f) => !pctOk(form[f.name]));
+    if (bad) return toast.error(`${bad.label}: nhập số nguyên từ 0 đến 200.`);
+    const body = { enabled: form.enabled };
+    for (const f of SMALL_GROUP_FIELDS) body[f.name] = Number(form[f.name]);
+    const r = await run(
+      () => api("/settings/small-group", { method: "PUT", body }),
+      "Đã lưu phụ thu nhóm nhỏ",
+    );
+    if (r) reload();
+  };
+
+  return (
+    <Card
+      icon={Users}
+      title={title}
+      description="Đoàn ít khách thì chi phí xe, hướng dẫn viên chia cho ít người hơn — website tự cộng thêm % vào giá tạm tính theo số khách."
+      actions={
+        <Toggle
+          checked={form.enabled}
+          onChange={(enabled) => set({ enabled })}
+          label={form.enabled ? "Đang bật" : "Đang tắt"}
+        />
+      }
+    >
+      <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-6 md:grid-cols-4">
+        {SMALL_GROUP_FIELDS.map((f) => (
+          <Field
+            key={f.name}
+            label={f.label}
+            error={pctOk(form[f.name]) ? "" : "Nhập số từ 0 đến 200"}
+          >
+            <div className="relative">
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={200}
+                step={5}
+                value={form[f.name]}
+                disabled={!form.enabled}
+                onChange={(e) => set({ [f.name]: e.target.value })}
+                className="pr-10"
+              />
+              <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-sm text-slate-400">
+                %
+              </span>
+            </div>
+          </Field>
+        ))}
+      </div>
+
+      <CardFooter
+        note={
+          <>
+            Chỉ áp dụng cho tour chưa có bảng giá theo số khách. Tour đã nhập bảng giá theo số khách
+            thì tính theo bảng đó.
+            <span className="mt-0.5 block">
+              Ví dụ: tour giá $100/người, 2 khách → cộng 30% = $260 cho cả đoàn. Trẻ em được miễn
+              phí thì không tính vào số khách. Nhập 0 nếu không muốn cộng.
+            </span>
+          </>
+        }
+      >
+        <Button icon={Save} onClick={save} loading={busy}>
+          Lưu
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
 /* ---------- Đo lường & quảng cáo (Google) ---------- */
 
 const TRACKING_TAGS = ["settings"];
@@ -491,7 +591,7 @@ function TrackingCard() {
         ))}
       </div>
 
-      <CardFooter note="">
+      <CardFooter note="Bấm Lưu để áp dụng cho toàn bộ website. Không chắc mã nào thì để trống.">
         <Button icon={Save} onClick={save} loading={busy}>
           Lưu
         </Button>

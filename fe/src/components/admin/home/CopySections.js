@@ -5,7 +5,6 @@ import Image from "next/image";
 import {
   ArrowRight,
   BadgeDollarSign,
-  Building2,
   CalendarCheck,
   Car,
   CheckCircle2,
@@ -15,6 +14,7 @@ import {
   Headphones,
   Headset,
   Hotel,
+  Landmark,
   Layers,
   Map,
   MapPin,
@@ -23,13 +23,15 @@ import {
   MessageSquareText,
   Plane,
   Quote,
+  Route,
   ShieldCheck,
-  Ship,
   SlidersHorizontal,
   Stamp,
   Star,
+  Users,
   UsersRound,
   Wallet,
+  Zap,
 } from "lucide-react";
 import { partners } from "@/components/home/PartnerStrip";
 import { tr } from "@/i18n/config";
@@ -626,13 +628,14 @@ export function PartnerStripSection() {
 
 /* ---------- Dự án hợp tác ---------- */
 
-const projectIcons = [Handshake, Building2, Ship];
+// Khớp thứ tự 4 dự án mặc định (components/home/PartnersBlock.js)
+const projectIcons = [Landmark, Zap, Route, Users];
 
 export function ProjectsSection() {
   return (
-    <Sec name="Dự án hợp tác" className="bg-white">
+    <Sec name="Dự án đã phục vụ" className="bg-white">
       <MiniHeading eyebrow="partnersEyebrow" title="projectsTitle" subtitle="partnersSubtitle" />
-      <ul className="grid gap-4 md:grid-cols-3">
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {projectIcons.map((Icon, i) => (
           <li
             key={i}
@@ -647,6 +650,18 @@ export function ProjectsSection() {
               label="Tên dự án"
               className="mt-3 text-sm font-bold text-ink"
             />
+            {[
+              ["size", "Quy mô (vd. 150 khách)"],
+              ["time", "Thời gian (vd. 2009)"],
+              ["place", "Địa điểm / hành trình"],
+            ].map(([key, label]) => (
+              <T
+                key={key}
+                k={`projects.${i}.${key}`}
+                label={label}
+                className="mt-1 text-xs font-medium text-ink/80"
+              />
+            ))}
             <T
               k={`projects.${i}.text`}
               multiline

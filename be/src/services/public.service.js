@@ -42,6 +42,7 @@ function tourCard(t) {
     rank: t.rank,
     featured: t.featured,
     featuredLong: t.featuredLong,
+    labels: t.labels ?? [], // nhãn "Bán chạy" / "Độc quyền" trên thẻ tour
     departure: t.departure,
     // dùng để tự chọn "Tour nổi bật" / "Hành trình dài ngày" trang chủ (fe/src/lib/tour-picks.js)
     photos: t.photoCount ?? 0,
@@ -56,7 +57,7 @@ function tourCard(t) {
 
 // photoCount / reviewCount / ratingAvg tính sẵn trong DB (tourRepository.listCards)
 const CARD_FIELDS =
-  "slug code days nights halfDay regions destinations themes cruise tourType price originalPrice image rank featured featuredLong departure updatedAt content.en.title content.zh.title content.vi.title content.en.summary content.zh.summary content.vi.summary content.en.route content.zh.route content.vi.route".split(
+  "slug code days nights halfDay regions destinations themes cruise tourType price originalPrice image rank featured featuredLong labels departure updatedAt content.en.title content.zh.title content.vi.title content.en.summary content.zh.summary content.vi.summary content.en.route content.zh.route content.vi.route".split(
     " ",
   );
 

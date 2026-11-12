@@ -1,5 +1,6 @@
 import { href, tr } from "@/i18n/config";
 import { regions } from "./regions";
+import { EXCLUSIVE_THEME } from "@/constants/themes";
 
 /**
  * Cây menu nhiều cấp. Trả về dữ liệu thuần để truyền xuống Header (client component).
@@ -37,7 +38,7 @@ const NAV_REGION = {
 };
 const NAV_THEME = {
   luxury: "/images/tours/hd/glaming.jpg",
-  "hand-picked": "/images/tours/hd/bai-dinh.jpg",
+  "exclusive-tours": "/images/tours/hd/bai-dinh.jpg",
   culture: "/images/tours/hue-tour.jpg",
   family: "/images/tours/hd/cham-islands-da-nang.jpg",
   honeymoon: "/images/b2b/phu-quoc.webp",
@@ -103,6 +104,7 @@ export function buildNavigation(
     label: tr(t.name, lang),
     href: h(`/themes/${t.slug}`),
     image: t.image || NAV_THEME[t.slug],
+    accent: t.slug === EXCLUSIVE_THEME, // "Tour độc quyền" nổi bật hơn trong menu
   });
   const img = (slug) => getDestination(slug)?.image || NAV_DEST[slug];
 
@@ -306,9 +308,9 @@ export function buildNavigation(
           href: h("/partners"),
           icon: "handshake",
           desc: z(
-            "Agencies, OTAs & MICE – net rates, quotes within 24h",
-            "旅行社、OTA与会奖团队：净价，24小时内报价",
-            "Đại lý, OTA & MICE – giá net, báo giá trong 24 giờ",
+            "Agencies, OTAs & MICE – net rates, quotes in 15–30 minutes",
+            "旅行社、OTA与会奖团队：净价，15–30分钟报价",
+            "Đại lý, OTA & MICE – giá net, báo giá trong 15–30 phút",
           ),
         },
         {

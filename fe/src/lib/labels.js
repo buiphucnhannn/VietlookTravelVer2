@@ -12,5 +12,8 @@ export function cardLabels(dict) {
     priceOnRequest: c.priceOnRequest,
     contactPrice: c.contactPrice,
     bookNow: c.bookNow,
+    // nhãn nổi bật trên thẻ tour (CMS → Tour → Nhãn)
+    bestseller: c.labelBestseller,
+    exclusive: c.labelExclusive,
   };
 }

@@ -42,6 +42,25 @@ export function ZaloIcon(props) {
   );
 }
 
+export function LineIcon(props) {
+  return (
+    <svg {...base(props)} fill="none">
+      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="#06c755" />
+      <text
+        x="12"
+        y="15.2"
+        textAnchor="middle"
+        fontSize="7.2"
+        fontWeight="700"
+        fontFamily="Arial, sans-serif"
+        fill="#fff"
+      >
+        LINE
+      </text>
+    </svg>
+  );
+}
+
 export function FacebookIcon(props) {
   return (
     <svg {...base(props)} fill="currentColor">
@@ -92,6 +111,26 @@ export function GoogleIcon(props) {
         fill="#EA4335"
         d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.1-3.1A11 11 0 0 0 2.2 7.1l3.6 2.8C6.7 7.3 9.1 5.4 12 5.4Z"
       />
+    </svg>
+  );
+}
+
+/** Biểu tượng Google Maps: ghim bản đồ 4 màu (xanh dương, đỏ, vàng, xanh lá) với chấm trắng ở giữa */
+export function GoogleMapsIcon(props) {
+  return (
+    <svg {...base(props)}>
+      <defs>
+        <clipPath id="gmaps-pin">
+          <path d="M12 1.5a7.6 7.6 0 0 0-7.6 7.6c0 5.7 7.6 13.4 7.6 13.4s7.6-7.7 7.6-13.4A7.6 7.6 0 0 0 12 1.5Z" />
+        </clipPath>
+      </defs>
+      <g clipPath="url(#gmaps-pin)">
+        <rect x="0" y="0" width="12" height="9.6" fill="#4285F4" />
+        <rect x="12" y="0" width="12" height="9.6" fill="#EA4335" />
+        <rect x="0" y="9.6" width="12" height="15" fill="#34A853" />
+        <rect x="12" y="9.6" width="12" height="15" fill="#FBBC04" />
+      </g>
+      <circle cx="12" cy="9.1" r="2.9" fill="#fff" />
     </svg>
   );
 }

@@ -43,16 +43,27 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_KEYS = new Set(["date", "returnDate", "entryDate", "arrival", "departureDate"]);
 
 /*
- * Ngày trong email: dạng số mm/dd/yyyy cho cả 3 ngôn ngữ (quy ước chung toàn hệ thống — bản website:
- * fe/src/lib/dates.js). Ngày + giờ → "mm/dd/yyyy HH:mm" (24h, giờ Việt Nam).
+ * Ngày trong email theo ngôn ngữ người đọc (khớp website — fe/src/lib/dates.js):
+ *  vi (và mọi email gửi nhân viên công ty) dd/mm/yyyy · en mm/dd/yyyy · zh yyyy年m月d日.
+ * Ngày + giờ → thêm " HH:mm" (24h, giờ Việt Nam).
  */
 
-/** "2026-12-20" → "12/20/2026" (đọc thẳng từ chuỗi → không lệch ngày theo múi giờ) */
-export function fmtDate(iso) {
+/** y, m, d (chuỗi 2 chữ số) → chữ ngày theo ngôn ngữ */
+function ymdText(y, m, d, lang) {
+  if (lang === "zh") return `${y}年${Number(m)}月${Number(d)}日`;
+  if (lang === "en") return `${m}/${d}/${y}`;
+  return `${d}/${m}/${y}`;
+}
+
+/**
+ * "2026-12-20" → vi "20/12/2026" · en "12/20/2026" · zh "2026年12月20日"
+ * (đọc thẳng từ chuỗi → không lệch ngày theo múi giờ)
+ */
+export function fmtDate(iso, lang = "vi") {
   const s = String(iso ?? "");
   if (!ISO_DATE.test(s)) return s;
   const [y, m, d] = s.split("-");
-  return `${m}/${d}/${y}`;
+  return ymdText(y, m, d, lang);
 }
 
 const VN_PARTS = new Intl.DateTimeFormat("en-US", {
@@ -65,12 +76,16 @@ const VN_PARTS = new Intl.DateTimeFormat("en-US", {
   hourCycle: "h23",
 });
 
-/** Thời điểm (giờ Việt Nam) → vi "11/27/2026 14:05" · en "… (GMT+7)" · zh "…（越南时间）" */
-export function fmtDateTime(value, lang) {
+/**
+ * Thời điểm (giờ Việt Nam) → vi "27/11/2026 14:05" · en "11/27/2026 14:05 (GMT+7)"
+ * · zh "2026年11月27日 14:05（越南时间）"
+ */
+export function fmtDateTime(value, lang = "vi") {
   const dt = value ? new Date(value) : null;
   if (!dt || Number.isNaN(dt.getTime())) return "";
   const p = Object.fromEntries(VN_PARTS.formatToParts(dt).map((x) => [x.type, x.value]));
-  const text = `${p.month}/${p.day}/${p.year} ${p.hour === "24" ? "00" : p.hour}:${p.minute}`;
+  const hm = `${p.hour === "24" ? "00" : p.hour}:${p.minute}`;
+  const text = `${ymdText(p.year, p.month, p.day, lang)} ${hm}`;
   if (lang === "zh") return `${text}（越南时间）`;
   if (lang === "en") return `${text} (GMT+7)`;
   return text;
@@ -236,6 +251,8 @@ export function priceLineLabel(label, lang) {
   m = s.match(/^Holiday surcharge (?:× (\d+)|(\d+)%)/);
   if (m) return m[1] ? `${w.holiday} × ${m[1]}` : `${w.holiday} ${m[2]}%`;
   if (/^Single supplement/.test(s)) return w.single;
+  m = s.match(/^Small-group supplement \((\d+) guests?\) \+(\d+)%/);
+  if (m) return w.smallGroup(Number(m[1]), m[2]);
   return s;
 }
 

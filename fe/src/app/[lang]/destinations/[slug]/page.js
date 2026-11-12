@@ -10,6 +10,7 @@ import TourListing from "@/components/tours/TourListing";
 import { DestinationTile } from "@/components/tours/TourCard";
 import PostCard from "@/components/guide/PostCard";
 import { getCatalog } from "@/lib/catalog";
+import { PHOTO_LABEL, photoCredit } from "@/data/photo-credits";
 
 export async function generateStaticParams() {
   const { regions, destinations } = await getCatalog();
@@ -62,6 +63,7 @@ async function DestinationPageContent({ params }) {
   if (!r) notFound();
   const dict = await getDictionary(lang);
   const { item, isRegion } = r;
+  const credit = photoCredit(item.hero || item.image);
   const name = tr(item.name, lang);
   const tours = toursByDestination(slug);
   const region = isRegion ? item : getRegion(item.region);
@@ -94,7 +96,19 @@ async function DestinationPageContent({ params }) {
             : [{ label: tr(region.name, lang), href: `${lp(lang)}/destinations/${region.slug}` }]),
           { label: name },
         ]}
-      />
+      >
+        {credit && (
+          // Ghi nguồn ảnh CC BY / CC BY-SA: dòng chữ nhỏ góc dưới phải banner
+          <a
+            href={credit.url}
+            target="_blank"
+            rel="noopener noreferrer license"
+            className="absolute right-3 bottom-2 text-[11px] text-white/70 drop-shadow transition hover:text-white hover:underline"
+          >
+            {PHOTO_LABEL[lang] ?? PHOTO_LABEL.en}: {credit.author} · {credit.license}
+          </a>
+        )}
+      </BlobHero>
 
       <section id="tours" className="bg-surface pb-14 lg:pb-[4.5rem]">
         <Container>

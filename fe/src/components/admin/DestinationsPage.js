@@ -347,8 +347,9 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
     >
       {/* Thứ tự theo trang điểm đến trên website: đầu trang (ảnh lớn, tên, mô tả) → thẻ điểm đến
           (ảnh thẻ, điểm nổi bật — ở trang chủ, menu, danh sách) → cài đặt hiển thị ở cuối */}
-      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
-        <div className="space-y-4">
+      {/* Máy tính: cột trái ngắn hơn nên dính lại khi cuộn, không để khoảng trống dưới cột */}
+      <div className="grid items-start gap-x-8 gap-y-6 lg:grid-cols-2">
+        <div className="space-y-4 lg:sticky lg:top-0">
           <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
           <FormSection title="Đầu trang điểm đến">
             <Field
@@ -451,11 +452,14 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
                 }}
               />
             </Field>
-            <Toggle
-              checked={d.isActive}
-              onChange={(isActive) => set({ isActive })}
-              label="Hiện trên website"
-            />
+            <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+              <Toggle
+                checked={d.isActive}
+                onChange={(isActive) => set({ isActive })}
+                label="Hiện trên website"
+                hint="Tắt để tạm ẩn điểm đến này khỏi website."
+              />
+            </div>
           </FormSection>
         </div>
       </div>

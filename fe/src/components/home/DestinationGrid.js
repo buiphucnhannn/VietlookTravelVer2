@@ -6,38 +6,32 @@ import { tr, lp } from "@/i18n/config";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 
 /**
- * Lưới điểm đến kiểu bento (mẫu khách gửi): thẻ ảnh lớn có tên vùng, tag điểm nổi bật (+n),
- * mô tả ngắn, nút "Discover now"; thẻ cuối "32+ Other location" (avatar tròn + View all).
- * `featured`: 5 điểm đến chính đã kèm tags/count; `others`: các điểm còn lại (lấy avatar).
+ * Lưới điểm đến (yêu cầu khách 11/2026): 6 ô ảnh bằng nhau — 3 cột × 2 hàng trên máy tính, 2 cột trên tablet,
+ * 1 cột trên điện thoại. Mỗi ô: tên (ô ghép: "Huế – Đà Nẵng"), số tour, tag điểm nổi bật, mô tả ngắn,
+ * nút "Discover now". Dưới cùng: dải "N điểm đến khác" (avatar tròn, Bắc → Nam) + View all.
+ * `featured`: 6 ô đã chuẩn hoá (toGridItem); `others`: các điểm đến còn lại (lấy avatar).
  */
-export default function DestinationGrid({ lang, dict, featured, others, total }) {
+export default function DestinationGrid({ lang, dict, featured, others }) {
   const t = dict.home;
-  // 3 cột × 2 hàng: 4 thẻ bên trái bằng nhau (2×2), Hạ Long cao 2 hàng bên phải;
-  // thẻ "Other locations" là dải ngang dưới cùng, rộng bằng cả lưới
-  const spans = ["", "", "lg:row-span-2", "", ""];
   const shown = others.slice(0, 6);
-  const more = Math.max(0, total - shown.length);
+  const more = Math.max(0, others.length - shown.length);
   return (
     <section className="relative isolate overflow-hidden bg-cream-50 py-14 lg:py-[4.5rem]">
       <Container>
         <SectionHeading eyebrow={t.gridEyebrow} title={t.gridTitle} subtitle={t.gridSubtitle} />
-        <div className="grid gap-4 sm:grid-cols-2 lg:auto-rows-[270px] lg:grid-cols-[1fr_1fr_0.9fr]">
+        <div className="grid gap-4 sm:grid-cols-2 lg:auto-rows-[290px] lg:grid-cols-3">
           {featured.map((d, i) => (
             <Reveal
               key={d.slug}
               delay={i * 70}
-              className={cn(
-                // Khung bo mềm (mục 6.6): thẻ ngang bo đỉnh vừa phải (không cắt chữ); thẻ cao (Hạ Long) vòm tròn hẳn
-                "group relative min-h-[280px] overflow-hidden rounded-t-[3rem] rounded-b-3xl bg-forest-900 text-white ring-1 ring-sand-300/70 lg:min-h-0",
-                i === 2 && "lg:rounded-t-[999px]",
-                spans[i],
-              )}
+              // Khung bo mềm (mục 6.6): bo đỉnh vừa phải, không cắt chữ
+              className="group relative min-h-[280px] overflow-hidden rounded-t-[3rem] rounded-b-3xl bg-forest-900 text-white ring-1 ring-sand-300/70 lg:min-h-0"
             >
               <Image
                 src={d.image}
                 alt=""
                 fill
-                sizes="(min-width: 1024px) 50vw, 100vw"
+                sizes="(min-width: 1024px) 34vw, (min-width: 640px) 50vw, 100vw"
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
               />
               <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
@@ -63,7 +57,9 @@ export default function DestinationGrid({ lang, dict, featured, others, total })
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 line-clamp-1 max-w-md text-sm text-white/85">{d.intro}</p>
+                {d.intro && (
+                  <p className="mt-2 line-clamp-1 max-w-md text-sm text-white/85">{d.intro}</p>
+                )}
                 <Link
                   href={d.href}
                   className="mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-white/60 px-4 py-1.5 text-sm font-semibold transition after:absolute after:inset-0 hover:bg-white hover:text-forest-900"
@@ -81,7 +77,7 @@ export default function DestinationGrid({ lang, dict, featured, others, total })
         >
           <div className="flex shrink-0 items-baseline gap-3">
             <p className="text-5xl leading-none font-bold tracking-tight text-amber-brand">
-              {total}+
+              {others.length}
             </p>
             <p className="text-lg font-semibold text-white">{t.gridOther}</p>
           </div>
@@ -124,16 +120,29 @@ export default function DestinationGrid({ lang, dict, featured, others, total })
   );
 }
 
-/** Chuẩn hoá dữ liệu điểm đến cho lưới: tên, tags, intro theo ngôn ngữ. */
-export function toGridItem(d, lang, count) {
-  const tags = (d.highlights || []).map((h) => tr(h, lang));
-  return {
+const tagsOf = (d, lang) => (d.highlights || []).map((h) => tr(h, lang)).filter(Boolean);
+
+/**
+ * Chuẩn hoá dữ liệu điểm đến cho lưới: tên, tags, intro theo ngôn ngữ.
+ * Ô ghép (`partner`): tên "Huế – Đà Nẵng", ảnh của điểm chính, tag xen kẽ 2 điểm, bỏ mô tả (tránh rối chữ).
+ */
+export function toGridItem(d, lang, count, { partner, href } = {}) {
+  const tags = tagsOf(d, lang);
+  const item = {
     slug: d.slug,
     name: tr(d.name, lang),
     image: d.image || d.hero,
     intro: tr(d.intro, lang),
     tags,
     count,
-    href: `${lp(lang)}/destinations/${d.slug}`,
+    href: href || `${lp(lang)}/destinations/${d.slug}`,
+  };
+  if (!partner) return item;
+  const other = tagsOf(partner, lang);
+  return {
+    ...item,
+    name: `${item.name} – ${tr(partner.name, lang)}`,
+    intro: "",
+    tags: [tags[0], other[0], tags[1], other[1]].filter(Boolean),
   };
 }

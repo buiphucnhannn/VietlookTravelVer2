@@ -42,10 +42,99 @@
   color: #0f6aa6;
   text-decoration: underline;
 }
+/* Ảnh trong bài — cùng quy tắc với website (theme.css .prose-guide img): giữ cỡ thật, ảnh nhỏ không bị
+   phóng to, ảnh lớn thu vừa khung (ngang ≤ 720px, cao ≤ 600px / 70% màn hình), căn giữa.
+   .rt-img = khung ảnh trong trình soạn (./components/admin/richTextImage.js), có nút X xoá ảnh. */
+.admin-prose {
+  display: flow-root; /* chứa ảnh nằm bên trái / phải chữ (bài cũ) */
+}
 .admin-prose img {
-  max-width: 100%;
+  display: block;
+  width: auto;
   height: auto;
+  max-width: min(100%, 720px);
+  max-height: min(70vh, 600px);
   border-radius: 12px;
+}
+.admin-prose .rt-img {
+  position: relative;
+  width: fit-content;
+  max-width: min(100%, 720px);
+  margin: 1.25em auto;
+  line-height: 0;
+  cursor: pointer;
+}
+.admin-prose .rt-img img {
+  max-width: 100%;
+  max-height: min(70vh, 600px);
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.06);
+  transition: box-shadow 0.15s;
+}
+.admin-prose .rt-img.ProseMirror-selectednode img {
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 5px var(--color-brand-500);
+}
+.admin-prose .rt-img-x {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  color: #fff;
+  background: rgb(15 23 42 / 0.72);
+  box-shadow:
+    0 0 0 2px rgb(255 255 255 / 0.9),
+    0 2px 6px rgb(15 23 42 / 0.3);
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 0.15s,
+    transform 0.15s,
+    background-color 0.15s;
+  cursor: pointer;
+}
+.admin-prose .rt-img:hover .rt-img-x,
+.admin-prose .rt-img:focus-within .rt-img-x,
+.admin-prose .rt-img.ProseMirror-selectednode .rt-img-x {
+  opacity: 1;
+  transform: none;
+}
+.admin-prose .rt-img-x:hover {
+  background: #dc2626;
+}
+.admin-prose .rt-img-x:focus-visible {
+  outline: 3px solid var(--color-brand-500);
+  outline-offset: 2px;
+  opacity: 1;
+}
+/* màn cảm ứng: không rê chuột được → nút X luôn hiện, to hơn cho dễ chạm */
+@media (hover: none) {
+  .admin-prose .rt-img-x {
+    opacity: 1;
+    transform: none;
+    width: 36px;
+    height: 36px;
+  }
+}
+/* ảnh bài cũ nằm bên trái / phải chữ (màn hẹp: căn giữa như mọi ảnh) */
+@media (min-width: 640px) {
+  .admin-prose .rt-img.alignleft {
+    float: left;
+    max-width: min(45%, 360px);
+    margin: 0.35em 1.5em 1em 0;
+  }
+  .admin-prose .rt-img.alignright {
+    float: right;
+    max-width: min(45%, 360px);
+    margin: 0.35em 0 1em 1.5em;
+  }
+  .admin-prose :is(h2, h3) {
+    clear: both;
+  }
 }
 .admin-prose hr {
   border-color: #e3e8ec;

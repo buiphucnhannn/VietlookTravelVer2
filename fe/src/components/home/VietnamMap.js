@@ -181,12 +181,13 @@ export default function VietnamMap({ items, labels, lang }) {
                   <Link
                     key={t.slug}
                     href={t.href}
-                    className="group flex gap-3 rounded-2xl bg-cream-50 p-2 ring-1 ring-sand-300/60 transition hover:ring-clay-500"
+                    // Từ sm: subgrid 2 hàng (tên tour · thời lượng/giá) → 2 thẻ cạnh nhau thẳng hàng
+                    className="group flex gap-3 rounded-2xl bg-cream-50 p-2 ring-1 ring-sand-300/60 transition hover:ring-clay-500 sm:row-span-2 sm:grid sm:grid-cols-[auto_1fr] sm:grid-rows-subgrid sm:gap-y-0"
                   >
-                    <span className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-sand-300/40">
+                    <span className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-sand-300/40 sm:row-span-2">
                       <Image src={t.image} alt="" fill sizes="64px" className="object-cover" />
                     </span>
-                    <span className="min-w-0">
+                    <span className="min-w-0 sm:contents">
                       <span className="line-clamp-2 text-sm leading-snug font-semibold text-ink group-hover:text-clay-600">
                         {t.title}
                       </span>

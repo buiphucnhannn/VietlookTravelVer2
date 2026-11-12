@@ -1,12 +1,15 @@
 import Image from "next/image";
 import BgImage from "@/components/ui/BgImage";
-import { Bus, Clock, FileSignature, Headset, Percent, Stamp } from "lucide-react";
+import { Bus, Clock, FileSignature, Flag, Gift, Headset, Percent, Stamp } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
 import { pageMetadata } from "@/lib/seo";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { BannerHero } from "@/components/ui/PageHero";
 import ContactForm from "@/components/forms/ContactForm";
 import { href } from "@/i18n/config";
+import { getCatalog } from "@/lib/catalog";
+import { withHomeCopy } from "@/components/home/copy";
+import { ProjectCases } from "@/components/home/PartnersBlock";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
@@ -24,13 +27,16 @@ export default async function PartnersPage({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = dict.partners;
+  // Dự án đã phục vụ: dùng chung câu chữ với trang chủ (sửa trong CMS → Trang chủ → Dự án)
+  const { home } = await getCatalog();
+  const homeCopy = withHomeCopy(dict.home, home.copy, lang);
   const c = {
     ...dict.common,
     fullName: dict.tour.fullName,
     phone: dict.tour.phone,
     message: dict.contact.message,
   };
-  const icons = [Percent, Clock, FileSignature, Bus, Stamp, Headset];
+  const icons = [Percent, Clock, FileSignature, Bus, Stamp, Headset, Flag, Gift];
 
   return (
     <>
@@ -57,20 +63,36 @@ export default async function PartnersPage({ params }) {
         <BgImage src="/images/tours/hd/emperor-cruises.jpg" tone="light" />
         <Container>
           <SectionHeading title={p.offerTitle} />
-          <div className="rail grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Subgrid: icon · tiêu đề · mô tả thẳng hàng giữa các thẻ cùng hàng (tiêu đề 2 dòng không đẩy lệch mô tả) */}
+          <div className="rail grid gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
             {p.offers.map((o, i) => {
               const Icon = icons[i];
               return (
-                <Reveal key={o.title} delay={(i % 3) * 80} className="rounded-3xl bg-surface p-7">
+                <Reveal
+                  key={o.title}
+                  delay={(i % 4) * 80}
+                  className="row-span-3 grid grid-rows-subgrid content-start gap-y-3 rounded-3xl bg-surface p-6"
+                >
                   <span className="grid size-12 place-items-center rounded-xl bg-brand-600 text-white">
                     <Icon className="size-5" />
                   </span>
-                  <h3 className="mt-4 text-xl font-bold text-ink">{o.title}</h3>
-                  <p className="mt-1.5 text-muted">{o.text}</p>
+                  <h3 className="mt-1 text-xl leading-snug font-bold text-ink">{o.title}</h3>
+                  <p className="text-muted">{o.text}</p>
                 </Reveal>
               );
             })}
           </div>
+        </Container>
+      </section>
+
+      <section id="projects" className="scroll-mt-28 bg-white py-14 lg:py-[4.5rem]">
+        <Container>
+          <SectionHeading
+            eyebrow={homeCopy.partnersEyebrow}
+            title={homeCopy.projectsTitle}
+            subtitle={homeCopy.partnersSubtitle}
+          />
+          <ProjectCases projects={homeCopy.projects} />
         </Container>
       </section>
 
@@ -79,7 +101,8 @@ export default async function PartnersPage({ params }) {
           {/* Bento: ảnh lớn trái + 2 ảnh phải + 1 ảnh ngang dưới; cả cụm cao đúng bằng form bên cạnh */}
           <div className="grid h-[420px] grid-cols-2 grid-rows-[1fr_1fr_0.9fr] gap-4 sm:h-[560px] lg:h-full">
             {[
-              ["/images/tours/hd/emperor-cruises.jpg", "row-span-2"],
+              // ô cao: ảnh du thuyền giữa vịnh Hạ Long chụp từ trên cao (sắc nét, hợp khung dọc)
+              ["/images/tours/v2/halong-bay-6348785.jpg", "row-span-2"],
               ["/images/tours/v2/nha-trang-32089687.jpg", ""],
               ["/images/tours/v2/nha-trang-5116343.jpg", ""],
               ["/images/tours/v2/nha-trang-261715.jpg", "col-span-2"],
@@ -89,7 +112,12 @@ export default async function PartnersPage({ params }) {
                   src={src}
                   alt=""
                   fill
-                  sizes="(min-width: 1024px) 25vw, 50vw"
+                  // ô cao (row-span-2): ảnh ngang bị phóng theo chiều cao → cần bản rộng gấp ~2 lần ô
+                  sizes={
+                    span === "row-span-2"
+                      ? "(min-width: 1024px) 50vw, 100vw"
+                      : "(min-width: 1024px) 25vw, 50vw"
+                  }
                   className="object-cover"
                 />
               </div>

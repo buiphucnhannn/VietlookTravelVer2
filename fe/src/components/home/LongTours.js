@@ -65,7 +65,7 @@ export default function LongTours({ lang, t, cards, labels }) {
           className="grid animate-fade-up grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4 lg:gap-6"
         >
           {list.map((card) => (
-            <TourCard key={card.slug} lang={lang} card={card} labels={labels} compact />
+            <TourCard key={card.slug} lang={lang} card={card} labels={labels} compact alignAt="" />
           ))}
         </div>
 

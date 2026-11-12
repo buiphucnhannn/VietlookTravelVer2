@@ -342,7 +342,7 @@ const titleCase = (s) =>
 const usd = (n) => `$${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 const isoDay = (s) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  return m ? `${m[2]}/${m[3]}/${m[1]}` : null;
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null; // dd/mm/yyyy (CMS tiếng Việt)
 };
 /** Chuỗi trông như mã / tên biến (vd. "mid_range", "superUrgent", "arr-vip") */
 const looksLikeCode = (s) => /^[a-z][a-z0-9]*([A-Z_-][a-zA-Z0-9]+)+$/.test(s);

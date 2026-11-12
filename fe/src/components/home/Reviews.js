@@ -39,8 +39,8 @@ function Laurel({ flip, className }) {
  */
 export default function Reviews({ lang, dict, reviews }) {
   const t = dict.home;
-  // "2026-10" / ngày đầy đủ → "10/2026" (dạng số như toàn hệ thống, không tên tháng)
-  const fmtDate = fmtMonthYear;
+  // "2026-10" / ngày đầy đủ → en/vi "10/2026" · zh "2026年10月" (không tên tháng)
+  const fmtDate = (v) => fmtMonthYear(v, lang);
   return (
     <section
       className="relative isolate overflow-hidden bg-forest-900 py-14 text-white lg:py-[4.5rem]"
@@ -100,7 +100,8 @@ export default function Reviews({ lang, dict, reviews }) {
             >
               <div className="relative flex-1 px-6 pt-7 pb-5">
                 <Quote className="absolute top-5 right-5 size-8 text-amber-brand/40" />
-                <h3 className="pr-8 text-lg leading-snug font-bold text-forest-700">
+                {/* Dải trượt (cha không phải lưới → không dùng subgrid): tiêu đề giữ chỗ 2 dòng để lời nhận xét các thẻ bắt đầu cùng một mức */}
+                <h3 className="min-h-[2lh] pr-8 text-lg leading-snug font-bold text-forest-700">
                   {tr(r.title, lang)}
                 </h3>
                 <blockquote className="mt-3 line-clamp-5 leading-relaxed text-ink/80">

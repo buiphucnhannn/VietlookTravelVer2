@@ -97,6 +97,7 @@ const FIXED = {
   "settings.test_email": "Gửi email thử",
   "settings.payment": "Sửa cài đặt thanh toán 9Pay",
   "settings.tracking": "Sửa mã đo lường",
+  "settings.smallGroup": "Sửa phụ thu nhóm nhỏ",
   "user.create": "Thêm tài khoản",
   "user.update": "Sửa tài khoản",
   "user.permissions": "Đổi quyền tài khoản",
@@ -355,6 +356,14 @@ export function describeLog(x) {
         href: "/settings",
         module: "admin",
       };
+    case "settings.smallGroup":
+      return {
+        before: "Sửa ",
+        name: "phụ thu nhóm nhỏ",
+        after: m.enabled === false ? " — đang tắt" : m.enabled ? " — đang bật" : "",
+        href: "/settings",
+        module: "admin",
+      };
   }
   return plain(actionLabel(action));
 }
@@ -480,6 +489,7 @@ const FILTER_GROUPS = [
       "settings.test_email",
       "settings.payment",
       "settings.tracking",
+      "settings.smallGroup",
     ],
   },
   {
@@ -842,7 +852,7 @@ export default function AuditLogPage() {
 
             {/* Máy tính: bảng */}
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[860px] table-fixed text-center text-sm">
+              <table className="w-full min-w-[860px] table-fixed text-left text-sm">
                 <colgroup>
                   <col className="w-[15%]" />
                   <col className="w-[14%]" />
@@ -854,9 +864,9 @@ export default function AuditLogPage() {
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] tracking-wide text-slate-500 uppercase">
                     <th className="px-4 py-3 font-semibold">Thời gian</th>
                     <th className="px-4 py-3 font-semibold">Người làm</th>
-                    <th className="px-4 py-3 text-left font-semibold">Nội dung</th>
+                    <th className="px-4 py-3 font-semibold">Nội dung</th>
                     <th className="px-4 py-3 font-semibold">Thiết bị</th>
-                    <th className="px-4 py-3 font-semibold">Chi tiết</th>
+                    <th className="px-4 py-3 text-center font-semibold">Chi tiết</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -871,7 +881,7 @@ export default function AuditLogPage() {
                             {fmtDateTime(x.createdAt)}
                           </td>
                           <td className="truncate px-4 py-3">{actorCell(x, id)}</td>
-                          <td className="px-4 py-3 text-left">
+                          <td className="px-4 py-3">
                             <span className="flex max-w-full items-baseline gap-3">
                               <ActionBadge action={x.action} className="shrink-0" />
                               <LogSentence
@@ -886,7 +896,7 @@ export default function AuditLogPage() {
                           >
                             {dev.short}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 text-center">
                             <ToggleButton
                               expanded={expanded}
                               onClick={() => setOpen(expanded ? null : x.id)}

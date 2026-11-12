@@ -29,14 +29,17 @@ export function WhyUs({ dict }) {
           {t.why.map((w, i) => {
             const Icon = whyIcons[i];
             return (
-              <Reveal key={w.title} delay={(i % 3) * 80} className="flex gap-4">
-                <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-forest-700 to-forest-700 text-white shadow-lg shadow-forest-700/25">
+              // Subgrid 2 hàng (tiêu đề · mô tả) → các ô cùng hàng thẳng nhau
+              <Reveal
+                key={w.title}
+                delay={(i % 3) * 80}
+                className="row-span-2 grid grid-cols-[auto_1fr] grid-rows-subgrid gap-x-4 gap-y-1.5"
+              >
+                <span className="row-span-2 grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-forest-700 to-forest-700 text-white shadow-lg shadow-forest-700/25">
                   <Icon className="size-6" />
                 </span>
-                <div>
-                  <h3 className="text-xl font-semibold tracking-tight text-ink">{w.title}</h3>
-                  <p className="mt-1.5 leading-relaxed text-muted">{w.text}</p>
-                </div>
+                <h3 className="text-xl font-semibold tracking-tight text-ink">{w.title}</h3>
+                <p className="leading-relaxed text-muted">{w.text}</p>
               </Reveal>
             );
           })}
@@ -54,7 +57,7 @@ export function WhyUs({ dict }) {
  * Khối B2B theo phong cách Demo 1: NỀN SÁNG (yêu cầu khách 05/11 – bỏ ảnh du thuyền Hạ Long vì sản phẩm
  * không còn; nền tươi sáng: biển Nha Trang xanh ngọc phủ kem),
  * 2 khung ảnh viền cọ đổi ảnh luân phiên + 2 huy hiệu số liệu; bên phải thông điệp B2B rõ ràng:
- * đối tượng (agencies, OTA, MICE), giá net, báo giá trong 24h.
+ * đối tượng (agencies, OTA, MICE), giá net, báo giá 15–30 phút (giờ hành chính).
  */
 export function B2BBlock({ lang, dict, images = DEFAULT_HOME_IMAGES }) {
   const t = dict.home;
@@ -100,7 +103,10 @@ export function B2BBlock({ lang, dict, images = DEFAULT_HOME_IMAGES }) {
           <div className="absolute bottom-[8%] left-[4%] flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-ink shadow-xl">
             <Clock4 className="size-8 text-sun-500" />
             <div className="leading-tight">
-              <p className="text-2xl font-extrabold">24h</p>
+              {/* Báo giá 15–30 phút trong giờ hành chính (cuối tuần / lễ: trong 24 giờ) */}
+              <p className="text-2xl font-extrabold">
+                15–30 {lang === "zh" ? "分钟" : lang === "vi" ? "phút" : "min"}
+              </p>
               <p className="text-xs text-muted">
                 {lang === "zh"
                   ? "报价回复"

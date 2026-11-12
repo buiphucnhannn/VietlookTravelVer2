@@ -7,7 +7,14 @@ import { siteConfig } from "@/constants/site";
 import { Container } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import ContactForm from "@/components/forms/ContactForm";
-import { FacebookIcon, WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
+import {
+  FacebookIcon,
+  LineIcon,
+  WeChatIcon,
+  WhatsAppIcon,
+  ZaloIcon,
+} from "@/components/ui/BrandIcons";
+import CopyButton from "@/components/ui/CopyButton";
 import LazyIframe from "@/components/ui/LazyIframe";
 
 export async function generateMetadata({ params }) {
@@ -20,10 +27,10 @@ export async function generateMetadata({ params }) {
     // Phụ đề hero ngắn → thêm thông tin liên hệ cho kết quả tìm kiếm
     description:
       lang === "zh"
-        ? `${dict.contact.subtitle}河内办公室，热线、WhatsApp、微信与Zalo全天候联系 Vietlook Travel。`
+        ? `${dict.contact.subtitle}河内办公室，热线、WhatsApp、微信、LINE与Zalo全天候联系 Vietlook Travel。`
         : lang === "vi"
-          ? `${dict.contact.subtitle} Liên hệ Vietlook Travel tại Hà Nội qua hotline, WhatsApp, WeChat, Zalo hoặc email.`
-          : `${dict.contact.subtitle} Contact Vietlook Travel in Hanoi by hotline, WhatsApp, WeChat, Zalo or email.`,
+          ? `${dict.contact.subtitle} Liên hệ Vietlook Travel tại Hà Nội qua hotline, WhatsApp, WeChat, LINE, Zalo hoặc email.`
+          : `${dict.contact.subtitle} Contact Vietlook Travel in Hanoi by hotline, WhatsApp, WeChat, LINE, Zalo or email.`,
   });
 }
 
@@ -40,8 +47,10 @@ export default async function ContactPage({ params }) {
   };
   const { contact, messaging, social, maps } = siteConfig;
 
+  // WeChat / LINE không có link mở thẳng → hiện ID / số điện thoại (WeChat kèm nút chép)
   const channels = [
     {
+      key: "wa1",
       icon: WhatsAppIcon,
       color: "text-[#25d366]",
       title: contact.hotline,
@@ -49,15 +58,46 @@ export default async function ContactPage({ params }) {
       href: messaging.whatsapp,
     },
     {
+      key: "wa2",
+      icon: WhatsAppIcon,
+      color: "text-[#25d366]",
+      title: contact.hotline2,
+      sub: "WhatsApp",
+      href: messaging.whatsapp2,
+    },
+    {
+      key: "wechat",
       icon: WeChatIcon,
       color: "text-[#07c160]",
       title: messaging.wechatId,
-      sub: "WeChat",
+      sub: lang === "zh" ? "微信号" : "WeChat ID",
       href: null,
       id: "wechat",
+      copy: messaging.wechatId,
     },
-    { icon: ZaloIcon, color: "", title: contact.hotline, sub: "Zalo", href: messaging.zalo },
     {
+      key: "line",
+      icon: LineIcon,
+      color: "",
+      title: (
+        <>
+          <span className="whitespace-nowrap">{contact.hotline}</span> ·{" "}
+          <span className="whitespace-nowrap">{contact.hotline2}</span>
+        </>
+      ),
+      sub: "LINE",
+      href: null,
+    },
+    {
+      key: "zalo",
+      icon: ZaloIcon,
+      color: "",
+      title: contact.hotline,
+      sub: "Zalo",
+      href: messaging.zalo,
+    },
+    {
+      key: "facebook",
       icon: FacebookIcon,
       color: "text-[#1877f2]",
       title: "Facebook",
@@ -92,7 +132,7 @@ export default async function ContactPage({ params }) {
                 const Tag = ch.href ? "a" : "div";
                 return (
                   <Tag
-                    key={ch.sub}
+                    key={ch.key}
                     id={ch.id}
                     {...(ch.href
                       ? { href: ch.href, target: "_blank", rel: "noopener noreferrer" }
@@ -105,6 +145,13 @@ export default async function ContactPage({ params }) {
                       <span className="text-sm text-muted">{ch.sub}</span>
                     </span>
                     {ch.href && <ChevronRight className="size-5 text-muted" />}
+                    {ch.copy && (
+                      <CopyButton
+                        value={ch.copy}
+                        label={dict.common.copy}
+                        copiedLabel={dict.common.copied}
+                      />
+                    )}
                   </Tag>
                 );
               })}
@@ -129,17 +176,27 @@ export default async function ContactPage({ params }) {
               </li>
               <li className="flex gap-3">
                 <Phone className="mt-0.5 size-5 shrink-0 text-sun-500" />
-                <span>
-                  <a
-                    href={`tel:${contact.hotlineRaw}`}
-                    className="font-semibold hover:text-brand-600"
-                  >
-                    {contact.hotline}
-                  </a>{" "}
-                  ·{" "}
-                  <a href={`tel:${contact.hotline2Raw}`} className="hover:text-brand-600">
-                    {contact.hotline2}
-                  </a>
+                <span className="space-y-2">
+                  <span className="block">
+                    <a
+                      href={`tel:${contact.hotlineRaw}`}
+                      className="font-semibold hover:text-brand-600"
+                    >
+                      {contact.hotline}
+                    </a>
+                    <span className="block text-sm text-muted">
+                      {tr(contact.channels.hotline, lang)}
+                    </span>
+                  </span>
+                  <span className="block">
+                    <a
+                      href={`tel:${contact.hotline2Raw}`}
+                      className="font-semibold hover:text-brand-600"
+                    >
+                      {contact.hotline2}
+                    </a>
+                    <span className="block text-sm text-muted">{contact.channels.hotline2}</span>
+                  </span>
                 </span>
               </li>
               <li className="flex gap-3">

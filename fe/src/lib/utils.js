@@ -29,7 +29,7 @@ export function formatUSD(value) {
   }).format(value);
 }
 
-/* Định dạng ngày: dùng lib/dates.js (mm/dd/yyyy cho mọi ngôn ngữ). */
+/* Định dạng ngày: dùng lib/dates.js (theo ngôn ngữ: en mm/dd/yyyy · vi dd/mm/yyyy · zh yyyy年m月d日). */
 
 export function slugify(text) {
   return String(text)

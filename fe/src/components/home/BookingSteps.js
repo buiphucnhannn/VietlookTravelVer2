@@ -1,5 +1,7 @@
 import { CalendarCheck, CreditCard, Map, MessageSquareText, Plane } from "lucide-react";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 
 const icons = [MessageSquareText, CalendarCheck, Map, CreditCard, Plane];
 
@@ -24,7 +26,12 @@ export default function BookingSteps({ dict }) {
           {t.steps.map((s, i) => {
             const Icon = icons[i];
             return (
-              <Reveal as="li" key={s.title} delay={i * 90} className="relative text-center">
+              <Reveal
+                as="li"
+                key={s.title}
+                delay={i * 90}
+                className={cn("relative text-center", subgrid(4, "md"))}
+              >
                 <span className="relative mx-auto grid size-20 place-items-center rounded-full bg-white text-ink shadow-[0_10px_30px_-14px_rgba(60,40,10,0.35)] ring-1 ring-sand-300/60">
                   <Icon className="size-9" strokeWidth={1.3} />
                   <span className="absolute -bottom-1.5 left-1/2 size-3 -translate-x-1/2 rounded-full bg-amber-brand ring-4 ring-cream-50" />

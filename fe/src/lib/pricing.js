@@ -9,6 +9,8 @@
  * 3. Phụ thu ngày lễ & cao điểm nếu ngày khởi hành nằm trong holidayDates (YYYY-MM-DD hoặc MM-DD lặp hằng năm):
  *    số tiền / khách (holidaySurcharge) và / hoặc % trên tiền tour (holidayPercent).
  * 4. Phụ thu phòng đơn: khi chỉ có 1 người lớn.
+ * 5. Phụ thu nhóm nhỏ (CMS → Cài đặt, truyền vào qua `smallGroup`): CHỈ tour chưa có bảng giá theo số khách —
+ *    % trên tiền tour (người lớn + trẻ em) theo số khách phải trả tiền (trẻ miễn phí không tính).
  */
 const DEFAULT_CHILD = [
   { minAge: 0, maxAge: 4, percent: 0 },
@@ -17,6 +19,15 @@ const DEFAULT_CHILD = [
 ];
 
 const round = (n) => Math.round(n * 100) / 100;
+
+/** Phụ thu nhóm nhỏ mặc định (% theo số khách): 1 khách 60%, 2 khách 30%, 3–4 khách 15%, từ 5 khách 0% */
+export const SMALL_GROUP_DEFAULT = Object.freeze({
+  enabled: true,
+  one: 60,
+  two: 30,
+  threeFour: 15,
+  fivePlus: 0,
+});
 
 /** Các hạng khách sạn tour có giá riêng: [3, 4, 5] (rỗng = không chia hạng) */
 export function hotelClasses(tour) {
@@ -42,10 +53,11 @@ const paxGap = (t, pax) =>
  *   4. không có bảng giá → giá bán `price`
  * Số khách nằm ngoài mọi bậc (1 khách, hoặc đông hơn bậc cuối) → dùng bậc gần nhất.
  */
+const pricedTiers = (tour) =>
+  (tour?.pricing?.groupTiers ?? []).filter((t) => [3, 4, 5].some((c) => tierPrice(t, c) > 0));
+
 export function unitPrice(tour, pax, hotelClass) {
-  const tiers = (tour?.pricing?.groupTiers ?? []).filter((t) =>
-    [3, 4, 5].some((c) => tierPrice(t, c) > 0),
-  );
+  const tiers = pricedTiers(tour);
   if (!tiers.length) return tour?.price ?? null;
   const classes = hotelClasses(tour);
   const cls = classes.includes(hotelClass) ? hotelClass : (classes[0] ?? 3);
@@ -66,13 +78,37 @@ export function childPercent(tour, age) {
   return rate ? rate.percent : 100;
 }
 
+/** Số khách phải trả tiền: người lớn + trẻ em không miễn phí */
+export const payingGuests = (tour, adults, childAges = []) =>
+  adults + childAges.filter((a) => childPercent(tour, a) > 0).length;
+
+/**
+ * % phụ thu nhóm nhỏ theo cài đặt CMS. 0 khi: tắt / chưa truyền cài đặt / tour đã có bảng giá theo số khách
+ * (bảng giá đó đã tính theo số khách) / chưa có giá.
+ */
+export function smallGroupPercent(tour, paying, setting) {
+  if (!setting?.enabled || !(tour?.price > 0) || pricedTiers(tour).length) return 0;
+  const p =
+    paying <= 1
+      ? setting.one
+      : paying === 2
+        ? setting.two
+        : paying <= 4
+          ? setting.threeFour
+          : setting.fivePlus;
+  return Number.isFinite(p) && p > 0 ? p : 0;
+}
+
 export function isHoliday(tour, date) {
   if (!date) return false;
   return (tour?.pricing?.holidayDates ?? []).some((d) => d === date || d === date.slice(5));
 }
 
 /** @returns {{ total: number|null, lines: {label:string, amount:number}[] }} */
-export function estimatePrice(tour, { adults = 1, childAges = [], date = "", hotelClass } = {}) {
+export function estimatePrice(
+  tour,
+  { adults = 1, childAges = [], date = "", hotelClass, smallGroup } = {},
+) {
   const pax = adults + childAges.length;
   const unit = unitPrice(tour, pax, hotelClass);
   if (!unit) return { total: null, lines: [] };
@@ -82,11 +118,17 @@ export function estimatePrice(tour, { adults = 1, childAges = [], date = "", hot
     const pct = childPercent(tour, age);
     lines.push({ label: `Child ${age}y (${pct}%)`, amount: Math.round((unit * pct) / 100) }); // làm tròn đô la như website
   });
+  const base = lines.reduce((s, l) => s + l.amount, 0); // tiền tour (người lớn + trẻ em)
+  const paying = payingGuests(tour, adults, childAges);
+  const groupPct = smallGroupPercent(tour, paying, smallGroup);
+  if (groupPct > 0)
+    lines.push({
+      label: `Small-group supplement (${paying} guest${paying === 1 ? "" : "s"}) +${groupPct}%`,
+      amount: Math.round((base * groupPct) / 100),
+    });
   if (isHoliday(tour, date)) {
-    const base = lines.reduce((s, l) => s + l.amount, 0);
     const surcharge = tour?.pricing?.holidaySurcharge;
     if (surcharge > 0) {
-      const paying = adults + childAges.filter((a) => childPercent(tour, a) > 0).length;
       lines.push({ label: `Holiday surcharge × ${paying}`, amount: round(surcharge * paying) });
     }
     const percent = tour?.pricing?.holidayPercent;

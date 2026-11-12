@@ -354,19 +354,66 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
       busy={busy || autoFill.busy || images.busy}
       saveLabel={images.label}
     >
-      {/* Cùng bố cục với thẻ xe trên trang Thuê xe: ảnh bên trái, thông tin bên phải theo đúng thứ tự trên trang */}
-      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
-        <FormSection title="Ảnh xe (ảnh đầu tiên là ảnh đại diện)">
-          <GalleryField
-            value={d.images}
-            onChange={(images) => set({ images })}
-            folder="cars"
-            max={12}
-            crop={{ ratio: 16 / 10, width: 1600 }}
-          />
-        </FormSection>
+      {/* Máy tính — cột trái (dính khi cuộn): ảnh + hiển thị + cài đặt nâng cao; cột phải: nội dung theo đúng thứ tự trên trang Thuê xe */}
+      <div className="grid items-start gap-x-8 gap-y-6 lg:grid-cols-2">
+        <div className="contents lg:sticky lg:top-0 lg:block lg:space-y-6">
+          <FormSection title="Ảnh xe (ảnh đầu tiên là ảnh đại diện)" className="order-1">
+            <GalleryField
+              value={d.images}
+              onChange={(images) => set({ images })}
+              folder="cars"
+              max={12}
+              crop={{ ratio: 16 / 10, width: 1600 }}
+            />
+          </FormSection>
 
-        <div className="space-y-6">
+          <FormSection title="Hiển thị trên website" className="order-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                <Toggle
+                  checked={d.isActive}
+                  onChange={(isActive) => set({ isActive })}
+                  label="Hiện trên website"
+                  hint="Tắt để tạm ẩn loại xe này khỏi trang Thuê xe."
+                />
+              </div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                <Toggle
+                  checked={d.vip}
+                  onChange={(vip) => set({ vip })}
+                  label="Xe VIP"
+                  hint="Gắn nhãn VIP trên thẻ xe ở website."
+                />
+              </div>
+            </div>
+          </FormSection>
+
+          <FormSection title="Cài đặt nâng cao" className="order-4">
+            <div className="space-y-5">
+              <Field label="Mã loại xe (không dấu)" required hint="Tự tạo từ tên, vd: sedan-4.">
+                <Input
+                  value={d.key}
+                  onChange={(e) => {
+                    setKeyTouched(true);
+                    set({ key: slugify(e.target.value) });
+                  }}
+                />
+              </Field>
+              <Field
+                label="Cột giá theo tuyến"
+                hint="Nối loại xe với cột giá trong bảng giá tuyến của website (vd. giá đón sân bay). Không rõ thì giữ nguyên."
+              >
+                <Input
+                  value={d.priceKey}
+                  onChange={(e) => set({ priceKey: e.target.value.trim() })}
+                />
+              </Field>
+            </div>
+          </FormSection>
+        </div>
+
+        {/* điện thoại: nội dung chính ngay sau ảnh, phần hiển thị & cài đặt xuống cuối */}
+        <div className="order-2 space-y-6 lg:order-none">
           <div className="space-y-4">
             <LangBar lang={lang} onLang={setLang} form={d} onForm={setD} />
             <Field label="Câu giới thiệu ngắn" hint="Dòng chữ nhỏ phía trên tên xe.">
@@ -446,45 +493,6 @@ function CarEditor({ initial, nextOrder, onClose, onSaved }) {
             />
           </Field>
         </div>
-
-        <FormSection title="Cài đặt hiển thị" className="lg:col-span-2">
-          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
-            <Field label="Mã loại xe (không dấu)" required hint="Tự tạo từ tên, vd: sedan-4.">
-              <Input
-                value={d.key}
-                onChange={(e) => {
-                  setKeyTouched(true);
-                  set({ key: slugify(e.target.value) });
-                }}
-              />
-            </Field>
-            <Field
-              label="Cột giá theo tuyến"
-              hint="Nối loại xe với cột giá trong bảng giá tuyến của website (vd. giá đón sân bay). Không rõ thì giữ nguyên."
-            >
-              <Input
-                value={d.priceKey}
-                onChange={(e) => set({ priceKey: e.target.value.trim() })}
-              />
-            </Field>
-            <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-              <Toggle
-                checked={d.isActive}
-                onChange={(isActive) => set({ isActive })}
-                label="Hiện trên website"
-                hint="Tắt để tạm ẩn loại xe này khỏi trang Thuê xe."
-              />
-            </div>
-            <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-              <Toggle
-                checked={d.vip}
-                onChange={(vip) => set({ vip })}
-                label="Xe VIP"
-                hint="Gắn nhãn VIP trên thẻ xe ở website."
-              />
-            </div>
-          </div>
-        </FormSection>
       </div>
     </EditorModal>
   );

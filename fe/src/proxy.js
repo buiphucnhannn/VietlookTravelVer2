@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ADMIN_BASE, ADMIN_LOGIN, BACKEND_URL, backendHeaders, safeNext } from "@/config/urls.mjs";
+import { resolveAdminLoginPath } from "@/config/admin-path.mjs";
 import { defaultLocale, locales } from "@/i18n/config";
 import { regions } from "@/data/regions";
 
@@ -9,6 +10,8 @@ import { regions } from "@/data/regions";
  * 2. Khu quản trị   → mở trang trực tiếp: hỏi backend /auth/me bằng cookie TRƯỚC khi render (proxy không giữ
  *                     secret JWT nào): chưa đăng nhập → trang đăng nhập; access hết hạn nhưng còn phiên → /auth/resume.
  *                     Chuyển tab / tải trước bên trong CMS: chỉ cần cookie phiên (xem guardAdmin).
+ *                     Có ADMIN_LOGIN_PATH (đường dẫn bí mật): trang đăng nhập CHỈ mở ở đó; /login, /admin… với
+ *                     người không có phiên → 404 như trang không tồn tại (không chuyển hướng → không lộ chỗ đăng nhập).
  * 3. Website        → URL như web cũ: tiếng Anh ở gốc, /zh, /vi có tiền tố; slug không tồn tại → 404 thật;
  *                     slug cũ (CMS đã đổi đường dẫn) → 308 sang slug mới (giữ SEO).
  */
@@ -56,6 +59,13 @@ function forwardApi(request) {
 
 /* ---------------- 2. Khu quản trị ---------------- */
 
+/**
+ * Đường dẫn bí mật của trang đăng nhập (null = chưa đặt → dùng /login như cũ, cho máy dev / test).
+ * Trình duyệt mở đường dẫn này → proxy rewrite sang route /login có sẵn (URL trên thanh địa chỉ giữ nguyên).
+ */
+const SECRET_LOGIN = resolveAdminLoginPath();
+const LOGIN_ENTRY = SECRET_LOGIN ?? ADMIN_LOGIN;
+
 const PRIVATE = { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" };
 const HINT_COOKIES = ["vl_session", "__Host-vl_session"];
 const hasSession = (request) => HINT_COOKIES.some((n) => request.cookies.has(n));
@@ -95,8 +105,18 @@ async function currentUser(request) {
  */
 const isRouterFetch = (request) => request.headers.get("sec-fetch-dest") === "empty";
 
+/** Chưa đăng nhập: có đường dẫn bí mật → 404 y như trang không tồn tại; chưa đặt → về /login như cũ */
+function toLogin(request) {
+  if (SECRET_LOGIN) return notFound(request.nextUrl.clone(), defaultLocale);
+  const { pathname, search } = request.nextUrl;
+  const login = new URL(ADMIN_LOGIN, request.url);
+  login.searchParams.set("next", pathname + search);
+  return withPrivate(NextResponse.redirect(login, 307));
+}
+
 async function guardAdmin(request) {
   const { pathname, search, searchParams } = request.nextUrl;
+  const isLogin = pathname === LOGIN_ENTRY;
 
   /*
    * Chuyển tab / tải trước trong CMS: KHÔNG hỏi backend (mỗi lần hỏi = 1 vòng mạng tới máy chủ API → bấm menu bị chậm,
@@ -109,20 +129,24 @@ async function guardAdmin(request) {
    *  - Phiên hết hạn / bị thu hồi khi đang chuyển tab: API trả 401 → lib/api.js tự làm mới phiên, không được
    *    → về /login; AdminShell cũng hỏi lại /auth/me (khi quay lại tab, mỗi phút, sau lỗi 403).
    */
-  if (pathname !== ADMIN_LOGIN && isRouterFetch(request)) {
+  if (!isLogin && isRouterFetch(request)) {
     if (hasSession(request)) return withPrivate(NextResponse.next());
-    const login = new URL(ADMIN_LOGIN, request.url);
-    login.searchParams.set("next", pathname + search);
-    return withPrivate(NextResponse.redirect(login, 307));
+    return toLogin(request);
   }
+
+  // Đường dẫn bí mật đang bật + không có cookie phiên → 404 ngay, không cần hỏi backend
+  if (SECRET_LOGIN && !isLogin && !hasSession(request)) return toLogin(request);
 
   const { user, limited, retry, down } = await currentUser(request);
 
-  if (pathname === ADMIN_LOGIN) {
+  if (isLogin) {
     // đã đăng nhập → về đúng trang ?next
     if (user)
       return NextResponse.redirect(new URL(safeNext(searchParams.get("next")), request.url));
-    return withPrivate(NextResponse.next());
+    if (!SECRET_LOGIN) return withPrivate(NextResponse.next());
+    const page = request.nextUrl.clone();
+    page.pathname = ADMIN_LOGIN; // giữ ?next / ?expired
+    return withPrivate(NextResponse.rewrite(page));
   }
 
   if (limited) {
@@ -161,9 +185,7 @@ async function guardAdmin(request) {
     return withPrivate(NextResponse.redirect(resume));
   }
 
-  const login = new URL(ADMIN_LOGIN, request.url);
-  login.searchParams.set("next", pathname + search);
-  return withPrivate(NextResponse.redirect(login, 307));
+  return toLogin(request);
 }
 
 /* ---------------- 3. Website: slug hợp lệ ---------------- */
@@ -256,6 +278,8 @@ async function slugResponse(url, path, lang, prefix) {
   return undefined;
 }
 
+const ADMIN_FILE = /^\/(admin|login)(\/.*)?\.[^/]*$/;
+
 export async function proxy(request) {
   const url = request.nextUrl;
   const { pathname } = url;
@@ -267,7 +291,13 @@ export async function proxy(request) {
     const to = new URL(`${pathname.replace(/\/+$/, "") || "/"}${url.search}`, request.url);
     return NextResponse.redirect(to, 301);
   }
-  if (pathname === ADMIN_LOGIN || pathname === ADMIN_BASE || pathname.startsWith(`${ADMIN_BASE}/`))
+  // Đã đặt đường dẫn bí mật → /login luôn là 404 (kể cả người đã đăng nhập)
+  if (SECRET_LOGIN && pathname === ADMIN_LOGIN) return notFound(url, defaultLocale);
+  // File nội bộ của Next gọi thẳng (VD /login.rsc, /admin.rsc — trình duyệt không bao giờ tự gọi kiểu này) → 404,
+  // không để lộ khu quản trị qua đường vòng
+  if (ADMIN_FILE.test(pathname))
+    return SECRET_LOGIN ? notFound(url, defaultLocale) : NextResponse.next();
+  if (pathname === LOGIN_ENTRY || pathname === ADMIN_BASE || pathname.startsWith(`${ADMIN_BASE}/`))
     return guardAdmin(request);
 
   const prefixed = PREFIXED.find((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`));
@@ -296,5 +326,10 @@ export async function proxy(request) {
 
 export const config = {
   // Mọi trang (bỏ qua tài nguyên tĩnh, file có phần mở rộng) + API /api/v1/* (gắn mã bí mật)
-  matcher: ["/((?!_next|api|images|icons|videos|.*\\..*).*)", "/api/v1/:path*"],
+  // + file có đuôi trong khu quản trị (/admin.rsc, /login.rsc…) để chặn đường vòng
+  matcher: [
+    "/((?!_next|api|images|icons|videos|.*\\..*).*)",
+    "/api/v1/:path*",
+    "/((?:admin|login)(?:/.*)?\\..*)",
+  ],
 };

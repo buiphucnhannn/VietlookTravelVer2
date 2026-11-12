@@ -18,10 +18,16 @@ export const destinationCoords = {
   "ha-giang": [22.82, 104.98],
   "cao-bang": [22.67, 106.26],
   "moc-chau": [20.85, 104.65],
+  "thai-nguyen": [21.59, 105.85],
+  "dien-bien": [21.39, 103.02],
+  "son-la": [21.33, 103.91],
+  "mai-chau": [20.66, 105.08],
+  "pu-luong": [20.47, 105.2],
   "quang-binh": [17.47, 106.62],
   hue: [16.46, 107.59],
   "da-nang": [16.05, 108.2],
   "hoi-an": [15.88, 108.33],
+  "quy-nhon": [13.78, 109.22],
   "nha-trang": [12.24, 109.19],
   dalat: [11.94, 108.44],
   "mui-ne": [10.93, 108.29],
@@ -29,6 +35,7 @@ export const destinationCoords = {
   "vung-tau": [10.35, 107.08],
   "mekong-delta": [10.03, 105.78],
   "phu-quoc": [10.29, 103.98],
+  "con-dao": [8.69, 106.61],
 };
 
 /** Quần đảo Hoàng Sa & Trường Sa (Việt Nam) – luôn hiển thị trên bản đồ. */

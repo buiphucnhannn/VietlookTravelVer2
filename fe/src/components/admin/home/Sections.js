@@ -5,6 +5,7 @@ import { ArrowRight, Clock, EyeOff, ImageOff, Plus, Repeat2, X } from "lucide-re
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { cn } from "@/lib/utils";
 import { Sortable } from "../Sortable";
+import { pairOf } from "@/data/destination-grid";
 import {
   AutoNote,
   HOVER_TOOLS,
@@ -449,7 +450,9 @@ function ThemeTile({ theme, drag, children }) {
 export function DestinationTiles({ options, status, value, onChange }) {
   const [slot, setSlot] = useState(null);
   const byValue = useMemo(() => byValueOf(options), [options]);
-  const others = options.filter((o) => !o.hidden && !value.includes(o.value));
+  // Điểm đi kèm của ô ghép (Huế → Đà Nẵng, Nha Trang → Đà Lạt) không lặp lại ở dải "điểm đến khác"
+  const covered = new Set(value.flatMap((v) => [v, pairOf(v, value)]));
+  const others = options.filter((o) => !o.hidden && !covered.has(o.value));
   const empty = Array.from({ length: MAX_DESTINATIONS - value.length }, (_, k) => value.length + k);
 
   /** Đặt điểm đến `v` vào ô `i`; nếu `v` đang ở ô khác thì hai ô đổi chỗ cho nhau */
@@ -468,19 +471,20 @@ export function DestinationTiles({ options, status, value, onChange }) {
     <Sec name="Điểm đến nổi bật" className="bg-cream-50">
       <MiniHeading eyebrow="gridEyebrow" title="gridTitle" subtitle="gridSubtitle" />
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:auto-rows-[150px] lg:grid-cols-[1fr_1fr_0.9fr]">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:auto-rows-[150px] lg:grid-cols-3">
         <Sortable
           items={value}
           getId={sameId}
           onReorder={onChange}
           layout="grid"
-          // ô thứ 3 cao 2 hàng (vòm tròn) như trang thật; ô cuối trên điện thoại rộng cả hàng
-          className="contents lg:[&>*:nth-child(3)]:row-span-2 max-lg:[&>*:nth-child(5)]:col-span-2"
+          // 6 ô bằng nhau như trang thật (3 cột × 2 hàng)
+          className="contents"
         >
           {(v, i, drag) => (
             <DestinationTile
               index={i}
               dest={byValue.get(v)}
+              partner={byValue.get(pairOf(v, value))}
               loading={status === "loading"}
               drag={drag}
               onSwap={() => setSlot(i)}
@@ -496,8 +500,6 @@ export function DestinationTiles({ options, status, value, onChange }) {
             onClick={() => setSlot(i)}
             className={cn(
               "flex min-h-[130px] flex-col items-center justify-center gap-1.5 rounded-t-[1.75rem] rounded-b-2xl border-2 border-dashed border-brand-200 bg-white/60 text-xs font-semibold text-brand-700 transition hover:border-brand-400 hover:bg-brand-50 disabled:pointer-events-none disabled:opacity-50 lg:min-h-0",
-              i === 2 && "lg:row-span-2 lg:rounded-t-[999px]",
-              i === 4 && "max-lg:col-span-2",
             )}
           >
             <Plus className="size-4" /> Chọn điểm đến
@@ -533,8 +535,9 @@ export function DestinationTiles({ options, status, value, onChange }) {
       </div>
 
       <AutoNote className="mt-4" href="/admin/destinations" linkText="Sửa tên, ảnh điểm đến">
-        Bấm vào ô để thay điểm đến, kéo thả để đổi vị trí. Các điểm đến còn lại tự động hiển thị ở
-        dải bên dưới.
+        Bấm vào ô để thay điểm đến, kéo thả để đổi vị trí. Huế và Nha Trang tự hiện ghép với Đà Nẵng
+        / Đà Lạt (1 ảnh, tên ghép, dẫn tới trang miền). Các điểm đến còn lại tự động hiển thị ở dải
+        bên dưới, theo thứ tự trong mục Điểm đến.
       </AutoNote>
 
       {slot !== null && (
@@ -555,13 +558,12 @@ export function DestinationTiles({ options, status, value, onChange }) {
   );
 }
 
-function DestinationTile({ index, dest, loading, drag, onSwap, onRemove }) {
+function DestinationTile({ index, dest, partner, loading, drag, onSwap, onRemove }) {
   return (
     <div
       {...grab(drag)}
       className={cn(
         "group relative h-full min-h-[130px] overflow-hidden rounded-t-[1.75rem] rounded-b-2xl bg-forest-900 text-white ring-1 ring-sand-300/70 select-none lg:min-h-0",
-        index === 2 && "lg:rounded-t-[999px]",
         drag.dragging && "ring-2 ring-amber-brand",
       )}
     >
@@ -574,7 +576,13 @@ function DestinationTile({ index, dest, loading, drag, onSwap, onRemove }) {
         className="absolute inset-0 flex cursor-grab flex-col items-start justify-end p-3.5 text-left sm:p-4"
       >
         <span className="text-base leading-tight font-bold tracking-tight drop-shadow sm:text-lg">
-          {dest ? dest.label : loading ? "Đang tải…" : "Điểm đến không còn nữa"}
+          {dest
+            ? partner
+              ? `${dest.label} – ${partner.label}`
+              : dest.label
+            : loading
+              ? "Đang tải…"
+              : "Điểm đến không còn nữa"}
         </span>
         <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-white/80">
           <Repeat2 className="size-3 max-sm:hidden" />

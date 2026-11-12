@@ -6,6 +6,9 @@ export const REGIONS = Object.freeze({
 });
 export const REGION_VALUES = Object.values(REGIONS);
 
+/** Nhãn nổi bật trên thẻ tour (CMS bật / tắt từng tour): Bán chạy · Độc quyền */
+export const TOUR_LABELS = ["bestseller", "exclusive"];
+
 /** Tối đa 08 chủ đề tour (hợp đồng mục 2) */
 export const MAX_THEMES = 8;
 

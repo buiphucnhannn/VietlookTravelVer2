@@ -439,6 +439,8 @@ function RolePicker({ value, onChange, disabled }) {
 
 /* ---------- Bảng phân quyền ---------- */
 
+/** Số cột của thanh chọn quyền theo số mức quyền của mục (lớp viết sẵn để Tailwind nhận ra) */
+const SEG_COLS = { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
 const LEVEL_ON = {
   none: "bg-white text-slate-700 shadow-sm ring-1 ring-slate-200",
   view: "bg-white text-brand-700 shadow-sm ring-1 ring-brand-200",
@@ -525,7 +527,12 @@ function PermissionMatrix({ value, onChange, disabled }) {
                   <div
                     role="radiogroup"
                     aria-label={`Quyền mục ${m.label}`}
-                    className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1"
+                    className={cn(
+                      "grid gap-1 rounded-xl bg-slate-100 p-1",
+                      // mục ít mức quyền (vd. Nhật ký: Không / Xem) → chia đều hết khung, không để trống nền xám
+                      SEG_COLS[LEVELS.filter((l) => m.levels.includes(l.value)).length] ??
+                        "grid-cols-4",
+                    )}
                   >
                     {LEVELS.filter((l) => m.levels.includes(l.value)).map((l) => (
                       <button

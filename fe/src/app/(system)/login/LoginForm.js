@@ -15,7 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { safeNext } from "@/config/urls.mjs";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, rememberAdminLoginPath } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 /** Mã lỗi backend → câu thông báo thân thiện */
@@ -86,6 +86,7 @@ export default function LoginForm() {
         body: { username: username.trim(), password, remember },
         retry: false,
       });
+      rememberAdminLoginPath();
       setStatus("done");
       router.replace(safeNext(params.get("next")));
       router.refresh();
@@ -103,6 +104,7 @@ export default function LoginForm() {
     setError("");
     try {
       await api("/auth/demo-login", { method: "POST", retry: false });
+      rememberAdminLoginPath();
       setStatus("done");
       router.replace(safeNext(params.get("next")));
       router.refresh();

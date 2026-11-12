@@ -19,6 +19,8 @@ import {
   ABOUT_MISSION_TITLE,
   ABOUT_VISION_TITLE,
 } from "@/data/about";
+import { cn } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 
 export async function generateMetadata({ params }) {
   const { about, aboutPage } = await getCatalog();
@@ -145,7 +147,10 @@ export default async function AboutPage({ params }) {
               text: tr(about.mission, lang),
             },
           ].map((x, i) => (
-            <div key={i} className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <div
+              key={i}
+              className={cn("rounded-3xl bg-white/5 p-8 ring-1 ring-white/10", subgrid(3, "md"))}
+            >
               <x.icon className="size-9 text-amber-brand" />
               <h3 className="mt-4 text-2xl font-bold">{x.title}</h3>
               <p className="mt-2 text-lg text-white/80">{x.text}</p>
@@ -158,7 +163,11 @@ export default async function AboutPage({ params }) {
             {(about.values ?? []).map((v, i) => {
               const Icon = valueIcons[i % valueIcons.length];
               return (
-                <Reveal key={i} delay={i * 90} className="rounded-3xl bg-white p-7 text-ink">
+                <Reveal
+                  key={i}
+                  delay={i * 90}
+                  className={cn("rounded-3xl bg-white p-7 text-ink", subgrid(3, "md"))}
+                >
                   <span className="grid size-12 place-items-center rounded-xl bg-sun-500 text-white">
                     <Icon className="size-6" />
                   </span>

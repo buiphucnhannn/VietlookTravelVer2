@@ -67,7 +67,7 @@ const MSG = {
     contactNeeded: "请输入邮箱或电话号码",
     date: "请选择日期",
     dateFuture: "请选择今天之后的日期",
-    dateInvalid: "请输入有效日期（mm/dd/yyyy）",
+    dateInvalid: "请输入有效日期（yyyy/mm/dd）",
     returnAfter: "返程日期不能早于出发日期",
     timeInvalid: "请输入有效时间（HH:mm，24小时制）",
     returnTimeAfter: "同一天返程时，返程时间须晚于接车时间",
@@ -83,7 +83,7 @@ const MSG = {
     contactNeeded: "Vui lòng nhập email hoặc số điện thoại",
     date: "Vui lòng chọn ngày",
     dateFuture: "Vui lòng chọn một ngày trong tương lai",
-    dateInvalid: "Ngày không hợp lệ (định dạng mm/dd/yyyy)",
+    dateInvalid: "Ngày không hợp lệ (định dạng dd/mm/yyyy)",
     returnAfter: "Ngày về không được sớm hơn ngày đi",
     timeInvalid: "Giờ không hợp lệ (HH:mm, 24 giờ)",
     returnTimeAfter: "Về trong cùng ngày thì giờ về phải sau giờ đón",
@@ -120,7 +120,7 @@ export function validate(d, lang, { email = "required", dates = {}, required = [
 }
 
 /**
- * Ô ngày của website: luôn hiện mm/dd/yyyy (mọi ngôn ngữ / máy), giá trị ISO; không cho chọn ngày đã qua
+ * Ô ngày của website: hiện theo ngôn ngữ trang (en mm/dd/yyyy · vi dd/mm/yyyy · zh yyyy/mm/dd), giá trị ISO; không cho chọn ngày đã qua
  * (min mặc định = ngày mai). Xem components/ui/DatePicker.js.
  */
 export function DateInput({ className, lang, min, ...props }) {
@@ -328,10 +328,15 @@ export function useEnquiry(type, lang) {
   return { ...state, submit, reset: () => setState({ status: "idle", code: null, error: null }) };
 }
 
-export function SuccessPanel({ title, text, code, labels, onReset }) {
+export function SuccessPanel({ title, text, code, labels, onReset, className }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="animate-fade-up rounded-2xl border border-brand-100 bg-brand-50/60 p-8 text-center">
+    <div
+      className={cn(
+        "animate-fade-up rounded-2xl border border-brand-100 bg-brand-50/60 p-8 text-center",
+        className,
+      )}
+    >
       <CheckCircle2 className="mx-auto size-14 text-brand-500" strokeWidth={1.6} />
       <h3 className="mt-4 text-2xl font-bold text-ink">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-muted">{text}</p>

@@ -477,6 +477,9 @@ function useEditor(initial, empty, path, label) {
   };
 }
 
+/** Ô bật/tắt dạng thẻ — giống popup Sửa loại xe */
+const TOGGLE_CARD = "rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100";
+
 function KeyField({ e, hint }) {
   return (
     <Field label="Mã (không dấu)" required hint={hint}>
@@ -519,7 +522,8 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
             onChange={(note) => set({ note })}
           />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/* 3 thông tin ngắn cùng 1 hàng, không để ô "Phí" kéo dài hết chiều ngang */}
+        <div className="grid items-start gap-4 sm:grid-cols-3">
           <Field label="Thời gian lưu trú" hint="VD: Tối đa 90 ngày, nhập cảnh nhiều lần">
             <LocInput value={d.stay} lang={lang} onChange={(stay) => set({ stay })} />
           </Field>
@@ -530,10 +534,10 @@ function VisaEditor({ initial, nextOrder, onClose, onSaved }) {
               onChange={(processing) => set({ processing })}
             />
           </Field>
+          <Field label="Phí" hint="Ghi rõ đơn vị, VD: From $25 / person">
+            <LocInput value={d.fee} lang={lang} onChange={(fee) => set({ fee })} />
+          </Field>
         </div>
-        <Field label="Phí" hint="Ghi rõ đơn vị, VD: From $25 / person">
-          <LocInput value={d.fee} lang={lang} onChange={(fee) => set({ fee })} />
-        </Field>
 
         <FormSection title="Cài đặt hiển thị" className="border-t border-slate-100 pt-5">
           <div className="grid items-start gap-4 sm:grid-cols-2">
@@ -626,23 +630,33 @@ function FastTrackEditor({ initial, all, onClose, onSaved }) {
         </FormSection>
 
         <FormSection title="Cài đặt hiển thị" className="border-t border-slate-100 pt-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <KeyField e={e} hint="Tự tạo từ tên. Vd: arrival-standard" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className={TOGGLE_CARD}>
+              <Toggle
+                checked={d.isActive}
+                onChange={(isActive) => set({ isActive })}
+                label="Hiện trên website"
+                hint="Tắt để tạm ẩn gói này."
+              />
+            </div>
+            <div className={TOGGLE_CARD}>
+              <Toggle
+                checked={d.popular}
+                onChange={(popular) => set({ popular })}
+                label="Phổ biến"
+                hint="Gắn nhãn “Phổ biến”."
+              />
+            </div>
+            <div className={TOGGLE_CARD}>
+              <Toggle
+                checked={d.vip}
+                onChange={(vip) => set({ vip })}
+                label="VIP"
+                hint="Gắn nhãn VIP."
+              />
+            </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Toggle
-              checked={d.isActive}
-              onChange={(isActive) => set({ isActive })}
-              label="Hiện trên website"
-            />
-            <Toggle
-              checked={d.popular}
-              onChange={(popular) => set({ popular })}
-              label="Phổ biến"
-              hint="Gắn nhãn “Phổ biến”"
-            />
-            <Toggle checked={d.vip} onChange={(vip) => set({ vip })} label="VIP" />
-          </div>
+          <KeyField e={e} hint="Tự tạo từ tên. Vd: arrival-standard" />
         </FormSection>
       </div>
     </EditorModal>

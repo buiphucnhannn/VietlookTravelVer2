@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowRight, Car, Map, Stamp } from "lucide-react";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { lp } from "@/i18n/config";
+import { cn } from "@/lib/utils";
+import { subgrid } from "@/lib/subgrid";
 import { DEFAULT_HOME_IMAGES } from "./images";
 
 /**
@@ -51,10 +53,14 @@ export default function ServicesTrio({ lang, dict, images = DEFAULT_HOME_IMAGES.
           {items.map((it, i) => {
             const data = s[it.key];
             return (
-              <Reveal key={it.key} delay={i * 90}>
+              // Subgrid 4 hàng (ảnh · tiêu đề · mô tả · nút): tiêu đề 2 dòng không làm lệch thẻ bên
+              <Reveal key={it.key} delay={i * 90} className={subgrid(4, "md")}>
                 <Link
                   href={it.href}
-                  className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_50px_-30px_rgba(60,40,10,0.55)] ring-1 ring-sand-300/60 transition duration-300 hover:-translate-y-1 hover:shadow-[0_30px_60px_-30px_rgba(60,40,10,0.7)] hover:ring-sun-500/50"
+                  className={cn(
+                    "group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_50px_-30px_rgba(60,40,10,0.55)] ring-1 ring-sand-300/60 transition duration-300 hover:-translate-y-1 hover:shadow-[0_30px_60px_-30px_rgba(60,40,10,0.7)] hover:ring-sun-500/50",
+                    subgrid(4, "md"),
+                  )}
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">
                     <Image
@@ -73,18 +79,16 @@ export default function ServicesTrio({ lang, dict, images = DEFAULT_HOME_IMAGES.
                       0{i + 1}
                     </span>
                   </div>
-                  <div className="flex flex-1 flex-col p-6">
-                    <h3 className="text-xl font-bold tracking-tight text-ink group-hover:text-sun-600 sm:text-[1.35rem]">
-                      {data.title}
-                    </h3>
-                    <p className="mt-2 flex-1 text-[0.95rem] leading-relaxed text-muted">
-                      {data.text}
-                    </p>
-                    <span className="mt-6 flex h-12 items-center justify-center gap-2 rounded-xl bg-sun-500 font-semibold text-white shadow-md shadow-sun-500/25 transition-colors group-hover:bg-sun-600">
-                      {data.cta}
-                      <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-                    </span>
-                  </div>
+                  <h3 className="px-6 pt-6 text-xl font-bold tracking-tight text-ink group-hover:text-sun-600 sm:text-[1.35rem]">
+                    {data.title}
+                  </h3>
+                  <p className="mt-2 flex-1 px-6 text-[0.95rem] leading-relaxed text-muted">
+                    {data.text}
+                  </p>
+                  <span className="mx-6 mt-6 mb-6 flex h-12 items-center justify-center gap-2 rounded-xl bg-sun-500 font-semibold text-white shadow-md shadow-sun-500/25 transition-colors group-hover:bg-sun-600">
+                    {data.cta}
+                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                  </span>
                 </Link>
               </Reveal>
             );

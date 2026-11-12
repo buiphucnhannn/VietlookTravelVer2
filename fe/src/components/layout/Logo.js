@@ -52,7 +52,8 @@ export default function Logo({
           alt=""
           width={210}
           height={210}
-          priority
+          // tải ngay nhưng KHÔNG preload: logo nhỏ, không được giành băng thông với ảnh lớn đầu trang (LCP)
+          loading="eager"
           // hiển thị 32–48px → tải đúng cỡ (không tải 256/640px)
           sizes="48px"
           className={cn("h-auto", small ? "w-8" : compact ? "w-8 lg:w-10" : "w-10 lg:w-12")}
@@ -63,7 +64,8 @@ export default function Logo({
         alt="Vietlook Travel"
         width={527}
         height={59}
-        priority
+        // tải ngay nhưng KHÔNG preload: logo nhỏ, không được giành băng thông với ảnh lớn đầu trang (LCP)
+        loading="eager"
         sizes={
           small
             ? "144px"
