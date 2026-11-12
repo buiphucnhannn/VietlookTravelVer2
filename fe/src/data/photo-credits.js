@@ -22,6 +22,24 @@ const CREDITS = {
     license: "CC BY 3.0",
     url: "https://commons.wikimedia.org/wiki/File:M%C5%A9i_C%C3%A1_M%E1%BA%ADp_C%C3%B4n_%C4%90%E1%BA%A3o_-_panoramio.jpg",
   },
+  // Bắc Kạn — hồ Ba Bể (ảnh đã cắt mép)
+  "h-1b08401332b00a6fbe971d15d803bd74": {
+    author: "Ekrem Canli",
+    license: "CC BY-SA 3.0",
+    url: "https://commons.wikimedia.org/wiki/File:Ba_Be_Lake_2014.jpg",
+  },
+  // Thánh địa Mỹ Sơn
+  "h-a893b07dc938fb51f4ebebcf5f0c283b": {
+    author: "Philip Nalangan",
+    license: "CC BY 4.0",
+    url: "https://commons.wikimedia.org/wiki/File:My_Son_Sanctuary_Vietnam_06.jpg",
+  },
+  // Cần Thơ — chợ nổi Cái Răng
+  "h-5351b6ee435a4dfca801d9d0f350e155": {
+    author: "Vyacheslav Argenberg",
+    license: "CC BY 4.0",
+    url: "https://commons.wikimedia.org/wiki/File:Can_Tho,_Vietnam,_Floating_Market.jpg",
+  },
 };
 
 /** Thông tin ghi nguồn của 1 ảnh (link Cloudinary / đường dẫn) hoặc null */

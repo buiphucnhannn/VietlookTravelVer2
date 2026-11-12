@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   CircleCheck,
-  DollarSign,
+  Star,
   Eye,
   Headphones,
   MapPin,
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }) {
   });
 }
 
-const whyIcons = [Smartphone, MapPin, Languages, Wrench, DollarSign, Headphones];
+const whyIcons = [Smartphone, MapPin, Wrench, Languages, Star, Headphones];
 
 function PackageRow({ tour, lang, dict, getDestination }) {
   const c = dict.common;

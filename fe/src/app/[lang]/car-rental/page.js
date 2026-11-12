@@ -30,7 +30,7 @@ import { CarQuoteForm, CarQuoteProvider, QuickQuote } from "@/components/car/Car
 import FleetStage from "@/components/car/FleetStage";
 import FleetMarquee from "@/components/car/FleetMarquee";
 import RoutesExplorer from "@/components/car/RoutesExplorer";
-import { WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
+import { TripAdvisorIcon, WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
 import { cn } from "@/lib/utils";
 import { subgrid } from "@/lib/subgrid";
 
@@ -436,7 +436,7 @@ export default async function CarRentalPage({ params }) {
           <div className="rail grid gap-6 md:grid-cols-3">
             {reviews.slice(0, 3).map((r) => (
               <figure
-                key={r.title.en}
+                key={r.name}
                 className={cn(
                   "relative flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-black/5",
                   subgrid(3, "md"),
@@ -454,18 +454,25 @@ export default async function CarRentalPage({ params }) {
                   {tr(r.text, lang)}
                 </blockquote>
                 <figcaption className="mt-6 flex items-center gap-3 border-t border-border pt-5 md:self-start">
-                  <span className="relative size-12 shrink-0 overflow-hidden rounded-full ring-2 ring-amber-brand/40">
-                    <Image
-                      src={r.avatar || r.photo}
-                      alt=""
-                      fill
-                      sizes="48px"
-                      className="object-cover"
-                    />
+                  {/* chữ cái đầu tên khách (không dùng ảnh minh hoạ ở chỗ ảnh đại diện — tránh hiểu nhầm là ảnh của khách) */}
+                  <span
+                    aria-hidden
+                    className="grid size-12 shrink-0 place-items-center rounded-full bg-forest-700 text-lg font-bold text-white uppercase ring-2 ring-amber-brand/40"
+                  >
+                    {(r.name || "?").trim()[0]}
                   </span>
-                  <span className="leading-tight">
-                    <span className="block font-semibold text-ink">{tr(r.title, lang)}</span>
-                    <span className="text-sm text-muted">● {tr(r.trip, lang)}</span>
+                  <span className="min-w-0 leading-tight">
+                    <span className="block truncate font-semibold text-ink">{r.name}</span>
+                    <span className="block text-sm text-muted">{tr(r.trip, lang)}</span>
+                    <a
+                      href={r.url || siteConfig.social.tripadvisor}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted hover:text-ink hover:underline"
+                    >
+                      <TripAdvisorIcon className="size-4 text-[#00af87]" />
+                      Tripadvisor
+                    </a>
                   </span>
                 </figcaption>
               </figure>

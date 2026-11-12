@@ -9,6 +9,8 @@ const staticPaths = [
   "/tours",
   "/packages",
   "/halong-bay-cruises",
+  "/halong-bay-overnight-cruises",
+  "/day-cruises",
   "/group-tailor-made-tours",
   "/plan-your-trip",
   "/car-rental",

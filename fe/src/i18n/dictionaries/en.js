@@ -45,6 +45,11 @@ const en = {
     week2: "2 Weeks Vietnam",
     week3: "3 Weeks Vietnam",
     halong: "Halong Bay cruises",
+    tourLength: "Tours by length",
+    cruisesCol: "Cruises",
+    halongOvernight: "Ha Long Bay overnight cruises",
+    dayCruises: "Day cruises & boat trips",
+    allHalong: "All Ha Long Bay tours",
     dayTours: "Day tours & excursions",
     groupTours: "Group & Tailor-made Tours",
     carHire: "Private Car Hire with Driver",
@@ -275,6 +280,8 @@ const en = {
     reviewsTitle: "Guest experiences",
     reviewsSubtitle: "Real reviews from our guests.",
     reviewsOn: "Read more reviews on",
+    reviewsOriginal: "",
+    reviewsVerified: "on Tripadvisor",
     guideTitle: "Travel guide",
     guideSubtitle: "Local tips for a better trip.",
     guideCta: "All travel guides",
@@ -388,11 +395,16 @@ const en = {
     sortPriceDesc: "Price: high to low",
     sortDuration: "Duration",
     durations: {
-      1: "Day trip",
-      "2-4": "2–4 days",
-      "5-7": "5–7 days (1 week)",
+      1: "1 day & half day",
+      2: "2 days",
+      3: "3 days",
+      "4-5": "4–5 days",
+      "6-7": "6–7 days (1 week)",
       "8-14": "8–14 days (2 weeks)",
-      "15+": "15+ days (3 weeks+)",
+      "15+": "15 days or more",
+      // đường dẫn cũ (không còn trong danh sách chọn)
+      "2-4": "2–4 days",
+      "5-7": "5–7 days",
     },
     prices: {
       "0-100": "Under $100",
@@ -524,19 +536,19 @@ const en = {
       },
       {
         title: "Local company, offices nationwide",
-        text: "A Vietnamese company with representative offices across Vietnam – local insight and fast help wherever you are.",
-      },
-      {
-        title: "Drivers who speak your language",
-        text: "Drivers who speak English, Chinese or the language you choose.",
+        text: "A Vietnamese company with representative offices in every region of Vietnam – local insight and fast help wherever you are.",
       },
       {
         title: "Customizable packages",
         text: "Every package can be adjusted to your wishes, pace and hotel class.",
       },
       {
-        title: "Pay in your currency",
-        text: "Secure payment by international card (Visa, Mastercard, JCB) or bank transfer.",
+        title: "Drivers who speak your language",
+        text: "Drivers who speak English, Chinese or the language you choose.",
+      },
+      {
+        title: "Unique experiences",
+        text: "Real local moments blended with comfortable, well-chosen hotels.",
       },
       {
         title: "24/7 support",
@@ -560,6 +572,17 @@ const en = {
     quickView: "Quick itinerary view",
   },
   cruises: {
+    tabs: {
+      all: "All Ha Long Bay tours",
+      overnight: "Ha Long overnight cruises",
+      day: "Day cruises",
+    },
+    overnightTitle: "Ha Long Bay Overnight Cruises",
+    overnightIntro:
+      "Spend a night on the bay aboard a 5- or 6-star cruise – kayaking, caves, sunset on deck and a seafood dinner. 2 days 1 night with transfers from Hanoi.",
+    dayTitle: "Day Cruises in Ha Long, Nha Trang & Phu Quoc",
+    dayIntro:
+      "A day on the water: Ha Long Bay day and evening cruises, Nha Trang bay cruises and island hopping, and Phu Quoc speedboat trips to the An Thoi islands with snorkelling.",
     title: "Halong Bay Cruises",
     intro:
       "Day cruises and overnight boutique cruises through Halong, Lan Ha and Bai Tu Long Bay – kayaking, caves, sunset parties and seafood dinners on deck.",

@@ -487,6 +487,8 @@ const SITE_PAGES = {
   partners: "Hợp tác đối tác",
   tours: "Danh sách tour",
   "halong-bay-cruises": "Du thuyền Hạ Long",
+  "halong-bay-overnight-cruises": "Du thuyền Hạ Long ngủ đêm",
+  "day-cruises": "Du thuyền trong ngày (Hạ Long, Nha Trang, Phú Quốc)",
   destinations: "Điểm đến",
   themes: "Chủ đề tour",
   packages: "Gói tour",

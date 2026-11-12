@@ -1,8 +1,6 @@
-import Image from "next/image";
 import { Quote } from "lucide-react";
 import { siteConfig } from "@/constants/site";
 import { tr } from "@/i18n/config";
-import { fmtMonthYear } from "@/lib/dates";
 import { Container, SectionHeading } from "@/components/ui";
 import Carousel from "@/components/ui/Carousel";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
@@ -34,13 +32,11 @@ function Laurel({ flip, className }) {
 
 /**
  * Slider thẻ đánh giá theo mẫu khách gửi (lotuscharmtravel.com): nền xanh rừng đậm, thẻ sáng;
- * tiêu đề + nội dung phía trên, chân thẻ có avatar tròn, chuyến đi, ngày và "5★" kèm nguyệt quế.
- * Dùng cho EN + ZH.
+ * tiêu đề + nội dung phía trên (nguyên văn của khách), chân thẻ: chữ cái đầu tên · tên khách · chuyến đi ·
+ * nguồn (link tới trang đánh giá gốc) và "5★" kèm nguyệt quế. Dữ liệu: data/reviews.js (đánh giá thật, không ghi ngày).
  */
 export default function Reviews({ lang, dict, reviews }) {
   const t = dict.home;
-  // "2026-10" / ngày đầy đủ → en/vi "10/2026" · zh "2026年10月" (không tên tháng)
-  const fmtDate = (v) => fmtMonthYear(v, lang);
   return (
     <section
       className="relative isolate overflow-hidden bg-forest-900 py-14 text-white lg:py-[4.5rem]"
@@ -88,6 +84,9 @@ export default function Reviews({ lang, dict, reviews }) {
           subtitle={t.reviewsSubtitle}
           light
         />
+        {t.reviewsOriginal && (
+          <p className="-mt-4 mb-8 text-center text-sm text-white/60">{t.reviewsOriginal}</p>
+        )}
         <Carousel
           itemClassName="basis-[90%] md:basis-1/2 lg:basis-1/3"
           autoplay={7000}
@@ -95,7 +94,7 @@ export default function Reviews({ lang, dict, reviews }) {
         >
           {reviews.map((r) => (
             <figure
-              key={r.title.en}
+              key={r.name || r.title.en}
               className="flex h-full flex-col overflow-hidden rounded-3xl bg-cream-50 text-ink shadow-[0_24px_50px_-28px_rgba(0,0,0,0.6)]"
             >
               <div className="relative flex-1 px-6 pt-7 pb-5">
@@ -108,27 +107,30 @@ export default function Reviews({ lang, dict, reviews }) {
                   {tr(r.text, lang)}
                 </blockquote>
               </div>
-              {/* chân thẻ: avatar – chuyến đi – ngày – 5★ nguyệt quế */}
+              {/* chân thẻ: chữ cái đầu – tên khách · chuyến đi – nguồn – 5★ nguyệt quế */}
               <figcaption className="mx-6 flex items-center gap-3 border-t border-sand-300/70 py-4">
-                <span className="relative size-11 shrink-0 overflow-hidden rounded-full ring-2 ring-white">
-                  <Image
-                    src={r.avatar || r.photo}
-                    alt=""
-                    fill
-                    sizes="44px"
-                    className="object-cover"
-                  />
+                <span
+                  aria-hidden
+                  className="grid size-11 shrink-0 place-items-center rounded-full bg-forest-700 text-lg font-bold text-white uppercase ring-2 ring-white"
+                >
+                  {(r.name || "?").trim()[0]}
                 </span>
                 <span className="min-w-0 flex-1 leading-tight">
-                  <span className="block truncate font-bold text-ink">{tr(r.trip, lang)}</span>
-                  <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-                    {fmtDate(r.date) || "2026"}
+                  <span className="block truncate font-bold text-ink">{r.name}</span>
+                  <span className="block truncate text-xs text-muted">{tr(r.trip, lang)}</span>
+                  <a
+                    href={r.url || siteConfig.social.tripadvisor}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 flex w-fit items-center gap-1 text-xs text-muted hover:text-ink hover:underline"
+                  >
                     {r.source === "google" ? (
                       <GoogleIcon className="size-3.5" />
                     ) : (
                       <TripAdvisorIcon className="size-4 text-[#00af87]" />
                     )}
-                  </span>
+                    {r.source === "google" ? "Google" : t.reviewsVerified}
+                  </a>
                 </span>
                 <span
                   className="flex items-center text-[#c9a227]"

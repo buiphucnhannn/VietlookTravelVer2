@@ -1,6 +1,7 @@
 import { href, tr } from "@/i18n/config";
 import { regions } from "./regions";
 import { EXCLUSIVE_THEME } from "@/constants/themes";
+import { DURATION_BUCKETS } from "@/lib/tour-categories";
 
 /**
  * Cây menu nhiều cấp. Trả về dữ liệu thuần để truyền xuống Header (client component).
@@ -51,8 +52,9 @@ const NAV_THEME = {
 export function buildNavigation(
   lang,
   dict,
-  { destinationsByRegion, getDestination, themes, policies },
+  { destinationsByRegion, getDestination, themes, policies, tourDurationCounts },
 ) {
+  const durationCounts = tourDurationCounts();
   const n = dict.nav;
   const h = (p) => href(lang, p);
   // Chỉ link tới trang chính sách đang bật "Hiện trên website" (trang tắt → 404)
@@ -121,41 +123,50 @@ export function buildNavigation(
         },
         {
           label: n.byDuration,
+          // Mục 4.2.1: tour theo số ngày (1 · 2 · 3 · 4–5 · 6–7 · 8–14 · 15+ ngày, nhóm 0 tour bị ẩn)
+          // + gói 1/2/3 tuần + du thuyền (Hạ Long ngủ đêm · trong ngày Hạ Long / Nha Trang / Phú Quốc).
+          // Không có ảnh nổi bật bên phải để 3 cột đủ rộng, chữ không bị ngắt nhiều dòng.
           columns: [
             {
-              title: n.byDuration,
+              title: n.tourLength,
+              links: DURATION_BUCKETS.filter((b) => durationCounts[b.value] > 0).map((b) => ({
+                label: dict.tours.durations[b.value],
+                href: h(`/tours?duration=${encodeURIComponent(b.value)}`),
+              })),
+              footer: { label: n.allTours, href: h("/tours") },
+            },
+            {
+              title: n.packages,
               links: [
-                { label: n.dayTours, href: h("/tours?duration=1"), image: img("ninh-binh") },
                 { label: n.week1, href: h("/packages#1-week"), image: img("hanoi") },
                 { label: n.week2, href: h("/packages#2-weeks"), image: img("hoi-an") },
                 { label: n.week3, href: h("/packages#3-weeks"), image: img("sapa") },
-              ],
-              footer: { label: n.allPackages, href: h("/packages") },
-            },
-            {
-              title: n.specialTours,
-              links: [
-                { label: n.halong, href: h("/halong-bay-cruises"), image: img("halong-bay") },
                 {
                   label: n.groupTours,
                   href: h("/group-tailor-made-tours"),
                   image: "/images/tours/hd/cham-islands-da-nang.jpg",
                 },
               ],
-              footer: { label: n.allTours, href: h("/tours") },
+              footer: { label: n.allPackages, href: h("/packages") },
+            },
+            {
+              title: n.cruisesCol,
+              links: [
+                {
+                  label: n.halongOvernight,
+                  href: h("/halong-bay-overnight-cruises"),
+                  image: img("halong-bay"),
+                },
+                { label: n.dayCruises, href: h("/day-cruises"), image: img("phu-quoc") },
+                // mục thường (không để ở dòng cuối cột) → menu điện thoại vẫn hiện
+                {
+                  label: n.allHalong,
+                  href: h("/halong-bay-cruises"),
+                  image: "/images/tours/v2/halong-bay-58597.jpg",
+                },
+              ],
             },
           ],
-          promo: {
-            image: "/images/nav/nav-packages.webp",
-            badge: z("1–3 weeks", "1至3周", "1–3 tuần"),
-            title: n.allPackages,
-            text: z(
-              "Private, flexible, door-to-door",
-              "私人专属，灵活安排，门到门服务",
-              "Riêng tư, linh hoạt, đón tận nơi",
-            ),
-            href: h("/packages"),
-          },
         },
         {
           label: n.byTheme,

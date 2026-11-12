@@ -44,6 +44,11 @@ const vi = {
     week2: "Việt Nam 2 tuần",
     week3: "Việt Nam 3 tuần",
     halong: "Du thuyền Vịnh Hạ Long",
+    tourLength: "Tour theo số ngày",
+    cruisesCol: "Du thuyền",
+    halongOvernight: "Du thuyền Hạ Long ngủ đêm",
+    dayCruises: "Du thuyền trải nghiệm trong ngày",
+    allHalong: "Tất cả tour Hạ Long",
     dayTours: "Tour trong ngày & tham quan",
     groupTours: "Tour đoàn & Tour thiết kế riêng",
     carHire: "Thuê xe riêng kèm tài xế",
@@ -274,6 +279,8 @@ const vi = {
     reviewsTitle: "Trải nghiệm của khách",
     reviewsSubtitle: "Đánh giá thật từ khách hàng của chúng tôi.",
     reviewsOn: "Xem thêm đánh giá trên",
+    reviewsOriginal: "Đánh giá giữ nguyên văn tiếng Anh của khách trên Tripadvisor",
+    reviewsVerified: "trên Tripadvisor",
     guideTitle: "Cẩm nang du lịch",
     guideSubtitle: "Mẹo từ người bản địa cho chuyến đi trọn vẹn hơn.",
     guideCta: "Tất cả cẩm nang du lịch",
@@ -388,11 +395,16 @@ const vi = {
     sortPriceDesc: "Giá: cao đến thấp",
     sortDuration: "Thời lượng",
     durations: {
-      1: "Tour trong ngày",
-      "2-4": "2–4 ngày",
-      "5-7": "5–7 ngày (1 tuần)",
-      "8-14": "8–14 ngày (2 tuần)",
-      "15+": "Từ 15 ngày (3 tuần trở lên)",
+      1: "Tour 1 ngày & nửa ngày",
+      2: "Tour 2 ngày",
+      3: "Tour 3 ngày",
+      "4-5": "Tour 4–5 ngày",
+      "6-7": "Tour 6–7 ngày (1 tuần)",
+      "8-14": "Tour 8–14 ngày (2 tuần)",
+      "15+": "Tour từ 15 ngày trở lên",
+      // đường dẫn cũ (không còn trong danh sách chọn)
+      "2-4": "Tour 2–4 ngày",
+      "5-7": "Tour 5–7 ngày",
     },
     prices: {
       "0-100": "Dưới $100",
@@ -525,19 +537,19 @@ const vi = {
       },
       {
         title: "Công ty bản địa, văn phòng khắp cả nước",
-        text: "Công ty Việt Nam có văn phòng đại diện trên khắp Việt Nam – am hiểu địa phương, hỗ trợ nhanh dù bạn ở đâu.",
-      },
-      {
-        title: "Tài xế nói ngôn ngữ của bạn",
-        text: "Tài xế nói tiếng Anh, tiếng Trung hoặc ngôn ngữ bạn chọn.",
+        text: "Công ty Việt Nam có văn phòng đại diện tại các vùng miền trên khắp Việt Nam – am hiểu địa phương, hỗ trợ nhanh dù bạn ở đâu.",
       },
       {
         title: "Gói tour tùy chỉnh",
         text: "Mọi gói tour đều có thể điều chỉnh theo mong muốn, nhịp độ và hạng khách sạn của bạn.",
       },
       {
-        title: "Thanh toán bằng tiền tệ của bạn",
-        text: "Thanh toán an toàn bằng thẻ quốc tế (Visa, Mastercard, JCB) hoặc chuyển khoản ngân hàng.",
+        title: "Tài xế nói ngôn ngữ của bạn",
+        text: "Tài xế nói tiếng Anh, tiếng Trung hoặc ngôn ngữ bạn chọn.",
+      },
+      {
+        title: "Trải nghiệm độc đáo",
+        text: "Những khoảnh khắc bản địa chân thực kết hợp với khách sạn tiện nghi, chọn lọc kỹ.",
       },
       {
         title: "Hỗ trợ 24/7",
@@ -561,6 +573,17 @@ const vi = {
     quickView: "Xem nhanh lịch trình",
   },
   cruises: {
+    tabs: {
+      all: "Tất cả tour Hạ Long",
+      overnight: "Du thuyền Hạ Long ngủ đêm",
+      day: "Du thuyền trong ngày",
+    },
+    overnightTitle: "Du thuyền Hạ Long ngủ đêm",
+    overnightIntro:
+      "Nghỉ một đêm trên vịnh cùng du thuyền 5–6 sao – chèo kayak, thăm hang động, ngắm hoàng hôn trên boong và thưởng thức bữa tối hải sản. Lịch trình 2 ngày 1 đêm, có xe đón từ Hà Nội.",
+    dayTitle: "Du thuyền trải nghiệm trong ngày: Hạ Long, Nha Trang, Phú Quốc",
+    dayIntro:
+      "Một ngày trọn vẹn trên biển: du thuyền ngày và du thuyền tối trên Vịnh Hạ Long, du thuyền và tour đảo vịnh Nha Trang, cano cao tốc ra quần đảo An Thới (Phú Quốc) lặn ngắm san hô.",
     title: "Du thuyền Vịnh Hạ Long",
     intro:
       "Du thuyền trong ngày và du thuyền boutique ngủ đêm trên Vịnh Hạ Long, Vịnh Lan Hạ và Vịnh Bái Tử Long – chèo kayak, khám phá hang động, tiệc ngắm hoàng hôn và bữa tối hải sản trên boong.",

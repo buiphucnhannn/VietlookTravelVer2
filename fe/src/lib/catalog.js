@@ -5,6 +5,7 @@ import { BACKEND_URL, backendHeaders } from "@/config/urls.mjs";
 import { fallbackLangs, isBlank, tr } from "@/i18n/config";
 import { regions } from "@/data/regions";
 import { autoFeaturedTours, autoLongTours, pushBack } from "@/lib/tour-picks";
+import { cruiseKind, durationCounts } from "@/lib/tour-categories";
 
 /**
  * Nội dung website lấy từ backend (be/) — quản lý trong CMS.
@@ -191,6 +192,8 @@ function buildCatalog({ tours, destinations, themes, articles, taxonomy, service
   const toursByTheme = (slug) => allTours.filter((t) => t.themes.includes(slug));
   const cruiseTours = () =>
     allTours.filter((t) => t.cruise || t.destinations.includes("halong-bay"));
+  /** Du thuyền theo loại: "overnight" (Hạ Long ngủ đêm) · "day" (trong ngày: Hạ Long, Nha Trang, Phú Quốc) */
+  const cruisesByKind = (kind) => allTours.filter((t) => cruiseKind(t) === kind);
   const bySlugs = (slugs) =>
     (slugs ?? []).map((s) => allTours.find((t) => t.slug === s)).filter(Boolean);
 
@@ -253,6 +256,7 @@ function buildCatalog({ tours, destinations, themes, articles, taxonomy, service
       regions: t.regions,
       themes: t.themes,
       cruise: t.cruise,
+      cruiseKind: cruiseKind(t),
       labels: t.labels,
       rank: t.rank,
       code: t.code,
@@ -330,6 +334,8 @@ function buildCatalog({ tours, destinations, themes, articles, taxonomy, service
     toursByDestination,
     toursByTheme,
     cruiseTours,
+    cruisesByKind,
+    tourDurationCounts: () => durationCounts(allTours),
     longTours,
     featuredTours,
     packagesByWeeks,

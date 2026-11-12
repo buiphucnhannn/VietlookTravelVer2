@@ -14,18 +14,12 @@ import {
 } from "lucide-react";
 import { cn, foldSearch } from "@/lib/utils";
 import { smoothScrollTo } from "@/components/fx/SmoothScroll";
+import { DURATION_BUCKETS, matchDuration } from "@/lib/tour-categories";
 import TourCard, { AuroraTourCard } from "./TourCard";
 
 // 2 hàng mỗi trang để lưới vừa khoảng một màn hình (4 cột thường / 3 cột kiểu Aurora)
 const PAGE_SIZE = { default: 8, aurora: 6 };
 
-const durationMatch = {
-  1: (d) => d <= 1,
-  "2-4": (d) => d >= 2 && d <= 4,
-  "5-7": (d) => d >= 5 && d <= 7,
-  "8-14": (d) => d >= 8 && d <= 14,
-  "15+": (d) => d >= 15,
-};
 const priceMatch = {
   "0-100": (p) => p != null && p < 100,
   "100-500": (p) => p != null && p >= 100 && p < 500,
@@ -128,7 +122,7 @@ export default function TourExplorer({
         if (!ok) return false;
       }
       if (f.theme && !c.themes.includes(f.theme)) return false;
-      if (f.duration && !durationMatch[f.duration]?.(c.days)) return false;
+      if (f.duration && !matchDuration(f.duration, c.days)) return false;
       if (f.price && !priceMatch[f.price]?.(c.price)) return false;
       return true;
     });
@@ -139,6 +133,16 @@ export default function TourExplorer({
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, f.q, f.destination, f.theme, f.duration, f.price, f.sort]);
+
+  // Chỉ hiện nhóm thời lượng có tour trong danh sách này (+ giá trị đang chọn từ đường dẫn cũ, vd. 2-4)
+  const durationOptions = useMemo(() => {
+    const values = DURATION_BUCKETS.map((b) => b.value).filter((v) =>
+      cards.some((c) => matchDuration(v, c.days)),
+    );
+    if (f.duration && !values.includes(f.duration) && t.durations[f.duration])
+      values.push(f.duration);
+    return values;
+  }, [cards, f.duration, t.durations]);
 
   const size = PAGE_SIZE[variant] || PAGE_SIZE.default;
   const pages = Math.max(1, Math.ceil(filtered.length / size));
@@ -216,9 +220,9 @@ export default function TourExplorer({
                 <option value="">
                   {t.duration}: {t.any}
                 </option>
-                {Object.entries(t.durations).map(([v, l]) => (
+                {durationOptions.map((v) => (
                   <option key={v} value={v}>
-                    {l}
+                    {t.durations[v]}
                   </option>
                 ))}
               </select>
