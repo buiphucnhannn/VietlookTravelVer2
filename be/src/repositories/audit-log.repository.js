@@ -3,6 +3,7 @@ import { AuditLog } from "../models/audit-log.model.js";
 import { Destination } from "../models/destination.model.js";
 import { Enquiry } from "../models/enquiry.model.js";
 import { Page } from "../models/page.model.js";
+import { Review } from "../models/review.model.js";
 import { Car, CarArea, FastTrackPackage, VisaType } from "../models/service.model.js";
 import { Author, Category } from "../models/taxonomy.model.js";
 import { Theme } from "../models/theme.model.js";
@@ -47,6 +48,8 @@ const TARGETS = {
   car_area: named(CarArea),
   visa_type: named(VisaType),
   fast_track: named(FastTrackPackage),
+  // đánh giá khách: tên người viết (không có tiêu đề 3 ngôn ngữ)
+  review: { model: Review, select: "name", name: (d) => d.name ?? "" },
   page: { model: Page, by: "key", select: "key title", name: (d) => localText(d.title) },
   user: { model: User, select: "username", name: (d) => d.username ?? "" },
   enquiry: {

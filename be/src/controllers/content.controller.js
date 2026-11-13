@@ -5,12 +5,13 @@ import { created, noContent, ok } from "../utils/response.js";
  * Controller CRUD dùng chung — chỉ: lấy dữ liệu đã validate → gọi service → trả phản hồi + ghi nhật ký.
  * @param {ReturnType<import("../services/content.service.js").createContentService>} service
  * @param {string} type tên loại cho nhật ký: "tour", "destination"…
+ * @param {{ name?: (doc: object) => string }} [options] name: tên dễ đọc ghi nhật ký (mặc định tiêu đề / tên)
  */
-export function createContentController(service, type) {
+export function createContentController(service, type, { name = auditName } = {}) {
   const target = (doc) => ({ type, id: String(doc?._id ?? doc?.id ?? "") });
   const ident = (doc) => doc?.slug ?? doc?.key ?? "";
   // nhật ký: đường dẫn (để tìm) + tên dễ đọc lúc thao tác (vẫn hiện được khi nội dung đã bị xoá)
-  const info = (doc) => ({ slug: ident(doc), name: auditName(doc) });
+  const info = (doc) => ({ slug: ident(doc), name: name(doc) });
 
   return {
     async list(req, res) {

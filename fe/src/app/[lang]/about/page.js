@@ -5,13 +5,12 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { href, lp, tr } from "@/i18n/config";
 import { pageMetadata, seoField } from "@/lib/seo";
 import { siteConfig } from "@/constants/site";
-import { reviews } from "@/data/reviews";
 import { Button, Container, Reveal, SectionHeading } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import { WhyUs } from "@/components/home/WhyAndB2B";
 import Reviews from "@/components/home/Reviews";
 import VideoEmbed from "@/components/ui/VideoEmbed";
-import { getCatalog } from "@/lib/catalog";
+import { getCatalog, getReviews } from "@/lib/catalog";
 import {
   ABOUT_COLLAGE,
   ABOUT_HERO_IMAGES,
@@ -38,6 +37,7 @@ export async function generateMetadata({ params }) {
 
 export default async function AboutPage({ params }) {
   const { about, aboutPage, allTours, allPosts } = await getCatalog();
+  const reviews = await getReviews("about");
   const { lang } = await params;
   const dict = await getDictionary(lang);
   // Tiêu đề / mô tả đầu trang sửa trong CMS (Giới thiệu & chính sách); chưa nhập → câu mặc định

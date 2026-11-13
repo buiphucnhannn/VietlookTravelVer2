@@ -237,11 +237,14 @@ export default function TourExplorer({
                 <option value="">
                   {t.priceRange}: {t.any}
                 </option>
-                {Object.entries(t.prices).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
+                {/* chỉ hiện mức giá đang có tour (giữ mức đang chọn nếu link cũ trỏ tới) */}
+                {Object.entries(t.prices)
+                  .filter(([v]) => v === f.price || cards.some((c) => priceMatch[v]?.(c.price)))
+                  .map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
               </select>
             </label>
           </div>

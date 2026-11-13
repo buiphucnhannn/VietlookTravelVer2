@@ -2,8 +2,7 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { lp, tr } from "@/i18n/config";
 import { cardLabels } from "@/lib/labels";
 import { pageMetadata } from "@/lib/seo";
-import { getCatalog } from "@/lib/catalog";
-import { reviews } from "@/data/reviews";
+import { getCatalog, getReviews } from "@/lib/catalog";
 import { Container, SectionHeading } from "@/components/ui";
 import TrustStrip from "@/components/home/TrustStrip";
 import Hero from "@/components/home/Hero";
@@ -25,6 +24,7 @@ import PartnersBlock from "@/components/home/PartnersBlock";
 import PartnerStrip from "@/components/home/PartnerStrip";
 import DrumStats from "@/components/home/DrumStats";
 import { withHomeCopy } from "@/components/home/copy";
+import { fillReviewStats } from "@/lib/review-stats";
 import { homeImages } from "@/components/home/images";
 import { DEFAULT_GRID, pairOf } from "@/data/destination-grid";
 
@@ -57,8 +57,13 @@ export default async function HomePage({ params }) {
     allPosts,
     monthPosts,
   } = await getCatalog();
+  const reviews = await getReviews("home");
   // Câu chữ các khối: bản đã sửa trong CMS → Trang chủ đè lên câu mặc định của từ điển (ô trống → mặc định)
-  const dict = { ...baseDict, home: withHomeCopy(baseDict.home, home.copy, lang) };
+  // (chữ trong CMS cũng được điền số đánh giá mới nhất: {taCount}, {gScore}… — lib/review-stats.js)
+  const dict = {
+    ...baseDict,
+    home: fillReviewStats(withHomeCopy(baseDict.home, home.copy, lang), baseDict.reviewStats, lang),
+  };
   const labels = cardLabels(dict);
   // Ảnh các khối: ảnh nhân viên thay trong CMS → Trang chủ, ô trống → ảnh có sẵn
   const images = homeImages(home.images);
@@ -125,7 +130,7 @@ export default async function HomePage({ params }) {
         regions={regions}
         destinations={destinations}
       />
-      <TrustStrip items={dict.home.trust} />
+      <TrustStrip items={dict.home.trust} stats={dict.reviewStats} />
       <ServicesTrio lang={lang} dict={dict} images={images.services} />
       <FeaturedTours lang={lang} dict={dict} labels={labels} cards={featured} />
       <B2BBlock lang={lang} dict={dict} images={images} />

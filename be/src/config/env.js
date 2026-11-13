@@ -161,6 +161,12 @@ const schema = z
     LIBRETRANSLATE_API_KEY: z.string().trim().default(""),
     MYMEMORY_EMAIL: z.string().trim().default(""),
 
+    // Điểm & số lượt đánh giá tự cập nhật mỗi ngày (services/review-stats.service.js) — API CHÍNH THỨC, không cào trang.
+    // Khoá API + mã địa điểm CHỈ nhập trong CMS (Cài đặt → Điểm & số lượt đánh giá), lưu mã hoá trong DB —
+    // KHÔNG còn biến môi trường dự phòng. Chưa có khoá → website dùng số nhập tay.
+    // Giờ chạy hằng ngày (giờ Việt Nam, 0–23)
+    REVIEW_SYNC_HOUR_VN: z.coerce.number().int().min(0).max(23).default(6),
+
     // CHỈ máy dev: làm chậm mọi request N ms để giả lập độ trễ mạng khi deploy (đo tốc độ CMS). Production luôn = 0.
     DEV_LATENCY_MS: z.coerce.number().int().min(0).max(5000).default(0),
   })
@@ -280,6 +286,11 @@ export const env = Object.freeze({
     libreUrl: e.LIBRETRANSLATE_URL,
     libreKey: e.LIBRETRANSLATE_API_KEY,
     myMemoryEmail: e.MYMEMORY_EMAIL,
+  },
+  reviews: {
+    syncHourVn: e.REVIEW_SYNC_HOUR_VN,
+    // Lịch hằng ngày: không chạy khi test
+    daily: e.NODE_ENV !== "test",
   },
   payment: {
     endpoint: (e.NINEPAY_ENDPOINT || "https://payment.9pay.vn").replace(/\/+$/, ""),

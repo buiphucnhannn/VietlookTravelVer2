@@ -1,5 +1,5 @@
 import { Headset, Layers, UsersRound } from "lucide-react";
-import { siteConfig } from "@/constants/site";
+import { REVIEW_STATS_FALLBACK } from "@/lib/review-stats";
 import { Container, Stars } from "@/components/ui";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
 
@@ -11,20 +11,18 @@ const icons = {
   all: <Layers className="size-8 text-forest-700" />,
 };
 
-/** Dải uy tín dưới hero (như localvietnam.com): đánh giá Tripadvisor/Google + điểm mạnh. */
-export default function TrustStrip({ items }) {
+/**
+ * Dải uy tín dưới hero (như localvietnam.com): đánh giá Tripadvisor/Google + điểm mạnh.
+ * `stats` = dict.reviewStats (CMS → Cài đặt → Điểm & số lượt đánh giá).
+ */
+export default function TrustStrip({ items, stats = REVIEW_STATS_FALLBACK }) {
   return (
     <section className="bg-cream-50">
       <Container>
         <ul className="grid grid-cols-2 gap-y-6 py-8 md:grid-cols-3 lg:grid-cols-5 lg:divide-x lg:divide-border">
           {items.map((x) => {
             const rated = x.kind === "tripadvisor" || x.kind === "google";
-            const href =
-              x.kind === "tripadvisor"
-                ? siteConfig.social.tripadvisor
-                : x.kind === "google"
-                  ? siteConfig.social.google
-                  : null;
+            const href = x.kind === "tripadvisor" || x.kind === "google" ? stats[x.kind].url : null;
             const Tag = href ? "a" : "div";
             return (
               <li
@@ -40,16 +38,7 @@ export default function TrustStrip({ items }) {
                   <span className="contents leading-tight">
                     <span className="flex flex-wrap items-center gap-x-2 font-bold text-ink">
                       {x.t}
-                      {rated && (
-                        <Stars
-                          value={
-                            x.kind === "google"
-                              ? siteConfig.googleRating
-                              : siteConfig.tripadvisorRating.score
-                          }
-                          size={14}
-                        />
-                      )}
+                      {rated && <Stars value={stats[x.kind].rating} size={14} />}
                     </span>
                     <span className="mt-1 block text-sm text-muted">{x.d}</span>
                   </span>

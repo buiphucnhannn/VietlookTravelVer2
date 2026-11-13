@@ -14,6 +14,7 @@ const TAGS = new Set([
   "services",
   "pages",
   "settings",
+  "reviews",
 ]);
 
 /**

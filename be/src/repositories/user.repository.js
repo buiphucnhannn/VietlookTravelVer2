@@ -42,6 +42,11 @@ class UserRepository extends BaseRepository {
     return user;
   }
 
+  /** Xác nhận lại mật khẩu đúng (thao tác nhạy cảm) → xoá bộ đếm nhập sai */
+  resetFailedLogins(id) {
+    return this.model.updateOne({ _id: id }, { $set: { failedLoginCount: 0 } });
+  }
+
   registerSuccessfulLogin(id, ip) {
     return this.model.updateOne(
       { _id: id },

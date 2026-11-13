@@ -4,6 +4,7 @@ import { tr } from "@/i18n/config";
 import { Container, SectionHeading } from "@/components/ui";
 import Carousel from "@/components/ui/Carousel";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
+import ReviewSource, { originalNote } from "./ReviewSource";
 
 /** Cành nguyệt quế nhỏ hai bên điểm "5★" (theo mẫu thẻ đánh giá khách gửi). */
 function Laurel({ flip, className }) {
@@ -33,10 +34,14 @@ function Laurel({ flip, className }) {
 /**
  * Slider thẻ đánh giá theo mẫu khách gửi (lotuscharmtravel.com): nền xanh rừng đậm, thẻ sáng;
  * tiêu đề + nội dung phía trên (nguyên văn của khách), chân thẻ: chữ cái đầu tên · tên khách · chuyến đi ·
- * nguồn (link tới trang đánh giá gốc) và "5★" kèm nguyệt quế. Dữ liệu: data/reviews.js (đánh giá thật, không ghi ngày).
+ * nguồn (link tới trang đánh giá gốc) · tháng/năm (nếu có) và số sao kèm nguyệt quế.
+ * Dữ liệu: CMS → Đánh giá khách (getReviews(trang) trong lib/catalog.js) — lời khách giữ nguyên văn, không dịch.
+ * Không có đánh giá nào đang hiện → ẩn cả khối.
  */
 export default function Reviews({ lang, dict, reviews }) {
   const t = dict.home;
+  if (!reviews?.length) return null;
+  const note = originalNote(reviews, lang, t);
   return (
     <section
       className="relative isolate overflow-hidden bg-forest-900 py-14 text-white lg:py-[4.5rem]"
@@ -84,9 +89,7 @@ export default function Reviews({ lang, dict, reviews }) {
           subtitle={t.reviewsSubtitle}
           light
         />
-        {t.reviewsOriginal && (
-          <p className="-mt-4 mb-8 text-center text-sm text-white/60">{t.reviewsOriginal}</p>
-        )}
+        {note && <p className="-mt-4 mb-8 text-center text-sm text-white/60">{note}</p>}
         <Carousel
           itemClassName="basis-[90%] md:basis-1/2 lg:basis-1/3"
           autoplay={7000}
@@ -94,17 +97,20 @@ export default function Reviews({ lang, dict, reviews }) {
         >
           {reviews.map((r) => (
             <figure
-              key={r.name || r.title.en}
-              className="flex h-full flex-col overflow-hidden rounded-3xl bg-cream-50 text-ink shadow-[0_24px_50px_-28px_rgba(0,0,0,0.6)]"
+              key={r.id}
+              className="relative flex h-full flex-col overflow-hidden rounded-3xl bg-cream-50 text-ink shadow-[0_24px_50px_-28px_rgba(0,0,0,0.6)] transition-transform duration-300 has-[a:hover]:-translate-y-1"
             >
               <div className="relative flex-1 px-6 pt-7 pb-5">
                 <Quote className="absolute top-5 right-5 size-8 text-amber-brand/40" />
                 {/* Dải trượt (cha không phải lưới → không dùng subgrid): tiêu đề giữ chỗ 2 dòng để lời nhận xét các thẻ bắt đầu cùng một mức */}
-                <h3 className="min-h-[2lh] pr-8 text-lg leading-snug font-bold text-forest-700">
-                  {tr(r.title, lang)}
+                <h3
+                  aria-hidden={r.title ? undefined : true}
+                  className="min-h-[2lh] pr-8 text-lg leading-snug font-bold text-forest-700"
+                >
+                  {r.title}
                 </h3>
-                <blockquote className="mt-3 line-clamp-5 leading-relaxed text-ink/80">
-                  {tr(r.text, lang)}
+                <blockquote className="mt-3 line-clamp-5 leading-relaxed whitespace-pre-line text-ink/80">
+                  {r.text}
                 </blockquote>
               </div>
               {/* chân thẻ: chữ cái đầu – tên khách · chuyến đi – nguồn – 5★ nguyệt quế */}
@@ -118,19 +124,7 @@ export default function Reviews({ lang, dict, reviews }) {
                 <span className="min-w-0 flex-1 leading-tight">
                   <span className="block truncate font-bold text-ink">{r.name}</span>
                   <span className="block truncate text-xs text-muted">{tr(r.trip, lang)}</span>
-                  <a
-                    href={r.url || siteConfig.social.tripadvisor}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-0.5 flex w-fit items-center gap-1 text-xs text-muted hover:text-ink hover:underline"
-                  >
-                    {r.source === "google" ? (
-                      <GoogleIcon className="size-3.5" />
-                    ) : (
-                      <TripAdvisorIcon className="size-4 text-[#00af87]" />
-                    )}
-                    {r.source === "google" ? "Google" : t.reviewsVerified}
-                  </a>
+                  <ReviewSource review={r} lang={lang} t={t} stretch />
                 </span>
                 <span
                   className="flex items-center text-[#c9a227]"
@@ -150,7 +144,7 @@ export default function Reviews({ lang, dict, reviews }) {
             {t.reviewsOn}
           </span>
           <a
-            href={siteConfig.social.tripadvisor}
+            href={dict.reviewStats?.tripadvisor.url ?? siteConfig.social.tripadvisor}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-xl bg-white px-5 py-3 text-ink shadow-sm transition hover:shadow-md"
@@ -162,7 +156,7 @@ export default function Reviews({ lang, dict, reviews }) {
             </span>
           </a>
           <a
-            href={siteConfig.social.google}
+            href={dict.reviewStats?.google.url ?? siteConfig.social.google}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-xl bg-white px-5 py-3 text-ink shadow-sm transition hover:shadow-md"

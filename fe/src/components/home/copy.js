@@ -1,5 +1,3 @@
-import { siteConfig } from "@/constants/site";
-
 /**
  * CÂU CHỮ TRANG CHỦ SỬA ĐƯỢC TRONG CMS (Trang chủ → bấm thẳng vào chữ để sửa).
  *
@@ -78,10 +76,9 @@ export const COPY_KEYS = [
 /** Khoá trong từ điển không phải câu chữ (không sửa, không lưu) */
 const SKIP = new Set(["kind"]);
 
-const reviews = siteConfig.tripadvisorRating.reviews;
 const stat = (label) => ({ label });
 
-/** Câu mặc định chưa có trong từ điển giao diện */
+/** Câu mặc định chưa có trong từ điển giao diện ({taCount}: số đánh giá Tripadvisor — lib/review-stats.js) */
 const EXTRA = {
   en: {
     b2bAudiences: ["Travel agencies", "OTAs", "MICE organisers", "Tour operators"],
@@ -91,7 +88,7 @@ const EXTRA = {
       "Destinations, North to South",
       "Airports with fast-track",
       "Seats – cars to coaches",
-      `Tripadvisor · ${reviews} reviews`,
+      "Tripadvisor · {taCount} reviews",
     ].map(stat),
   },
   zh: {
@@ -102,7 +99,7 @@ const EXTRA = {
       "个目的地 · 从北到南",
       "个机场提供快速通关",
       "座 · 从轿车到大巴",
-      `猫途鹰 · ${reviews} 条评价`,
+      "猫途鹰 · {taCount} 条评价",
     ].map(stat),
   },
   vi: {
@@ -113,7 +110,7 @@ const EXTRA = {
       "Điểm đến từ Bắc vào Nam",
       "Sân bay có dịch vụ fast-track",
       "Chỗ – từ xe con đến xe khách",
-      `Tripadvisor · ${reviews} đánh giá`,
+      "Tripadvisor · {taCount} đánh giá",
     ].map(stat),
   },
 };

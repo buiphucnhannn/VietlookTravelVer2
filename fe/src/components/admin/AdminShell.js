@@ -17,6 +17,7 @@ import {
   LogOut,
   Map,
   Menu,
+  MessageSquareQuote,
   Newspaper,
   ScrollText,
   Settings,
@@ -83,6 +84,7 @@ const NAV = [
       { href: A("/articles"), label: "Bài viết", Icon: Newspaper },
       { href: A("/taxonomy"), label: "Chuyên mục & tác giả", Icon: FileText },
       { href: A("/pages"), label: "Giới thiệu & chính sách", Icon: ScrollText },
+      { href: A("/reviews"), label: "Đánh giá", Icon: MessageSquareQuote },
     ],
   },
   {
@@ -120,6 +122,7 @@ const PAGE_DATA = {
   ],
   [A("/articles")]: ["/admin/articles?sort=newest&limit=15", CAT_OPTS],
   [A("/taxonomy")]: [CAT_OPTS],
+  [A("/reviews")]: ["/admin/reviews?limit=200&sort=order"],
   [A("/users")]: ["/users?limit=20"],
   [A("/audit-log")]: ["/audit-logs?limit=25"],
 };

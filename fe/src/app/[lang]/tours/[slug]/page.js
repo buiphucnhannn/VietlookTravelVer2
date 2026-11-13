@@ -18,6 +18,7 @@ import { fill, href, locales, lp, tr } from "@/i18n/config";
 import { cardLabels } from "@/lib/labels";
 import { cn, formatUSD } from "@/lib/utils";
 import { subgrid } from "@/lib/subgrid";
+import { formatCount, formatScore } from "@/lib/review-stats";
 import { fmtDayChip, fmtMonthYear } from "@/lib/dates";
 import { JsonLd, pageMetadata, notFoundMetadata, seoField, tourLangs } from "@/lib/seo";
 import { siteConfig } from "@/constants/site";
@@ -148,6 +149,8 @@ async function TourPageContent({ params }) {
   const dict = await getDictionary(lang);
   const t = dict.tour;
   const c = dict.common;
+  // Điểm Tripadvisor của công ty: CMS → Cài đặt → Điểm & số lượt đánh giá (lib/review-stats.js)
+  const ta = dict.reviewStats.tripadvisor;
   const tx = tourText(tour, lang);
   // 9Pay bật trong CMS → sau khi gửi đơn có bước "Thanh toán"; tắt → đặt tour như cũ
   const paymentConfig = await getPaymentConfig();
@@ -369,12 +372,12 @@ async function TourPageContent({ params }) {
           </div>
           {/* Đánh giá của CÔNG TY trên Tripadvisor (không phải đánh giá riêng từng tour) – ghi rõ & dẫn link */}
           <a
-            href={siteConfig.social.tripadvisor}
+            href={ta.url}
             target="_blank"
             rel="noopener noreferrer"
             className="group mt-4 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm"
           >
-            <Stars value={siteConfig.tripadvisorRating.score} className="text-[#34E0A1]" />
+            <Stars value={ta.rating} className="text-[#34E0A1]" />
             <span className="font-semibold text-ink group-hover:underline">
               {tr(
                 {
@@ -396,8 +399,8 @@ async function TourPageContent({ params }) {
                   lang,
                 ),
                 {
-                  score: siteConfig.tripadvisorRating.score.toFixed(1),
-                  n: siteConfig.tripadvisorRating.reviews,
+                  score: formatScore(ta.rating),
+                  n: formatCount(ta.count, lang),
                 },
               )}
             </span>
@@ -676,7 +679,7 @@ async function TourPageContent({ params }) {
                   ))}
                 </div>
                 <a
-                  href={siteConfig.social.tripadvisor}
+                  href={ta.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-5 inline-flex items-center gap-2 font-semibold text-clay-600 hover:underline"
@@ -707,15 +710,15 @@ async function TourPageContent({ params }) {
 
           {/* Khối đặt tour dính bên phải */}
           <div id="book" className="scroll-mt-36">
-            {/* Dính ngay dưới header (108px + 12px); cao tối đa = màn hình − 132px → luôn thấy trọn khung & nút đặt
-                (nội dung xếp dọc, phần giữa chỉ cuộn khi màn hình quá thấp — xem BookingWidget) */}
+            {/* Dính ngay dưới header (108px + 12px); cao tối đa = màn hình − 132px → luôn thấy trọn khung & nút đặt.
+                BookingWidget tự đo và đặt data-density (roomy / mid / compact) lên khung này: rộng rãi nhất mà vẫn vừa */}
             <StickySide
               offset={120}
               gap={12}
-              className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border lg:flex lg:max-h-[calc(100dvh-8.25rem)] lg:flex-col xl:p-6 mid:p-5 shorter:p-4"
+              className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border lg:flex lg:max-h-[calc(100dvh-8.25rem)] lg:flex-col xl:p-6 bk-mid:p-5 bk-compact:p-4"
             >
               {/* leading-none: bỏ khoảng trống dòng chữ thừa → lề trên (tới chữ) bằng lề dưới (dưới nút đặt) */}
-              <h2 className="mt-0.5 mb-4 shrink-0 text-xl leading-none font-bold tracking-tight text-ink mid:mb-3.5 shorter:mb-3 shorter:text-lg">
+              <h2 className="mt-0.5 mb-4 shrink-0 text-xl leading-none font-bold tracking-tight text-ink bk-mid:mb-3.5 bk-compact:mb-3 bk-compact:text-lg">
                 {t.bookTitle}
               </h2>
               <BookingWidget

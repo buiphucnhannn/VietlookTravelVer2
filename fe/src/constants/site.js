@@ -92,12 +92,8 @@ export const siteConfig = {
   },
   // Video giới thiệu chính chủ (chỉ dùng để phát video, không phải link mạng xã hội)
   youtubeIds: ["-Si4zYv7gKs"],
-  // Số liệu thật: TripAdvisor 89 đánh giá (khách xác nhận 12/11/2026), Google qua Google Maps
-  // Đổi số ở đây → nhớ đổi cả common.ratingText & home.trust trong fe/src/i18n/dictionaries/{en,zh,vi}.js
-  tripadvisorRating: { label: "Excellent", score: 5, reviews: 89 },
-  // Số đánh giá Google Maps (cập nhật tay theo trang doanh nghiệp)
-  googleRating: 4.7,
-  googleReviews: 31,
+  // Điểm & số lượt đánh giá Tripadvisor / Google: KHÔNG để cứng ở đây — nhập trong CMS → Cài đặt →
+  // "Điểm & số lượt đánh giá" (hoặc máy chủ tự cập nhật mỗi ngày). Xem lib/review-stats.js.
   messaging: {
     whatsapp: "https://wa.me/84983393588",
     whatsapp2: "https://wa.me/84983393488",

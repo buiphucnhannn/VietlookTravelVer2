@@ -8,6 +8,7 @@ import {
   destinationRepository,
   fastTrackRepository,
   pageRepository,
+  reviewRepository,
   themeRepository,
   tourRepository,
   visaTypeRepository,
@@ -237,6 +238,16 @@ export const fastTrackService = createContentService({
   idField: "key",
   searchFields: ["name.en", "name.zh", "name.vi"],
   filters: (q) => (q.group ? { group: q.group } : {}),
+});
+
+/* ---------- Đánh giá khách ---------- */
+
+export const reviewService = createContentService({
+  repo: reviewRepository,
+  label: "đánh giá",
+  idField: "_id", // không có đường dẫn / mã riêng
+  searchFields: ["name", "title", "text", "trip.vi", "trip.en", "trip.zh"],
+  filters: (q) => (q.source ? { source: q.source } : {}),
 });
 
 /* ---------- Trang giới thiệu & chính sách ---------- */

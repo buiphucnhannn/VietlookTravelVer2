@@ -160,6 +160,38 @@ export const authService = {
   },
 
   /**
+   * Xác nhận lại mật khẩu (step-up) trước thao tác nhạy cảm — vd. lưu / xoá khoá API, mã 9Pay.
+   * Nhập sai được tính chung với số lần đăng nhập sai (LOGIN_MAX_ATTEMPTS) → đủ số lần thì tài khoản bị tạm khoá
+   * như khi đăng nhập sai. Đúng → xoá bộ đếm sai.
+   * Lỗi: REAUTH_REQUIRED (chưa nhập), REAUTH_FAILED (sai), ACCOUNT_LOCKED (đang / vừa bị khoá).
+   */
+  async confirmPassword(userId, password) {
+    const field = "body.confirmPassword";
+    if (!password) {
+      const message = "Nhập mật khẩu của bạn để xác nhận";
+      throw new ApiError(400, message, {
+        code: "REAUTH_REQUIRED",
+        details: [{ field, message }],
+      });
+    }
+    const user = await userRepository.findByIdWithPassword(userId);
+    if (!user || !user.isActive) throw expired();
+    if (isLocked(user)) throw locked(user.lockUntil);
+    if (await passwordService.verify(password, user.passwordHash)) {
+      if (user.failedLoginCount) await userRepository.resetFailedLogins(user._id);
+      return true;
+    }
+    const after = await userRepository.registerFailedLogin(user._id, env.login);
+    if (after && isLocked(after)) {
+      const err = locked(after.lockUntil);
+      err.justLocked = true; // lần sai này làm tài khoản bị khoá → ghi nhật ký
+      throw err;
+    }
+    const message = "Mật khẩu không đúng";
+    throw new ApiError(400, message, { code: "REAUTH_FAILED", details: [{ field, message }] });
+  },
+
+  /**
    * Đổi mật khẩu của chính mình: kiểm tra mật khẩu hiện tại → lưu hash mới (tokenVersion tăng)
    * → đăng xuất MỌI thiết bị khác → cấp phiên mới cho thiết bị đang dùng.
    */

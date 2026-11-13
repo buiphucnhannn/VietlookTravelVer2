@@ -18,13 +18,12 @@ import {
 } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
 import { JsonLd, pageMetadata } from "@/lib/seo";
-import { reviews } from "@/data/reviews";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import TripPlannerForm from "@/components/forms/TripPlannerForm";
 import Reviews from "@/components/home/Reviews";
 import { href } from "@/i18n/config";
-import { getCatalog } from "@/lib/catalog";
+import { getCatalog, getReviews } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { subgrid } from "@/lib/subgrid";
 
@@ -42,6 +41,7 @@ export async function generateMetadata({ params }) {
 
 export default async function GroupTailorMadePage({ params }) {
   const { plannerOptions } = await getCatalog();
+  const reviews = await getReviews("group");
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const g = dict.group;

@@ -21,6 +21,7 @@ const SORTS = {
  *   afterUpdate(next, prev)   đồng bộ chỗ khác khi đổi slug…
  *   beforeRemove(doc)         chặn xoá khi đang được dùng
  *   filters(query)            điều kiện lọc riêng của trang danh sách
+ * idField "_id": loại không có đường dẫn / mã riêng (vd. đánh giá khách) → không kiểm tra trùng, không tìm theo mã.
  * Tuỳ chọn: sorts (ghi đè cách sắp xếp mặc định, vd. bài viết "Mới nhất" theo ngày đăng), listSelect (chỉ lấy các trường cần cho trang danh sách — nhẹ hơn),
  *   trackOldSlugs (loại có slug cũ để chuyển hướng 301: tour, bài viết).
  */
@@ -45,7 +46,10 @@ export function createContentService({
     return doc;
   }
 
+  const hasIdent = idField !== "_id";
+
   async function assertUnique(value, exceptId) {
+    if (!hasIdent) return;
     const other = await repo.findByIdent(value, { select: "_id" });
     if (other && String(other._id) !== String(exceptId))
       throw ApiError.conflict(
@@ -69,7 +73,11 @@ export function createContentService({
       if (query.status) filter.isActive = query.status === "active";
       // không phân biệt dấu / hoa thường / khoảng trắng: "ha noi" = "hà nội" = "hanoi"
       const rx = searchRegex(query.q);
-      if (rx) filter.$or = [{ [idField]: rx }, ...searchFields.map((f) => ({ [f]: rx }))];
+      if (rx)
+        filter.$or = [
+          ...(hasIdent ? [{ [idField]: rx }] : []),
+          ...searchFields.map((f) => ({ [f]: rx })),
+        ];
       const sortKey = query.sort ?? defaultSort;
       const sort = sorts[sortKey] ?? SORTS[sortKey] ?? SORTS[defaultSort];
       const { items, total } = await repo.paginate(filter, {
@@ -93,7 +101,7 @@ export function createContentService({
 
     async update(id, data) {
       const prev = await getOr404(id);
-      if (data[idField] !== prev[idField]) await assertUnique(data[idField], id);
+      if (hasIdent && data[idField] !== prev[idField]) await assertUnique(data[idField], id);
       const next = await repo.updateById(id, { $set: await prepare(data, prev) });
       if (next.slug !== prev.slug) await releaseOldSlug(next);
       await afterUpdate?.(next, prev);

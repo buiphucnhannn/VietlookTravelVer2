@@ -1,10 +1,10 @@
 import { MapPin, Search } from "lucide-react";
 import { fill, lp, tr } from "@/i18n/config";
-import { siteConfig } from "@/constants/site";
 import { Stars } from "@/components/ui";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
 import { Container } from "@/components/ui";
 import HeroVideos from "./HeroVideos";
+import { formatCount, formatScore } from "@/lib/review-stats";
 import { cloudinaryVideo, cloudinaryVideoUrl, embedUrl, parseVideo } from "@/lib/video";
 
 // Video nền mặc định: 4 clip cắt từ video do khách cung cấp (file gốc 79 MB lưu NGOÀI repo:
@@ -98,22 +98,24 @@ export default function Hero({ lang, dict, banner, regions, destinations }) {
     description: text(banner, "description", lang, t.heroText),
     descriptionShort: text(banner, "descriptionShort", lang, t.heroTextShort),
   };
+  // Điểm & số lượt đánh giá: CMS → Cài đặt (dict.reviewStats — i18n/dictionaries.js)
+  const { google, tripadvisor } = dict.reviewStats;
   const ratings = [
     {
-      href: siteConfig.social.google,
+      href: google.url,
       logo: GoogleIcon,
       name: "Google",
-      stars: siteConfig.googleRating,
-      score: siteConfig.googleRating.toFixed(1),
-      n: siteConfig.googleReviews,
+      stars: google.rating,
+      score: formatScore(google.rating),
+      n: formatCount(google.count, lang),
     },
     {
-      href: siteConfig.social.tripadvisor,
+      href: tripadvisor.url,
       logo: TripAdvisorIcon,
       name: "Tripadvisor",
-      stars: siteConfig.tripadvisorRating.score,
-      score: siteConfig.tripadvisorRating.score.toFixed(1),
-      n: siteConfig.tripadvisorRating.reviews,
+      stars: tripadvisor.rating,
+      score: formatScore(tripadvisor.rating),
+      n: formatCount(tripadvisor.count, lang),
       green: true,
     },
   ];

@@ -6,11 +6,12 @@ import { fallbackLangs, isBlank, tr } from "@/i18n/config";
 import { regions } from "@/data/regions";
 import { autoFeaturedTours, autoLongTours, pushBack } from "@/lib/tour-picks";
 import { cruiseKind, durationCounts } from "@/lib/tour-categories";
+import { normalizeReviewStats } from "@/lib/review-stats";
 
 /**
  * Nội dung website lấy từ backend (be/) — quản lý trong CMS.
  * - Mỗi loại dữ liệu cache riêng theo thẻ (tours, destinations, themes, articles, taxonomy, services, pages,
- *   settings). CMS lưu xong gọi refreshPublicContent (lib/revalidate.js) → website hiện dữ liệu mới ngay.
+ *   settings, reviews). CMS lưu xong gọi refreshPublicContent (lib/revalidate.js) → website hiện dữ liệu mới ngay.
  * - getCatalog() trả về đúng các hàm trước đây nằm trong src/data/* (allTours, toursByDestination,
  *   getDestination, allPosts…) → các trang giữ nguyên giao diện, chỉ đổi nguồn dữ liệu.
  * Chỉ chạy ở server (Server Components, sitemap, metadata).
@@ -107,6 +108,13 @@ async function loadPages() {
   return (await get("/pages")) ?? [];
 }
 
+async function loadReviews() {
+  "use cache";
+  cacheTag("reviews");
+  cacheLife("hours");
+  return (await get("/reviews")) ?? [];
+}
+
 async function loadHome() {
   "use cache";
   cacheTag("settings");
@@ -142,6 +150,19 @@ export const getPaymentConfig = cache(loadPaymentConfig);
  * cho tour chưa có bảng giá theo số khách. null = máy chủ chưa có cài đặt này → khung đặt tour không cộng.
  */
 export const getSmallGroup = cache(async () => (await loadSite()).smallGroup ?? null);
+
+/**
+ * Điểm & số lượt đánh giá công ty (CMS → Cài đặt → Điểm & số lượt đánh giá) — { tripadvisor, google }:
+ * { rating, count, url }. Thẻ "settings": CMS lưu / máy chủ tự cập nhật xong → website làm mới ngay.
+ * Backend lỗi → số dự phòng trong lib/review-stats.js (website không bao giờ hỏng vì thiếu số này).
+ */
+export const getReviewStats = cache(async () => {
+  try {
+    return normalizeReviewStats((await loadSite()).reviewStats);
+  } catch {
+    return normalizeReviewStats(null);
+  }
+});
 
 /** Mã đo lường Google nhập trong CMS (Cài đặt) — { gtmId, ga4Id, adsId } */
 export const getTracking = cache(async () => (await loadSite()).tracking ?? {});
@@ -374,6 +395,16 @@ export const getCatalog = cache(async () => {
       loadHome(),
     ]);
   return buildCatalog({ tours, destinations, themes, articles, taxonomy, services, pages, home });
+});
+
+/**
+ * Đánh giá khách đang hiện (CMS → Đánh giá khách), đúng thứ tự trong CMS.
+ * `place`: chỉ lấy đánh giá được chọn hiện ở trang đó — "home" | "about" | "group" | "car".
+ * Không có đánh giá nào → [] (trang ẩn khối đánh giá).
+ */
+export const getReviews = cache(async (place) => {
+  const list = await loadReviews();
+  return place ? list.filter((r) => (r.showOn ?? []).includes(place)) : list;
 });
 
 /* ---------- Chi tiết (đầy đủ nội dung) ---------- */

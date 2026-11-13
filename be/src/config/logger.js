@@ -14,11 +14,15 @@ const SENSITIVE = [
   "passwordHash",
   "currentPassword",
   "newPassword",
+  "confirmPassword", // xác nhận mật khẩu khi đổi khoá (Cài đặt)
   "token",
   "accessToken",
   "refreshToken",
   "secret",
   "apiSecret",
+  "apiKey",
+  "secretKey", // mã 9Pay
+  "checksumKey",
   "authorization",
   "cookie",
   "set-cookie",

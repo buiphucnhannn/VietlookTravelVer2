@@ -1,0 +1,154 @@
+[
+  {
+    "name": "Bhavik Shah",
+    "title": "Wonderful experience, Vietnam trip, family trip.",
+    "text": "It was a wonderful experience. We enjoyed our stay in ha noi and Danang. The trip was well organised and both the guides MR. TINH (Ha noi) AND MS. ALANA (Da nang) were wonderful, knowledgeable and always smiling. Mr. Tinh gave us so much information about the rich culture and history of ha noi. Ms. Alana also gave us ample information about da nang, bana hills and hoi an. They both planned the the spots in such a way that we enjoyed the spots at their best time of the day. You will have wonderful time in Vietnam and having a guide is must.",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "Family trip · Hanoi & Da Nang",
+      "zh": "家庭游 · 河内与岘港",
+      "vi": "Du lịch gia đình · Hà Nội & Đà Nẵng"
+    },
+    "photo": "/images/tours/v2/da-nang-19927758.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 1,
+    "isActive": true
+  },
+  {
+    "name": "Ankil P",
+    "title": "Patel family",
+    "text": "We had a wonderful experience on our Phu Quoc tour. The guide was very knowledgeable and explained the history and local culture in a way that was easy to understand and interesting. We felt very well taken care of the whole time — friendly, patient, and always checking on us. The trip was comfortable, safe, and well organized. Overall, we are very happy and would definitely recommend this tour.",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "Family tour · Phu Quoc",
+      "zh": "家庭游 · 富国岛",
+      "vi": "Tour gia đình · Phú Quốc"
+    },
+    "photo": "/images/tours/v2/phu-quoc-14787924.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 2,
+    "isActive": true
+  },
+  {
+    "name": "yogesh k",
+    "title": "Excellent in Da Nang",
+    "text": "I had a very good holiday in Da Nang city . The service is very good. And we were very happy to see Tracy our guide from Vietlooktravel . She is very helpful and friendly, take care of us well. And give us good information about DaNang city. Next time we will back again",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "Holiday · Da Nang",
+      "zh": "度假 · 岘港",
+      "vi": "Kỳ nghỉ · Đà Nẵng"
+    },
+    "photo": "/images/tours/v2/da-nang-20539373.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 3,
+    "isActive": true
+  },
+  {
+    "name": "Niku P",
+    "title": "Phu Quoc",
+    "text": "We had such a great time in Phu Quoc! Thank you so much for being such a kind and thoughtful tour guide. You really made our trip easy and fun — from showing us all the beautiful spots to helping us try local food and learn more about the island. The kids had an amazing time too, and we all felt so well taken care of. We’ll definitely remember this trip and recommend you to anyone visiting Phu Quoc!",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "Island tour · Phu Quoc",
+      "zh": "海岛游 · 富国岛",
+      "vi": "Tour đảo · Phú Quốc"
+    },
+    "photo": "/images/tours/v2/phu-quoc-26742975.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 4,
+    "isActive": true
+  },
+  {
+    "name": "Sherpa21575634518",
+    "title": "Da Nang trip",
+    "text": "I had one of the most unforgettable trips of my life — journey to Da Nang. From the moment I arrived, I was amazed by how beautiful and peaceful the city was. The combination of beaches, friendly locals, and delicious food made every moment special. Specailly thanks our tourguide Tracy, very kind person, she help us a lot during the tour",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "City & beach · Da Nang",
+      "zh": "城市与海滩 · 岘港",
+      "vi": "Thành phố & biển · Đà Nẵng"
+    },
+    "photo": "/images/tours/hd/cham-islands-da-nang.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 5,
+    "isActive": true
+  },
+  {
+    "name": "Navigator49148771631",
+    "title": "Vietnam tour hanoi 3 days",
+    "text": "3 days tour at hanoi made us very memorable. Our tour guide me tinh explained us very well. Everything was made perfect for us.",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "3-day tour · Hanoi",
+      "zh": "3天游 · 河内",
+      "vi": "Tour 3 ngày · Hà Nội"
+    },
+    "photo": "/images/tours/v2/hanoi-920561.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 6,
+    "isActive": true
+  },
+  {
+    "name": "Kruti G",
+    "title": "It was good Experience to explore the cities.",
+    "text": "It was nice trip. Perfectly organized. our guide was very knowledgable, had good English , and looked after us very well.",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "City tours · Vietnam",
+      "zh": "城市游 · 越南",
+      "vi": "City tour · Việt Nam"
+    },
+    "photo": "/images/tours/hd/hcm-tour-2-1.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 7,
+    "isActive": true
+  },
+  {
+    "name": "Nisarg s",
+    "title": "Danang Trip",
+    "text": "Nice Trip. Nice guidance and explanation by Alina (Tour Guide) about History of related places. Good Hotel & Dinner Restaurant. 😊👍👌",
+    "rating": 5,
+    "source": "tripadvisor",
+    "url": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "date": "",
+    "trip": {
+      "en": "Da Nang trip",
+      "zh": "岘港之旅",
+      "vi": "Chuyến đi Đà Nẵng"
+    },
+    "photo": "/images/tours/v2/hoi-an-20605047.jpg",
+    "language": "en",
+    "showOn": ["home", "about", "group", "car"],
+    "order": 8,
+    "isActive": true
+  }
+]

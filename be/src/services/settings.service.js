@@ -51,6 +51,14 @@ export const HOME_REFS = Object.freeze({
   destination: ["featuredDestinations"],
 });
 
+/** 3 mã 9Pay — đổi / xoá mã nào cũng phải xác nhận mật khẩu + ghi nhật ký (không kèm giá trị) */
+export const PAYMENT_KEYS = ["merchantKey", "secretKey", "checksumKey"];
+
+/** Thiếu bước xác nhận mật khẩu → không cho đổi mã (an toàn mặc định nếu nơi gọi quên truyền) */
+const NO_REAUTH = async () => {
+  throw ApiError.forbidden("Cần xác nhận mật khẩu trước khi đổi mã 9Pay");
+};
+
 /** Tỷ lệ đặt cọc (%) khi thanh toán online: 100 = trả đủ (mặc định) */
 const depositOf = (v) => {
   const n = Number(v?.depositPercent);
@@ -154,6 +162,10 @@ export const settingsService = {
   /* ----- 9Pay: chỉ admin; secret mã hoá AES-256-GCM, không bao giờ trả nguyên văn ra ngoài ----- */
   async getPayment() {
     const v = (await settingRepository.get(KEYS.payment)) ?? {};
+    // lần đổi gần nhất của từng mã + người đổi (không kèm giá trị)
+    const keyInfo = Object.fromEntries(
+      PAYMENT_KEYS.map((k) => [k, { at: v.keys?.[k]?.at ?? null, by: v.keys?.[k]?.by ?? "" }]),
+    );
     return {
       provider: "9pay",
       enabled: Boolean(v.enabled),
@@ -168,32 +180,56 @@ export const settingsService = {
       // bật + đủ 3 mã → khách thấy bước thanh toán sau khi đặt tour
       ready: Boolean(v.enabled && v.merchantKey && v.secretKey && v.checksumKey),
       updatedAt: v.updatedAt ?? null,
+      keyInfo,
     };
   },
 
   /**
    * Đổi tài khoản nhận tiền áp dụng ngay cho đơn mới (tài khoản cũ ngừng nhận vì key cũ bị ghi đè).
-   * Ô secret để trống = giữ secret đã lưu.
+   * Ô secret để trống = giữ secret đã lưu; clearSecretKey / clearChecksumKey = xoá.
+   * Đổi Merchant key hoặc đổi / xoá Secret / Checksum key → gọi opts.reauth() (xác nhận mật khẩu) trước khi ghi;
+   * chỉ bật / tắt, đổi tên tài khoản, tỷ lệ cọc thì không cần.
+   * @param {{ reauth?: () => Promise<unknown> }} [opts]
+   * @returns {Promise<{ data: object, keyChanges: { field: string, op: "replace" | "clear" }[] }>}
    */
-  async savePayment(data, actor) {
+  async savePayment(data, actor, { reauth = NO_REAUTH } = {}) {
     const prev = (await settingRepository.get(KEYS.payment)) ?? {};
+    const now = new Date().toISOString();
+    const keyChanges = [];
+    const secret = (field, clear) => {
+      const old = prev[field] ?? "";
+      if (clear) {
+        if (old) keyChanges.push({ field, op: "clear" });
+        return "";
+      }
+      if (data[field] && data[field] !== decryptSecret(old)) {
+        keyChanges.push({ field, op: "replace" });
+        return encryptSecret(data[field]);
+      }
+      return old;
+    };
     const next = {
       provider: "9pay",
       enabled: data.enabled,
       environment: "production",
       merchantKey: data.merchantKey,
       accountName: data.accountName,
-      secretKey: data.secretKey ? encryptSecret(data.secretKey) : (prev.secretKey ?? ""),
-      checksumKey: data.checksumKey ? encryptSecret(data.checksumKey) : (prev.checksumKey ?? ""),
+      secretKey: secret("secretKey", data.clearSecretKey),
+      checksumKey: secret("checksumKey", data.clearChecksumKey),
       depositPercent: data.depositPercent ?? depositOf(prev),
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
+      keys: { ...prev.keys },
     };
+    if (data.merchantKey !== (prev.merchantKey ?? ""))
+      keyChanges.unshift({ field: "merchantKey", op: data.merchantKey ? "replace" : "clear" });
+    for (const { field } of keyChanges) next.keys[field] = { at: now, by: actor?.username ?? "" };
     if (next.enabled && (!next.merchantKey || !next.secretKey || !next.checksumKey))
       throw ApiError.badRequest(
         "Cần đủ Merchant key, Secret key và Checksum key trước khi bật thanh toán",
       );
+    if (keyChanges.length) await reauth(); // sai mật khẩu → ném lỗi, không ghi gì
     await settingRepository.set(KEYS.payment, next, actor?.username);
-    return this.getPayment();
+    return { data: await this.getPayment(), keyChanges };
   },
 
   /**

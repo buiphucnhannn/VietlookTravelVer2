@@ -348,8 +348,18 @@ export const uploadService = {
     return results.map(toImage);
   },
 
-  async deleteImage(publicId) {
+  /**
+   * Xoá hẳn 1 ảnh trên Cloudinary — CHỈ khi không còn bản ghi nào dùng (tour, bài viết, trang…).
+   * Một ảnh có thể được nhiều nơi dùng chung (vd. ảnh tour chèn trong bài viết) → đang dùng thì từ chối,
+   * để lần dọn hằng ngày tự xử lý khi ảnh thật sự không còn ai dùng.
+   */
+  async deleteImage(publicId, deps = mediaDeps) {
     ensureEnabled();
+    const refs = await deps.references();
+    if (refs.has(publicId))
+      throw ApiError.conflict(
+        "Ảnh này đang được dùng ở tour, bài viết hoặc trang khác nên không xoá được. Hãy gỡ ảnh khỏi nội dung rồi lưu — hệ thống sẽ tự dọn khi ảnh không còn ai dùng.",
+      );
     const { result } = await cloudinary.uploader.destroy(publicId, { invalidate: true });
     if (result !== "ok") throw ApiError.notFound("Không tìm thấy ảnh");
   },

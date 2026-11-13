@@ -3,15 +3,11 @@
 import { useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, foldSearch } from "@/lib/utils";
 import PostCard from "./PostCard";
 
-const norm = (s) =>
-  String(s || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/gi, "d") // "da nang" tìm được "Đà Nẵng"
-    .toLowerCase();
+// Bỏ dấu + bỏ khoảng trắng như ô tìm tour: "ha noi" = "Hà Nội" = "hanoi", "da nang" = "Đà Nẵng"
+const norm = foldSearch;
 
 /**
  * Danh sách bài cẩm nang + tìm kiếm + lọc chuyên mục (phía client).

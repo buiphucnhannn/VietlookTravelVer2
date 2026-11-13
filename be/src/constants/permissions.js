@@ -28,6 +28,7 @@ export const MODULES = Object.freeze({
   articles: LEVELS,
   taxonomy: LEVELS,
   pages: LEVELS,
+  reviews: LEVELS,
   audit: Object.freeze(["none", "view"]),
 });
 export const MODULE_KEYS = Object.freeze(Object.keys(MODULES));
@@ -43,6 +44,7 @@ export const CONTENT_MODULES = Object.freeze([
   "articles",
   "taxonomy",
   "pages",
+  "reviews",
 ]);
 
 /** Tên tiếng Việt (nhật ký thao tác) */
@@ -58,6 +60,7 @@ export const MODULE_LABELS = Object.freeze({
   articles: "Bài viết",
   taxonomy: "Chuyên mục & tác giả",
   pages: "Giới thiệu & chính sách",
+  reviews: "Đánh giá",
   audit: "Nhật ký thao tác",
 });
 export const LEVEL_LABELS = Object.freeze({

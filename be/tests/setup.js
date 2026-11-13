@@ -31,3 +31,4 @@ process.env.LIBRETRANSLATE_URL = "";
 process.env.LINGVA_INSTANCES = "";
 process.env.LIBRETRANSLATE_API_KEY = "";
 process.env.MYMEMORY_EMAIL = "";
+// Điểm đánh giá: khoá API chỉ nhập trong CMS (không có biến môi trường) — test dùng fetch giả + kho cài đặt giả

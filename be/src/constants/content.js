@@ -53,4 +53,13 @@ export const CACHE_TAGS = Object.freeze({
   services: "services", // xe + visa
   pages: "pages",
   settings: "settings",
+  reviews: "reviews", // đánh giá khách
 });
+
+/**
+ * Đánh giá khách (mục "Đánh giá khách" trong CMS): nguồn của đánh giá, các trang website có khối đánh giá,
+ * ngôn ngữ lời khách viết ("" = không ghi).
+ */
+export const REVIEW_SOURCES = ["tripadvisor", "google", "facebook", "email", "other"];
+export const REVIEW_PLACES = ["home", "about", "group", "car"]; // trang chủ · giới thiệu · tour đoàn · thuê xe
+export const REVIEW_LANGS = ["", "en", "zh", "vi", "other"];

@@ -7,6 +7,7 @@ import { getCatalog } from "@/lib/catalog";
 import { Container, Reveal } from "@/components/ui";
 import CountUp from "@/components/ui/CountUp";
 import { cn } from "@/lib/utils";
+import { formatCount } from "@/lib/review-stats";
 
 /**
  * "Vietlook in numbers" – chủ đề SƠN MÀI & ĐỒNG:
@@ -82,15 +83,16 @@ export default async function DrumStats({ lang, dict }) {
     },
     {
       icon: Star,
-      value: siteConfig.tripadvisorRating.score,
+      value: dict.reviewStats.tripadvisor.rating,
       decimals: 1,
       suffix: "★",
+      // nhãn mặc định = heritageStats[5] (components/home/copy.js, đã điền số đánh giá mới nhất)
       label: {
-        en: `Tripadvisor · ${siteConfig.tripadvisorRating.reviews} reviews`,
-        zh: `猫途鹰 · ${siteConfig.tripadvisorRating.reviews} 条评价`,
-        vi: `Tripadvisor · ${siteConfig.tripadvisorRating.reviews} đánh giá`,
+        en: `Tripadvisor · ${formatCount(dict.reviewStats.tripadvisor.count, "en")} reviews`,
+        zh: `猫途鹰 · ${formatCount(dict.reviewStats.tripadvisor.count, "zh")} 条评价`,
+        vi: `Tripadvisor · ${formatCount(dict.reviewStats.tripadvisor.count, "vi")} đánh giá`,
       },
-      href: siteConfig.social.tripadvisor,
+      href: dict.reviewStats.tripadvisor.url,
       external: true,
     },
   ].map((s, i) => ({

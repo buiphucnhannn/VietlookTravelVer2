@@ -17,7 +17,10 @@ import { ReadOnlyArea, usePermission } from "./permissions";
  * Phần dùng chung của 4 tab danh mục: Điểm đến, Chủ đề, Xe & khu vực, Visa & fast-track.
  */
 
-/** Hàng tab ngôn ngữ của form: tiêu đề bên trái — nút "Dịch tự động" nằm sát bên trái tab ngôn ngữ */
+/**
+ * Hàng tab ngôn ngữ của form: tiêu đề bên trái — nút "Dịch tự động" nằm sát bên trái tab ngôn ngữ.
+ * Chấm xanh trên tab theo ô `form.name`; form không có tên 3 ngôn ngữ → truyền `filled` (vd. filledOf(form.trip)).
+ */
 export function LangBar({
   title = "Nội dung theo ngôn ngữ",
   lang,
@@ -25,6 +28,7 @@ export function LangBar({
   form,
   onForm,
   skipKeys,
+  filled,
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -37,7 +41,7 @@ export function LangBar({
           skipKeys={skipKeys}
           className="px-3"
         />
-        <LangTabs value={lang} onChange={onLang} filled={filledOf(form.name)} />
+        <LangTabs value={lang} onChange={onLang} filled={filled ?? filledOf(form.name)} />
       </div>
     </div>
   );

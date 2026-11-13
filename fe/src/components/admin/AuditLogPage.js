@@ -43,6 +43,7 @@ const CONTENT = {
   car_area: { noun: "khu vực xe", module: "cars", list: "/cars" },
   visa_type: { noun: "loại visa", module: "visa", list: "/visa" },
   fast_track: { noun: "gói fast-track", module: "visa", list: "/visa" },
+  review: { noun: "đánh giá khách", module: "reviews", list: "/reviews" },
 };
 const CONTENT_VERBS = {
   create: "Thêm",
@@ -70,12 +71,14 @@ const FOLDER_LABELS = {
   cars: "Xe",
   pages: "Trang giới thiệu / chính sách",
   home: "Trang chủ",
+  reviews: "Đánh giá",
 };
 
 const FIXED = {
   "auth.login": "Đăng nhập",
   "auth.login_failed": "Nhập sai mật khẩu",
   "auth.locked": "Bị tạm khoá vì sai mật khẩu nhiều lần",
+  "auth.reauth_failed": "Nhập sai mật khẩu khi xác nhận đổi khoá",
   "auth.logout": "Đăng xuất",
   "auth.password_change": "Đổi mật khẩu",
   "enquiry.create": "Khách gửi đơn / yêu cầu",
@@ -98,6 +101,9 @@ const FIXED = {
   "settings.payment": "Sửa cài đặt thanh toán 9Pay",
   "settings.tracking": "Sửa mã đo lường",
   "settings.smallGroup": "Sửa phụ thu nhóm nhỏ",
+  "settings.review_stats": "Sửa điểm & số lượt đánh giá",
+  "settings.review_sync": "Cập nhật ngay điểm đánh giá",
+  "settings.secret": "Thay / xoá khoá bảo mật (9Pay, khoá API)",
   "user.create": "Thêm tài khoản",
   "user.update": "Sửa tài khoản",
   "user.permissions": "Đổi quyền tài khoản",
@@ -120,6 +126,8 @@ const BADGES = {
   "auth.logout": ["Đăng xuất", "gray"],
   "auth.login_failed": ["Sai mật khẩu", "red"],
   "auth.locked": ["Tạm khoá", "red"],
+  "auth.reauth_failed": ["Sai mật khẩu", "red"],
+  "settings.secret": ["Khoá bảo mật", "red"],
   "auth.password_change": ["Mật khẩu", "violet"],
   "enquiry.create": ["Đơn mới", "amber"],
   "enquiry.update": ["Đơn", "amber"],
@@ -293,6 +301,8 @@ export function describeLog(x) {
           ? `Tài khoản ${x.actorName || "không rõ"} bị tạm khoá vì nhập sai mật khẩu nhiều lần`
           : "Đăng nhập bị tạm chặn vì nhập sai nhiều lần",
       );
+    case "auth.reauth_failed":
+      return plain("Nhập sai mật khẩu khi xác nhận đổi khoá bảo mật");
     case "auth.password_change":
       return plain("Đổi mật khẩu đăng nhập của mình");
     case "media.upload":
@@ -353,6 +363,30 @@ export function describeLog(x) {
         before: "Sửa ",
         name: "mã đo lường lượt truy cập",
         after: "",
+        href: "/settings",
+        module: "admin",
+      };
+    case "settings.review_stats":
+      return {
+        before: "Sửa ",
+        name: "điểm & số lượt đánh giá Tripadvisor / Google",
+        after: m.keyChanged?.length ? " — có đổi khoá API" : "", // dòng cũ; nay ghi riêng "settings.secret"
+        href: "/settings",
+        module: "admin",
+      };
+    case "settings.secret":
+      return {
+        before: m.op === "clear" ? "Đã xoá " : "Đã thay ",
+        name: m.name || "khoá bảo mật",
+        after: "",
+        href: "/settings",
+        module: "admin",
+      };
+    case "settings.review_sync":
+      return {
+        before: "Bấm cập nhật ngay ",
+        name: "điểm & số lượt đánh giá",
+        after: m.ok === false ? " — có lỗi" : m.ok ? " — thành công" : "",
         href: "/settings",
         module: "admin",
       };
@@ -444,6 +478,23 @@ function detailRows(x) {
     if (m.environment)
       add("Chế độ", m.environment === "production" ? "Chạy thật (thu tiền thật)" : "Chạy thử");
   }
+  if (x.action === "settings.review_stats") {
+    add(
+      "Tripadvisor",
+      m.tripadvisor && `${m.tripadvisor} đánh giá${m.tripadvisorAuto ? " (tự động)" : ""}`,
+    );
+    add("Google", m.google && `${m.google} đánh giá${m.googleAuto ? " (tự động)" : ""}`);
+    if (m.keyChanged?.length)
+      add(
+        "Đổi khoá API",
+        m.keyChanged.map((k) => (k === "google" ? "Google" : "Tripadvisor")).join(", "),
+      );
+  }
+  if (x.action === "settings.review_sync") add("Kết quả", m.message);
+  if (x.action === "settings.secret") {
+    add("Khoá", m.name);
+    add("Thao tác", m.op === "clear" ? "Xoá khoá" : "Thay khoá mới (lưu mã hoá)");
+  }
   if (x.action === "auth.login" && m.demo) add("Cách đăng nhập", "Đăng nhập nhanh (bản dùng thử)");
   return rows;
 }
@@ -452,7 +503,13 @@ function detailRows(x) {
 const FILTER_GROUPS = [
   {
     label: "Đăng nhập & mật khẩu",
-    actions: ["auth.login", "auth.login_failed", "auth.locked", "auth.password_change"],
+    actions: [
+      "auth.login",
+      "auth.login_failed",
+      "auth.locked",
+      "auth.reauth_failed",
+      "auth.password_change",
+    ],
   },
   {
     label: "Đơn & yêu cầu",
@@ -490,6 +547,9 @@ const FILTER_GROUPS = [
       "settings.payment",
       "settings.tracking",
       "settings.smallGroup",
+      "settings.review_stats",
+      "settings.review_sync",
+      "settings.secret",
     ],
   },
   {
@@ -592,7 +652,11 @@ const explainOf = (x, id) =>
       : "Tên đăng nhập không có trong hệ thống — có thể gõ nhầm, hoặc người ngoài thử vào."
     : x.action === "auth.locked"
       ? "Nhập sai mật khẩu nhiều lần liên tiếp nên tài khoản được tạm khoá ít phút để bảo vệ."
-      : "";
+      : x.action === "auth.reauth_failed"
+        ? "Đang đăng nhập nhưng nhập sai mật khẩu khi xác nhận thay / xoá khoá bảo mật. Sai nhiều lần thì tài khoản bị tạm khoá."
+        : x.action === "settings.secret"
+          ? "Khoá được lưu mã hoá; nhật ký chỉ ghi tên khoá, người làm và thời gian — không ghi giá trị khoá."
+          : "";
 
 /** Ô chi tiết khi bấm "Xem" */
 function DetailPanel({ x, id }) {

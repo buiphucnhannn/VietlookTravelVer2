@@ -160,7 +160,7 @@ export function airportFrom(priceKey) {
 
 /**
  * Địa điểm đón/trả (nhóm Sân bay / Thành phố & điểm du lịch – như ô báo giá của hltcarservice.com).
- * Theo danh sách khách gửi (11 sân bay, 28 điểm đón), sắp xếp Bắc → Trung → Nam.
+ * Theo danh sách khách gửi (11 sân bay, 44 điểm đón: đủ 28 điểm khách gửi + điểm cũ), sắp xếp Bắc → Trung → Nam.
  * Điểm chưa có tuyến giá cố định vẫn chọn được – ô báo giá hiện "Giá liên hệ".
  */
 export const places = {

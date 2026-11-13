@@ -12,11 +12,16 @@ import {
   categoryService,
   destinationService,
   fastTrackService,
+  reviewService,
   themeService,
   tourService,
   visaTypeService,
 } from "../services/modules.service.js";
 import { idParam } from "../validators/common.validator.js";
+import { reviewImportService } from "../services/review-import.service.js";
+import { limiter } from "../middlewares/rate-limit.middleware.js";
+import { ok } from "../utils/response.js";
+import { reviewImportQuery, reviewSchema } from "../validators/review.validator.js";
 import {
   articleSchema,
   authorSchema,
@@ -43,8 +48,8 @@ import {
  *   PATCH  /:id/visibility  ẩn / hiện                        sửa
  *   DELETE /:id        xoá                                   toàn quyền
  */
-function crud(service, schema, type, module) {
-  const c = createContentController(service, type);
+function crud(service, schema, type, module, options) {
+  const c = createContentController(service, type, options);
   const view = requirePermission(module, "view");
   const edit = requirePermission(module, "edit");
   const full = requirePermission(module, "full");
@@ -83,5 +88,33 @@ router.use("/cars", crud(carService, carSchema, "car", "cars"));
 router.use("/car-areas", crud(carAreaService, carAreaSchema, "car_area", "cars"));
 router.use("/visa-types", crud(visaTypeService, visaTypeSchema, "visa_type", "visa"));
 router.use("/fast-track", crud(fastTrackService, fastTrackSchema, "fast_track", "visa"));
+
+// Lấy đánh giá mới nhất qua API chính thức (Tripadvisor / Google) để chọn thêm vào danh sách.
+// Chỉ xem trước — thêm thật đi qua POST /reviews bình thường (kiểm tra dữ liệu + nhật ký). Quyền: sửa Đánh giá.
+// Gắn TRƯỚC /reviews để "/import" không bị hiểu là mã đánh giá.
+const reviewImport = Router();
+reviewImport.use(requireStaff);
+reviewImport.get("/sources", requirePermission("reviews", "view"), async (_req, res) =>
+  ok(res, await reviewImportService.sources()),
+);
+reviewImport.get(
+  "/preview",
+  requirePermission("reviews", "edit"),
+  limiter({
+    windowMs: 10 * 60 * 1000,
+    limit: 10,
+    message: "Bạn vừa lấy đánh giá nhiều lần, vui lòng thử lại sau ít phút",
+  }),
+  validate({ query: reviewImportQuery }),
+  async (req, res) =>
+    ok(res, await reviewImportService.preview({ source: req.validated.query.source })),
+);
+router.use("/reviews/import", reviewImport);
+
+// Đánh giá khách — nhật ký ghi tên người viết đánh giá
+router.use(
+  "/reviews",
+  crud(reviewService, reviewSchema, "review", "reviews", { name: (d) => d?.name ?? "" }),
+);
 
 export default router;

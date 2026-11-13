@@ -77,14 +77,14 @@ export default function Footer({ lang, dict, policies }) {
               {
                 icon: TripAdvisorIcon,
                 label: "Tripadvisor",
-                sub: dict.common.ratingText,
-                href: social.tripadvisor,
+                sub: dict.common.ratingText, // điểm & số lượt: CMS → Cài đặt (i18n/dictionaries.js)
+                href: dict.reviewStats?.tripadvisor.url ?? social.tripadvisor,
               },
               {
                 icon: GoogleMapsIcon,
                 label: "Google Maps",
                 sub: dict.common.mapsReviews,
-                href: social.google,
+                href: dict.reviewStats?.google.url ?? social.google,
               },
               {
                 icon: FacebookIcon,

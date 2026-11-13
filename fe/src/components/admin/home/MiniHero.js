@@ -20,7 +20,7 @@ import {
   Upload,
 } from "lucide-react";
 import { errorMessage, isAbort } from "@/lib/api";
-import { siteConfig } from "@/constants/site";
+import { REVIEW_STATS_FALLBACK, formatScore } from "@/lib/review-stats";
 import {
   canonicalVideo,
   cloudinaryVideo,
@@ -68,7 +68,14 @@ import {
  * phần video / ảnh của slide đang chọn.
  * `sel` = vị trí slide đang chọn (cha giữ để có thể nhảy tới slide cần sửa khi lưu).
  */
-export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
+export default function MiniHero({
+  banner,
+  lang,
+  setBanner,
+  sel,
+  setSel,
+  reviewStats = REVIEW_STATS_FALLBACK,
+}) {
   const { confirm } = useUi();
   const slides = banner.slides;
   const cur = Math.min(sel, slides.length - 1);
@@ -167,11 +174,11 @@ export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
           >
             <span className="flex items-center gap-1.5">
               Google <Star className="size-3 fill-amber-brand text-amber-brand" />
-              {siteConfig.googleRating.toFixed(1)}
+              {formatScore(reviewStats.google.rating)}
             </span>
             <span className="flex items-center gap-1.5">
               Tripadvisor <Star className="size-3 fill-[#34e0a1] text-[#34e0a1]" />
-              {siteConfig.tripadvisorRating.score.toFixed(1)}
+              {formatScore(reviewStats.tripadvisor.rating)}
             </span>
           </div>
         </div>

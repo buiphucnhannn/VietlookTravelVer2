@@ -17,10 +17,10 @@
 
 /* Màn hình thấp (laptop nhỏ, trình duyệt có nhiều thanh công cụ): gọn các khung dính bên cạnh */
 @custom-variant short (@media (min-width: 1024px) and (max-height: 900px));
-/* Khung đặt tour dính bên phải: gọn dần theo chiều cao màn hình — mid: ≤ 1100px (1920×1080),
-   shorter: ≤ 900px (1440×900, 1536×864, 1366×768, 1280×720…) */
-@custom-variant mid (@media (min-width: 1024px) and (max-height: 1100px));
-@custom-variant shorter (@media (min-width: 1024px) and (max-height: 900px));
+/* Khung đặt tour dính bên phải: độ thoáng theo NỘI DUNG — BookingWidget tự đo và đặt data-density lên khung
+   (không có = rộng rãi; "mid" = gọn vừa; "compact" = gọn nhất). bk-mid: áp cho cả mid lẫn compact. */
+@custom-variant bk-mid (&:where([data-density="mid"], [data-density="mid"] *, [data-density="compact"], [data-density="compact"] *));
+@custom-variant bk-compact (&:where([data-density="compact"], [data-density="compact"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -309,14 +309,32 @@ body {
     margin: 1.75rem auto;
     border-radius: 0.75rem;
   }
+  /* Ảnh có chú thích: <figure><img><figcaption> — khung rộng đúng bằng ảnh, chú thích chữ nhỏ, xám, căn giữa
+     ngay dưới ảnh (không làm khung rộng thêm: contain inline-size). Cùng kiểu với trình soạn (.admin-prose .rt-img-cap). */
   .prose-guide figure {
+    width: fit-content;
+    max-width: min(100%, 720px);
     margin: 1.75rem auto;
   }
   .prose-guide figure img {
-    margin-block: 0;
+    margin: 0 auto;
+    max-width: 100%;
   }
   .prose-guide figcaption {
-    @apply mt-2 text-center text-sm leading-6 text-muted;
+    contain: inline-size;
+    margin-top: 0.5rem;
+    padding-inline: 0.25rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: var(--color-muted);
+    text-wrap: balance;
+  }
+  @media (min-width: 40rem) {
+    .prose-guide figcaption {
+      font-size: 0.875rem;
+    }
   }
   /* bài cũ: ảnh có lớp alignleft / alignright nằm bên trái / phải chữ (màn hẹp: căn giữa như mọi ảnh) */
   @media (min-width: 40rem) {

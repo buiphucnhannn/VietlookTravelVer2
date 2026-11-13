@@ -102,6 +102,12 @@ export const PERMISSION_GROUPS = [
         hint: "Trang giới thiệu, điều khoản, chính sách",
         href: A("/pages"),
       },
+      {
+        key: "reviews",
+        label: "Đánh giá",
+        hint: "Đánh giá của khách hiện trên website",
+        href: A("/reviews"),
+      },
     ],
   },
   {

@@ -21,6 +21,7 @@
     "media:cleanup": "node --env-file-if-exists=.env src/scripts/media-cleanup.js",
     "images:upload": "node --env-file-if-exists=.env scripts/upload-site-images.js",
     "seed": "node --env-file-if-exists=.env src/scripts/seed-content.js",
+    "reviews:seed": "node --env-file-if-exists=.env src/scripts/seed-reviews.js",
     "admin:reset": "node --env-file-if-exists=.env src/scripts/reset-admin.js",
     "db:backup": "node --env-file-if-exists=.env src/scripts/db-backup.js",
     "db:restore": "node --env-file-if-exists=.env src/scripts/db-restore.js",

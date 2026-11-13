@@ -7,6 +7,7 @@ import {
   destinationRepository,
   fastTrackRepository,
   pageRepository,
+  reviewRepository,
   themeRepository,
   tourRepository,
   visaTypeRepository,
@@ -117,6 +118,19 @@ export const publicService = {
 
   async pages() {
     return pageRepository.listActive({ sort: { key: 1 }, select: PUBLIC_OMIT });
+  },
+
+  /** Đánh giá khách đang hiện, theo thứ tự trong CMS (website lọc theo trang qua showOn) */
+  async reviews() {
+    const list = await reviewRepository.listActive({
+      sort: { order: 1, createdAt: 1 },
+      select: "name title text rating source url date trip photo language showOn",
+    });
+    return list.map(({ _id, trip, ...r }) => ({
+      id: String(_id),
+      ...r,
+      trip: Object.fromEntries(LANGS.map((l) => [l, trip?.[l] ?? ""])),
+    }));
   },
 
   async home() {

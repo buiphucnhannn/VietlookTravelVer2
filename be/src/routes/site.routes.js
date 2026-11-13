@@ -11,7 +11,7 @@ import {
   requireEnquiryList,
 } from "../middlewares/enquiry-access.middleware.js";
 import { requireCaptcha } from "../middlewares/captcha.middleware.js";
-import { publicFormLimiter } from "../middlewares/rate-limit.middleware.js";
+import { limiter, publicFormLimiter } from "../middlewares/rate-limit.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import { idParam, slug } from "../validators/common.validator.js";
 import {
@@ -24,6 +24,7 @@ import {
   pageKeyParam,
   pageSchema,
   paymentSettingsSchema,
+  reviewStatsSettingsSchema,
   smallGroupSettingsSchema,
   trackingSettingsSchema,
 } from "../validators/content.validator.js";
@@ -44,6 +45,7 @@ publicRoutes.get("/articles/:slug", slugParam, publicController.article);
 publicRoutes.get("/taxonomy", publicController.taxonomy);
 publicRoutes.get("/services", publicController.services);
 publicRoutes.get("/pages", publicController.pages);
+publicRoutes.get("/reviews", publicController.reviews);
 publicRoutes.get("/home", publicController.home);
 publicRoutes.get("/slugs", publicController.slugs);
 publicRoutes.get("/site", publicController.site);
@@ -176,10 +178,40 @@ settingsRoutes.put(
   validate({ body: smallGroupSettingsSchema }),
   settingsController.saveSmallGroup,
 );
+// Điểm & số lượt đánh giá: chỉ admin (có khoá API). "Cập nhật ngay" gọi API ngoài → giới hạn 6 lần / 10 phút
+const reviewSyncLimiter = limiter({
+  windowMs: 10 * 60 * 1000,
+  limit: 6,
+  message: "Bạn vừa cập nhật nhiều lần, vui lòng thử lại sau ít phút",
+});
+// Lưu mục có khoá bí mật (khoá API đánh giá, mã 9Pay): đổi / xoá khoá phải nhập lại mật khẩu (sai được tính vào
+// khoá tài khoản như đăng nhập sai) + giới hạn 20 lần / 15 phút / tài khoản (chống thử mật khẩu, bấm lặp).
+// Cache-Control: no-store đã áp cho cả /settings (routes/index.js).
+const secretSaveLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  keyGenerator: (req) => `secret-save:${req.user?.id}`,
+  message: "Bạn vừa lưu nhiều lần, vui lòng thử lại sau ít phút",
+});
+settingsRoutes.get("/review-stats", requireAdmin, settingsController.getReviewStats);
+settingsRoutes.put(
+  "/review-stats",
+  requireAdmin,
+  secretSaveLimiter,
+  validate({ body: reviewStatsSettingsSchema }),
+  settingsController.saveReviewStats,
+);
+settingsRoutes.post(
+  "/review-stats/sync",
+  requireAdmin,
+  reviewSyncLimiter,
+  settingsController.syncReviewStats,
+);
 settingsRoutes.get("/payment", requireAdmin, settingsController.getPayment);
 settingsRoutes.put(
   "/payment",
   requireAdmin,
+  secretSaveLimiter,
   validate({ body: paymentSettingsSchema }),
   settingsController.savePayment,
 );

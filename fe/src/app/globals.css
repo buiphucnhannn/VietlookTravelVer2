@@ -1,6 +1,19 @@
 @import "tailwindcss";
 @import "./theme.css";
 
+/* Ô mật khẩu / khoá đều có nút con mắt riêng → ẩn nút có sẵn của trình duyệt (Edge "hiện mật khẩu", Safari tự điền)
+   để không bao giờ hiện 2 con mắt chồng nhau. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+input::-webkit-credentials-auto-fill-button,
+input::-webkit-contacts-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+
 /* CSS của khu quản trị (CMS) + trang đăng nhập. Website dùng site.css (nhẹ hơn, không kèm lớp của CMS). */
 
 /* ===== CMS: nội dung trong trình soạn thảo (RichText) ===== */
@@ -57,12 +70,55 @@
   border-radius: 12px;
 }
 .admin-prose .rt-img {
-  position: relative;
   width: fit-content;
   max-width: min(100%, 720px);
   margin: 1.25em auto;
-  line-height: 0;
   cursor: pointer;
+}
+.admin-prose .rt-img-frame {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  line-height: 0;
+}
+/* Chú thích ảnh — giống hệt website (theme.css .prose-guide figcaption): chữ nhỏ, xám, căn giữa, rộng bằng ảnh.
+   Chưa có chú thích: dòng gợi ý mờ, nghiêng; rê chuột / bấm vào mới rõ. */
+.admin-prose .rt-img-cap {
+  contain: inline-size;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 6px 0 0;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #64748b;
+  text-align: center;
+  cursor: text;
+  transition: background-color 0.15s;
+}
+.admin-prose .rt-img-cap::placeholder {
+  color: #a3b0bf;
+  font-style: italic;
+}
+.admin-prose .rt-img-cap:focus {
+  background: #f1f5f9;
+}
+@media (hover: hover) {
+  .admin-prose .rt-img:hover .rt-img-cap {
+    background: #f1f5f9;
+  }
+}
+.admin-prose .rt-img-cap:focus::placeholder {
+  color: #94a3b8;
 }
 .admin-prose .rt-img img {
   max-width: 100%;

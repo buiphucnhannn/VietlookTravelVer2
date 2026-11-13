@@ -228,6 +228,25 @@ describe("tiện ích", async () => {
     assert.ok(!/script|onerror|onclick|javascript:/i.test(out), out);
   });
 
+  it("lọc HTML: giữ ảnh có chú thích (figure / figcaption), bỏ thuộc tính lạ", () => {
+    const src = "https://res.cloudinary.com/demo/image/upload/v1/vietlook/articles/a.jpg";
+    const out = cleanHtml(
+      `<figure class="alignleft" onclick="x()" data-x="1"><img src="${src}" alt="Chùa Bái Đính, Ninh Bình" width="800" height="533"><figcaption id="c" onmouseover="x()">Chùa Bái Đính, Ninh Bình</figcaption></figure>`,
+    );
+    assert.equal(
+      out,
+      `<figure class="alignleft"><img src="${src}" alt="Chùa Bái Đính, Ninh Bình" width="800" height="533" /><figcaption>Chùa Bái Đính, Ninh Bình</figcaption></figure>`,
+    );
+    // ảnh ngoài kho ảnh bị bỏ, chú thích (chữ) vẫn còn
+    assert.ok(
+      !/<img/.test(
+        cleanHtml(
+          `<figure><img src="https://evil.example/a.jpg"><figcaption>x</figcaption></figure>`,
+        ),
+      ),
+    );
+  });
+
   it("mã hoá secret 2 chiều", () => {
     const enc = encryptSecret("sk_test_123");
     assert.match(enc, /^enc:v1:/);

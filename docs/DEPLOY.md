@@ -49,6 +49,48 @@ Turnstile → Hostnames phải có tên miền website. Đặt secret mà thiế
 `RESEND_API_KEY`, `MAIL_FROM` (địa chỉ trên tên miền công ty đã xác minh, có SPF/DKIM/DMARC — xem `be/README.md`).
 Không đặt thì đơn vẫn lưu CMS, chỉ không gửi email.
 
+### 1.6. Điểm & số lượt đánh giá Tripadvisor / Google (tuỳ chọn)
+
+Điểm và số lượt đánh giá của công ty (chân trang, banner trang chủ, dải uy tín, trang tour…) lấy từ **một chỗ duy nhất**:
+CMS → **Cài đặt → "Điểm & số lượt đánh giá"**. Mỗi nền tảng có 2 chế độ:
+
+- **Nhập tay** (mặc định, không cần khoá): nhân viên nhập điểm + số lượt rồi bấm Lưu → website đổi ngay.
+- **Tự động**: dán khoá API vào ô "Khoá API Tripadvisor" / "Khoá API Google" + bật "Tự động cập nhật mỗi ngày" →
+  máy chủ tự lấy số mới mỗi sáng ~06:00 (giờ VN) và khi bấm **"Cập nhật ngay"** (dùng nút này ngay sau khi dán khoá để kiểm tra
+  khoá — báo số lấy được hoặc lỗi dễ hiểu). Khoá lưu **mã hoá** trên máy chủ (như key 9Pay), CMS chỉ hiện 4 ký tự cuối.
+  Có khoá thì mục **Đánh giá** có thêm nút "Lấy đánh giá từ Tripadvisor / Google" (xem 5 đánh giá mới nhất, tick chọn để thêm).
+
+Chỉ dùng **API chính thức** — không cào trang (Tripadvisor / Google chặn bot và cấm trong điều khoản). Số nhận về bất thường
+(điểm ngoài 0–5, số lượt tụt hơn 5) bị bỏ qua, giữ số cũ. Cả hai nhà cung cấp **bắt buộc gắn thẻ thanh toán** khi đăng ký, nhưng
+website chỉ gọi khoảng **30–60 lần / tháng** → nằm trong hạn mức miễn phí. Nên đặt **giới hạn ngân sách / hạn mức** (bên dưới) để chắc chắn không phát sinh phí.
+
+**Khoá Tripadvisor (Content API)**
+
+1. Vào <https://www.tripadvisor.com/developers> → đăng nhập bằng tài khoản Tripadvisor của công ty → **Get started / Sign up**,
+   điền thông tin công ty, website, gắn thẻ thanh toán (5.000 lượt gọi / tháng miễn phí).
+2. Trang quản lý API (API Management) → **Create API key**. Ở phần giới hạn (restrictions) chọn **IP address** và nhập
+   **IP của máy chủ backend** (VPS) — không có IP này thì Tripadvisor từ chối khoá ("Khoá không hợp lệ hoặc chưa cho phép máy chủ này").
+3. Đặt **giới hạn chi tiêu** (spending limit / usage cap) ở mức thấp nhất trong trang quản lý.
+4. Chép khoá → CMS → Cài đặt → "Khoá API Tripadvisor". Mã địa điểm đã điền sẵn `27950353` (số sau `-d` trong link Tripadvisor).
+5. Điều khoản: luôn hiện logo / tên Tripadvisor + link về trang Tripadvisor cạnh điểm số (website đã làm sẵn).
+
+**Khoá Google (Places API (New))**
+
+1. <https://console.cloud.google.com> → tạo project (vd. `vietlook-website`) → **Billing**: gắn tài khoản thanh toán
+   (Google cho hạn mức miễn phí hằng tháng; ~30 lượt gọi / tháng không tốn phí).
+2. **APIs & Services → Library** → tìm **"Places API (New)"** → **Enable**.
+3. **APIs & Services → Credentials → Create credentials → API key** → **Edit API key**:
+   *API restrictions* = **Restrict key → Places API (New)**; *Application restrictions* = **IP addresses** → IP máy chủ backend.
+4. **Billing → Budgets & alerts**: tạo ngân sách (vd. 1 USD, cảnh báo qua email); **APIs & Services → Places API (New) → Quotas**:
+   có thể hạ "requests per day" xuống ~100.
+5. Chép khoá → CMS → Cài đặt → "Khoá API Google". Ô **Mã địa điểm Google (Place ID)** để trống: máy chủ tự tìm đúng hồ sơ
+   Google Maps của công ty (khớp mã cid). Muốn tự điền: mở <https://developers.google.com/maps/documentation/places/web-service/place-id>
+   → ô "Place ID Finder" → gõ "Vietlook Travel Ha Dong" → chép mã dạng `ChIJ…`.
+
+Khoá **chỉ** nhập trong CMS (lưu mã hoá; không có biến môi trường cho khoá này) —
+**không bao giờ** đặt ở Vercel / frontend. Website được làm mới ngay sau mỗi lần số đổi (backend gọi `POST <PUBLIC_SITE_URL>/api/revalidate`
+kèm `PROXY_SECRET` → cần `PROXY_SECRET` trùng nhau ở hai bên, nếu không website tự cập nhật chậm tối đa vài giờ).
+
 #### Email vào hộp thư chính (không vào Quảng cáo / Spam)
 
 Code đã làm phần của mình: thư giao dịch ngắn, 1 logo nhỏ, ≤ 3 link (không tham số theo dõi), luôn gửi
@@ -103,7 +145,7 @@ App **không khởi động** nếu thiếu / sai biến bắt buộc (log ghi r
 | `TRUST_PROXY` | `2` |
 | `CLOUDINARY_*` | khoá Cloudinary |
 | `TURNSTILE_SECRET_KEY` | secret Turnstile |
-| `RESEND_API_KEY`, `MAIL_FROM`, `NOTIFY_EMAIL` | Resend; `NOTIFY_EMAIL` = email nhận thông báo dự phòng của **khách** |
+| `RESEND_API_KEY`, `MAIL_FROM` | Resend (người nhận email thông báo cài trong CMS → Cài đặt, không đặt ở đây) |
 | `MAIL_REDIRECT_TO` | **để trống** (có giá trị = mọi email chỉ gửi tới 1 địa chỉ thử) |
 | `DEMO_LOGIN` | **`false`** (true = ai cũng vào được CMS bằng nút "Đăng nhập nhanh") |
 | `NINEPAY_FAKE` | `false` (production luôn bỏ qua) · `NINEPAY_ENDPOINT` để trống = cổng thật |
@@ -111,6 +153,7 @@ App **không khởi động** nếu thiếu / sai biến bắt buộc (log ghi r
 | `MEDIA_ORPHAN_GRACE_DAYS` | `21` — ảnh không dùng được đánh dấu trước, chỉ xoá khi suốt N ngày không ai dùng lại (nên ≥ thời gian giữ bản sao lưu cũ nhất: 3 bản hằng tuần ≈ 21 ngày) |
 | `AZURE_TRANSLATOR_KEY` (+ `AZURE_TRANSLATOR_REGION`), `DEEPL_API_KEY`, `GOOGLE_TRANSLATE_API_KEY` | tuỳ chọn — key gói miễn phí cho "Dịch tự động" (ổn định hơn dịch vụ không key); trống = bỏ qua. Xem `be/.env.example` |
 | `TRANSLATE_PROVIDERS`, `TRANSLATE_COOLDOWN_MINUTES`, `LINGVA_INSTANCES`, `LIBRETRANSLATE_URL`, `MYMEMORY_EMAIL` | thường để trống / mặc định (`15` phút) |
+| `REVIEW_SYNC_HOUR_VN` | `6` — giờ tự cập nhật điểm đánh giá (khoá API Tripadvisor / Google nhập trong CMS → Cài đặt, mục 1.6) |
 | `BACKUP_DIR`, `BACKUP_KEEP` | thư mục sao lưu ngoài thư mục code, `7` |
 
 Kiểm tra: `curl https://<backend>/api/v1/health` → `{"success":true,"data":{"status":"ok","database":"connected",...}}`.
@@ -191,6 +234,7 @@ lên Google Search Console. Bản chạy thử trên tên miền tạm luôn b�
 - [ ] Gửi từng form (đặt tour, thiết kế tour, xe, visa, liên hệ, đối tác) → thấy trong CMS + email tới đúng người nhận
 - [ ] Mở `<ADMIN_LOGIN_PATH>` → đăng nhập → vào `/admin`; upload ảnh lên Cloudinary được
 - [ ] Cửa sổ ẩn danh (chưa đăng nhập): `/login`, `/admin`, `/admin/tours` → trang 404
+- [ ] CMS → Cài đặt → "Điểm & số lượt đánh giá": số đúng với Tripadvisor / Google; có khoá thì bấm "Cập nhật ngay" → báo thành công
 - [ ] Cookie `__Host-vl_at`, `__Secure-vl_rt`, `__Host-vl_session` (HttpOnly, Secure, SameSite=Strict)
 
 ## 5. Checklist bàn giao
@@ -199,7 +243,7 @@ lên Google Search Console. Bản chạy thử trên tên miền tạm luôn b�
 - [ ] `ADMIN_LOGIN_PATH` đã đặt trên Vercel (giá trị ngẫu nhiên mới, không dùng lại giá trị lúc chạy thử) → Redeploy;
       gửi link `https://<tên-miền><ADMIN_LOGIN_PATH>` **riêng** cho khách (gặp trực tiếp / tin nhắn riêng), dặn lưu
       bookmark và không chia sẻ; hướng dẫn cách đổi link (mục 3.1)
-- [ ] CMS → Cài đặt → Email nhận thông báo = email của **khách**; `NOTIFY_EMAIL` = email khách
+- [ ] CMS → Cài đặt → Email nhận thông báo = email của **khách**
 - [ ] CMS → Cài đặt → Thanh toán 9Pay: admin nhập 3 mã thật **trực tiếp trên CMS / server** (không gửi qua Zalo / email);
       đăng ký Return URL `https://<tên-miền>/api/v1/payments/return`, IPN URL `https://<tên-miền>/api/v1/payments/ipn`;
       thanh toán thật 1 đơn thành công

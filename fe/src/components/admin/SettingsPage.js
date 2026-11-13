@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, CreditCard, Eye, EyeOff, Mail, Save, Users } from "lucide-react";
+import { BarChart3, CreditCard, Mail, Save, Users } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { toastError, useMutation } from "./hooks";
+import ReviewStatsCard from "./ReviewStatsCard";
+import { SECRET_RULES, SecretKeyField, secretError, useReauth } from "./secrets";
 import {
   Button,
   Card,
@@ -27,12 +29,13 @@ export default function SettingsPage() {
     <>
       <PageHeader
         title="Cài đặt"
-        description="Email nhận thông báo, thanh toán 9Pay, phụ thu nhóm nhỏ và mã đo lường của Google."
+        description="Email nhận thông báo, thanh toán 9Pay, phụ thu nhóm nhỏ, điểm đánh giá Tripadvisor / Google và mã đo lường của Google."
       />
       <div className="space-y-6">
         <NotificationsCard />
         <PaymentCard />
         <SmallGroupCard />
+        <ReviewStatsCard />
         <TrackingCard />
       </div>
     </>
@@ -101,8 +104,11 @@ const paymentForm = (d) => ({
   enabled: !!d.enabled,
   merchantKey: d.merchantKey ?? "",
   accountName: d.accountName ?? "",
+  // khoá bí mật: chỉ gửi đi, không bao giờ nhận về; "view" = đang dùng khoá đã lưu
   secretKey: "",
+  secretKeyMode: d.secretKeySet ? "view" : "edit",
   checksumKey: "",
+  checksumKeyMode: d.checksumKeySet ? "view" : "edit",
   depositPercent: String(d.depositPercent ?? 100),
 });
 
@@ -206,39 +212,21 @@ function NotificationsCard() {
 
 /* ---------- Thanh toán 9Pay ---------- */
 
-function SecretInput({ label, isSet, masked, value, onChange }) {
-  const [show, setShow] = useState(false);
-  return (
-    <Field
-      label={label}
-      hint={
-        isSet
-          ? `Đã lưu (${masked || "••••"}). Để trống nếu không đổi.`
-          : "Lấy trong trang quản lý của 9Pay."
-      }
-    >
-      <div className="relative">
-        <Input
-          type={show ? "text" : "password"}
-          autoComplete="new-password"
-          value={value}
-          placeholder={isSet ? "••••••••" : ""}
-          onChange={(e) => onChange(e.target.value)}
-          className="pr-11 font-mono"
-        />
-        <button
-          type="button"
-          onClick={() => setShow((s) => !s)}
-          aria-label={show ? "Ẩn" : "Hiện"}
-          title={show ? "Ẩn" : "Hiện"}
-          className="absolute top-1/2 right-2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-        </button>
-      </div>
-    </Field>
-  );
-}
+/** 2 mã bí mật của 9Pay (Merchant Key là mã cửa hàng, hiện rõ) */
+const SECRETS_9PAY = [
+  {
+    name: "secretKey",
+    label: "Mã bí mật (Secret Key)",
+    audit: "Mã bí mật 9Pay (Secret Key)",
+    rule: SECRET_RULES.ninePay,
+  },
+  {
+    name: "checksumKey",
+    label: "Mã kiểm tra (Checksum Key)",
+    audit: "Mã kiểm tra 9Pay (Checksum Key)",
+    rule: SECRET_RULES.ninePay,
+  },
+];
 
 const FX_SOURCE = {
   vietcombank: "Vietcombank",
@@ -274,19 +262,45 @@ function PaymentCard() {
   // "settings": website đọc lại cấu hình thanh toán ngay sau khi lưu
   const { run, busy } = useMutation(["settings"]);
   const { confirm, toast } = useUi();
+  const reauth = useReauth();
 
   if (error || !form) return <CardState title="Thanh toán 9Pay" error={error} reload={reload} />;
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const deposit = Number(form.depositPercent);
   const depositOk = Number.isInteger(deposit) && deposit >= 10 && deposit <= 100;
-  const missingKey =
-    !form.merchantKey.trim() ||
-    (!data.secretKeySet && !form.secretKey.trim()) ||
-    (!data.checksumKeySet && !form.checksumKey.trim());
+  const merchantKey = form.merchantKey.trim();
+  const merchantError =
+    merchantKey && !SECRET_RULES.ninePay.rx.test(merchantKey)
+      ? "Mã cửa hàng không được có dấu cách hay chữ có dấu."
+      : "";
+  // khoá còn dùng được sau khi lưu: vừa nhập, hoặc khoá đã lưu mà không bấm Xoá
+  const keyAfter = (f) => Boolean(form[f]) || (data[`${f}Set`] && form[`${f}Mode`] !== "clear");
+  const missingKey = !merchantKey || !keyAfter("secretKey") || !keyAfter("checksumKey");
+  const secretFields = SECRETS_9PAY.map((s) => ({
+    ...s,
+    error: secretError(form[s.name], s.rule),
+  }));
+  const badSecret = secretFields.find((s) => s.error);
+  // các khoá sẽ bị đổi / xoá → hiện trong hộp xác nhận mật khẩu
+  const changes = [
+    merchantKey !== (data.merchantKey ?? "") && {
+      label: "Mã cửa hàng 9Pay (Merchant Key)",
+      op: merchantKey ? "replace" : "clear",
+    },
+    ...SECRETS_9PAY.map((s) =>
+      form[s.name]
+        ? { label: s.audit, op: "replace" }
+        : form[`${s.name}Mode`] === "clear" && data[`${s.name}Set`]
+          ? { label: s.audit, op: "clear" }
+          : null,
+    ),
+  ].filter(Boolean);
 
   const save = async () => {
     if (!depositOk) return toast.error("Tỷ lệ đặt cọc là số từ 10 đến 100.");
+    if (merchantError) return toast.error(merchantError);
+    if (badSecret) return toast.error(`${badSecret.label}: ${badSecret.error}`);
     if (form.enabled && missingKey)
       return toast.error("Nhập đủ Merchant Key, Secret Key và Checksum Key trước khi bật.");
     const turningOn = form.enabled && !data.enabled;
@@ -302,17 +316,24 @@ function PaymentCard() {
     }
     const body = {
       enabled: form.enabled,
-      merchantKey: form.merchantKey.trim(),
+      merchantKey,
       accountName: form.accountName.trim(),
-      ...(form.secretKey.trim() && { secretKey: form.secretKey.trim() }),
-      ...(form.checksumKey.trim() && { checksumKey: form.checksumKey.trim() }),
+      ...(form.secretKey && { secretKey: form.secretKey }),
+      ...(form.checksumKey && { checksumKey: form.checksumKey }),
+      clearSecretKey: !form.secretKey && form.secretKeyMode === "clear",
+      clearChecksumKey: !form.checksumKey && form.checksumKeyMode === "clear",
       depositPercent: deposit,
     };
-    const r = await run(
-      () => api("/settings/payment", { method: "PUT", body }),
-      "Đã lưu cài đặt 9Pay",
-    );
-    if (r) reload();
+    const send = (confirmPassword) =>
+      api("/settings/payment", {
+        method: "PUT",
+        body: { ...body, ...(confirmPassword && { confirmPassword }) },
+      });
+    const r = await run(() => reauth.run(send, changes), "Đã lưu cài đặt 9Pay");
+    if (r) {
+      set({ secretKey: "", checksumKey: "" }); // xoá khoá khỏi bộ nhớ trình duyệt ngay
+      reload();
+    }
   };
 
   return (
@@ -343,29 +364,52 @@ function PaymentCard() {
         {/* Tên trong ngoặc giữ đúng chữ 9Pay ghi trên trang quản lý của họ để dễ tìm & chép */}
         <Field
           label="Mã cửa hàng (Merchant Key)"
-          hint="Chép từ trang quản lý của 9Pay, mục Merchant Key."
+          error={merchantError}
+          hint={
+            data.keyInfo?.merchantKey?.at
+              ? `Cập nhật lúc ${fmtDateTime(data.keyInfo.merchantKey.at)}${data.keyInfo.merchantKey.by ? ` bởi ${data.keyInfo.merchantKey.by}` : ""}. Đổi mã cần nhập lại mật khẩu.`
+              : "Chép từ trang quản lý của 9Pay, mục Merchant Key."
+          }
         >
           <Input
             value={form.merchantKey}
-            onChange={(e) => set({ merchantKey: e.target.value })}
+            onChange={(e) => set({ merchantKey: e.target.value.replace(/\s+/g, "") })}
+            aria-invalid={!!merchantError || undefined}
             className="font-mono"
+            maxLength={200}
             autoComplete="off"
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            data-1p-ignore="true"
+            data-lpignore="true"
           />
         </Field>
-        <SecretInput
-          label="Mã bí mật (Secret Key)"
-          isSet={data.secretKeySet}
-          masked={data.secretKeyMasked}
-          value={form.secretKey}
-          onChange={(secretKey) => set({ secretKey })}
-        />
-        <SecretInput
-          label="Mã kiểm tra (Checksum Key)"
-          isSet={data.checksumKeySet}
-          masked={data.checksumKeyMasked}
-          value={form.checksumKey}
-          onChange={(checksumKey) => set({ checksumKey })}
-        />
+        {secretFields.map((s) => (
+          <SecretKeyField
+            key={s.name}
+            label={s.label}
+            hint="Chép từ trang quản lý của 9Pay."
+            configured={data[`${s.name}Set`]}
+            masked={data[`${s.name}Masked`]}
+            info={data.keyInfo?.[s.name]}
+            value={form[s.name]}
+            onChange={(v) => set({ [s.name]: v })}
+            mode={form[`${s.name}Mode`]}
+            onMode={(m) => set({ [`${s.name}Mode`]: m, [s.name]: "" })}
+            rule={s.rule}
+            onRequestClear={() =>
+              confirm({
+                title: `Xoá ${s.label.toLowerCase()}?`,
+                message:
+                  "Sau khi lưu, khách không thanh toán online được cho tới khi bạn nhập mã mới.",
+                confirmText: "Xoá mã",
+                danger: true,
+              })
+            }
+            placeholder="Dán mã vào đây"
+          />
+        ))}
         <Field
           label="Tỷ lệ đặt cọc (%)"
           hint="100 = khách trả toàn bộ. Ví dụ 30 = khách đặt cọc 30%, phần còn lại thu sau."
@@ -412,6 +456,7 @@ function PaymentCard() {
           Lưu
         </Button>
       </CardFooter>
+      {reauth.dialog}
     </Card>
   );
 }

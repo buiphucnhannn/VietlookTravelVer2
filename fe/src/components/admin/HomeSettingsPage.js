@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, RotateCcw, Save } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/constants/site";
+import { fillReviewStats, formatScore, normalizeReviewStats } from "@/lib/review-stats";
 import { defaultHomeCopy, fillCopy, stripCopy } from "@/components/home/copy";
 import { useMutation, useOptions, useOptionsState } from "./hooks";
 import { AutoTranslate, useAutoFill } from "./translate";
@@ -59,18 +60,21 @@ const PATH = "/settings/home";
 const TAGS = ["settings"];
 const STATS = 6;
 
-/** Câu mặc định của website theo 3 ngôn ngữ (chữ đang hiện trên trang chủ khi chưa ai sửa) */
+/**
+ * Câu mặc định của website theo 3 ngôn ngữ (chữ đang hiện trên trang chủ khi chưa ai sửa), đã điền điểm &
+ * số lượt đánh giá đang dùng (Cài đặt → Điểm & số lượt đánh giá) để nhân viên thấy đúng như trên website.
+ * `reviewStats`: số liệu đó (huy hiệu banner, con số nổi bật).
+ */
 const loadDefaults = async () => {
-  const [en, zh, vi] = await Promise.all([
+  const [en, zh, vi, site] = await Promise.all([
     import("@/i18n/dictionaries/en"),
     import("@/i18n/dictionaries/zh"),
     import("@/i18n/dictionaries/vi"),
+    api("/public/site").catch(() => null),
   ]);
-  return {
-    en: defaultHomeCopy(en.default.home, "en"),
-    zh: defaultHomeCopy(zh.default.home, "zh"),
-    vi: defaultHomeCopy(vi.default.home, "vi"),
-  };
+  const reviewStats = normalizeReviewStats(site?.data?.reviewStats);
+  const copy = (mod, l) => fillReviewStats(defaultHomeCopy(mod.default.home, l), reviewStats, l);
+  return { en: copy(en, "en"), zh: copy(zh, "zh"), vi: copy(vi, "vi"), reviewStats };
 };
 
 const slots = (arr, n) => Array.from({ length: n }, (_, i) => arr?.[i] ?? "");
@@ -439,7 +443,7 @@ export default function HomeSettingsPage() {
     destinations.length ? String(shown(destinations)) : "…",
     services ? String(services.airports) : "…",
     services ? services.seats : "…",
-    `${siteConfig.tripadvisorRating.score.toFixed(1)}★`,
+    `${formatScore(defs?.reviewStats?.tripadvisor.rating ?? 5)}★`,
   ];
 
   return (
@@ -476,6 +480,7 @@ export default function HomeSettingsPage() {
               setBanner={setBanner}
               sel={slideIndex}
               setSel={setSlideIndex}
+              reviewStats={defs?.reviewStats}
             />
             <TrustSection />
             <ServicesSection />

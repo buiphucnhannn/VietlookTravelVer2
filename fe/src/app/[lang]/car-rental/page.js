@@ -23,14 +23,14 @@ import { href, lp, tr } from "@/i18n/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";
 import { siteConfig } from "@/constants/site";
 import { airportFrom, carRoutes, places, quoteRoutes, routeTitle } from "@/data/cars";
-import { getCatalog } from "@/lib/catalog";
-import { reviews } from "@/data/reviews";
+import { getCatalog, getReviews } from "@/lib/catalog";
 import { Breadcrumbs, Container, Reveal, SectionHeading, Stars } from "@/components/ui";
 import { CarQuoteForm, CarQuoteProvider, QuickQuote } from "@/components/car/CarQuote";
 import FleetStage from "@/components/car/FleetStage";
 import FleetMarquee from "@/components/car/FleetMarquee";
 import RoutesExplorer from "@/components/car/RoutesExplorer";
-import { TripAdvisorIcon, WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
+import ReviewSource from "@/components/home/ReviewSource";
+import { WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
 import { cn } from "@/lib/utils";
 import { subgrid } from "@/lib/subgrid";
 
@@ -83,6 +83,8 @@ const fleetPhotos = () => ({
 
 export default async function CarRentalPage({ params }) {
   const { fleet, carAreas } = await getCatalog();
+  // 3 đánh giá đầu tiên được chọn hiện ở trang Thuê xe (CMS → Đánh giá khách)
+  const reviews = (await getReviews("car")).slice(0, 3);
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const t = dict.car;
@@ -429,57 +431,56 @@ export default async function CarRentalPage({ params }) {
         </Container>
       </section>
 
-      {/* ========== KHÁCH HÀNG NÓI GÌ ========== */}
-      <section className="bg-[#f6f1e8] py-14 lg:py-[4.5rem]">
-        <Container>
-          <SectionHeading title={t.reviewsTitle} subtitle={t.reviewsSub} />
-          <div className="rail grid gap-6 md:grid-cols-3">
-            {reviews.slice(0, 3).map((r) => (
-              <figure
-                key={r.name}
-                className={cn(
-                  "relative flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-black/5",
-                  subgrid(3, "md"),
-                )}
-              >
-                <span className="absolute top-5 right-7 font-serif text-7xl leading-none text-amber-brand/30">
-                  “
-                </span>
-                <Stars
-                  value={5}
-                  className="w-fit rounded-full bg-amber-brand/15 px-3 py-1"
-                  size={13}
-                />
-                <blockquote className="mt-5 flex-1 leading-relaxed text-ink/85">
-                  {tr(r.text, lang)}
-                </blockquote>
-                <figcaption className="mt-6 flex items-center gap-3 border-t border-border pt-5 md:self-start">
-                  {/* chữ cái đầu tên khách (không dùng ảnh minh hoạ ở chỗ ảnh đại diện — tránh hiểu nhầm là ảnh của khách) */}
-                  <span
-                    aria-hidden
-                    className="grid size-12 shrink-0 place-items-center rounded-full bg-forest-700 text-lg font-bold text-white uppercase ring-2 ring-amber-brand/40"
-                  >
-                    {(r.name || "?").trim()[0]}
+      {/* ========== KHÁCH HÀNG NÓI GÌ (CMS → Đánh giá khách; không có đánh giá → ẩn khối) ========== */}
+      {reviews.length > 0 && (
+        <section className="bg-[#f6f1e8] py-14 lg:py-[4.5rem]">
+          <Container>
+            <SectionHeading title={t.reviewsTitle} subtitle={t.reviewsSub} />
+            <div className="rail grid gap-6 md:grid-cols-3">
+              {reviews.map((r) => (
+                <figure
+                  key={r.id}
+                  className={cn(
+                    "relative flex flex-col rounded-3xl bg-white p-7 shadow-sm ring-1 ring-black/5 transition-transform duration-300 has-[a:hover]:-translate-y-1",
+                    subgrid(3, "md"),
+                  )}
+                >
+                  <span className="absolute top-5 right-7 font-serif text-7xl leading-none text-amber-brand/30">
+                    “
                   </span>
-                  <span className="min-w-0 leading-tight">
-                    <span className="block truncate font-semibold text-ink">{r.name}</span>
-                    <span className="block text-sm text-muted">{tr(r.trip, lang)}</span>
-                    <a
-                      href={r.url || siteConfig.social.tripadvisor}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted hover:text-ink hover:underline"
+                  <Stars
+                    value={r.rating}
+                    className="w-fit rounded-full bg-amber-brand/15 px-3 py-1"
+                    size={13}
+                  />
+                  <blockquote className="mt-5 flex-1 leading-relaxed whitespace-pre-line text-ink/85">
+                    {r.text}
+                  </blockquote>
+                  <figcaption className="mt-6 flex items-center gap-3 border-t border-border pt-5 md:self-start">
+                    {/* chữ cái đầu tên khách (không dùng ảnh minh hoạ ở chỗ ảnh đại diện — tránh hiểu nhầm là ảnh của khách) */}
+                    <span
+                      aria-hidden
+                      className="grid size-12 shrink-0 place-items-center rounded-full bg-forest-700 text-lg font-bold text-white uppercase ring-2 ring-amber-brand/40"
                     >
-                      <TripAdvisorIcon className="size-4 text-[#00af87]" />
-                      Tripadvisor
-                    </a>
-                  </span>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </Container>
-      </section>
+                      {(r.name || "?").trim()[0]}
+                    </span>
+                    <span className="min-w-0 leading-tight">
+                      <span className="block truncate font-semibold text-ink">{r.name}</span>
+                      <span className="block text-sm text-muted">{tr(r.trip, lang)}</span>
+                      <ReviewSource
+                        review={r}
+                        lang={lang}
+                        t={{ ...dict.home, reviewsVerified: "Tripadvisor" }}
+                        stretch
+                      />
+                    </span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* ========== CÂU HỎI THƯỜNG GẶP ========== */}
       <section className="py-14 lg:py-[4.5rem]">

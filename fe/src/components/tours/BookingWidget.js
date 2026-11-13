@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AlertCircle, ArrowLeft, Info, ShieldCheck } from "lucide-react";
 import { cn, formatUSD } from "@/lib/utils";
 import {
@@ -114,17 +114,68 @@ const extraLabel = (x, lang) =>
 /*
  * Khung đặt tour dính bên phải (màn hình lớn): khung cao tối đa = màn hình − header (xem trang tour),
  * nội dung xếp dọc — phần giữa chỉ cuộn khi màn hình quá thấp, nút đặt luôn ở đáy khung.
- * Màn hình thấp gọn dần theo chiều cao: mid: (≤ 1100px) → shorter: (≤ 900px) — theme.css.
+ * Độ thoáng theo NỘI DUNG của bước đang hiện (không theo chiều cao màn hình): khung tự đo và chọn mức rộng rãi nhất
+ * mà vẫn vừa — roomy (mặc định) → mid → compact; compact vẫn không vừa mới cho phần giữa cuộn.
+ * Mức được ghi vào data-density của khung (thẻ cha); kiểu dáng theo biến thể bk-mid: / bk-compact: (theme.css).
  */
+const DENSITIES = ["roomy", "mid", "compact"];
+const HYSTERESIS = 8; // px: chỉ nới rộng ra khi còn dư ≥ 8px → không bập bênh giữa 2 mức
+
+/** Chọn mức rộng rãi nhất mà khung vừa màn hình (chỉ màn hình lớn — khung dính; điện thoại luôn rộng rãi). */
+function fitDensity(root) {
+  const card = root?.parentElement;
+  if (!card) return;
+  const setLevel = (lvl) => {
+    if (lvl === "roomy") delete card.dataset.density;
+    else card.dataset.density = lvl;
+  };
+  if (!window.matchMedia("(min-width: 1024px)").matches) return setLevel("roomy");
+  const cur = DENSITIES.indexOf(card.dataset.density || "roomy");
+  const avail = parseFloat(getComputedStyle(card).maxHeight) || window.innerHeight - 132;
+  for (const [i, lvl] of DENSITIES.entries()) {
+    setLevel(lvl); // đổi thuộc tính → đọc kích thước ngay (cùng khung hình, chưa vẽ → không nháy)
+    const over = [...card.querySelectorAll("[data-bk-scroll]")].reduce(
+      (n, el) => n + Math.max(0, el.scrollHeight - el.clientHeight),
+      0,
+    );
+    const slack = i < cur ? HYSTERESIS : 0;
+    if (over <= 1 && card.offsetHeight <= avail - slack) return;
+  }
+  // compact vẫn dư → giữ compact, phần giữa cuộn (nút đặt luôn ở đáy khung)
+}
 const frameCls = "relative lg:flex lg:min-h-0 lg:flex-1 lg:flex-col";
 // -mx/-my + px/py: chừa chỗ cho viền sáng (ring) khi chọn ô, không bị cắt bởi vùng cuộn
 const scrollCls =
   "scrollbar-thin lg:-mx-2 lg:-my-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:px-2 lg:py-1";
-const inputCls = "mid:h-11 shorter:h-9";
+const inputCls = "bk-mid:h-11 bk-compact:h-9";
 
 /** Đặt tour online: chọn ngày, người lớn, trẻ em (độ tuổi) → giá tạm tính → gửi yêu cầu. */
 export default function BookingWidget({ lang, tour, t, c, payment, smallGroup }) {
   const formRef = useRef(null);
+  const rootRef = useRef(null); // khung bước thanh toán / cảm ơn (bước nhập liệu dùng formRef)
+  // Đo lại sau mỗi lần hiển thị (đổi bước, thêm trẻ em, hiện lỗi, dòng phụ thu…) + khi đổi cỡ cửa sổ / khung
+  useLayoutEffect(() => fitDensity(rootRef.current || formRef.current));
+  useEffect(() => {
+    const card = (rootRef.current || formRef.current)?.parentElement;
+    if (!card) return;
+    let raf = 0;
+    const run = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => fitDensity(rootRef.current || formRef.current));
+    };
+    const ro = new ResizeObserver(run);
+    ro.observe(card);
+    window.addEventListener("resize", run);
+    // Hiệu ứng trượt vào (bước thanh toán / cảm ơn) làm nội dung tạm "tràn" vài px → đo lại khi hiệu ứng xong
+    card.addEventListener("animationend", run);
+    document.fonts?.ready.then(run);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("resize", run);
+      card.removeEventListener("animationend", run);
+    };
+  }, []);
   const { status, code, submit, reset, error: sendError } = useEnquiry("booking", lang);
   // 9Pay bật (CMS) + đơn có giá → máy chủ trả "offer" (số tiền + payToken) → hiện bước thanh toán
   const [offer, setOffer] = useState(null);
@@ -227,7 +278,7 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
       .filter(Boolean)
       .join(" · ");
     return (
-      <div className={frameCls}>
+      <div ref={rootRef} className={frameCls}>
         <PaymentStep
           lang={lang}
           code={code}
@@ -246,15 +297,15 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
 
   if (status === "success") {
     return (
-      <div className={frameCls}>
-        <div className={scrollCls}>
+      <div ref={rootRef} className={frameCls}>
+        <div data-bk-scroll className={scrollCls}>
           <SuccessPanel
             title={c.thankYou}
             text={t.bookingSent}
             code={code}
             labels={c}
             onReset={() => (reset(), setStep(0))}
-            className="mid:p-6 shorter:p-5"
+            className="bk-mid:p-6 bk-compact:p-5"
           />
         </div>
       </div>
@@ -315,25 +366,26 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
 
   // Ô ở 2 cột (tên / email…): lỗi chữ nhỏ, dòng sát nhau → khi hiện lỗi khung không bị đẩy cao nhiều
   const fieldCls =
-    "min-w-0 mid:space-y-1 shorter:[&>label]:text-[0.8rem] [&>p]:text-[0.7rem] [&>p]:leading-tight";
-  // Nhãn nằm cùng hàng với ô chọn trên màn hình thấp (hạng khách sạn, tuổi trẻ em) → bớt 1 dòng
+    "min-w-0 bk-mid:space-y-1 bk-compact:[&>label]:text-[0.8rem] [&>p]:text-[0.7rem] [&>p]:leading-tight";
+  // Nhãn nằm cùng hàng với ô chọn ở mức compact (hạng khách sạn, tuổi trẻ em) → bớt 1 dòng
   const inlineCls =
-    "shorter:flex shorter:items-center shorter:gap-3 shorter:space-y-0 shorter:[&>label]:w-28 shorter:[&>label]:shrink-0 shorter:[&>label]:text-[0.8rem] shorter:[&>label]:leading-tight";
+    "bk-compact:flex bk-compact:items-center bk-compact:gap-3 bk-compact:space-y-0 bk-compact:[&>label]:w-28 bk-compact:[&>label]:shrink-0 bk-compact:[&>label]:text-[0.8rem] bk-compact:[&>label]:leading-tight";
 
   return (
     <form ref={formRef} onSubmit={onSubmit} noValidate className={frameCls}>
-      {/* Phần nội dung: màn hình thấp mới cuộn bên trong (phương án cuối) — nút đặt luôn nằm ở đáy khung */}
+      {/* Phần nội dung: mức compact vẫn không vừa mới cuộn bên trong (phương án cuối) — nút đặt luôn nằm ở đáy khung */}
       <div
+        data-bk-scroll
         className={cn(
           scrollCls,
           step === 0
-            ? "space-y-5 mid:space-y-3.5 shorter:space-y-2"
-            : "space-y-4 mid:space-y-3 shorter:space-y-2",
+            ? "space-y-5 bk-mid:space-y-3.5 bk-compact:space-y-2"
+            : "space-y-4 bk-mid:space-y-3 bk-compact:space-y-2",
         )}
       >
-        {/* Mô tả chỉ cần ở bước chọn ngày (màn hình thấp bỏ đi); bước liên hệ bỏ đi để khung luôn vừa màn hình */}
+        {/* Mô tả chỉ cần ở bước chọn ngày (khung gọn bỏ đi); bước liên hệ bỏ đi để khung luôn vừa màn hình */}
         {step === 0 && (
-          <p className="-mt-1 text-sm leading-snug text-muted mid:hidden">{t.bookSubtitle}</p>
+          <p className="-mt-1 text-sm leading-snug text-muted bk-mid:hidden">{t.bookSubtitle}</p>
         )}
         {step === 0 ? (
           <>
@@ -342,7 +394,7 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
               required
               htmlFor="bk-date"
               error={errs.date}
-              className="shorter:space-y-1"
+              className="bk-compact:space-y-1"
             >
               <DateInput
                 id="bk-date"
@@ -353,23 +405,23 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                 value={date}
                 onChange={(e) => pickDate(e.target.value)}
                 aria-invalid={!!errs.date}
-                className="mid:h-11 shorter:h-10"
+                className="bk-mid:h-11 bk-compact:h-10"
               />
             </Field>
             {departures.length > 0 && (
               <div>
-                {/* Gợi ý chọn nhanh: màn hình thấp bỏ câu hướng dẫn (các ô ngày tự rõ nghĩa) */}
-                <p className="mb-2.5 text-xs leading-snug text-muted mid:mb-2 shorter:hidden">
+                {/* Gợi ý chọn nhanh: khung gọn bỏ câu hướng dẫn (các ô ngày tự rõ nghĩa) */}
+                <p className="mb-2.5 text-xs leading-snug text-muted bk-mid:hidden">
                   {tour.departure === "dates" ||
                   (tour.departure === "weekly" && tour.departureDays?.length)
                     ? tr(FIXED_NOTE, lang)
                     : t.departureNote}
                 </p>
                 {/* Lưới đều nhau: thứ (nhỏ, nhạt) trên — ngày theo ngôn ngữ (en 11/14/2026 · vi 14/11/2026 · zh 2026年11月14日, đậm) dưới; số cột chia hết số ngày → không lẻ ô.
-                    Màn hình thấp: thứ + ngày cùng 1 dòng, ô thấp hơn */}
+                    Mức compact: thứ + ngày cùng 1 dòng, ô thấp hơn */}
                 <div
                   className={cn(
-                    "grid gap-2 shorter:gap-1.5",
+                    "grid gap-2 bk-compact:gap-1.5",
                     departures.length % 3 && departures.length % 2 === 0
                       ? "grid-cols-2"
                       : "grid-cols-3",
@@ -386,7 +438,7 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                         title={fmtDate(d)}
                         onClick={() => pickDate(d)}
                         className={cn(
-                          "flex h-12 flex-col items-center justify-center rounded-xl border leading-tight transition focus-visible:ring-4 focus-visible:ring-brand-500/20 focus-visible:outline-none mid:h-11 shorter:h-8 shorter:flex-row shorter:gap-1 shorter:rounded-lg",
+                          "flex h-12 flex-col items-center justify-center rounded-xl border leading-tight transition focus-visible:ring-4 focus-visible:ring-brand-500/20 focus-visible:outline-none bk-mid:h-11 bk-compact:h-8 bk-compact:flex-row bk-compact:gap-1 bk-compact:rounded-lg",
                           on
                             ? "border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/25"
                             : "border-border bg-white text-ink hover:border-brand-300 hover:bg-brand-50",
@@ -400,7 +452,7 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                         >
                           {weekdayShort(d, lang)}
                         </span>
-                        <span className="text-[0.8rem] font-bold tabular-nums shorter:text-[0.75rem]">
+                        <span className="text-[0.8rem] font-bold tabular-nums bk-compact:text-[0.75rem]">
                           {/* zh "2026年11月16日" quá dài cho ô nhỏ trên điện thoại → "11月16日" (đủ năm ở aria-label / title) */}
                           {lang === "zh" ? fmtDayMonth(d, lang) : fmtDateOnly(d, lang)}
                         </span>
@@ -411,23 +463,23 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
-              <Field label={c.adults} className="shorter:space-y-1">
+              <Field label={c.adults} className="bk-compact:space-y-1">
                 <Counter
                   value={adults}
                   min={1}
                   max={60}
                   onChange={setAdults}
                   label={c.adults}
-                  className="mid:h-11 shorter:h-10"
+                  className="bk-mid:h-11 bk-compact:h-10"
                 />
               </Field>
-              <Field label={c.children} className="shorter:space-y-1">
+              <Field label={c.children} className="bk-compact:space-y-1">
                 <Counter
                   value={ages.length}
                   max={10}
                   onChange={setChildren}
                   label={c.children}
-                  className="mid:h-11 shorter:h-10"
+                  className="bk-mid:h-11 bk-compact:h-10"
                 />
               </Field>
             </div>
@@ -441,7 +493,7 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                       aria-pressed={cls === k}
                       onClick={() => setHotelClass(k)}
                       className={cn(
-                        "h-10 rounded-lg border text-sm font-semibold transition shorter:h-9",
+                        "h-10 rounded-lg border text-sm font-semibold transition bk-compact:h-9",
                         cls === k
                           ? "border-brand-500 bg-brand-50 text-brand-700"
                           : "border-border text-ink hover:border-brand-300",
@@ -465,7 +517,7 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                         onChange={(e) =>
                           setAges((a) => a.map((x, j) => (j === i ? +e.target.value : x)))
                         }
-                        className="h-10 bg-[length:14px] bg-[right_8px_center] pr-6 pl-2.5 text-sm shorter:h-9 shorter:text-[0.8rem]"
+                        className="h-10 bg-[length:14px] bg-[right_8px_center] pr-6 pl-2.5 text-sm bk-compact:h-9 bk-compact:text-[0.8rem]"
                       >
                         {Array.from({ length: 18 }, (_, k) => k).map((k) => (
                           <option key={k} value={k}>
@@ -476,17 +528,17 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                     ))}
                   </div>
                 </Field>
-                {/* Chính sách trẻ em: màn hình thấp bỏ đi (giá từng bé đã hiện trong khung tạm tính) */}
-                <p className="text-xs text-muted shorter:hidden">
+                {/* Chính sách trẻ em: khung gọn bỏ đi (giá từng bé đã hiện trong khung tạm tính) */}
+                <p className="text-xs text-muted bk-mid:hidden">
                   {childRatesSummary(tour.pricing?.childRates, lang) || t.childPolicy}
                 </p>
               </div>
             )}
 
-            <div className="rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 mid:py-2.5 shorter:py-2">
+            <div className="rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 bk-mid:py-2.5 bk-compact:py-2">
               {estimate ? (
                 <>
-                  <div className="space-y-2 text-sm leading-snug text-muted mid:space-y-1.5 shorter:space-y-0.5 shorter:text-[0.8rem]">
+                  <div className="space-y-2 text-sm leading-snug text-muted bk-mid:space-y-1.5 bk-compact:space-y-0.5 bk-compact:text-[0.8rem]">
                     <p className="flex items-start justify-between gap-4">
                       <span className="min-w-0">
                         {pax(adults, c.adult, c.adults)} × {formatUSD(unit)}
@@ -514,25 +566,25 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                       </p>
                     ))}
                   </div>
-                  <p className="mt-3 flex items-end justify-between gap-4 border-t border-brand-100 pt-3 mid:mt-2.5 mid:pt-2.5 shorter:mt-2 shorter:pt-2">
+                  <p className="mt-3 flex items-end justify-between gap-4 border-t border-brand-100 pt-3 bk-mid:mt-2.5 bk-mid:pt-2.5 bk-compact:mt-2 bk-compact:pt-2">
                     <span className="flex items-center gap-1.5 font-semibold text-ink">
                       {t.estimate}
-                      {/* Màn hình thấp: lời lưu ý thu vào biểu tượng (i) — rê chuột / chạm để xem */}
+                      {/* Khung gọn (mid / compact): lời lưu ý thu vào biểu tượng (i) — rê chuột / chạm để xem */}
                       <span
                         role="img"
                         tabIndex={0}
                         title={t.estimateNote}
                         aria-label={t.estimateNote}
-                        className="hidden cursor-help rounded-full text-muted outline-none hover:text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-400 shorter:inline-flex"
+                        className="hidden cursor-help rounded-full text-muted outline-none hover:text-brand-600 focus-visible:ring-2 focus-visible:ring-brand-400 bk-mid:inline-flex"
                       >
                         <Info className="size-3.5" />
                       </span>
                     </span>
-                    <span className="text-2xl font-extrabold whitespace-nowrap text-sun-500 tabular-nums shorter:text-xl shorter:leading-none">
+                    <span className="text-2xl font-extrabold whitespace-nowrap text-sun-500 tabular-nums bk-compact:text-xl bk-compact:leading-none">
                       {formatUSD(estimate.total)}
                     </span>
                   </p>
-                  <p className="mt-1.5 flex gap-1.5 text-[0.7rem] leading-snug text-muted shorter:hidden">
+                  <p className="mt-1.5 flex gap-1.5 text-[0.7rem] leading-snug text-muted bk-mid:hidden">
                     <Info className="mt-0.5 size-3.5 shrink-0" /> {t.estimateNote}
                   </p>
                 </>
@@ -544,13 +596,13 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
         ) : (
           <>
             {/* Nút quay lại + tóm tắt lựa chọn gộp thành một hàng */}
-            <div className="flex items-center gap-2 rounded-lg bg-surface py-1.5 pr-3 pl-1.5 text-sm shorter:py-1 shorter:text-[0.8rem]">
+            <div className="flex items-center gap-2 rounded-lg bg-surface py-1.5 pr-3 pl-1.5 text-sm bk-compact:py-1 bk-compact:text-[0.8rem]">
               <button
                 type="button"
                 onClick={() => setStep(0)}
                 aria-label={c.back}
                 title={c.back}
-                className="grid size-8 shrink-0 place-items-center rounded-md bg-white text-muted shadow-sm ring-1 ring-border hover:text-ink shorter:size-7"
+                className="grid size-8 shrink-0 place-items-center rounded-md bg-white text-muted shadow-sm ring-1 ring-border hover:text-ink bk-compact:size-7"
               >
                 <ArrowLeft className="size-4" />
               </button>
@@ -624,12 +676,12 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
               <Textarea
                 id="bk-notes"
                 rows={3}
-                className="h-24 min-h-0 resize-none py-2.5 mid:h-20 shorter:h-12 shorter:py-2"
+                className="h-24 min-h-0 resize-none py-2.5 bk-mid:h-20 bk-compact:h-12 bk-compact:py-2"
                 value={contact.notes}
                 onChange={(e) => setContact({ ...contact, notes: e.target.value })}
               />
             </Field>
-            <p className="flex gap-2 text-xs leading-snug text-muted mid:text-[0.7rem]">
+            <p className="flex gap-2 text-xs leading-snug text-muted bk-mid:text-[0.7rem]">
               <ShieldCheck className="size-4 shrink-0 text-brand-500" />{" "}
               {payOnline
                 ? payment.depositPercent < 100
@@ -647,21 +699,21 @@ export default function BookingWidget({ lang, tour, t, c, payment, smallGroup })
                 if (v) setErrs(dropConsentError);
               }}
               error={errs.consent}
-              className="mid:space-y-1 mid:[&>label]:gap-2.5 mid:[&>label]:px-3 mid:[&>label]:py-2 mid:[&>label]:text-xs shorter:[&>label]:py-1.5 mid:[&>p]:text-[0.7rem] mid:[&>p]:leading-tight"
+              className="bk-mid:space-y-1 bk-mid:[&>label]:gap-2.5 bk-mid:[&>label]:px-3 bk-mid:[&>label]:py-2 bk-mid:[&>label]:text-xs bk-compact:[&>label]:py-1.5 bk-mid:[&>p]:text-[0.7rem] bk-mid:[&>p]:leading-tight"
             />
           </>
         )}
       </div>
 
       {/* Đáy khung (không cuộn): captcha khi cần + 1 dòng lỗi chung gọn + nút đặt */}
-      <div className="shrink-0 space-y-2 pt-4 mid:pt-3 shorter:space-y-1.5 shorter:pt-2.5">
+      <div className="shrink-0 space-y-2 pt-4 bk-mid:pt-3 bk-compact:space-y-1.5 bk-compact:pt-2.5">
         <Honeypot />
         <InlineError show={!!error} text={error} />
         <InlineError show={status === "error"} text={sendError || c.errorGeneric} />
         <button
           type="submit"
           disabled={status === "sending"}
-          className="flex h-12 w-full items-center justify-center rounded-md bg-sun-500 text-base font-semibold text-white shadow-md shadow-sun-500/25 transition hover:bg-sun-600 disabled:opacity-60 mid:h-11 shorter:h-10"
+          className="flex h-12 w-full items-center justify-center rounded-md bg-sun-500 text-base font-semibold text-white shadow-md shadow-sun-500/25 transition hover:bg-sun-600 disabled:opacity-60 bk-mid:h-11 bk-compact:h-10"
         >
           {step === 0 ? t.continue : status === "sending" ? c.sending : t.sendBooking}
         </button>
