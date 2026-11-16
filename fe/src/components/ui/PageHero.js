@@ -10,6 +10,7 @@ import Container from "./Container";
  * - subtitle: dòng phụ (ngắn) hoặc đoạn giới thiệu.
  * - compact: tiêu đề dài (bài viết) → chữ nhỏ hơn, không nét cọ.
  * - children: thông tin thêm dưới tiêu đề (meta bài viết, nút…).
+ * - credit: ghi công tác giả ảnh { label, text, href? } → nhãn nhỏ mờ ở góc dưới bên phải ảnh.
  */
 export function BrushHero({
   title,
@@ -20,6 +21,7 @@ export function BrushHero({
   baseUrl,
   compact,
   children,
+  credit,
 }) {
   const list = [...new Set(images.filter(Boolean))].slice(0, 3);
   const n = list.length;
@@ -70,7 +72,34 @@ export function BrushHero({
           </Button>
         )}
       </Container>
+      {credit?.text && n > 0 && <PhotoCredit {...credit} />}
     </section>
+  );
+}
+
+/** Ghi công tác giả ảnh hero: nhãn nhỏ, nền tối mờ, góc dưới bên phải (không đè tiêu đề / breadcrumb) */
+function PhotoCredit({ label, text, href }) {
+  const body = (
+    <>
+      {label}: {text}
+    </>
+  );
+  const cls =
+    "absolute right-2 bottom-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-full bg-black/45 px-2.5 py-0.5 text-[10px] leading-4 text-white/80 backdrop-blur-sm sm:right-4 sm:bottom-3 sm:max-w-md sm:text-[11px]";
+  return href ? (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      title={`${label}: ${text}`}
+      className={cn(cls, "transition hover:bg-black/65 hover:text-white")}
+    >
+      {body}
+    </a>
+  ) : (
+    <p className={cls} title={`${label}: ${text}`}>
+      {body}
+    </p>
   );
 }
 

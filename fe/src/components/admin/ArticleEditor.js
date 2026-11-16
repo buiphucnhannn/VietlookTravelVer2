@@ -62,6 +62,8 @@ const empty = () => ({
   excerpt: loc(),
   body: loc(),
   image: "",
+  imageCredit: "",
+  imageCreditUrl: "",
   category: "",
   author: "vietlook-team",
   destination: "",
@@ -84,6 +86,8 @@ const fromDoc = (doc) => {
     excerpt: { ...base.excerpt, ...doc.excerpt },
     body: { ...base.body, ...doc.body },
     image: doc.image ?? "",
+    imageCredit: doc.imageCredit ?? "",
+    imageCreditUrl: doc.imageCreditUrl ?? "",
     category: doc.category ?? "",
     author: doc.author ?? "",
     destination: doc.destination ?? "",
@@ -101,6 +105,8 @@ const toPayload = (d) => ({
   excerpt: d.excerpt,
   body: d.body,
   image: d.image,
+  imageCredit: d.imageCredit.trim(),
+  imageCreditUrl: d.imageCreditUrl.trim(),
   category: d.category,
   author: d.author,
   destination: d.destination,
@@ -192,6 +198,8 @@ function EditorForm({ initial, back }) {
     if (!anyLang(d.title)) errs.title = "Nhập tiêu đề ở ít nhất một ngôn ngữ";
     if (d.publishedAt && !isISODate(d.publishedAt))
       errs.publishedAt = "Ngày đăng không hợp lệ (định dạng dd/mm/yyyy)";
+    if (d.imageCreditUrl.trim() && !/^https:\/\/\S+$/i.test(d.imageCreditUrl.trim()))
+      errs.imageCreditUrl = "Link nguồn ảnh phải bắt đầu bằng https://";
     // ảnh vừa chọn (ảnh bìa, ảnh chèn trong bài) chỉ được lưu vào kho ảnh lúc này — trước khi dịch,
     // để bản dịch dùng đúng link ảnh đã lưu
     const base = errs.title ? d : await images.prepare(d);
@@ -329,17 +337,43 @@ function EditorForm({ initial, back }) {
             actions={langBar}
           >
             <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-              <Field
-                label="Ảnh bìa"
-                hint="Ảnh ngang, tối thiểu 1200px. Phủ ngang đầu bài (chỉ hiện phần giữa ảnh) và hiện ở thẻ bài viết."
-              >
-                <ImageField
-                  value={d.image}
-                  onChange={(image) => set({ image })}
-                  folder="articles"
-                  crop={{ width: 1920 }}
-                />
-              </Field>
+              <div className="min-w-0 space-y-4">
+                <Field
+                  label="Ảnh bìa"
+                  hint="Ảnh ngang, tối thiểu 1200px. Phủ ngang đầu bài (chỉ hiện phần giữa ảnh) và hiện ở thẻ bài viết."
+                >
+                  <ImageField
+                    value={d.image}
+                    onChange={(image) => set({ image })}
+                    folder="articles"
+                    crop={{ width: 1920 }}
+                  />
+                </Field>
+                <Field
+                  label="Nguồn ảnh bìa (ghi công tác giả)"
+                  hint="Không bắt buộc. Hiện nhỏ ở góc ảnh bìa, vd: Tên tác giả / Wikimedia Commons (CC BY-SA 4.0)"
+                >
+                  <Input
+                    value={d.imageCredit}
+                    onChange={(e) => set({ imageCredit: e.target.value })}
+                    maxLength={200}
+                    placeholder="Tên tác giả / Wikimedia Commons (CC BY-SA 4.0)"
+                  />
+                </Field>
+                <Field
+                  label="Link nguồn ảnh"
+                  hint="Không bắt buộc. Trang gốc của ảnh (bắt đầu bằng https://) — bấm vào dòng nguồn ảnh sẽ mở trang này."
+                  error={errors.imageCreditUrl}
+                >
+                  <Input
+                    value={d.imageCreditUrl}
+                    onChange={(e) => set({ imageCreditUrl: e.target.value })}
+                    aria-invalid={!!errors.imageCreditUrl}
+                    placeholder="https://commons.wikimedia.org/wiki/File:…"
+                    inputMode="url"
+                  />
+                </Field>
+              </div>
               <div className="min-w-0 space-y-5">
                 <Field label="Tiêu đề" required error={errors.title}>
                   <LocInput
@@ -425,6 +459,7 @@ function EditorForm({ initial, back }) {
               </Field>
               <Field label="Nội dung bài viết">
                 <RichText
+                  lang={lang}
                   value={d.body[lang]}
                   onChange={(html) => setD((x) => ({ ...x, body: { ...x.body, [lang]: html } }))}
                   folder="articles"

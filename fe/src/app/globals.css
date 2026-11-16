@@ -195,6 +195,111 @@ input::-webkit-contacts-auto-fill-button {
 .admin-prose hr {
   border-color: #e3e8ec;
 }
+/* Nguồn ảnh (ghi công tác giả) dưới ô chú thích — giống website (theme.css .prose-guide .photo-credit) —
+   kèm nút "Sửa nguồn ảnh" / "+ Thêm nguồn ảnh". Ảnh chưa có nguồn: nút chỉ hiện khi rê chuột / chọn ảnh. */
+.admin-prose .rt-img-credit-row {
+  contain: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8a99a8;
+  text-align: center;
+}
+.admin-prose .rt-img-credit-btn {
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-brand-600);
+  cursor: pointer;
+}
+.admin-prose .rt-img-credit-btn:hover {
+  background: var(--color-brand-50);
+}
+.admin-prose .rt-img-credit-row:not(.has-credit) .rt-img-credit-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.admin-prose
+  .rt-img:is(:hover, :focus-within, .ProseMirror-selectednode)
+  .rt-img-credit-row
+  .rt-img-credit-btn,
+.admin-prose .rt-img-credit-btn:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .admin-prose .rt-img-credit-row .rt-img-credit-btn {
+    opacity: 1;
+  }
+}
+.admin-prose .rt-img-credit a {
+  color: inherit;
+  text-decoration: none;
+}
+.admin-prose .rt-img-credit a:hover {
+  color: #5b6b77;
+  text-decoration: underline;
+}
+/* Bảng — cùng kiểu với website (theme.css .prose-guide table). .tableWrapper = khung TipTap (cuộn ngang). */
+.admin-prose .tableWrapper {
+  margin: 1em 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e3e8ec;
+  border-radius: 10px;
+}
+.admin-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.admin-prose :is(th, td) {
+  position: relative;
+  min-width: 6.5rem;
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #e3e8ec;
+}
+.admin-prose :is(th, td) + :is(th, td) {
+  border-left: 1px dashed #edf1f4; /* chỉ trong CMS: thấy rõ ranh giới cột khi soạn */
+}
+.admin-prose th {
+  font-weight: 600;
+  color: #22323d;
+  background: color-mix(in srgb, var(--color-brand-50) 60%, white);
+}
+.admin-prose tr:first-child > th {
+  background: var(--color-brand-50);
+  color: var(--color-brand-900);
+  border-bottom: 2px solid var(--color-brand-100);
+}
+.admin-prose tr:nth-child(odd):not(:first-child) > td {
+  background: color-mix(in srgb, #f4f6f8 65%, white);
+}
+.admin-prose tr:last-child > :is(th, td) {
+  border-bottom: 0;
+}
+.admin-prose :is(th, td) > * {
+  margin: 0;
+}
+.admin-prose :is(th, td) > * + * {
+  margin-top: 0.5em;
+}
+/* ô đang được chọn (kéo chọn nhiều ô) */
+.admin-prose .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(23 128 193 / 0.12);
+  pointer-events: none;
+}
 .admin-prose p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: #94a3b8;

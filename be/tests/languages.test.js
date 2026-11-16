@@ -68,3 +68,40 @@ describe("nội dung nhiều ngôn ngữ: chỉ cần 1 ngôn ngữ bất kỳ",
     assert.equal(slugify("Đà Nẵng – Hội An 3 ngày"), "da-nang-hoi-an-3-ngay");
   });
 });
+
+describe("bài viết: ghi công ảnh bìa, bảng, ghi công ảnh trong chú thích", () => {
+  const base = { slug: "bai-viet", title: name({ en: "Guide" }) };
+
+  it("nhận nguồn ảnh bìa (≤ 200 ký tự) + link https; mặc định để trống", () => {
+    const ok = articleSchema.safeParse({
+      ...base,
+      imageCredit: "  InterEdit88 / Wikimedia Commons (CC0) ",
+      imageCreditUrl: "https://commons.wikimedia.org/wiki/File:Ha_Long.jpg",
+    });
+    assert.equal(ok.success, true);
+    assert.equal(ok.data.imageCredit, "InterEdit88 / Wikimedia Commons (CC0)");
+    const empty = articleSchema.parse(base);
+    assert.equal(empty.imageCredit, "");
+    assert.equal(empty.imageCreditUrl, "");
+  });
+
+  it("từ chối nguồn ảnh quá dài và link không phải https", () => {
+    assert.equal(articleSchema.safeParse({ ...base, imageCredit: "a".repeat(201) }).success, false);
+    for (const imageCreditUrl of ["http://x.com/a", "javascript:alert(1)", "commons.wikimedia.org"])
+      assert.equal(articleSchema.safeParse({ ...base, imageCreditUrl }).success, false);
+  });
+
+  it("lọc HTML giữ bảng (thead/th) và dòng ghi công ảnh có link", () => {
+    const html =
+      "<table><thead><tr><th></th><th>Hanoi</th></tr></thead><tbody><tr><td>Jan</td><td>17°C</td></tr></tbody></table>" +
+      '<figure><img src="https://res.cloudinary.com/demo/image/upload/v1/a.jpg" alt="x"><figcaption>Bay. ' +
+      '<span class="photo-credit">Photo: <a href="https://commons.wikimedia.org/wiki/User:A" target="_blank">A</a>' +
+      " / Wikimedia Commons</span></figcaption></figure>";
+    const body = prepareArticle(articleSchema.parse({ ...base, body: { en: html } })).body.en;
+    assert.match(body, /<table><thead><tr><th><\/th><th>Hanoi<\/th><\/tr><\/thead><tbody>/);
+    assert.match(
+      body,
+      /<span class="photo-credit">Photo: <a href="https:\/\/commons\.wikimedia\.org\/wiki\/User:A" target="_blank" rel="noopener noreferrer nofollow">A<\/a> \/ Wikimedia Commons<\/span>/,
+    );
+  });
+});

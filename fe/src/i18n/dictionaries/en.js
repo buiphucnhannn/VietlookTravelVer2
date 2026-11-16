@@ -985,6 +985,7 @@ const en = {
     toc: "In this article",
     author: "Author",
     aboutAuthor: "About the author",
+    photoCredit: "Photo",
     articles: "articles",
     noResults: "No articles found.",
     loadMore: "Load more articles",

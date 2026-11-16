@@ -991,6 +991,7 @@ const vi = {
     toc: "Trong bài viết này",
     author: "Tác giả",
     aboutAuthor: "Về tác giả",
+    photoCredit: "Ảnh",
     articles: "bài viết",
     noResults: "Không tìm thấy bài viết nào.",
     loadMore: "Xem thêm bài viết",

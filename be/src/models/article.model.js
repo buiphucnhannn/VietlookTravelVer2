@@ -10,6 +10,9 @@ const articleSchema = new Schema(
     excerpt: { type: localizedString(), default: () => ({}) },
     body: { type: localizedString(), default: () => ({}) },
     image: { type: String, default: "" },
+    // ghi công tác giả ảnh bìa (vd "Tên tác giả / Wikimedia Commons (CC BY-SA 4.0)") + link trang nguồn (https)
+    imageCredit: { type: String, default: "", maxlength: 200 },
+    imageCreditUrl: { type: String, default: "" },
     category: { type: String, default: "", index: true }, // slug chuyên mục
     author: { type: String, default: "vietlook-team", index: true }, // slug tác giả
     destination: { type: String, default: "" }, // slug điểm đến liên quan (bài viết liên quan)

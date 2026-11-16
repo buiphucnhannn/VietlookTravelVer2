@@ -443,6 +443,7 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
         {/* key theo ngôn ngữ: mỗi ngôn ngữ có lời nhắc riêng khi còn trống */}
         <RichText
           key={lang}
+          lang={lang}
           value={d.body[lang]}
           onChange={(html) => set({ body: { ...d.body, [lang]: html } })}
           folder="pages"

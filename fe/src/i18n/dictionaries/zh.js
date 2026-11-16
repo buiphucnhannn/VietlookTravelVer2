@@ -817,6 +817,7 @@ const zh = {
     toc: "本文目录",
     author: "作者",
     aboutAuthor: "关于作者",
+    photoCredit: "图片",
     articles: "篇文章",
     noResults: "没有找到文章。",
     loadMore: "加载更多文章",

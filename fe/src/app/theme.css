@@ -336,6 +336,90 @@ body {
       font-size: 0.875rem;
     }
   }
+  /* Ghi công tác giả ảnh trong chú thích: <span class="photo-credit">Photo: <a>Tác giả</a> / …</span> —
+     dòng riêng dưới mô tả, chữ nhỏ hơn, mờ hơn; link kín đáo (gạch chân khi rê chuột). */
+  .prose-guide .photo-credit {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: color-mix(in srgb, var(--color-muted) 80%, white);
+  }
+  .prose-guide .photo-credit a {
+    font-weight: inherit;
+    color: inherit;
+    text-decoration: none;
+  }
+  .prose-guide .photo-credit a:hover {
+    color: var(--color-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  @media (min-width: 40rem) {
+    .prose-guide .photo-credit {
+      font-size: 0.75rem;
+    }
+  }
+  /* Bảng (so sánh, giá, thời tiết…): khung bo góc viền nhạt, hàng tiêu đề nền xanh nhạt, đường kẻ giữa các hàng,
+     hàng chẵn nền xám rất nhạt. Bảng rộng hơn màn hình → cuộn ngang trong khung .table-wrap (trang bài viết
+     tự bọc bảng, xem travel-guide/[slug]/page.js), không làm vỡ bề ngang trang. Bảng chưa được bọc: tự cuộn. */
+  .prose-guide .table-wrap,
+  .prose-guide > table {
+    margin: 1.75rem 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+  }
+  .prose-guide > table {
+    display: block;
+  }
+  .prose-guide table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  .prose-guide :is(th, td) {
+    min-width: 6.5rem;
+    padding: 0.625rem 0.875rem;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .prose-guide th {
+    font-weight: 600;
+    color: var(--color-ink);
+    background: color-mix(in srgb, var(--color-brand-50) 60%, white);
+  }
+  .prose-guide thead th {
+    background: var(--color-brand-50);
+    color: var(--color-brand-900);
+    border-bottom: 2px solid var(--color-brand-100);
+    vertical-align: bottom;
+  }
+  .prose-guide tbody tr:nth-child(even) > td {
+    background: color-mix(in srgb, var(--color-surface) 65%, white);
+  }
+  .prose-guide tbody tr:last-child > :is(th, td) {
+    border-bottom: 0;
+  }
+  .prose-guide :is(th, td) > :is(p, ul, ol) {
+    margin: 0;
+  }
+  .prose-guide :is(th, td) > * + * {
+    margin-top: 0.5em;
+  }
+  @media (min-width: 40rem) {
+    .prose-guide table {
+      font-size: 0.9375rem;
+    }
+    .prose-guide :is(th, td) {
+      padding: 0.75rem 1rem;
+    }
+  }
   /* bài cũ: ảnh có lớp alignleft / alignright nằm bên trái / phải chữ (màn hẹp: căn giữa như mọi ảnh) */
   @media (min-width: 40rem) {
     .prose-guide .alignleft {

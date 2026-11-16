@@ -293,6 +293,16 @@ export const articleSchema = z.object({
   excerpt: loc(1000),
   body: locHtml(),
   image: media.default(""),
+  // ghi công tác giả ảnh bìa (chữ thuần) + link trang nguồn ảnh (chỉ https, không bắt buộc)
+  imageCredit: str(200),
+  imageCreditUrl: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((v) => v === "" || /^https:\/\/[^\s"'<>]+$/i.test(v), {
+      message: "Link nguồn ảnh phải bắt đầu bằng https://",
+    })
+    .default(""),
   category: z.union([z.literal(""), slug]).default(""),
   author: z.union([z.literal(""), slug]).default("vietlook-team"),
   destination: z.union([z.literal(""), slug]).default(""),

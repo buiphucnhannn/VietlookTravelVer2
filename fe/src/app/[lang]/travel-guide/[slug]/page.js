@@ -47,6 +47,12 @@ export async function generateMetadata({ params }) {
   };
 }
 
+/** Bọc bảng trong khung cuộn ngang (.table-wrap, theme.css) → bảng rộng không làm vỡ bề ngang trang trên điện thoại */
+const withTableWrap = (html) =>
+  html
+    .replace(/<table\b/g, '<div class="table-wrap"><table')
+    .replace(/<\/table>/g, "</table></div>");
+
 /** Gắn id cho các thẻ h2 để làm mục lục. */
 function withAnchors(html) {
   const toc = [];
@@ -87,7 +93,7 @@ async function GuidePostPageContent({ params }) {
     : `${lp(lang)}/travel-guide`;
   const absUrl = (u) => (/^https?:\/\//.test(u) ? u : `${siteConfig.url}${u}`);
   const rawBody = tr(post.body, lang);
-  const { html, toc } = withAnchors(rawBody);
+  const { html, toc } = withAnchors(withTableWrap(rawBody));
   const untranslated = !post.body[lang]?.trim() && !!rawBody;
   const related = relatedPosts(post, 3);
   const dest = post.destination && getDestination(post.destination);
@@ -123,6 +129,13 @@ async function GuidePostPageContent({ params }) {
         compact
         title={title}
         images={post.image ? [post.image] : []}
+        credit={
+          post.imageCredit && {
+            label: g.photoCredit,
+            text: post.imageCredit,
+            href: /^https:\/\//i.test(post.imageCreditUrl ?? "") ? post.imageCreditUrl : undefined,
+          }
+        }
         baseUrl={siteConfig.url}
         breadcrumbs={[
           { label: g.title, href: `${lp(lang)}/travel-guide` },
