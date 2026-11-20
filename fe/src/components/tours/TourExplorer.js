@@ -16,6 +16,11 @@ import { cn, foldSearch } from "@/lib/utils";
 import { smoothScrollTo } from "@/components/fx/SmoothScroll";
 import { DURATION_BUCKETS, matchDuration } from "@/lib/tour-categories";
 import TourCard, { AuroraTourCard } from "./TourCard";
+import AdviceBox from "@/components/ui/AdviceBox";
+import { lp } from "@/i18n/config";
+
+// Lọc theo số ngày ~ 1 / 2 / 3 tuần → lời giới thiệu + lời mời thiết kế riêng tương ứng (dict.packages.best)
+const WEEK_OF = { "6-7": 1, "5-7": 1, "8-14": 2, "15+": 3 };
 
 // 2 hàng mỗi trang để lưới vừa khoảng một màn hình (4 cột thường / 3 cột kiểu Aurora)
 const PAGE_SIZE = { default: 8, aurora: 6 };
@@ -68,6 +73,8 @@ export default function TourExplorer({
   hide = [],
   badgeFor,
   variant,
+  advice,
+  weekCopy,
 }) {
   const router = useRouter();
   const a11y = useA11y();
@@ -86,6 +93,7 @@ export default function TourExplorer({
     sort: params.get("sort") || "popular",
     page: Math.max(1, Number(params.get("page")) || 1),
   };
+  const week = weekCopy?.[WEEK_OF[f.duration]] ?? null;
 
   const update = (patch) => {
     const next = new URLSearchParams(params.toString());
@@ -308,6 +316,15 @@ export default function TourExplorer({
         </label>
       </div>
 
+      {week && (
+        <div className="mt-6 rounded-2xl bg-white px-6 py-5 shadow-sm ring-1 ring-border sm:px-8">
+          <h2 className="text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
+            {week.title}
+          </h2>
+          <p className="mt-2 max-w-5xl leading-relaxed text-ink/75">{week.text}</p>
+        </div>
+      )}
+
       {shown.length > 0 ? (
         <div
           className={cn(
@@ -425,6 +442,21 @@ export default function TourExplorer({
             </form>
           )}
         </nav>
+      )}
+
+      {(week || advice) && (
+        <div className="mt-10">
+          <AdviceBox
+            {...(week
+              ? {
+                  title: week.ctaTitle,
+                  text: week.ctaText,
+                  cta: weekCopy.button,
+                  href: advice?.href ?? `${lp(lang)}/plan-your-trip`,
+                }
+              : advice)}
+          />
+        </div>
       )}
     </div>
   );

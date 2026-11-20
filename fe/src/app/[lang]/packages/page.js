@@ -17,7 +17,7 @@ import { fill, href, lp, tr } from "@/i18n/config";
 import { cn, formatUSD } from "@/lib/utils";
 import { pageMetadata } from "@/lib/seo";
 import { Button, Container, Reveal } from "@/components/ui";
-import { BrushHero } from "@/components/ui/PageHero";
+import { AdviceBox, BrushHero } from "@/components/ui/PageHero";
 import { getCatalog } from "@/lib/catalog";
 
 export async function generateMetadata({ params }) {
@@ -127,6 +127,11 @@ export default async function PackagesPage({ params }) {
           "/images/tours/v2/hoi-an-746921.jpg",
           "/images/tours/v2/mekong-delta-3180637.jpg",
         ]}
+        collage={[
+          "/images/tours/v2/hoi-an-746921.jpg",
+          "/images/tours/v2/ha-giang-14025581.jpg",
+          "/images/tours/v2/mekong-delta-3180637.jpg",
+        ]}
         breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: p.title }]}
       />
 
@@ -159,6 +164,7 @@ export default async function PackagesPage({ params }) {
       {/* Mỗi nhóm 1 / 2 / 3 tuần là một khối riêng (~1 màn hình), nền xen kẽ; xem đủ qua liên kết "See all" */}
       {weeks.map((w, wi) => {
         const list = packagesByWeeks(w.n).slice(0, 3);
+        const best = p.best[w.n];
         return (
           <section
             key={w.id}
@@ -185,16 +191,34 @@ export default async function PackagesPage({ params }) {
                     {fill(p.seeAllWeek, { n: w.n })} <ArrowRight className="size-4" />
                   </Link>
                 </div>
-                <div className="rail space-y-5 max-sm:space-y-0">
-                  {list.map((t) => (
-                    <PackageRow
-                      key={t.slug}
-                      tour={t}
-                      lang={lang}
-                      dict={dict}
-                      getDestination={getDestination}
+                <div className="min-w-0">
+                  {/* Lời giới thiệu "Lịch trình hay nhất cho tour N tuần" ngay trên danh sách */}
+                  <div className="mb-6">
+                    <p className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+                      {best.title}
+                    </p>
+                    <p className="mt-2 max-w-4xl leading-relaxed text-ink/75">{best.text}</p>
+                  </div>
+                  <div className="rail space-y-5 max-sm:space-y-0">
+                    {list.map((t) => (
+                      <PackageRow
+                        key={t.slug}
+                        tour={t}
+                        lang={lang}
+                        dict={dict}
+                        getDestination={getDestination}
+                      />
+                    ))}
+                  </div>
+                  {/* Chưa ưng tour nào → mời gửi yêu cầu thiết kế riêng đúng số tuần */}
+                  <div className="mt-8">
+                    <AdviceBox
+                      title={best.ctaTitle}
+                      text={best.ctaText}
+                      cta={p.ctaButton}
+                      href={`${lp(lang)}/plan-your-trip`}
                     />
-                  ))}
+                  </div>
                 </div>
               </div>
             </Container>

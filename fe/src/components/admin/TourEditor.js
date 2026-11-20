@@ -161,6 +161,16 @@ const MEALS = [
 ];
 const cleanMeals = (v) => MEALS.map((m) => m.value).filter((k) => arr(v).includes(k));
 
+/** Đi kèm trong ngày (dùng chung cho cả 3 ngôn ngữ) — website hiện thành cột "Đi kèm" của bảng lịch trình */
+const SUPPORT = [
+  { value: "", label: "— Chưa chọn —" },
+  { value: "guide-car", label: "Hướng dẫn viên + xe" },
+  { value: "driver", label: "Chỉ tài xế (không HDV)" },
+  { value: "guide", label: "Chỉ hướng dẫn viên" },
+  { value: "none", label: "Tự do (không ai đi kèm)" },
+];
+const cleanSupport = (v) => (SUPPORT.some((s) => s.value === v) ? v : "");
+
 const DEFAULT_CHILD_RATES = [
   { minAge: 0, maxAge: 4, percent: 0 },
   { minAge: 5, maxAge: 10, percent: 75 },
@@ -194,6 +204,7 @@ function normalizeLang(c = {}) {
       html: str(d?.html),
       meals: cleanMeals(d?.meals),
       overnight: str(d?.overnight),
+      support: cleanSupport(d?.support),
     })),
     included: strList(c.included),
     excluded: strList(c.excluded),
@@ -319,6 +330,7 @@ function cleanLang(c) {
         html: str(d.html),
         meals: cleanMeals(d.meals),
         overnight: str(d.overnight).trim(),
+        support: cleanSupport(d.support),
       })),
     included: cleanList(c.included),
     excluded: cleanList(c.excluded),
@@ -467,6 +479,7 @@ function translationSource(t, from) {
         html: "",
         meals: cleanMeals(d.meals),
         overnight: "",
+        support: cleanSupport(d.support),
       }));
       return [l, { ...c, itinerary: [...c.itinerary, ...extra] }];
     }),
@@ -591,8 +604,8 @@ export default function TourEditor({ id }) {
     setDirty(true);
   }, []);
 
-  /** Bữa ăn không phụ thuộc ngôn ngữ: ghi cùng giá trị vào ngày thứ i của cả 3 bản */
-  const setDayMeals = useCallback((i, meals) => {
+  /** Bữa ăn & đi kèm không phụ thuộc ngôn ngữ: ghi cùng giá trị vào ngày thứ i của cả 3 bản */
+  const setDayShared = useCallback((i, patch) => {
     setT((x) => ({
       ...x,
       content: Object.fromEntries(
@@ -601,7 +614,7 @@ export default function TourEditor({ id }) {
           if (i >= c.itinerary.length) return [l, c];
           return [
             l,
-            { ...c, itinerary: c.itinerary.map((d, k) => (k === i ? { ...d, meals } : d)) },
+            { ...c, itinerary: c.itinerary.map((d, k) => (k === i ? { ...d, ...patch } : d)) },
           ];
         }),
       ),
@@ -640,7 +653,7 @@ export default function TourEditor({ id }) {
       set={set}
       setSlug={setSlug}
       setContent={setContent}
-      setDayMeals={setDayMeals}
+      setDayShared={setDayShared}
       onTranslated={applyTranslation}
       savedSlug={savedSlug}
       savedActive={savedActive}
@@ -673,7 +686,7 @@ function EditorBody({
   set,
   setSlug,
   setContent,
-  setDayMeals,
+  setDayShared,
   onTranslated,
   savedSlug,
   savedActive,
@@ -909,7 +922,7 @@ function EditorBody({
             <ItinerarySection
               t={t}
               setContent={setContent}
-              setDayMeals={setDayMeals}
+              setDayShared={setDayShared}
               lang={lang}
               setLang={setLang}
               onTranslated={onTranslated}
@@ -1338,7 +1351,7 @@ const OverviewSection = memoOn(
  * ========================================================================= */
 
 const ItinerarySection = memoOn(
-  function ItinerarySection({ t, setContent, setDayMeals, lang, setLang, onTranslated }) {
+  function ItinerarySection({ t, setContent, setDayShared, lang, setLang, onTranslated }) {
     const setL = useCallback((patch) => setContent(lang, patch), [lang, setContent]);
     // bản ngôn ngữ khác có nhiều ngày nhất → dùng làm khung (số ngày, bữa ăn) cho bản đang soạn
     const ref = LANG_KEYS.filter((l) => l !== lang).sort(
@@ -1355,7 +1368,7 @@ const ItinerarySection = memoOn(
           key={`it-${lang}`}
           value={t.content[lang].itinerary}
           onChange={setL}
-          onMeals={setDayMeals}
+          onShared={setDayShared}
           enDays={t.content[ref].itinerary}
           refName={langLabel(ref)}
         />
@@ -2089,7 +2102,7 @@ function ItemTools({ i, onRemove, open, onToggle }) {
 const ItineraryEditor = memo(function ItineraryEditor({
   value,
   onChange,
-  onMeals,
+  onShared,
   enDays,
   refName,
 }) {
@@ -2114,6 +2127,7 @@ const ItineraryEditor = memo(function ItineraryEditor({
       // lấy sẵn bữa ăn của ngày tương ứng bên bản ngôn ngữ khác
       meals: cleanMeals(enDays?.[value.length]?.meals),
       overnight: "",
+      support: cleanSupport(enDays?.[value.length]?.support),
     };
     setOpen((s) => new Set(s).add(d._k));
     emit([...value, d]);
@@ -2144,6 +2158,7 @@ const ItineraryEditor = memo(function ItineraryEditor({
       html: "",
       meals: cleanMeals(d.meals),
       overnight: "",
+      support: cleanSupport(d.support),
     }));
     setOpen(new Set());
     emit(days);
@@ -2233,22 +2248,41 @@ const ItineraryEditor = memo(function ItineraryEditor({
                 />
                 <ItemTools i={i} onRemove={remove} open={isOpen} onToggle={() => toggle(d._k)} />
               </div>
+              {/* Thông tin nhanh của ngày → bảng "Lịch trình tóm tắt" trên website (Ngày · Lịch trình · Đi kèm ·
+                  Bữa ăn · Nghỉ đêm). Bữa ăn & Đi kèm dùng chung 3 ngôn ngữ; Nghỉ đêm viết theo từng ngôn ngữ */}
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-3 pb-2.5 sm:pl-12">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500">Bữa ăn</span>
                   <ChipSelect
                     options={MEALS}
                     value={d.meals}
-                    onChange={(meals) => onMeals(i, cleanMeals(meals))}
+                    onChange={(meals) => onShared(i, { meals: cleanMeals(meals) })}
                   />
                 </div>
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-xs font-semibold text-slate-500">Đi kèm</span>
+                  <Select
+                    value={d.support || ""}
+                    onChange={(e) => onShared(i, { support: cleanSupport(e.target.value) })}
+                    aria-label="Đi kèm trong ngày"
+                    className="w-auto min-w-[13.5rem]"
+                  >
+                    {SUPPORT.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
                 <div className="flex min-w-0 flex-1 basis-56 items-center gap-2">
-                  <span className="shrink-0 text-xs font-semibold text-slate-500">Nghỉ đêm</span>
+                  <span className="shrink-0 text-xs font-semibold text-slate-500">
+                    Nghỉ đêm tại
+                  </span>
                   <Input
                     value={d.overnight}
                     maxLength={200}
                     placeholder={enDay?.overnight || "VD: Hanoi"}
-                    aria-label="Nghỉ đêm"
+                    aria-label="Nghỉ đêm tại"
                     onChange={(e) => setDay(i, { overnight: e.target.value })}
                     className="min-w-0 flex-1"
                   />

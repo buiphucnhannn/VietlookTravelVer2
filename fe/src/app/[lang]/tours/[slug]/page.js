@@ -2,15 +2,22 @@ import { Suspense } from "react";
 import PageSkeleton from "@/components/ui/PageSkeleton";
 import { notFound } from "next/navigation";
 import {
+  Accessibility,
   BedDouble,
+  CarFront,
   Check,
   Clock,
+  Coffee,
+  Compass,
+  Ear,
+  Flag,
   Headphones,
   MapPin,
   MessageCircle,
   Plane,
+  Soup,
   UserRound,
-  Utensils,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -27,7 +34,7 @@ import TourCard from "@/components/tours/TourCard";
 import TourGallery from "@/components/tours/TourGallery";
 import StickyTabs from "@/components/tours/StickyTabs";
 import BookingWidget from "@/components/tours/BookingWidget";
-import StickySide from "@/components/ui/StickySide";
+import TourSide from "@/components/tours/TourSide";
 import { PriceTables, PricingGrid, hasStructuredPricing } from "@/components/tours/PriceTable";
 import MobileBookBar from "@/components/tours/MobileBookBar";
 import VideoEmbed from "@/components/ui/VideoEmbed";
@@ -141,6 +148,184 @@ const weekdayName = (n, lang) =>
     new Date(Date.UTC(2024, 0, 7 + n)),
   );
 
+// Bảng "Tóm tắt lịch trình": biểu tượng cho bữa ăn & người đi kèm (nhãn chữ lấy từ từ điển / TOUR_L)
+const MEAL_ICON = { B: Coffee, L: UtensilsCrossed, D: Soup };
+const SUPPORT_ICON = { "guide-car": Flag, driver: CarFront, guide: UserRound, none: Compass };
+/** Tiêu đề ngày kiểu cũ "Đồng Văn (B, L, D)" / "(ĂN SÁNG, TRƯA, TỐI)" / "（含早、午、晚餐）": đã có cột / nhãn
+ *  bữa ăn → bỏ phần ghi bữa ăn lặp lại ở cuối (chỉ khi ngày đó có nhập bữa ăn, để không mất thông tin) */
+const MEAL_SUFFIX = [
+  /\s*\((?:\s*[BLD]\s*[,/&]?)+\)\s*$/,
+  /\s*\(\s*(?:ăn\s*)?(?:(?:sáng|trưa|chiều|tối)\s*[,/&-]?\s*)+\)\s*$/iu,
+  /\s*[（(]\s*含?\s*[早午晚餐、,，及和\s]+[）)]\s*$/u,
+];
+const stripMealCodes = (title, meals) =>
+  meals?.length ? MEAL_SUFFIX.reduce((s, re) => s.replace(re, ""), title) : title;
+
+const dayTag =
+  "inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 ring-1 ring-border/70";
+function SupportIcon({ support }) {
+  const Icon = SUPPORT_ICON[support];
+  return Icon ? <Icon className="size-3.5 shrink-0 text-brand-600" aria-hidden /> : null;
+}
+
+/** Bữa ăn dạng chữ có biểu tượng nhỏ: "☕ Breakfast  🍴 Lunch" */
+function MealList({ meals, lang, className }) {
+  return (
+    <span className={cn("flex flex-wrap gap-x-3 gap-y-1", className)}>
+      {meals.map((m) => {
+        const Icon = MEAL_ICON[m];
+        return (
+          <span key={m} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <Icon className="size-3.5 shrink-0 text-brand-600" aria-hidden />
+            {tr(TOUR_L[m], lang)}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/**
+ * Bảng tóm tắt lịch trình (Ngày | Lịch trình | Đi kèm | Bữa ăn | Nghỉ đêm) ở đầu mục Lịch trình.
+ * Cột nào không ngày nào có dữ liệu → ẩn cả cột. Khung hẹp (điện thoại, cột trái màn hình vừa) → các dòng
+ * xếp chồng gọn; chỉ đổi thành bảng khi CHÍNH khung đủ rộng (container query), không theo bề rộng màn hình.
+ */
+function ItineraryGlance({ days, lang, t, c }) {
+  const has = {
+    support: days.some((d) => d.support),
+    meals: days.some((d) => d.meals?.length),
+    stay: days.some((d) => d.overnight),
+  };
+  const cols = 2 + has.support + has.meals + has.stay;
+  const dayLabel = (d) => (lang === "zh" ? `第${d.day}天` : `${c.day} ${d.day}`);
+  const supportLabel = (d) => (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      <SupportIcon support={d.support} />
+      {t.support[d.support]}
+    </span>
+  );
+  const empty = <span className="text-muted/70">—</span>;
+  const dayChip =
+    "grid h-6 w-[4.5rem] shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold whitespace-nowrap text-brand-700 capitalize tabular-nums";
+  return (
+    <div className="@container">
+      {/* Bảng (khung đủ rộng) */}
+      <table
+        className={cn(
+          "hidden w-full border-separate border-spacing-0 overflow-hidden rounded-xl text-left text-sm ring-1 ring-border",
+          cols >= 5 ? "@2xl:table" : "@xl:table",
+        )}
+      >
+        <thead>
+          <tr className="bg-surface text-xs font-bold tracking-wide whitespace-nowrap text-brand-700 uppercase">
+            <th scope="col" className="w-[6.25rem] px-4 py-3">
+              {t.colDay}
+            </th>
+            <th scope="col" className="px-3 py-3">
+              {t.colItinerary}
+            </th>
+            {has.support && (
+              <th scope="col" className="px-3 py-3">
+                {t.colSupport}
+              </th>
+            )}
+            {has.meals && (
+              <th scope="col" className="px-3 py-3">
+                {t.colMeals}
+              </th>
+            )}
+            {has.stay && (
+              <th scope="col" className="px-3 py-3 pr-4">
+                {t.colStay}
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((d, i) => (
+            <tr key={i} className="align-top [&>*]:border-t [&>*]:border-border">
+              <td className="px-4 py-3">
+                <span className={dayChip}>{dayLabel(d)}</span>
+              </td>
+              <th scope="row" className="px-3 py-3 leading-snug font-semibold text-ink">
+                {stripMealCodes(d.title, d.meals) || empty}
+              </th>
+              {has.support && (
+                <td className="px-3 py-3 text-ink/85">{d.support ? supportLabel(d) : empty}</td>
+              )}
+              {has.meals && (
+                <td className="px-3 py-3 text-ink/85">
+                  {d.meals?.length ? <MealList meals={d.meals} lang={lang} /> : empty}
+                </td>
+              )}
+              {has.stay && (
+                <td className="min-w-[8.5rem] px-3 py-3 pr-4 text-ink/85">
+                  {d.overnight ? (
+                    <span className="inline-flex items-start gap-1.5">
+                      <BedDouble className="mt-0.5 size-3.5 shrink-0 text-brand-600" aria-hidden />
+                      {d.overnight}
+                    </span>
+                  ) : (
+                    empty
+                  )}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* Dòng xếp chồng (khung hẹp) — chỉ hiện mục có dữ liệu */}
+      <ol
+        className={cn(
+          "divide-y divide-border overflow-hidden rounded-xl ring-1 ring-border",
+          cols >= 5 ? "@2xl:hidden" : "@xl:hidden",
+        )}
+      >
+        {days.map((d, i) => (
+          <li key={i} className="flex items-start gap-3 px-3.5 py-3">
+            <span className={cn(dayChip, "mt-0.5")}>{dayLabel(d)}</span>
+            <div className="min-w-0 flex-1">
+              <p className="leading-snug font-semibold text-ink">
+                {stripMealCodes(d.title, d.meals)}
+              </p>
+              {(d.support || d.meals?.length > 0 || d.overnight) && (
+                <dl className="mt-1.5 space-y-1 text-[0.85rem] text-ink/80">
+                  {d.support && (
+                    <div className="flex gap-1.5">
+                      <dt className="sr-only">{t.colSupport}</dt>
+                      <dd>{supportLabel(d)}</dd>
+                    </div>
+                  )}
+                  {d.meals?.length > 0 && (
+                    <div className="flex gap-1.5">
+                      <dt className="sr-only">{t.colMeals}</dt>
+                      <dd>
+                        <MealList meals={d.meals} lang={lang} />
+                      </dd>
+                    </div>
+                  )}
+                  {d.overnight && (
+                    <div className="flex gap-1.5">
+                      <dt className="sr-only">{t.colStay}</dt>
+                      <dd className="inline-flex items-start gap-1.5">
+                        <BedDouble
+                          className="mt-0.5 size-3.5 shrink-0 text-brand-600"
+                          aria-hidden
+                        />
+                        {d.overnight}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 async function TourPageContent({ params }) {
   const { getDestination, getTheme, relatedTours, toCard } = await getCatalog();
   const { lang, slug } = await params;
@@ -213,6 +398,10 @@ async function TourPageContent({ params }) {
           .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
           .map((n) => weekdayName(n, lang))
       : [];
+
+  // Bảng tóm tắt chỉ khi ít nhất 1 ngày có bữa ăn / nghỉ đêm / đi kèm (tour cũ chưa nhập → chỉ hiện danh sách ngày)
+  const showGlance = tx.itinerary.some((d) => d.meals?.length || d.overnight || d.support);
+  const ax = dict.access;
 
   const related = relatedTours(tour, 4).map((x) => toCard(x, lang));
   const labels = cardLabels(dict);
@@ -321,6 +510,22 @@ async function TourPageContent({ params }) {
               </div>
             ))}
           </div>
+          {/* Du lịch không rào cản: dòng nhấn gọn trên MỌI tour (hỗ trợ theo yêu cầu, ghi chú khi đặt tour) */}
+          <p className="mt-6 flex items-center gap-3 rounded-xl bg-brand-50/70 px-4 py-2.5 text-sm ring-1 ring-brand-100">
+            <span className="flex shrink-0 items-center gap-1 text-brand-600" aria-hidden>
+              <Accessibility className="size-5" />
+              <Ear className="size-4" />
+            </span>
+            <span className="min-w-0 leading-snug">
+              <span className="font-semibold text-ink">{ax.badge}</span>
+              <a
+                href="#book"
+                className="ml-2 inline-block font-semibold whitespace-nowrap text-brand-600 hover:text-sun-500 hover:underline"
+              >
+                {ax.cta} →
+              </a>
+            </span>
+          </p>
           {destNames.length > 0 && (
             /* Dòng điểm đến căn giữa theo chiều ngang của cột trái */
             <p className="mt-7 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted">
@@ -469,6 +674,13 @@ async function TourPageContent({ params }) {
 
             {tx.itinerary.length > 0 && (
               <Card id="itinerary" eyebrow={t.yourJourney} title={t.itinerary}>
+                {showGlance && (
+                  <>
+                    <h3 className="mb-3 text-lg font-bold text-ink">{t.glanceTitle}</h3>
+                    <ItineraryGlance days={tx.itinerary} lang={lang} t={t} c={c} />
+                    <h3 className="mt-8 mb-3 text-lg font-bold text-ink">{t.dayDetails}</h3>
+                  </>
+                )}
                 <div className="space-y-3">
                   {tx.itinerary.map((d, i) => (
                     <details
@@ -483,24 +695,30 @@ async function TourPageContent({ params }) {
                           <span className="-mt-2 text-lg leading-none font-bold">{d.day}</span>
                         </span>
                         <span className="flex-1">
-                          <span className="block font-semibold text-ink">{d.title}</span>
-                          {(d.meals?.length > 0 || d.overnight) && (
-                            <span className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
+                          <span className="block font-semibold text-ink">
+                            {stripMealCodes(d.title, d.meals)}
+                          </span>
+                          {/* Nhãn nhỏ: đi kèm · bữa ăn · nghỉ đêm (ngày nào có mới hiện) */}
+                          {(d.support || d.meals?.length > 0 || d.overnight) && (
+                            <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-ink/75">
+                              {d.support && (
+                                <span className={dayTag} title={t.colSupport}>
+                                  <SupportIcon support={d.support} />
+                                  {t.support[d.support]}
+                                </span>
+                              )}
                               {d.meals?.length > 0 && (
-                                <span
-                                  className="flex items-center gap-1.5"
-                                  title={tr(TOUR_L.meals, lang)}
-                                >
-                                  <Utensils className="size-3.5 text-brand-600" />
+                                <span className={dayTag} title={tr(TOUR_L.meals, lang)}>
+                                  <UtensilsCrossed
+                                    className="size-3.5 text-brand-600"
+                                    aria-hidden
+                                  />
                                   {d.meals.map((m) => tr(TOUR_L[m], lang)).join(" · ")}
                                 </span>
                               )}
                               {d.overnight && (
-                                <span
-                                  className="flex items-center gap-1.5"
-                                  title={tr(TOUR_L.overnight, lang)}
-                                >
-                                  <BedDouble className="size-3.5 text-brand-600" />
+                                <span className={dayTag} title={tr(TOUR_L.overnight, lang)}>
+                                  <BedDouble className="size-3.5 text-brand-600" aria-hidden />
                                   {d.overnight}
                                 </span>
                               )}
@@ -709,13 +927,31 @@ async function TourPageContent({ params }) {
           </div>
 
           {/* Khối đặt tour dính bên phải */}
-          <div id="book" className="scroll-mt-36">
+          <div id="book" className="relative min-w-0 scroll-mt-36 lg:flex lg:flex-col">
             {/* Dính ngay dưới header (108px + 12px); cao tối đa = màn hình − 132px → luôn thấy trọn khung & nút đặt.
-                BookingWidget tự đo và đặt data-density (roomy / mid / compact) lên khung này: rộng rãi nhất mà vẫn vừa */}
-            <StickySide
-              offset={120}
-              gap={12}
-              className="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border lg:flex lg:max-h-[calc(100dvh-8.25rem)] lg:flex-col xl:p-6 bk-mid:p-5 bk-compact:p-4"
+                BookingWidget tự đo và đặt data-density (roomy / mid / compact) lên khung này: rộng rãi nhất mà vẫn vừa.
+                Khối "Liên hệ trực tiếp" xếp dưới khung khi màn hình còn chỗ, không thì nằm cuối cột (TourSide) */}
+            <TourSide
+              cardClassName="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border lg:flex lg:max-h-[calc(100dvh-8.25rem)] lg:flex-col xl:p-6 bk-mid:p-5 bk-compact:p-4"
+              contact={{
+                title: t.askTitle,
+                text: t.contactText,
+                signoff: t.contactSignoff,
+                team: t.contactTeam,
+                emailLabel: t.contactEmail,
+                channelsNote: tr(siteConfig.contact.channels.hotline, lang),
+                labels: {
+                  whatsapp: dict.floating.whatsapp,
+                  zalo: dict.floating.zalo,
+                  wechat: dict.floating.wechat,
+                  line: dict.floating.line,
+                },
+                hotline: siteConfig.contact.hotline,
+                hotlineRaw: siteConfig.contact.hotlineRaw,
+                email: siteConfig.contact.email,
+                whatsapp: siteConfig.messaging.whatsapp,
+                zalo: siteConfig.messaging.zalo,
+              }}
             >
               {/* leading-none: bỏ khoảng trống dòng chữ thừa → lề trên (tới chữ) bằng lề dưới (dưới nút đặt) */}
               <h2 className="mt-0.5 mb-4 shrink-0 text-xl leading-none font-bold tracking-tight text-ink bk-mid:mb-3.5 bk-compact:mb-3 bk-compact:text-lg">
@@ -740,7 +976,7 @@ async function TourPageContent({ params }) {
                 payment={{ ...paymentConfig, labels: dict.payment }}
                 smallGroup={smallGroup}
               />
-            </StickySide>
+            </TourSide>
           </div>
         </Container>
       </div>
@@ -756,6 +992,7 @@ async function TourPageContent({ params }) {
         }}
       />
 
+      {/* "Có thể bạn thích": luôn có dưới mọi tour (relatedTours tự bù tour phổ biến khi không có tour cùng điểm đến) */}
       <section className="py-14 lg:py-[4.5rem]">
         <Container>
           <SectionHeading title={t.related} />

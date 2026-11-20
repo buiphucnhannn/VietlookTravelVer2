@@ -9,6 +9,7 @@ import { Button, Container, Reveal, SectionHeading } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import { WhyUs } from "@/components/home/WhyAndB2B";
 import Reviews from "@/components/home/Reviews";
+import AccessibleTravel from "@/components/ui/AccessibleTravel";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { getCatalog, getReviews } from "@/lib/catalog";
 import {
@@ -190,6 +191,7 @@ export default async function AboutPage({ params }) {
       <div id="why">
         <WhyUs dict={whyDict} />
       </div>
+      <AccessibleTravel lang={lang} dict={dict} />
 
       <section className="relative isolate overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
         <BgImage src="/images/tours/v2/hanoi-32123175.jpg" tone="mist" />

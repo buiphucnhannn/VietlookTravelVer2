@@ -63,6 +63,8 @@ async function ThemePageContent({ params }) {
         })}
         subtitle={tr(theme.tagline, lang)}
         images={[theme.banner || theme.image]}
+        // Khung ảnh ghép kiểu localvietnam (màn hình lớn): ảnh chủ đề + ảnh 2 tour đầu danh sách
+        collage={[theme.banner || theme.image, ...tours.slice(0, 4).map((t) => t.image)]}
         breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: name }]}
       />
       <section className="py-14 lg:py-[4.5rem]">

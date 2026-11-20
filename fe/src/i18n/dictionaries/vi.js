@@ -507,6 +507,24 @@ const vi = {
       "Các dịch vụ bao gồm được điều chỉnh theo lịch trình và hạng khách sạn – đội ngũ của chúng tôi sẽ gửi danh sách bao gồm/không bao gồm đầy đủ kèm báo giá.",
     childPolicyTitle: "Chính sách trẻ em",
     notesTitle: "Thông tin hữu ích",
+    // Bảng "Tóm tắt lịch trình" + khối liên hệ cột phải trang tour
+    glanceTitle: "Tóm tắt lịch trình",
+    dayDetails: "Chi tiết từng ngày",
+    colDay: "Ngày",
+    colItinerary: "Lịch trình",
+    colSupport: "Đi kèm",
+    colMeals: "Bữa ăn",
+    colStay: "Nghỉ đêm",
+    support: {
+      "guide-car": "HDV + xe",
+      driver: "Tài xế",
+      guide: "Hướng dẫn viên",
+      none: "Tự do",
+    },
+    contactText: "Trò chuyện với đội ngũ địa phương – chúng tôi luôn sẵn lòng hỗ trợ!",
+    contactSignoff: "Câu hỏi nhỏ hay kế hoạch lớn, chúng tôi đều vui lòng trò chuyện!",
+    contactTeam: "— Đội ngũ Vietlook",
+    contactEmail: "Gửi email",
   },
   destination: {
     allTitle: "Tất cả điểm đến Việt Nam",
@@ -574,6 +592,31 @@ const vi = {
     },
     seeAllWeek: "Xem tất cả tour {n} tuần",
     quickView: "Xem nhanh lịch trình",
+    // Lời giới thiệu + lời mời thiết kế riêng cho từng nhóm 1 / 2 / 3 tuần (trang Packages, lọc tour dài ngày)
+    best: {
+      1: {
+        title: "Lịch trình hay nhất cho tour Việt Nam 1 tuần",
+        text: "Dưới đây là những tour Việt Nam 7 ngày được yêu thích – mỗi tour một cách khám phá đất nước: núi rừng và văn hoá miền Bắc, di sản và bờ biển miền Trung, hay sông nước và biển đảo miền Nam.",
+        ctaTitle: "Chưa tìm được tour Việt Nam 1 tuần ưng ý?",
+        ctaText:
+          "Hãy cho chúng tôi biết phong cách du lịch và những trải nghiệm bạn mong muốn – chuyên gia địa phương của chúng tôi sẽ thiết kế lịch trình 7 ngày vừa khớp thời gian và sở thích của bạn.",
+      },
+      2: {
+        title: "Lịch trình hay nhất cho tour Việt Nam 2 tuần",
+        text: "Dưới đây là các tour Việt Nam 2 tuần được yêu thích – mỗi tour một cách khám phá đất nước khác nhau.",
+        ctaTitle: "Chưa tìm được tour Việt Nam 2 tuần ưng ý?",
+        ctaText:
+          "Hãy cho chúng tôi biết phong cách du lịch và những trải nghiệm bạn mong muốn – chuyên gia địa phương của chúng tôi sẽ thiết kế lịch trình 14 ngày vừa khớp thời gian và sở thích của bạn.",
+      },
+      3: {
+        title: "Lịch trình hay nhất cho tour Việt Nam 3 tuần",
+        text: "Dưới đây là các tour Việt Nam 3 tuần được yêu thích – mỗi tour một cách khám phá đất nước khác nhau.",
+        ctaTitle: "Chưa tìm được tour Việt Nam 3 tuần ưng ý?",
+        ctaText:
+          "Hãy cho chúng tôi biết phong cách du lịch và những trải nghiệm bạn mong muốn – chuyên gia địa phương của chúng tôi sẽ thiết kế lịch trình 3 tuần vừa khớp thời gian và sở thích của bạn.",
+      },
+    },
+    ctaButton: "Lên kế hoạch chuyến đi",
   },
   cruises: {
     tabs: {
@@ -1164,6 +1207,31 @@ const vi = {
     payments: "Chúng tôi chấp nhận",
     updating: "Đang cập nhật",
   },
+  // Du lịch không rào cản: khối trang chủ / Giới thiệu / Tour nhóm & thiết kế riêng + dòng nhấn trên mọi trang tour
+  access: {
+    eyebrow: "Du lịch không rào cản",
+    title: "Tour phục vụ người khuyết tật",
+    text: "Vietlook phục vụ khách là người khuyết tật. Hãy cho chúng tôi biết nhu cầu khi đặt tour.",
+    points: [
+      {
+        title: "Khách đi xe lăn",
+        text: "Có người đẩy xe lăn cho bạn.",
+      },
+      {
+        title: "Khách khiếm thính",
+        text: "Phục vụ khách khiếm thính.",
+      },
+      {
+        title: "Khách là người khuyết tật",
+        text: "Tour được sắp xếp để phục vụ người khuyết tật.",
+      },
+    ],
+    note: "Hãy cho chúng tôi biết nhu cầu khi đặt tour.",
+    cta: "Cho chúng tôi biết nhu cầu",
+    badge: "Có người đẩy xe lăn, phục vụ khách khiếm thính",
+    badgeLong:
+      "Vietlook phục vụ người khuyết tật: có người đẩy xe lăn, phục vụ khách khiếm thính – hãy cho chúng tôi biết nhu cầu khi đặt tour.",
+  },
   floating: {
     hotline: "Hotline",
     whatsapp: "WhatsApp",
@@ -1172,6 +1240,9 @@ const vi = {
     line: "LINE",
     contact: "Liên hệ",
     top: "Lên đầu trang",
+    greeting: "Xin chào! 👋 Bạn cần tư vấn chuyến đi Việt Nam?",
+    greetingCta: "Chat với chúng tôi",
+    greetingClose: "Đóng lời chào",
   },
   // Thanh toán online 9Pay (chỉ hiện khi CMS bật 9Pay)
   payment: {

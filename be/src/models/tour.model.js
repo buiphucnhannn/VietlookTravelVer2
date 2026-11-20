@@ -1,5 +1,5 @@
 import { Schema, model } from "mongoose";
-import { REGION_VALUES, TOUR_LABELS } from "../constants/content.js";
+import { DAY_SUPPORT, REGION_VALUES, TOUR_LABELS } from "../constants/content.js";
 import { publishable, seoSchema, toJSONOptions } from "./shared.schema.js";
 
 /**
@@ -14,6 +14,7 @@ const day = new Schema(
     html: { type: String, default: "" }, // HTML đã lọc (sanitize) ở service
     meals: { type: [{ type: String, enum: ["B", "L", "D"] }], default: [] }, // bữa sáng / trưa / tối
     overnight: { type: String, trim: true, default: "" }, // nghỉ đêm tại…
+    support: { type: String, enum: DAY_SUPPORT, default: "" }, // đi kèm: HDV + xe / tài xế / HDV / tự do
   },
   { _id: false },
 );

@@ -506,6 +506,24 @@ const en = {
       "Inclusions are tailored to your itinerary and hotel class – our team sends the full included/excluded list with your quote.",
     childPolicyTitle: "Children policy",
     notesTitle: "Good to know",
+    // Bảng "Tóm tắt lịch trình" + khối liên hệ cột phải trang tour
+    glanceTitle: "Itinerary at a glance",
+    dayDetails: "Day-by-day details",
+    colDay: "Day",
+    colItinerary: "Itinerary",
+    colSupport: "Accompanied by",
+    colMeals: "Meals",
+    colStay: "Accommodation",
+    support: {
+      "guide-car": "Guide + car",
+      driver: "Driver only",
+      guide: "Local guide",
+      none: "Free time",
+    },
+    contactText: "Chat with our local team – we're here to help!",
+    contactSignoff: "Small questions or big plans, we're happy to chat!",
+    contactTeam: "— Vietlook Team",
+    contactEmail: "Email us",
   },
   destination: {
     allTitle: "All Vietnam destinations",
@@ -573,6 +591,31 @@ const en = {
     },
     seeAllWeek: "See all {n}-week packages",
     quickView: "Quick itinerary view",
+    // Lời giới thiệu + lời mời thiết kế riêng cho từng nhóm 1 / 2 / 3 tuần (trang Packages, lọc tour dài ngày)
+    best: {
+      1: {
+        title: "Best itineraries for a 1-week Vietnam tour",
+        text: "Here are popular 7-day Vietnam tours – each offering a different way to explore the country: the mountains and culture of the north, the heritage and coastline of central Vietnam, or the rivers and islands of the south.",
+        ctaTitle: "Can't find the perfect 1-week Vietnam tour?",
+        ctaText:
+          "Tell us your travel style and what you want to experience – our local experts will design a 7-day itinerary that fits your schedule and interests perfectly.",
+      },
+      2: {
+        title: "Best itineraries for a 2-week Vietnam tour",
+        text: "Here are popular 2-week Vietnam tours – each offering a different way to explore the country.",
+        ctaTitle: "Can't find the perfect 2-week Vietnam tour?",
+        ctaText:
+          "Tell us your travel style and what you want to experience – our local experts will design a 14-day itinerary that fits your schedule and interests perfectly.",
+      },
+      3: {
+        title: "Best itineraries for a 3-week Vietnam tour",
+        text: "Here are popular 3-week Vietnam tours – each offering a different way to explore the country.",
+        ctaTitle: "Can't find the perfect 3-week Vietnam tour?",
+        ctaText:
+          "Tell us your travel style and what you want to experience – our local experts will design a 3-week itinerary that fits your schedule and interests perfectly.",
+      },
+    },
+    ctaButton: "Plan my trip",
   },
   cruises: {
     tabs: {
@@ -1158,6 +1201,31 @@ const en = {
     payments: "We accept",
     updating: "Updating",
   },
+  // Du lịch không rào cản: khối trang chủ / Giới thiệu / Tour nhóm & thiết kế riêng + dòng nhấn trên mọi trang tour
+  access: {
+    eyebrow: "Accessible travel",
+    title: "Tours for travellers with disabilities",
+    text: "Vietlook serves travellers with disabilities. Tell us your needs when you book.",
+    points: [
+      {
+        title: "Wheelchair users",
+        text: "A staff member to push the wheelchair for you.",
+      },
+      {
+        title: "Deaf & hearing-impaired travellers",
+        text: "We serve deaf and hearing-impaired travellers.",
+      },
+      {
+        title: "Travellers with disabilities",
+        text: "Our tours are arranged to serve travellers with disabilities.",
+      },
+    ],
+    note: "Tell us your needs when booking.",
+    cta: "Tell us your needs",
+    badge: "Wheelchair & hearing-impaired support",
+    badgeLong:
+      "We serve travellers with disabilities: a staff member to push the wheelchair and support for deaf and hearing-impaired guests – tell us your needs when booking.",
+  },
   floating: {
     hotline: "Hotline",
     whatsapp: "WhatsApp",
@@ -1166,6 +1234,9 @@ const en = {
     line: "LINE",
     contact: "Contact us",
     top: "Back to top",
+    greeting: "Hi there! 👋 Need help planning your Vietnam trip?",
+    greetingCta: "Chat with us",
+    greetingClose: "Close message",
   },
   // Thanh toán online 9Pay (chỉ hiện khi CMS bật 9Pay)
   payment: {

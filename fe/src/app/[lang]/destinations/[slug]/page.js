@@ -88,6 +88,8 @@ async function DestinationPageContent({ params }) {
         }
         text={tr(item.intro, lang)}
         images={[item.hero || item.image]}
+        // Khung ảnh ghép kiểu localvietnam (màn hình lớn): ảnh điểm đến + ảnh 2 tour đầu danh sách
+        collage={[item.hero || item.image, ...tours.slice(0, 4).map((t) => t.image)]}
         link={{ href: "#tours", label: dict.destination.viewTours }}
         breadcrumbs={[
           { label: "Vietlook", href: href(lang) },

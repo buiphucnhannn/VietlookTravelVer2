@@ -94,6 +94,7 @@ const SKIP = new Set([
   "posterMobile",
   "collage",
   "meals",
+  "support",
   "email",
   "phone",
   "publicId",

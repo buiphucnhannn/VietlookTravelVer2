@@ -242,13 +242,17 @@ function buildCatalog({ tours, destinations, themes, articles, taxonomy, service
       .sort((a, b) => (b.price ? 1 : 0) - (a.price ? 1 : 0) || a.days - b.days);
   };
 
+  // "Có thể bạn thích" dưới MỌI tour: cùng điểm đến > cùng miền / chủ đề / độ dài; không khớp gì thì vẫn đủ
+  // thẻ — hoà điểm giữ thứ tự gợi ý của danh sách (rank = tour phổ biến trước) nên không bao giờ trống
   function relatedTours(tour, limit = 4) {
+    const regionsOf = tour.regions ?? [];
     return allTours
       .filter((t) => t.slug !== tour.slug)
       .map((t) => ({
         t,
         score:
           t.destinations.filter((d) => tour.destinations.includes(d)).length * 3 +
+          (t.regions ?? []).filter((r) => regionsOf.includes(r)).length +
           t.themes.filter((d) => tour.themes.includes(d)).length +
           (Math.abs(t.days - tour.days) <= 2 ? 1 : 0),
       }))
@@ -445,6 +449,7 @@ export function tourText(t, lang) {
       html: dayOf(i, "html") ?? d.html ?? "",
       meals: dayOf(i, "meals") ?? [],
       overnight: dayOf(i, "overnight") ?? "",
+      support: dayOf(i, "support") ?? "",
     })),
     included: pick("included") ?? [],
     excluded: pick("excluded") ?? [],

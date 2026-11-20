@@ -9,6 +9,9 @@ export const REGION_VALUES = Object.values(REGIONS);
 /** Nhãn nổi bật trên thẻ tour (CMS bật / tắt từng tour): Bán chạy · Độc quyền */
 export const TOUR_LABELS = ["bestseller", "exclusive"];
 
+/** Đi kèm trong một ngày lịch trình: "" chưa nhập · HDV + xe · chỉ tài xế · chỉ HDV · tự do (không ai đi kèm) */
+export const DAY_SUPPORT = ["", "guide-car", "driver", "guide", "none"];
+
 /** Tối đa 08 chủ đề tour (hợp đồng mục 2) */
 export const MAX_THEMES = 8;
 

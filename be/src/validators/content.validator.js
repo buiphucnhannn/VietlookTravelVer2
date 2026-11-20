@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AIRPORT_CODES,
+  DAY_SUPPORT,
   ENQUIRY_STATUS,
   ENQUIRY_TYPE_VALUES,
   FAST_TRACK_GROUPS,
@@ -174,6 +175,7 @@ const tourLang = z
             .max(3)
             .default([]),
           overnight: str(200),
+          support: z.enum(DAY_SUPPORT).default(""),
         }),
       )
       .max(120)

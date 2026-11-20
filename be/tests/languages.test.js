@@ -64,6 +64,30 @@ describe("nội dung nhiều ngôn ngữ: chỉ cần 1 ngôn ngữ bất kỳ",
     assert.equal(tourSchema.safeParse(tour({})).success, false);
   });
 
+  it("tour: ngày lịch trình có bữa ăn, nghỉ đêm, đi kèm (tuỳ chọn, dữ liệu cũ vẫn hợp lệ)", () => {
+    const withDays = (days) => ({
+      slug: "ha-noi-3-ngay",
+      content: { en: { title: "Hanoi 3 days", itinerary: days }, zh: {}, vi: {} },
+    });
+    const ok = tourSchema.safeParse(
+      withDays([
+        { day: 1, title: "Hanoi", meals: ["L", "D"], overnight: "Hanoi", support: "guide-car" },
+        { day: 2, title: "Old day" },
+      ]),
+    );
+    assert.equal(ok.success, true);
+    const [d1, d2] = ok.data.content.en.itinerary;
+    assert.equal(d1.support, "guide-car");
+    assert.equal(d2.support, "");
+    assert.deepEqual(d2.meals, []);
+    for (const s of ["driver", "guide", "none", ""])
+      assert.equal(tourSchema.safeParse(withDays([{ day: 1, support: s }])).success, true, s);
+    assert.equal(
+      tourSchema.safeParse(withDays([{ day: 1, support: "helicopter" }])).success,
+      false,
+    );
+  });
+
   it("tạo đường dẫn từ tên tiếng Việt (bỏ dấu, đ → d)", () => {
     assert.equal(slugify("Đà Nẵng – Hội An 3 ngày"), "da-nang-hoi-an-3-ngay");
   });

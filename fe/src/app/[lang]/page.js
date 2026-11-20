@@ -23,6 +23,7 @@ import DestinationGrid, { toGridItem } from "@/components/home/DestinationGrid";
 import PartnersBlock from "@/components/home/PartnersBlock";
 import PartnerStrip from "@/components/home/PartnerStrip";
 import DrumStats from "@/components/home/DrumStats";
+import AccessibleTravel from "@/components/ui/AccessibleTravel";
 import { withHomeCopy } from "@/components/home/copy";
 import { fillReviewStats } from "@/lib/review-stats";
 import { homeImages } from "@/components/home/images";
@@ -171,6 +172,8 @@ export default async function HomePage({ params }) {
       <CustomTrip lang={lang} dict={dict} starImages={images.star} starLabels={home.starLabels} />
 
       <WhyUs dict={dict} />
+      {/* Du lịch không rào cản: xe lăn (có người đẩy), khiếm thính, đi lại hạn chế — theo yêu cầu */}
+      <AccessibleTravel lang={lang} dict={dict} />
       <PartnerStrip title={dict.home.partnerStrip} />
       <PartnersBlock lang={lang} dict={dict} />
       <Reviews lang={lang} dict={dict} reviews={reviews} />

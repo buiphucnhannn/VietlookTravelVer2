@@ -22,6 +22,7 @@ import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import TripPlannerForm from "@/components/forms/TripPlannerForm";
 import Reviews from "@/components/home/Reviews";
+import AccessibleTravel from "@/components/ui/AccessibleTravel";
 import { href } from "@/i18n/config";
 import { getCatalog, getReviews } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,13 @@ export default async function GroupTailorMadePage({ params }) {
         <p className="mx-auto max-w-5xl text-xl leading-snug font-medium text-ink sm:text-2xl">
           {g.intro}
         </p>
+        {/* Du lịch không rào cản: nhóm có khách đi xe lăn / khiếm thính / đi lại hạn chế → sắp xếp theo yêu cầu */}
+        <AccessibleTravel
+          lang={lang}
+          dict={dict}
+          variant="band"
+          className="mx-auto mt-8 max-w-5xl"
+        />
       </Container>
 
       {/* Thanh tab kiểu localvietnam */}

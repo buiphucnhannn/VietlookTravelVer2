@@ -461,6 +461,24 @@ const zh = {
       "费用包含项目将根据您的行程与酒店等级定制——我们会在报价中附上完整的包含/不含清单。",
     childPolicyTitle: "儿童政策",
     notesTitle: "温馨提示",
+    // Bảng "Tóm tắt lịch trình" + khối liên hệ cột phải trang tour
+    glanceTitle: "行程一览",
+    dayDetails: "每日详情",
+    colDay: "天数",
+    colItinerary: "行程",
+    colSupport: "陪同",
+    colMeals: "餐食",
+    colStay: "住宿",
+    support: {
+      "guide-car": "导游+专车",
+      driver: "司机",
+      guide: "导游",
+      none: "自由活动",
+    },
+    contactText: "与我们的本地团队聊聊——我们随时为您服务！",
+    contactSignoff: "无论是小问题还是大计划，我们都乐意和您聊聊！",
+    contactTeam: "—— Vietlook 团队",
+    contactEmail: "发送邮件",
   },
   destination: {
     allTitle: "越南全部目的地",
@@ -502,6 +520,31 @@ const zh = {
     week3: { title: "越南3周套餐", text: "全景深度游——高山、海湾、古城、海滩与湄公河。" },
     seeAllWeek: "查看全部{n}周套餐",
     quickView: "快速查看行程",
+    // Lời giới thiệu + lời mời thiết kế riêng cho từng nhóm 1 / 2 / 3 tuần (trang Packages, lọc tour dài ngày)
+    best: {
+      1: {
+        title: "越南1周最佳行程",
+        text: "以下是热门的越南7天线路——每条都以不同方式探索越南：北部的高山与民族文化、中部的世界遗产与海岸线，或南部的河流与海岛。",
+        ctaTitle: "没找到理想的越南1周线路？",
+        ctaText:
+          "告诉我们您的旅行风格和想要的体验——我们的本地专家将为您量身设计一条契合您时间和兴趣的7天行程。",
+      },
+      2: {
+        title: "越南2周最佳行程",
+        text: "以下是广受欢迎的越南两周行程——每条线路都以不同的方式探索越南。",
+        ctaTitle: "没找到理想的越南2周线路？",
+        ctaText:
+          "告诉我们您的旅行风格和想要的体验——我们的本地专家将为您量身设计一条契合您时间和兴趣的14天行程。",
+      },
+      3: {
+        title: "越南3周最佳行程",
+        text: "以下是广受欢迎的越南三周行程——每条线路都以不同的方式探索越南。",
+        ctaTitle: "没找到理想的越南3周线路？",
+        ctaText:
+          "告诉我们您的旅行风格和想要的体验——我们的本地专家将为您量身设计一条契合您时间和兴趣的3周行程。",
+      },
+    },
+    ctaButton: "定制我的行程",
   },
   cruises: {
     tabs: {
@@ -952,6 +995,31 @@ const zh = {
     payments: "支持支付方式",
     updating: "更新中",
   },
+  // Du lịch không rào cản: khối trang chủ / Giới thiệu / Tour nhóm & thiết kế riêng + dòng nhấn trên mọi trang tour
+  access: {
+    eyebrow: "无障碍旅行",
+    title: "服务残障旅客的行程",
+    text: "Vietlook为残障旅客提供服务。预订时请告诉我们您的需求。",
+    points: [
+      {
+        title: "轮椅使用者",
+        text: "安排专人为您推轮椅。",
+      },
+      {
+        title: "听障旅客",
+        text: "为听障旅客提供服务。",
+      },
+      {
+        title: "残障旅客",
+        text: "行程安排可服务残障旅客。",
+      },
+    ],
+    note: "预订时请告诉我们您的需求。",
+    cta: "告诉我们您的需求",
+    badge: "专人推轮椅·服务听障旅客",
+    badgeLong:
+      "我们为残障旅客提供服务：安排专人推轮椅，并为听障旅客提供服务——预订时请告诉我们您的需求。",
+  },
   floating: {
     hotline: "热线",
     whatsapp: "WhatsApp",
@@ -960,6 +1028,9 @@ const zh = {
     line: "LINE",
     contact: "联系我们",
     top: "返回顶部",
+    greeting: "您好！👋 需要帮您规划越南之旅吗？",
+    greetingCta: "和我们聊聊",
+    greetingClose: "关闭消息",
   },
   // Thanh toán online 9Pay (chỉ hiện khi CMS bật 9Pay)
   payment: {
