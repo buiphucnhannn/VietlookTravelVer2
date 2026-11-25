@@ -112,6 +112,20 @@ describe("phân quyền — hàm tính quyền", () => {
     );
   });
 
+  it("Trang chủ / Giao diện trang không có thao tác xoá → cao nhất là sửa; quyền cũ lưu “full” vẫn dùng được", () => {
+    // tài khoản đã lưu "full" trước đây → hiểu là "edit" (không mất quyền sửa, không cần sửa dữ liệu)
+    const old = { role: "editor", permissions: { pages: "full", home: "full", reviews: "full" } };
+    const p = effectivePermissions(old);
+    assert.equal(p.pages, "edit");
+    assert.equal(p.home, "edit");
+    assert.equal(p.reviews, "full");
+    assert.equal(can(old, "pages", "edit"), true);
+    assert.equal(LEGACY_EDITOR_PERMISSIONS.pages, "edit");
+    assert.equal(updateUserSchema.safeParse({ permissions: { pages: "edit" } }).success, true);
+    assert.equal(updateUserSchema.safeParse({ permissions: { pages: "full" } }).success, false);
+    assert.equal(updateUserSchema.safeParse({ permissions: { home: "full" } }).success, false);
+  });
+
   it("validator chỉ nhận mục / mức đã biết", () => {
     assert.equal(updateUserSchema.safeParse({ permissions: { tours: "edit" } }).success, true);
     assert.equal(updateUserSchema.safeParse({ permissions: { users: "full" } }).success, false);
@@ -183,6 +197,12 @@ describe("phân quyền — nội dung (none / view / edit / full)", () => {
     try {
       assert.equal((await call(ID.staff, "post", "/translate", {})).status, 403);
       assert.equal((await call(ID.staff, "delete", "/uploads/images", {})).status, 403);
+      // xoá hẳn ảnh khỏi kho = thao tác xoá → quyền "Sửa" chưa đủ, cần "Toàn quyền" ở 1 mục nội dung
+      users[ID.staff].permissions = { tours: "edit", pages: "edit" };
+      assert.equal((await call(ID.staff, "post", "/translate", {})).status, 422);
+      assert.equal((await call(ID.staff, "delete", "/uploads/images", {})).status, 403);
+      users[ID.staff].permissions = { tours: "full" };
+      assert.equal((await call(ID.staff, "delete", "/uploads/images", {})).status, 422);
     } finally {
       users[ID.staff].permissions = { tours: "view", articles: "full", bookings: "edit" };
     }
@@ -299,7 +319,8 @@ describe("phân quyền — đổi quyền có hiệu lực ngay", () => {
     assert.equal(res.body.data.user.permissions.tours, "view");
     assert.equal(res.body.data.user.permissions.destinations, "none");
     const adm = await call(ID.admin, "get", "/auth/me");
-    assert.equal(adm.body.data.user.permissions.pages, "full");
+    assert.equal(adm.body.data.user.permissions.tours, "full");
+    assert.equal(adm.body.data.user.permissions.pages, "edit"); // mục không có thao tác xoá: cao nhất là sửa
   });
 });
 

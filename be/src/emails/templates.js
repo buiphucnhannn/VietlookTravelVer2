@@ -172,6 +172,8 @@ const CUSTOMER = {
 
 export function customerEmail(e, lookups = {}) {
   const lang = pickLang(e.lang);
+  // Thông tin công ty: CMS → Cài đặt → Thông tin liên hệ (enquiry.service truyền vào); thiếu → mặc định
+  const co = lookups.company ?? COMPANY;
   const t = CUSTOMER[lang];
   const type = TYPE_LABEL[lang][e.type] ? e.type : "contact";
   const { facts, price } = describeEnquiry(e, lang, lookups);
@@ -205,15 +207,15 @@ export function customerEmail(e, lookups = {}) {
     p(escape(nextText), { margin: "0" }),
     // nhóm liên hệ liền nhau: câu hỏi → nút (16) → "Hoặc gọi" (12)
     p(escape(t.questions), { margin: "24px 0 0" }),
-    button(COMPANY.whatsapp, t.whatsapp, { top: 16 }),
+    button(co.whatsapp, t.whatsapp, { top: 16 }),
     p(
-      `${escape(t.orCall)} ${link(telHref(COMPANY.hotline), COMPANY.hotline)} · ${link(`mailto:${COMPANY.email}?subject=${encodeURIComponent(e.code)}`, COMPANY.email)}`,
+      `${escape(t.orCall)} ${link(telHref(co.hotline), co.hotline)} · ${link(`mailto:${co.email}?subject=${encodeURIComponent(e.code)}`, co.email)}`,
       { size: 14, muted: true, margin: `${SPACE.para}px 0 0`, align: "center" },
     ),
     p(`${escape(t.signoff)}<br>${escape(t.team)}`, { margin: `${SPACE.section}px 0 0` }),
   ].join("\n");
 
-  const footer = `<p class="mu" style="margin:0 0 4px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><b>${escape(COMPANY.legalName[lang])}</b><br>${escape(COMPANY.address[lang])}</p>
+  const footer = `<p class="mu" style="margin:0 0 4px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><b>${escape(co.legalName[lang])}</b><br>${escape(co.address[lang])}</p>
 <p class="mu" style="margin:10px 0 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted}">${escape(t.why)}</p>`;
 
   const html = shell({
@@ -244,15 +246,15 @@ export function customerEmail(e, lookups = {}) {
     nextText,
     "",
     t.questions,
-    `WhatsApp: ${COMPANY.whatsapp}`,
-    `${t.orCall} ${COMPANY.hotline} · ${COMPANY.email}`,
+    `WhatsApp: ${co.whatsapp}`,
+    `${t.orCall} ${co.hotline} · ${co.email}`,
     "",
     t.signoff,
     t.team,
     "",
     "--",
-    COMPANY.legalName[lang],
-    COMPANY.address[lang],
+    co.legalName[lang],
+    co.address[lang],
     t.why,
   ].join("\n");
 

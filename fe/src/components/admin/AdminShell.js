@@ -19,7 +19,7 @@ import {
   Menu,
   MessageSquareQuote,
   Newspaper,
-  ScrollText,
+  PanelsTopLeft,
   Settings,
   Shapes,
   Stamp,
@@ -80,10 +80,12 @@ const NAV = [
   {
     group: "Nội dung",
     items: [
-      { href: A("/home"), label: "Trang chủ", Icon: Home },
+      // Giao diện trang: mọi trang công khai (Trang chủ, Giới thiệu, chính sách, Thuê xe, Visa…) ở 1 chỗ;
+      // đang sửa Trang chủ (/home) cũng đánh dấu mục này. Tài khoản chỉ có quyền Trang chủ → hiện mục Trang chủ riêng.
+      { href: A("/pages"), label: "Giao diện trang", Icon: PanelsTopLeft, also: [A("/home")] },
+      { href: A("/home"), label: "Trang chủ", Icon: Home, hideIf: (u) => canUser(u, "pages") },
       { href: A("/articles"), label: "Bài viết", Icon: Newspaper },
       { href: A("/taxonomy"), label: "Chuyên mục & tác giả", Icon: FileText },
-      { href: A("/pages"), label: "Giới thiệu & chính sách", Icon: ScrollText },
       { href: A("/reviews"), label: "Đánh giá", Icon: MessageSquareQuote },
     ],
   },
@@ -100,6 +102,9 @@ const NAV = [
 
 const isActive = (pathname, href) =>
   href === A() ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+/** Mục menu đang mở: đúng đường dẫn của mục, hoặc 1 trang thuộc mục (also) */
+const itemActive = (pathname, item) =>
+  [item.href, ...(item.also ?? [])].some((h) => isActive(pathname, h));
 
 /**
  * Dữ liệu ban đầu của từng trang — tải trước khi di chuột / chạm vào mục menu → bấm vào là có dữ liệu ngay.
@@ -154,9 +159,7 @@ function NavLinks({ todo, onNavigate }) {
  * Trạng thái mở / gọn giữ nguyên khi chuyển trang trong phiên làm việc.
  */
 function NavList({ user, todo, onNavigate, pathname = "" }) {
-  const activeGroup = NAV.findIndex(
-    (g) => g.group && g.items.some((i) => isActive(pathname, i.href)),
-  );
+  const activeGroup = NAV.findIndex((g) => g.group && g.items.some((i) => itemActive(pathname, i)));
   const [open, setOpen] = useState(() => new Set(activeGroup >= 0 ? [activeGroup] : []));
   // chuyển sang trang thuộc nhóm đang gọn → tự mở nhóm đó
   const [seenGroup, setSeenGroup] = useState(activeGroup);
@@ -176,7 +179,7 @@ function NavList({ user, todo, onNavigate, pathname = "" }) {
     // chưa tải xong tài khoản → chỉ hiện mục ai cũng vào được (không nháy mục không có quyền)
     const items = g.items.filter((i) => {
       const m = moduleForPath(i.href);
-      return !m || canUser(user, m, "view");
+      return (!m || canUser(user, m, "view")) && !(user && i.hideIf?.(user));
     });
     if (!items.length) return null;
     const isOpen = !g.group || open.has(gi);
@@ -219,8 +222,9 @@ function NavList({ user, todo, onNavigate, pathname = "" }) {
             className={cn("space-y-1 overflow-hidden", g.group && isOpen && "pt-0.5 pb-2")}
             inert={!isOpen || undefined}
           >
-            {items.map(({ href, label, Icon, count }) => {
-              const active = isActive(pathname, href);
+            {items.map((item) => {
+              const { href, label, Icon, count } = item;
+              const active = itemActive(pathname, item);
               return (
                 <Link
                   key={href}

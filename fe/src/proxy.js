@@ -257,8 +257,8 @@ async function checkSlug(path) {
 }
 
 const notFound = (url, lang) => {
-  url.pathname = `/${lang}/__not-found`;
-  return NextResponse.rewrite(url);
+  url.pathname = `/${lang}/page-not-found`;
+  return NextResponse.rewrite(url, { status: 404 });
 };
 
 // Ngôn ngữ có tiền tố URL (mọi ngôn ngữ trừ tiếng Anh mặc định): zh, vi

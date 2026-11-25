@@ -8,6 +8,7 @@ import { AdviceBox, BannerHero } from "@/components/ui/PageHero";
 import TourListing from "@/components/tours/TourListing";
 import { href, lp } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 /**
  * Các trang du thuyền (mục 4.2.1 của khách), mỗi loại một đường dẫn riêng để Google lập chỉ mục:
@@ -15,54 +16,37 @@ import { getCatalog } from "@/lib/catalog";
  * - /halong-bay-overnight-cruises  : du thuyền Hạ Long ngủ đêm
  * - /day-cruises                   : du thuyền / tàu tham quan trong ngày ở Hạ Long, Nha Trang, Phú Quốc
  * Phân loại tour: lib/tour-categories.js (cruiseKind).
+ * Ảnh đầu trang, tiêu đề, giới thiệu, hộp tư vấn: CMS → Giao diện trang (khoá `copyKey`, ảnh &
+ * chữ mặc định khai báo ở lib/page-copy/registry/tours.mjs). Danh sách tour: mục Tour.
  */
 export const CRUISE_PAGES = {
   all: {
     path: "/halong-bay-cruises",
-    images: [
-      "/images/tours/v2/halong-bay-58597.jpg",
-      "/images/tours/hd/ha-long.jpg",
-      "/images/tours/v2/halong-bay-5041966.jpg",
-    ],
+    copyKey: "halong-bay-cruises",
     hide: ["destination"],
   },
   overnight: {
     path: "/halong-bay-overnight-cruises",
-    images: [
-      "/images/tours/v2/halong-bay-5041966.jpg",
-      "/images/tours/v2/halong-bay-58597.jpg",
-      "/images/tours/hd/ha-long.jpg",
-    ],
+    copyKey: "halong-bay-overnight-cruises",
     hide: ["destination"],
   },
   day: {
     path: "/day-cruises",
-    images: [
-      "/images/b2b/phu-quoc.webp",
-      "/images/tours/hd/tourdulichnhatranggiare.jpg",
-      "/images/tours/hd/ha-long.jpg",
-    ],
+    copyKey: "day-cruises",
     hide: [],
   },
 };
 
-const copy = (c, kind) =>
-  ({
-    all: { title: c.title, intro: c.intro },
-    overnight: { title: c.overnightTitle, intro: c.overnightIntro },
-    day: { title: c.dayTitle, intro: c.dayIntro },
-  })[kind];
-
 export async function cruiseMetadata(kind, params) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  const { title, intro } = copy(dict.cruises, kind);
+  const p = await getPageText(CRUISE_PAGES[kind].copyKey, lang, dict);
   return pageMetadata({
     lang,
     path: CRUISE_PAGES[kind].path,
-    title,
-    description: intro,
-    image: CRUISE_PAGES[kind].images[0],
+    title: p.heroTitle,
+    description: p.heroIntro,
+    image: p.heroImages[0],
   });
 }
 
@@ -71,21 +55,21 @@ export default async function CruisePage({ kind, params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const c = dict.cruises;
-  const { title, intro } = copy(c, kind);
+  const page = CRUISE_PAGES[kind];
+  const p = await getPageText(page.copyKey, lang, dict);
   const lists = {
     all: cruiseTours(),
     overnight: cruisesByKind("overnight"),
     day: cruisesByKind("day"),
   };
-  const page = CRUISE_PAGES[kind];
 
   return (
     <>
       <BannerHero
-        title={title}
-        subtitle={intro}
-        images={page.images}
-        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: title }]}
+        title={p.heroTitle}
+        subtitle={p.heroIntro}
+        images={p.heroImages}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: p.heroTitle }]}
       />
       <section className="bg-surface py-14 lg:py-[4.5rem]">
         <Container>
@@ -119,9 +103,9 @@ export default async function CruisePage({ kind, params }) {
           <TourListing lang={lang} dict={dict} tours={lists[kind]} hide={page.hide} />
           <div className="mt-10">
             <AdviceBox
-              title={dict.tours.notSureTitle}
-              text={dict.tours.notSureText}
-              cta={dict.tours.notSureCta}
+              title={p.adviceTitle}
+              text={p.adviceText}
+              cta={p.adviceCta}
               href={`${lp(lang)}/plan-your-trip`}
             />
           </div>

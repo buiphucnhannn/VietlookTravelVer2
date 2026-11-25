@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import PageSkeleton from "@/components/ui/PageSkeleton";
 import Link from "next/link";
 import { CalendarX2, CreditCard, FileText, Mail, Phone, ShieldCheck } from "lucide-react";
-import { siteConfig } from "@/constants/site";
 import { WhatsAppIcon } from "@/components/ui/BrandIcons";
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -11,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { pageMetadata, notFoundMetadata, policyLangs, seoField } from "@/lib/seo";
 import { Container } from "@/components/ui";
 import { BannerHero } from "@/components/ui/PageHero";
-import { getCatalog } from "@/lib/catalog";
+import { getCatalog, getContactInfo } from "@/lib/catalog";
 
 const policyIcons = {
   payment: CreditCard,
@@ -52,6 +51,7 @@ async function PolicyPageContent({ params }) {
   if (!policy) notFound();
   const dict = await getDictionary(lang);
   const t = dict.policy;
+  const info = await getContactInfo(); // CMS → Cài đặt → Thông tin liên hệ
 
   // Gắn id cho các đề mục <h2> để làm mục lục "On this page" ở cột phải
   const toc = [];
@@ -149,23 +149,23 @@ async function PolicyPageContent({ params }) {
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               {[
                 {
-                  href: siteConfig.messaging.whatsapp,
+                  href: info.messaging.whatsapp,
                   icon: WhatsAppIcon,
                   label: "WhatsApp",
                   title: "WhatsApp",
                   ext: true,
                 },
                 {
-                  href: `tel:${siteConfig.contact.hotlineRaw}`,
+                  href: `tel:${info.contact.hotlineRaw}`,
                   icon: Phone,
                   label: "Hotline",
-                  title: siteConfig.contact.hotline,
+                  title: info.contact.hotline,
                 },
                 {
-                  href: `mailto:${siteConfig.contact.email}`,
+                  href: `mailto:${info.contact.email}`,
                   icon: Mail,
                   label: "Email",
-                  title: siteConfig.contact.email,
+                  title: info.contact.email,
                 },
               ].map((c) => (
                 <a

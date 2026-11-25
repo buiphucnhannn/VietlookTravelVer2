@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { EXCLUSIVE_THEME } from "@/constants/themes";
 import TourListing from "@/components/tours/TourListing";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 /**
  * Tên chủ đề để chèn vào mẫu câu "Samples of {name} tours": bỏ chữ "tour" / "线路" đã có sẵn trong tên
@@ -36,10 +37,11 @@ export async function generateMetadata({ params }) {
   const theme = getTheme(slug);
   if (!theme) return notFoundMetadata();
   const dict = await getDictionary(lang);
+  const p = await getPageText("detail", lang, dict);
   return pageMetadata({
     lang,
     path: `/themes/${slug}`,
-    title: fill(dict.theme.samples, { name: inSentence(tr(theme.name, lang), lang) }),
+    title: fill(p.themeSamples, { name: inSentence(tr(theme.name, lang), lang) }),
     description: tr(theme.intro, lang),
     image: theme.banner || theme.image,
   });
@@ -52,13 +54,15 @@ async function ThemePageContent({ params }) {
   const theme = getTheme(slug);
   if (!theme) notFound();
   const dict = await getDictionary(lang);
+  // Chữ chung sửa được trong CMS → Giao diện trang → Chữ chung trên trang chi tiết (chưa sửa = từ điển)
+  const p = await getPageText("detail", lang, dict);
   const name = tr(theme.name, lang);
   const tours = toursByTheme(slug);
 
   return (
     <>
       <BannerHero
-        title={fill(dict.theme.samples, {
+        title={fill(p.themeSamples, {
           name: lang === "zh" ? inSentence(name, lang) : inSentence(name, lang).toUpperCase(),
         })}
         subtitle={tr(theme.tagline, lang)}
@@ -71,7 +75,7 @@ async function ThemePageContent({ params }) {
         <Container>
           <header className="mx-auto mb-10 max-w-4xl text-center">
             <h2 className="text-2xl font-semibold tracking-wide text-ink uppercase sm:text-3xl">
-              {fill(dict.theme.browse, { name: inSentence(name, lang) })}
+              {fill(p.themeBrowse, { name: inSentence(name, lang) })}
             </h2>
             <p className="mt-4 leading-relaxed text-muted sm:text-lg">{tr(theme.intro, lang)}</p>
           </header>
@@ -80,9 +84,9 @@ async function ThemePageContent({ params }) {
           ) : (
             // Chủ đề chưa gắn tour nào (vd. "Tour độc quyền" mới tạo, chờ phòng kinh doanh gắn tour)
             <AdviceBox
-              title={dict.theme.emptyTitle}
-              text={dict.theme.emptyText}
-              cta={dict.theme.emptyCta}
+              title={p.themeEmptyTitle}
+              text={p.themeEmptyText}
+              cta={p.themeEmptyCta}
               href={href(lang, "/plan-your-trip")}
             />
           )}
@@ -92,7 +96,7 @@ async function ThemePageContent({ params }) {
       <section className="bg-[#0d1114] py-12 text-white lg:py-14">
         <Container>
           <h2 className="mb-8 text-center text-2xl font-bold tracking-wide text-amber-brand uppercase">
-            {dict.theme.others}
+            {p.themeOthers}
           </h2>
           <div className="-mx-4 flex scrollbar-none gap-4 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0 lg:grid-cols-7">
             {themes

@@ -27,7 +27,13 @@ import { apifyProvider } from "./apify.provider.js";
  * @property {(err: Error) => string} errorCode                               mã ngắn để ghi log
  * @property {boolean} [canImportReviews]
  * @property {(list: string[]) => number} [reviewCost]
- * @property {(src: string, o: { fetchImpl?: typeof fetch }) => Promise<object[]>} [fetchReviews]
+ * @property {(err: Error) => boolean} [errorFinal]  lỗi khi hỏi trạng thái → dừng hẳn (true) hay hỏi lại sau
+ * @property {(src: string, o: { fetchImpl?: typeof fetch }) => Promise<{ runId: string, datasetId?: string }>} [startReviews]
+ *           bắt đầu lấy đánh giá, trả NGAY mã lần chạy (không chờ xong)
+ * @property {(src: string, handle: object, o: { fetchImpl?: typeof fetch }) => Promise<
+ *   { status: "running" } | { status: "done", items: object[], durationS?: number|null }
+ *   | { status: "error", error: Error, durationS?: number|null }>} [checkReviews]
+ *           hỏi trạng thái lần chạy; lỗi mạng / HTTP → ném
  */
 const PROVIDERS = { apify: apifyProvider };
 export const PROVIDER_IDS = Object.keys(PROVIDERS);

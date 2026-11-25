@@ -16,6 +16,7 @@ import { BrushHero } from "@/components/ui/PageHero";
 import PostCard from "@/components/guide/PostCard";
 import TourCard from "@/components/tours/TourCard";
 import { getCatalog, getPost, readingTime } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 /**
  * Dựng sẵn lúc build CHỈ 30 bài mới nhất × 3 ngôn ngữ (dựng cả ~454 bài × 3 làm deploy rất lâu).
@@ -82,6 +83,11 @@ async function GuidePostPageContent({ params }) {
   if (!post) notFound();
   const dict = await getDictionary(lang);
   const g = dict.guide;
+  // Chữ chung (CMS → Giao diện trang → Chữ chung trên trang chi tiết) + tên trang Cẩm nang cho breadcrumb
+  const [p, gp] = await Promise.all([
+    getPageText("detail", lang, dict),
+    getPageText("travel-guide", lang, dict),
+  ]);
   const title = tr(post.title, lang);
   const category = getGuideCategory(post.category);
   // Tác giả bị ẩn trong CMS → dùng "Vietlook Travel Team" (tránh lỗi trang), link về trang cẩm nang
@@ -138,7 +144,7 @@ async function GuidePostPageContent({ params }) {
         }
         baseUrl={siteConfig.url}
         breadcrumbs={[
-          { label: g.title, href: `${lp(lang)}/travel-guide` },
+          { label: gp.heroTitle, href: `${lp(lang)}/travel-guide` },
           // bài chưa chọn chuyên mục → bỏ mục chuyên mục trong breadcrumb
           ...(category
             ? [
@@ -190,7 +196,7 @@ async function GuidePostPageContent({ params }) {
             <details open className="group mt-6 rounded-xl border border-border">
               <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 font-semibold text-ink">
                 <span className="flex items-center gap-2">
-                  <ListOrdered className="size-4 text-brand-500" /> {g.toc}
+                  <ListOrdered className="size-4 text-brand-500" /> {p.guideToc}
                 </span>
                 <span className="transition group-open:rotate-180">⌃</span>
               </summary>
@@ -216,11 +222,11 @@ async function GuidePostPageContent({ params }) {
               className="size-16"
             />
             <div className="flex-1 text-center sm:text-left">
-              <p className="text-lg font-bold text-brand-700">{g.ebookTitle}</p>
-              <p className="text-sm text-muted">{g.ebookText}</p>
+              <p className="text-lg font-bold text-brand-700">{p.guideEbookTitle}</p>
+              <p className="text-sm text-muted">{p.guideEbookText}</p>
             </div>
             <Button href={`${lp(lang)}/plan-your-trip`} variant="primary">
-              {dict.nav.planTrip}
+              {p.guideEbookButton}
             </Button>
           </div>
 
@@ -236,7 +242,7 @@ async function GuidePostPageContent({ params }) {
             />
             <div>
               <p className="text-xs font-bold tracking-wider text-sun-500 uppercase">
-                {g.aboutAuthor}
+                {p.guideAboutAuthor}
               </p>
               <Link
                 href={authorHref}
@@ -252,7 +258,7 @@ async function GuidePostPageContent({ params }) {
 
         {/* Sidebar kiểu localvietnam */}
         <aside className="space-y-5 lg:sticky lg:top-36 lg:self-start">
-          <p className="text-xl font-semibold text-ink">{g.sidebarTitle}</p>
+          <p className="text-xl font-semibold text-ink">{p.guideSidebarTitle}</p>
           {regions.map((r) => (
             <div key={r.slug} className="rounded-3xl bg-surface p-6">
               <p className="mb-3 font-bold text-ink">{tr(r.name, lang)}</p>
@@ -274,7 +280,7 @@ async function GuidePostPageContent({ params }) {
                     href={`${lp(lang)}/destinations/${r.slug}`}
                     className="block py-2 font-medium text-ink hover:text-brand-600"
                   >
-                    {fill(dict.destination.regionTours, { name: tr(r.name, lang) })}
+                    {fill(p.destRegionTours, { name: tr(r.name, lang) })}
                   </Link>
                 </li>
               </ul>
@@ -286,7 +292,7 @@ async function GuidePostPageContent({ params }) {
       {tours.length > 0 && (
         <section className="bg-brand-50 py-14 lg:py-[4.5rem]">
           <Container>
-            <SectionHeading title={g.relatedTours} />
+            <SectionHeading title={p.guideRelatedTours} />
             <div className="rail grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {tours.map((c) => (
                 <TourCard key={c.slug} card={c} lang={lang} labels={labels} />
@@ -298,7 +304,7 @@ async function GuidePostPageContent({ params }) {
 
       <section className="py-14 lg:py-[4.5rem]">
         <Container>
-          <SectionHeading title={g.related} />
+          <SectionHeading title={p.guideRelated} />
           <div className="rail grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {related.map((p) => (
               <PostCard

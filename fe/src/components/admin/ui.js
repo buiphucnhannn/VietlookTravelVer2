@@ -1244,9 +1244,24 @@ function Thumb({ src, alt = "", className, sizes = "(min-width: 1024px) 320px, 5
   );
 }
 
-/** Hộp "Dán link ảnh" (1 hoặc nhiều link, mỗi dòng 1 link) */
-export function ImageUrlDialog({ open, onClose, onSubmit, multiple = false, busy }) {
+/**
+ * Hộp "Đổi ảnh" dùng chung cho MỌI ô ảnh: chọn ảnh từ máy · kéo thả · dán ảnh (Ctrl+V) · dán link ảnh.
+ * - `onFiles(files)`: ảnh từ máy (hộp tự đóng trước, nhường chỗ cho hộp cắt ảnh).
+ * - `onSubmit(links)`: ảnh từ link → trả true khi xong (nơi gọi tự đóng hộp trước khi mở hộp cắt).
+ * Ảnh lệch khung (dù từ máy hay từ link) → nơi gọi tự mở hộp cắt (useImageCrop).
+ */
+export function ImageUrlDialog({
+  open,
+  onClose,
+  onSubmit,
+  onFiles,
+  multiple = false,
+  busy,
+  title,
+}) {
   const [text, setText] = useState("");
+  const [drag, setDrag] = useState(false);
+  const fileRef = useRef(null);
   const links = text
     .split(/\s+/)
     .map((x) => x.trim())
@@ -1257,46 +1272,138 @@ export function ImageUrlDialog({ open, onClose, onSubmit, multiple = false, busy
     const done = await onSubmit(multiple ? links : links.slice(0, 1));
     if (done) setText("");
   };
+  const pickFiles = (files) => {
+    const list = [...(files ?? [])].filter(
+      (f) => /^image\//.test(f.type) || /\.hei[cf]$/i.test(f.name),
+    );
+    if (fileRef.current) fileRef.current.value = "";
+    if (!list.length || !onFiles) return;
+    setText("");
+    onClose();
+    onFiles(multiple ? list : list.slice(0, 1));
+  };
+  const onPaste = (e) => {
+    const files = [...(e.clipboardData?.files ?? [])];
+    if (files.length && onFiles) {
+      e.preventDefault();
+      pickFiles(files);
+    }
+  };
+  const close = () => {
+    setDrag(false);
+    onClose();
+  };
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       size="sm"
-      icon={Link2}
-      title={multiple ? "Thêm ảnh từ link" : "Dán link ảnh"}
+      icon={ImagePlus}
+      title={title ?? (onFiles ? (multiple ? "Thêm ảnh" : "Đổi ảnh") : "Dán link ảnh")}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <p className="mr-auto hidden max-w-[16rem] text-left text-[11.5px] leading-snug text-slate-500 sm:block">
+            Ảnh không vừa khung sẽ mở công cụ cắt để bạn chọn đúng phần cần lấy.
+          </p>
+          <Button variant="secondary" onClick={close}>
             Huỷ
-          </Button>
-          <Button onClick={submit} loading={busy} disabled={!links.length || bad.length > 0}>
-            {multiple && links.length > 1 ? `Thêm ${links.length} ảnh` : "Thêm ảnh"}
           </Button>
         </>
       }
     >
-      <Field
-        label={multiple ? "Link ảnh (mỗi dòng 1 link)" : "Link ảnh"}
-        error={bad.length ? "Link phải bắt đầu bằng http:// hoặc https://" : ""}
-        hint="Mở ảnh trên trình duyệt, bấm chuột phải → “Sao chép địa chỉ hình ảnh” rồi dán vào đây."
+      <div
+        onPaste={onPaste}
+        onDragOver={(e) => {
+          if (!onFiles || !e.dataTransfer?.types?.includes("Files")) return;
+          e.preventDefault();
+          setDrag(true);
+        }}
+        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setDrag(false)}
+        onDrop={(e) => {
+          if (!onFiles) return;
+          e.preventDefault();
+          setDrag(false);
+          pickFiles(e.dataTransfer.files);
+        }}
+        className="space-y-4"
       >
-        {multiple ? (
-          <Textarea
-            rows={4}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="https://…/anh-1.jpg"
-          />
-        ) : (
-          <Input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), submit())}
-            placeholder="https://…/anh.jpg"
-            inputMode="url"
-          />
+        {onFiles && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              className={cn(
+                "group flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed px-4 py-7 text-center transition",
+                drag
+                  ? "border-brand-400 bg-brand-50 ring-4 ring-brand-100"
+                  : "border-slate-300 bg-slate-50/70 hover:border-brand-300 hover:bg-brand-50/50",
+              )}
+            >
+              <span className="grid size-12 place-items-center rounded-2xl bg-white text-brand-600 shadow-sm ring-1 ring-slate-200 transition group-hover:scale-105">
+                <Upload className="size-5" />
+              </span>
+              <span className="text-sm font-semibold text-slate-800">
+                {drag ? "Thả ảnh vào đây" : multiple ? "Chọn ảnh từ máy" : "Chọn ảnh từ máy"}
+              </span>
+              <span className="text-xs text-slate-500">
+                <span className="[@media(hover:none)]:hidden">
+                  hoặc kéo thả{multiple ? " nhiều ảnh" : " ảnh"} vào đây · dán ảnh bằng Ctrl+V
+                  <br />
+                </span>
+                JPG, PNG, WebP, AVIF, GIF
+              </span>
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={IMAGE_ACCEPT}
+              multiple={multiple}
+              hidden
+              onChange={(e) => pickFiles(e.target.files)}
+            />
+            <div className="flex items-center gap-3 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+              <span className="h-px flex-1 bg-slate-200" />
+              hoặc dán link ảnh
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+          </>
         )}
-      </Field>
+        <Field
+          label={onFiles ? undefined : multiple ? "Link ảnh (mỗi dòng 1 link)" : "Link ảnh"}
+          error={bad.length ? "Link phải bắt đầu bằng http:// hoặc https://" : ""}
+          hint="Mở ảnh trên trình duyệt, bấm chuột phải → “Sao chép địa chỉ hình ảnh” rồi dán vào đây."
+        >
+          <div className={cn("flex gap-2", multiple && "flex-col")}>
+            {multiple ? (
+              <Textarea
+                rows={3}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={"https://…/anh-1.jpg\nhttps://…/anh-2.jpg (mỗi dòng 1 link)"}
+              />
+            ) : (
+              <Input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), submit())}
+                placeholder="https://…/anh.jpg"
+                inputMode="url"
+                aria-label="Link ảnh"
+              />
+            )}
+            <Button
+              icon={Link2}
+              onClick={submit}
+              loading={busy}
+              disabled={!links.length || bad.length > 0}
+              className={cn("shrink-0", multiple && "self-end")}
+            >
+              {multiple && links.length > 1 ? `Lấy ${links.length} ảnh` : "Lấy ảnh"}
+            </Button>
+          </div>
+        </Field>
+      </div>
     </Modal>
   );
 }
@@ -1342,7 +1449,6 @@ export function ImageField({
 }) {
   const { toast } = useUi();
   const isDefault = !!fallback && value === fallback;
-  const input = useRef(null);
   const [busy, setBusy] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -1351,7 +1457,6 @@ export function ImageField({
 
   const fromFiles = async (files) => {
     const list = [...(files ?? [])].slice(0, 1);
-    if (input.current) input.current.value = "";
     if (!list.length) return;
     setBusy(true);
     try {
@@ -1412,8 +1517,8 @@ export function ImageField({
           "group relative overflow-hidden rounded-2xl transition",
           aspect,
           value
-            ? "ring-1 ring-slate-200"
-            : "border-2 border-dashed border-slate-300 bg-slate-50/80",
+            ? "ring-1 ring-slate-200 hover:ring-2 hover:ring-blue-500 [@media(hover:none)]:ring-blue-500/40"
+            : "border-2 border-dashed border-slate-300 bg-slate-50/80 hover:border-blue-400 hover:bg-blue-50/40",
           drag && "border-brand-400 bg-brand-50 ring-4 ring-brand-100",
         )}
       >
@@ -1424,8 +1529,19 @@ export function ImageField({
               sizes="(min-width: 1024px) 640px, 100vw"
               className="absolute inset-0"
             />
-            {/* Các nút nằm gọn ở chân ảnh — ảnh dọc hay ngang đều không có nút lơ lửng bên dưới */}
-            <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-center gap-1.5 bg-gradient-to-t from-slate-950/75 via-slate-950/35 to-transparent px-2 pt-9 pb-2.5">
+            {/* Bấm thẳng vào ảnh = Đổi ảnh; rê chuột: nhãn xanh "Bấm để đổi ảnh" (như chữ sửa tại chỗ) */}
+            <button
+              type="button"
+              onClick={() => setLinkOpen(true)}
+              aria-label="Đổi ảnh"
+              className="absolute inset-0 z-0 cursor-pointer"
+            >
+              <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[11px] leading-none font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                <Upload className="size-3" /> Bấm để đổi ảnh
+              </span>
+            </button>
+            {/* Các nút nằm gọn ở chân ảnh — hiện khi rê chuột vào ảnh (màn cảm ứng: luôn hiện) */}
+            <div className="absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-center gap-1.5 bg-gradient-to-t from-slate-950/75 via-slate-950/35 to-transparent px-2 pt-9 pb-2.5 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100 [@media(hover:none)]:opacity-100">
               {/* Ảnh có sẵn của website: ghi rõ ngay trên hàng nút (không đè lên số / nhãn ở góc ảnh) */}
               {isDefault && (
                 <span
@@ -1438,12 +1554,6 @@ export function ImageField({
               <OverlayBtn
                 icon={Upload}
                 label="Đổi ảnh"
-                crowded={croppable}
-                onClick={() => input.current?.click()}
-              />
-              <OverlayBtn
-                icon={Link2}
-                label="Dán link"
                 crowded={croppable}
                 onClick={() => setLinkOpen(true)}
               />
@@ -1478,26 +1588,15 @@ export function ImageField({
               <ImagePlus className="size-5" />
             </span>
             <span className="hidden text-xs text-slate-500 @[16rem]:block">{label}</span>
-            <span className="flex flex-nowrap justify-center gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={Upload}
-                className="px-3"
-                onClick={() => input.current?.click()}
-              >
-                Tải lên
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={Link2}
-                className="px-3"
-                onClick={() => setLinkOpen(true)}
-              >
-                Dán link
-              </Button>
-            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={Upload}
+              className="px-3"
+              onClick={() => setLinkOpen(true)}
+            >
+              Thêm ảnh
+            </Button>
           </div>
         )}
         {busy && (
@@ -1506,17 +1605,11 @@ export function ImageField({
           </span>
         )}
       </div>
-      <input
-        ref={input}
-        type="file"
-        accept={IMAGE_ACCEPT}
-        hidden
-        onChange={(e) => fromFiles(e.target.files)}
-      />
       <ImageUrlDialog
         open={linkOpen}
         onClose={() => setLinkOpen(false)}
         onSubmit={fromLinks}
+        onFiles={fromFiles}
         busy={busy}
       />
       {cropper.dialog}
@@ -1531,7 +1624,6 @@ export function ImageField({
  */
 export function GalleryField({ value = [], onChange, folder, max = 40, onSetCover, crop }) {
   const { toast } = useUi();
-  const input = useRef(null);
   const [busy, setBusy] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -1541,7 +1633,6 @@ export function GalleryField({ value = [], onChange, folder, max = 40, onSetCove
 
   const fromFiles = async (files) => {
     const list = [...(files ?? [])];
-    if (input.current) input.current.value = "";
     if (room <= 0) return toast(`Tối đa ${max} ảnh`, "error");
     if (!list.length) return;
     if (list.length > room) toast(`Album tối đa ${max} ảnh — chỉ thêm ${room} ảnh đầu`, "warning");
@@ -1674,16 +1765,8 @@ export function GalleryField({ value = [], onChange, folder, max = 40, onSetCove
           ) : (
             <>
               <span className="text-xs text-slate-500">Kéo thả ảnh vào đây, hoặc</span>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={Upload}
-                onClick={() => input.current?.click()}
-              >
-                Tải từ máy
-              </Button>
-              <Button size="sm" variant="secondary" icon={Link2} onClick={() => setLinkOpen(true)}>
-                Dán link
+              <Button size="sm" variant="secondary" icon={Upload} onClick={() => setLinkOpen(true)}>
+                Thêm ảnh
               </Button>
             </>
           )}
@@ -1693,19 +1776,12 @@ export function GalleryField({ value = [], onChange, folder, max = 40, onSetCove
         {value.length}/{max} ảnh · JPG, PNG, WebP, AVIF, GIF
         {value.length > 1 && " · giữ và kéo ảnh để đổi thứ tự"}
       </p>
-      <input
-        ref={input}
-        type="file"
-        multiple
-        accept={IMAGE_ACCEPT}
-        hidden
-        onChange={(e) => fromFiles(e.target.files)}
-      />
       <ImageUrlDialog
         open={linkOpen}
         multiple
         onClose={() => setLinkOpen(false)}
         onSubmit={fromLinks}
+        onFiles={fromFiles}
         busy={busy}
       />
       {cropper.dialog}

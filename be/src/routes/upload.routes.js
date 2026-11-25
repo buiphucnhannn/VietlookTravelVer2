@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { uploadController } from "../controllers/upload.controller.js";
-import { requireContentEditor, requireStaff } from "../middlewares/auth.middleware.js";
+import {
+  requireAnyPermission,
+  requireContentEditor,
+  requireStaff,
+} from "../middlewares/auth.middleware.js";
+import { CONTENT_MODULES } from "../constants/permissions.js";
 import { limiter } from "../middlewares/rate-limit.middleware.js";
 import { uploadImages } from "../middlewares/upload.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
@@ -64,7 +69,13 @@ router.delete(
 // Chỉ xoá file "chờ lưu" do chính người đó tải (admin: mọi người), không form nào khác giữ, không bản ghi nào dùng.
 router.delete("/pending", validate({ body: discardPendingSchema }), uploadController.discard);
 
-// DELETE /api/v1/uploads/images   body: { publicId }
-router.delete("/images", validate({ body: deleteImageSchema }), uploadController.remove);
+// DELETE /api/v1/uploads/images   body: { publicId } — xoá hẳn 1 ảnh (không còn nơi nào dùng) khỏi kho ảnh:
+// thao tác xoá → cần "Toàn quyền" ở ít nhất 1 mục nội dung (quyền "Sửa" chỉ tải lên / bỏ ảnh chưa lưu của mình)
+router.delete(
+  "/images",
+  requireAnyPermission(CONTENT_MODULES, "full"),
+  validate({ body: deleteImageSchema }),
+  uploadController.remove,
+);
 
 export default router;

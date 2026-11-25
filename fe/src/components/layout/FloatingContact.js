@@ -123,6 +123,11 @@ export default function FloatingContact({ labels, contact, messaging }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // LINE (CMS → Cài đặt → Thông tin liên hệ): LINE ID nếu có + các số tích kênh LINE
+  const lineValues = [
+    messaging.lineId,
+    ...(messaging.linePhones ?? [contact.hotline, contact.hotline2]),
+  ].filter(Boolean);
   const items = [
     {
       key: "whatsapp",
@@ -138,7 +143,7 @@ export default function FloatingContact({ labels, contact, messaging }) {
       color: "bg-[#07c160]",
       onClick: () => setDialog("wechat"),
     },
-    {
+    lineValues.length > 0 && {
       key: "line",
       label: labels.line,
       icon: LineIcon,
@@ -159,9 +164,9 @@ export default function FloatingContact({ labels, contact, messaging }) {
       color: "bg-sun-500",
       href: `tel:${contact.hotlineRaw}`,
     },
-  ];
+  ].filter(Boolean);
 
-  // LINE: chưa có LINE ID → kết bạn bằng số điện thoại (2 số đều dùng LINE)
+  // LINE: chưa có LINE ID → kết bạn bằng số điện thoại (các số tích kênh LINE)
   const dialogs = {
     wechat: {
       icon: WeChatIcon,
@@ -175,7 +180,7 @@ export default function FloatingContact({ labels, contact, messaging }) {
       color: "bg-[#06c755]",
       title: labels.addLine,
       hint: labels.lineHint,
-      values: [contact.hotline, contact.hotline2],
+      values: lineValues,
     },
   };
   const d = dialog && dialogs[dialog];

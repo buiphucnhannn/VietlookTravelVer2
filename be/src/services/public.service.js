@@ -12,6 +12,8 @@ import {
   tourRepository,
   visaTypeRepository,
 } from "../repositories/content.repository.js";
+import { trusted } from "../repositories/base.repository.js";
+import { PAGE_KEYS } from "../constants/content.js";
 import { ApiError } from "../utils/ApiError.js";
 import { settingsService } from "./settings.service.js";
 
@@ -117,7 +119,11 @@ export const publicService = {
   },
 
   async pages() {
-    return pageRepository.listActive({ sort: { key: 1 }, select: PUBLIC_OMIT });
+    return pageRepository.listActive({
+      sort: { key: 1 },
+      select: PUBLIC_OMIT,
+      filter: { key: trusted({ $in: PAGE_KEYS }) },
+    });
   },
 
   /** Đánh giá khách đang hiện, theo thứ tự trong CMS (website lọc theo trang qua showOn) */
@@ -149,7 +155,7 @@ export const publicService = {
       themeRepository.listActive({ select: "slug" }),
       categoryRepository.listActive({ select: "slug" }),
       authorRepository.listActive({ select: "slug" }),
-      pageRepository.listActive({ select: "key" }),
+      pageRepository.listActive({ select: "key", filter: { key: trusted({ $in: PAGE_KEYS }) } }),
     ]);
     const withOld = (l) => l.map((d) => ({ slug: d.slug, old: d.oldSlugs ?? [] }));
     const plain = (l) => l.map((d) => d.slug);

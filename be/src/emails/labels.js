@@ -4,41 +4,14 @@
  * Đổi chữ trên form website → cập nhật cả ở đây (email không đọc được từ điển của frontend).
  */
 
-/** Thông tin doanh nghiệp — giống fe/src/constants/site.js (siteConfig) */
-export const COMPANY = Object.freeze({
-  name: "Vietlook Travel",
-  legalName: {
-    en: "Vietlook Travel and Trading Company Limited",
-    zh: "Vietlook Travel and Trading Company Limited",
-    vi: "Công ty TNHH Du lịch và Thương mại Vietlook",
-  },
-  licence: "01-176/2022/CDLQGVN-GP LHQT",
-  hotline: "+84 98 339 3588",
-  hotlineRaw: "+84983393588",
-  // Email liên hệ hiển thị cho khách (KHÔNG phải hộp thư gửi/nhận thông báo – xem MAIL_FROM & cài đặt "notifications")
-  email: "info@vietlooktravel.com",
-  whatsapp: "https://wa.me/84983393588",
-  zalo: "https://zalo.me/84983393588",
-  wechatId: "TA14102014",
-  address: {
-    en: "01 Lien Ke 20, Van Khe Urban Area, Ha Dong, Hanoi 12113, Vietnam",
-    zh: "越南河内市河东文溪新区LK20区01号（邮编12113）",
-    vi: "01 Liền Kề 20, Khu đô thị Văn Khê, Hà Đông, Hà Nội 12113, Việt Nam",
-  },
-  hours: {
-    en: "Mon – Sat: 9:00 – 18:00 (GMT+7) · Hotline 24/7",
-    zh: "周一至周六 9:00 – 18:00（越南时间）· 热线24小时",
-    vi: "Thứ Hai – Thứ Bảy: 9:00 – 18:00 (GMT+7) · Hotline 24/7",
-  },
-  social: [
-    ["Facebook", "https://www.facebook.com/vietlooktravelhanoi"],
-    [
-      "Tripadvisor",
-      "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
-    ],
-    ["Google Maps", "https://maps.google.com/?cid=12890319484623913190"],
-  ],
-});
+import { CONTACT_DEFAULTS, emailCompany } from "../constants/contact.js";
+
+/**
+ * Thông tin doanh nghiệp MẶC ĐỊNH trong email — giống fe/src/constants/site.js (siteConfig).
+ * Bản thật lấy từ CMS → Cài đặt → Thông tin liên hệ (settingsService.emailCompany()) rồi truyền vào mẫu email
+ * (lookups.company / tham số company); COMPANY chỉ dùng khi nơi gọi không truyền (VD test, xem trước).
+ */
+export const COMPANY = Object.freeze(emailCompany(CONTACT_DEFAULTS));
 
 /** Loại yêu cầu */
 export const TYPE_LABEL = {

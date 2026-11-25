@@ -28,10 +28,23 @@ import {
   trackingSettingsSchema,
 } from "../validators/content.validator.js";
 import { lookupCodeParam, publicEnquirySchema } from "../validators/enquiry.validator.js";
+import { contactSettingsSchema } from "../validators/contact.validator.js";
+import { PAGE_COPY_VALIDATORS } from "../validators/page-copy.validator.js";
+import { PAGE_COPY_KEYS } from "../constants/page-copy.js";
+import { ApiError } from "../utils/ApiError.js";
 import { formLang, formMessage, localizeFormDetails } from "../utils/form-messages.js";
 import { z } from "zod";
 
 const slugParam = validate({ params: z.object({ slug }) });
+
+/** Giao diện trang: chỉ các trang đã khai báo (constants/page-copy.js) — khoá lạ → 404 (website dùng mặc định) */
+const requirePageCopyKey = (req, _res, next) =>
+  PAGE_COPY_KEYS.includes(req.params.key)
+    ? next()
+    : next(ApiError.notFound("Không tìm thấy trang"));
+/** Kiểm tra dữ liệu theo đúng khai báo ô của trang đó */
+const validatePageCopy = (req, res, next) =>
+  validate({ body: PAGE_COPY_VALIDATORS[req.params.key] })(req, res, next);
 
 /* ---------- /public — website đọc (không cần đăng nhập) ---------- */
 export const publicRoutes = Router();
@@ -44,6 +57,7 @@ publicRoutes.get("/articles/:slug", slugParam, publicController.article);
 publicRoutes.get("/taxonomy", publicController.taxonomy);
 publicRoutes.get("/services", publicController.services);
 publicRoutes.get("/pages", publicController.pages);
+publicRoutes.get("/page-copy/:key", requirePageCopyKey, publicController.pageCopy);
 publicRoutes.get("/reviews", publicController.reviews);
 publicRoutes.get("/home", publicController.home);
 publicRoutes.get("/slugs", publicController.slugs);
@@ -131,7 +145,7 @@ enquiryRoutes.delete(
   enquiryController.remove,
 );
 
-/* ---------- /settings — trang chủ, trang nội dung (theo quyền); email, 9Pay, mã đo lường (chỉ admin) ---------- */
+/* ---------- /settings — trang chủ, giao diện trang, điểm đánh giá (theo quyền); liên hệ, email, 9Pay, mã đo lường (chỉ admin) ---------- */
 export const settingsRoutes = Router();
 const home = (level) => [requireStaff, requirePermission("home", level)];
 const pages = (level) => [requireStaff, requirePermission("pages", level)];
@@ -155,6 +169,21 @@ settingsRoutes.put(
   validate({ params: pageKeyParam, body: pageSchema }),
   settingsController.savePage,
 );
+// Giao diện các trang công khai (Thuê xe, Visa…) — cùng quyền "Giao diện trang" (pages)
+settingsRoutes.get("/page-copy", pages("view"), settingsController.pageCopies);
+settingsRoutes.get(
+  "/page-copy/:key",
+  pages("view"),
+  requirePageCopyKey,
+  settingsController.pageCopy,
+);
+settingsRoutes.put(
+  "/page-copy/:key",
+  pages("edit"),
+  requirePageCopyKey,
+  validatePageCopy,
+  settingsController.savePageCopy,
+);
 settingsRoutes.get("/notifications", requireAdmin, settingsController.getNotifications);
 settingsRoutes.put(
   "/notifications",
@@ -169,6 +198,14 @@ settingsRoutes.put(
   validate({ body: trackingSettingsSchema }),
   settingsController.saveTracking,
 );
+// Thông tin liên hệ công ty (điện thoại, email, địa chỉ, mạng xã hội…): chỉ admin
+settingsRoutes.get("/contact", requireAdmin, settingsController.getContact);
+settingsRoutes.put(
+  "/contact",
+  requireAdmin,
+  validate({ body: contactSettingsSchema }),
+  settingsController.saveContact,
+);
 // Phụ thu nhóm nhỏ: nhân viên được xem (ô "Giá tạm tính thử" khi sửa tour), chỉ admin được sửa
 settingsRoutes.get("/small-group", requireStaff, settingsController.getSmallGroup);
 settingsRoutes.put(
@@ -177,8 +214,10 @@ settingsRoutes.put(
   validate({ body: smallGroupSettingsSchema }),
   settingsController.saveSmallGroup,
 );
-// Điểm & số lượt đánh giá (tự cập nhật qua Apify): chỉ admin xem. "Cập nhật ngay" tốn ~0,02 USD hạn mức Apify →
-// service chặn bấm lại trong 5 phút + giữ hạn mức cho cập nhật tự động; thêm giới hạn 6 lần / giờ phòng bấm lặp.
+// Điểm & số lượt đánh giá (tự cập nhật qua Apify): theo quyền "Đánh giá" (reviews) — xem số + hạn mức = xem;
+// "Cập nhật ngay" tốn ~0,02 USD hạn mức Apify = sửa (giống "Lấy đánh giá" ở /admin/reviews/import).
+// Service chặn bấm lại trong 5 phút + giữ hạn mức cho cập nhật tự động; thêm giới hạn 6 lần / giờ phòng bấm lặp.
+const reviews = (level) => [requireStaff, requirePermission("reviews", level)];
 const reviewSyncLimiter = limiter({
   windowMs: 60 * 60 * 1000,
   limit: 6,
@@ -193,10 +232,10 @@ const secretSaveLimiter = limiter({
   keyGenerator: (req) => `secret-save:${req.user?.id}`,
   message: "Bạn vừa lưu nhiều lần, vui lòng thử lại sau ít phút",
 });
-settingsRoutes.get("/review-stats", requireAdmin, settingsController.getReviewStats);
+settingsRoutes.get("/review-stats", reviews("view"), settingsController.getReviewStats);
 settingsRoutes.post(
   "/review-stats/sync",
-  requireAdmin,
+  reviews("edit"),
   reviewSyncLimiter,
   settingsController.syncReviewStats,
 );

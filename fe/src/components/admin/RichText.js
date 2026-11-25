@@ -36,7 +36,7 @@ import {
 } from "./richTextImage";
 import { EXTERNAL_REL, createEditorExtensions } from "./richTextSchema";
 import { NEW_TABLE, tidyEditorHtml } from "./richTextTable";
-import { Button, Field, Input, Modal, Toggle, useUi } from "./ui";
+import { Button, Field, ImageUrlDialog, Input, Modal, Toggle, useUi } from "./ui";
 
 /** Nút trên thanh công cụ (giữ vùng chọn khi bấm: preventDefault ở mousedown) */
 function B({ on, title, onClick, icon: Icon, disabled, off }) {
@@ -104,10 +104,8 @@ export default function RichText({
   lang,
 }) {
   const { toast } = useUi();
-  const fileRef = useRef(null);
   const [imgOpen, setImgOpen] = useState(false);
   const [linkState, setLinkState] = useState(null); // { href, blank } khi đang mở hộp chèn link
-  const [imgUrl, setImgUrl] = useState("");
   const [source, setSource] = useState(false);
   const [busy, setBusy] = useState(false);
   const [creditState, setCreditState] = useState(null); // { pos, isNew, fields } khi đang sửa nguồn ảnh
@@ -151,7 +149,6 @@ export default function RichText({
 
   const insertImage = async (files) => {
     const list = [...(files ?? [])];
-    if (fileRef.current) fileRef.current.value = "";
     if (!list.length || !editor) return;
     setImgOpen(false); // nhường chỗ cho hộp cắt ảnh (nếu cần)
     setBusy(true);
@@ -166,18 +163,24 @@ export default function RichText({
   };
 
   /** Ảnh từ link: máy chủ nhờ Cloudinary chép ảnh về (không nhúng thẳng ảnh của trang khác) */
-  const insertImageUrl = async () => {
-    const url = imgUrl.trim();
-    if (!/^https?:\/\/\S+$/i.test(url))
-      return toast("Link ảnh phải bắt đầu bằng http:// hoặc https://", "error");
+  const insertImageLinks = async (links) => {
+    if (!editor) return false;
     setBusy(true);
     try {
-      const { urls } = await cropper.importLinks([url], { beforeCrop: () => setImgOpen(false) });
-      if (urls[0]) insertImages(editor, [urls[0]]);
-      setImgUrl("");
-      setImgOpen(false);
+      const { urls, failed } = await cropper.importLinks(links.slice(0, 10), {
+        beforeCrop: () => setImgOpen(false),
+      });
+      if (urls.length) insertImages(editor, urls);
+      if (failed)
+        toast(
+          `${failed} link không lấy được ảnh (link hỏng hoặc không phải ảnh công khai)`,
+          "error",
+        );
+      if (!failed) setImgOpen(false);
+      return !failed;
     } catch (err) {
       toast(errorMessage(err), "error");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -459,65 +462,17 @@ export default function RichText({
       ) : (
         <EditorContent editor={editor} />
       )}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-        multiple
-        hidden
-        onChange={(e) => insertImage(e.target.files)}
-      />
       {cropper.dialog}
 
-      <Modal
+      <ImageUrlDialog
         open={imgOpen}
         onClose={() => setImgOpen(false)}
-        size="sm"
-        icon={ImagePlus}
         title="Chèn ảnh vào nội dung"
-        description="Tải ảnh từ máy hoặc dán link. Ảnh hiện ngay trong bài, tự căn giữa và vừa khung — chỉ được lưu lên website khi bạn bấm Lưu."
-      >
-        <div className="space-y-5">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-            className="flex w-full items-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-left transition hover:border-brand-300 hover:bg-brand-50/50 disabled:opacity-60"
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-brand-600 shadow-sm ring-1 ring-slate-200">
-              {busy ? (
-                <Loader2 className="size-5 animate-spin" />
-              ) : (
-                <ImagePlus className="size-5" />
-              )}
-            </span>
-            <span>
-              <span className="block text-sm font-semibold text-slate-800">Tải ảnh từ máy</span>
-              <span className="block text-xs text-slate-500">
-                JPG, PNG, WebP, AVIF, GIF · tối đa 8MB / ảnh · chọn nhiều ảnh được
-              </span>
-            </span>
-          </button>
-          <div className="flex items-center gap-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-            <span className="h-px flex-1 bg-slate-200" /> hoặc{" "}
-            <span className="h-px flex-1 bg-slate-200" />
-          </div>
-          <Field label="Dán link ảnh" hint="Link trực tiếp tới file ảnh, mở được công khai.">
-            <div className="flex gap-2">
-              <Input
-                value={imgUrl}
-                onChange={(e) => setImgUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), insertImageUrl())}
-                placeholder="https://…/anh.jpg"
-                inputMode="url"
-              />
-              <Button onClick={insertImageUrl} loading={busy} disabled={!imgUrl.trim()}>
-                Chèn
-              </Button>
-            </div>
-          </Field>
-        </div>
-      </Modal>
+        multiple
+        busy={busy}
+        onFiles={insertImage}
+        onSubmit={insertImageLinks}
+      />
 
       <Modal
         open={!!linkState}

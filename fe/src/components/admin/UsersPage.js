@@ -493,8 +493,9 @@ function PermissionMatrix({ value, onChange, disabled }) {
 
       <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-xs leading-relaxed text-slate-600">
         <b>Xem</b>: chỉ xem. <b>Sửa</b>: thêm mới, sửa, ẩn/hiện, sắp xếp (với đơn: đổi trạng thái,
-        ghi chú). <b>Toàn quyền</b>: như Sửa, thêm quyền xoá. Cài đặt và Tài khoản quản trị luôn chỉ
-        dành cho quản trị viên.
+        ghi chú). <b>Toàn quyền</b>: như Sửa, thêm quyền xoá — mục không có gì để xoá thì chỉ có tới
+        Sửa. Cài đặt (thông tin liên hệ, email thông báo, thanh toán 9Pay…) và Tài khoản quản trị
+        luôn chỉ dành cho quản trị viên.
       </p>
 
       {PERMISSION_GROUPS.map((g) => (

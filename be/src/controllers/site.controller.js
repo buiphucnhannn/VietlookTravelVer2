@@ -3,7 +3,7 @@ import { enquiryModule, viewableKinds } from "../middlewares/enquiry-access.midd
 import { auditService } from "../services/audit.service.js";
 import { authService } from "../services/auth.service.js";
 import { enquiryService } from "../services/enquiry.service.js";
-import { pageService } from "../services/modules.service.js";
+import { pageCopyService, pageService } from "../services/modules.service.js";
 import { publicService } from "../services/public.service.js";
 import { reviewStatsService } from "../services/review-stats.service.js";
 import { settingsService } from "../services/settings.service.js";
@@ -57,6 +57,8 @@ export const publicController = {
   taxonomy: async (_req, res) => ok(res, await publicService.taxonomy()),
   services: async (_req, res) => ok(res, await publicService.services()),
   pages: async (_req, res) => ok(res, await publicService.pages()),
+  // Giao diện trang (khoá đã kiểm tra ở route): ô đã sửa trong CMS, website đè lên nội dung mặc định
+  pageCopy: async (req, res) => ok(res, await pageCopyService.publicData(req.params.key)),
   reviews: async (_req, res) => ok(res, await publicService.reviews()),
   home: async (_req, res) => ok(res, await publicService.home()),
   slugs: async (_req, res) => ok(res, await publicService.slugs()),
@@ -64,6 +66,8 @@ export const publicController = {
     ok(res, {
       tracking: await settingsService.getTracking(),
       smallGroup: await settingsService.getSmallGroup(),
+      // Thông tin liên hệ công ty (CMS → Cài đặt → Thông tin liên hệ) — website dùng cho đầu / chân trang, nút chat…
+      contact: await settingsService.getContact(),
       reviewStats: await reviewStatsService.publicStats(),
     }),
 
@@ -178,6 +182,16 @@ export const settingsController = {
     ok(res, data);
   },
 
+  /* Giao diện các trang công khai (khoá trang đã kiểm tra ở route — requirePageCopyKey) */
+  pageCopies: async (_req, res) => ok(res, await pageCopyService.list()),
+  pageCopy: async (req, res) => ok(res, await pageCopyService.get(req.params.key)),
+  async savePageCopy(req, res) {
+    const { key } = req.params;
+    const data = await pageCopyService.save(key, req.validated.body);
+    auditService.record(req, "page.update", { target: { type: "page", id: key } });
+    ok(res, data);
+  },
+
   getNotifications: async (_req, res) => ok(res, await settingsService.getNotifications()),
   async saveNotifications(req, res) {
     const data = await settingsService.saveNotifications(req.validated.body, req.user);
@@ -191,6 +205,14 @@ export const settingsController = {
     ok(res, data);
   },
 
+  getContact: async (_req, res) => ok(res, await settingsService.getContact()),
+  async saveContact(req, res) {
+    const data = await settingsService.saveContact(req.validated.body, req.user);
+    auditService.record(req, "settings.contact", {
+      meta: { phones: data.phones.length, email: data.email },
+    });
+    ok(res, data);
+  },
   getSmallGroup: async (_req, res) => ok(res, await settingsService.getSmallGroup()),
   async saveSmallGroup(req, res) {
     const data = await settingsService.saveSmallGroup(req.validated.body, req.user);
@@ -198,7 +220,7 @@ export const settingsController = {
     ok(res, data);
   },
 
-  /* Điểm & số lượt đánh giá (Tripadvisor / Google) — chỉ admin xem; tự cập nhật qua Apify (mã trên máy chủ) */
+  /* Điểm & số lượt đánh giá (Tripadvisor / Google) — theo quyền Đánh giá; tự cập nhật qua Apify (mã trên máy chủ) */
   getReviewStats: async (_req, res) => ok(res, await reviewStatsService.get()),
   /**
    * Nút "Cập nhật ngay": BẮT ĐẦU lấy số mới (chạy nền 20–90 giây) rồi trả ngay; CMS hỏi lại GET để biết kết quả.

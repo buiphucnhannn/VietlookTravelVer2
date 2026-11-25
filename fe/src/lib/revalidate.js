@@ -3,6 +3,7 @@
 import { updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { BACKEND_URL, backendHeaders } from "@/config/urls.mjs";
+import { PAGE_COPY_KEYS } from "@/lib/page-copy/registry.mjs";
 
 /** Thẻ cache website (lib/catalog.js gắn cacheTag tương ứng) */
 const TAGS = new Set([
@@ -23,7 +24,10 @@ const TAGS = new Set([
  * @param {string[]} tags vd. ["tours"], ["destinations", "tours"]
  */
 export async function refreshPublicContent(tags) {
-  const list = (Array.isArray(tags) ? tags : [tags]).filter((t) => TAGS.has(t));
+  const list = (Array.isArray(tags) ? tags : [tags]).filter(
+    // "page:<khoá>": giao diện 1 trang (CMS → Giao diện trang) — chỉ khoá đã khai báo
+    (t) => TAGS.has(t) || (t?.startsWith?.("page:") && PAGE_COPY_KEYS.includes(t.slice(5))),
+  );
   if (!list.length) return false;
   const res = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
     headers: {

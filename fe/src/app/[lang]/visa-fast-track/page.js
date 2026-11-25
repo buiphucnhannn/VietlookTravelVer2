@@ -3,8 +3,9 @@ import { AlertTriangle, CalendarDays, Clock3, FileCheck2, Info } from "lucide-re
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, tr } from "@/i18n/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";
-import { airportCodes, airports, visaFaq, visaNotes, visaProcesses, visaTerms } from "@/data/visa";
+import { airportCodes, airports, visaProcesses } from "@/data/visa";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import VisaForm from "@/components/forms/VisaForm";
@@ -16,12 +17,13 @@ import { subgrid } from "@/lib/subgrid";
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const p = await getPageText("visa-fast-track", lang, dict);
   return pageMetadata({
     lang,
     path: "/visa-fast-track",
-    title: dict.visa.title,
-    description: dict.visa.intro,
-    image: "/images/tours/welcome-vietlook.png",
+    title: p.heroTitle,
+    description: p.heroIntro,
+    image: p.heroImages[0],
   });
 }
 
@@ -35,12 +37,22 @@ export default async function VisaPage({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const v = dict.visa;
+  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Visa & Fast-track (chưa sửa = nội dung mặc định)
+  const p = await getPageText("visa-fast-track", lang, dict);
+  const groups = { arrival: p.groupArrival, departure: p.groupDeparture, addons: p.groupAddons };
+  const groupSub = {
+    arrival: p.groupArrivalSub,
+    departure: p.groupDepartureSub,
+    addons: p.groupAddonsSub,
+  };
+  const tabs = { arrival: p.tabArrival, departure: p.tabDeparture, evisa: p.tabEvisa };
+  const steps = { arrival: p.stepsArrival, departure: p.stepsDeparture, evisa: p.stepsEvisa };
   const c = { ...dict.common, fullName: dict.tour.fullName, phone: dict.tour.phone };
 
-  const localize = (p) => ({
-    ...p,
-    label: tr(p.name, lang),
-    text: tr(p.desc, lang),
+  const localize = (pkg) => ({
+    ...pkg,
+    label: tr(pkg.name, lang),
+    text: tr(pkg.desc, lang),
   });
   const packages = Object.fromEntries(
     Object.entries(fastTrackPackages).map(([g, list]) => [g, list.map(localize)]),
@@ -49,13 +61,14 @@ export default async function VisaPage({ params }) {
   const ap = airportCodes
     .map((code) => airports.find((a) => a.code === code))
     .map((a) => ({ ...a, label: tr(a.name, lang) }));
+  // biểu tượng từng bước cố định (data/visa.js), chữ sửa được trong CMS
   const processes = Object.fromEntries(
-    Object.entries(visaProcesses).map(([k, steps]) => [
+    Object.entries(visaProcesses).map(([k, list]) => [
       k,
-      steps.map((s) => ({ icon: s.icon, title: tr(s.title, lang), text: tr(s.text, lang) })),
+      list.map((s, i) => ({ icon: s.icon, ...steps[k][i] })),
     ]),
   );
-  const faq = visaFaq[lang] || visaFaq.en;
+  const faq = p.faq;
 
   return (
     <>
@@ -72,28 +85,24 @@ export default async function VisaPage({ params }) {
       />
 
       <BrushHero
-        title={v.title}
-        subtitle={v.intro}
-        images={[
-          "/images/tours/welcome-vietlook.png",
-          "/images/tours/v2/hanoi-34405373.jpg",
-          "/images/tours/v2/ho-chi-minh-city-1018478.jpg",
-        ]}
-        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: v.title }]}
+        title={p.heroTitle}
+        subtitle={p.heroIntro}
+        images={p.heroImages}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: p.heroTitle }]}
       >
-        <p className="mt-3 text-lg font-bold text-amber-brand drop-shadow">{v.subtitle}</p>
+        <p className="mt-3 text-lg font-bold text-amber-brand drop-shadow">{p.heroTagline}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <a
             href="#fast-track"
             className="inline-flex h-12 items-center rounded-md bg-clay-500 px-6 font-semibold shadow-lg hover:bg-clay-600"
           >
-            {v.fastTitle}
+            {p.ctaFast}
           </a>
           <a
             href="#visa"
             className="inline-flex h-12 items-center rounded-md border-2 border-white/70 px-6 font-semibold hover:bg-white hover:text-forest-900"
           >
-            {v.typesTitle}
+            {p.ctaTypes}
           </a>
         </div>
       </BrushHero>
@@ -101,13 +110,13 @@ export default async function VisaPage({ params }) {
       {/* 1. Gói fast-track theo 3 nhóm */}
       <section id="fast-track" className="scroll-mt-32 bg-cream-50 py-14 lg:py-[4.5rem]">
         <Container>
-          <SectionHeading title={v.fastTitle} subtitle={v.fastSubtitle} />
+          <SectionHeading title={p.fastTitle} subtitle={p.fastSubtitle} />
           <PackageGroups
             packages={packages}
             airports={ap}
             labels={{
-              groups: v.groups,
-              groupSub: v.groupSub,
+              groups,
+              groupSub,
               priceByAirport: v.priceByAirport,
               perPax: v.perPax,
               book: v.bookPackage,
@@ -116,23 +125,23 @@ export default async function VisaPage({ params }) {
               from: dict.common.from,
             }}
           />
-          <p className="mt-4 text-center text-xs text-muted">{v.dashNote}</p>
+          <p className="mt-4 text-center text-xs text-muted">{p.dashNote}</p>
           <p className="mt-6 flex items-center justify-center gap-2 text-sm text-muted">
-            <Info className="size-4" /> {v.priceNote}
+            <Info className="size-4" /> {p.priceNote}
           </p>
         </Container>
       </section>
 
       {/* 2. Quy trình 5 bước: nhập cảnh / xuất cảnh / e-visa */}
       <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
-        <BgImage src="/images/tours/v2/hanoi-34405373.jpg" tone="light" />
+        <BgImage src={p.processImage} tone="light" />
         <Container>
-          <SectionHeading title={v.processTitle} subtitle={v.processSubtitle} />
-          <ProcessTabs processes={processes} tabs={v.processTabs} />
+          <SectionHeading title={p.processTitle} subtitle={p.processSubtitle} />
+          <ProcessTabs processes={processes} tabs={tabs} />
 
           {/* 3. Hai lưu ý bắt buộc */}
           <div className="mx-auto mt-12 grid max-w-4xl gap-4 sm:grid-cols-2">
-            {visaNotes.map((n, i) => (
+            {p.notes.map((n, i) => (
               <Reveal
                 key={i}
                 delay={i * 90}
@@ -140,8 +149,8 @@ export default async function VisaPage({ params }) {
               >
                 <AlertTriangle className="mt-0.5 size-5 shrink-0 text-clay-600" />
                 <p className="text-sm leading-relaxed text-ink">
-                  <span className="mr-1 font-bold text-clay-600">{v.notesTitle}:</span>
-                  {tr(n, lang)}
+                  <span className="mr-1 font-bold text-clay-600">{p.notesTitle}:</span>
+                  {n}
                 </p>
               </Reveal>
             ))}
@@ -152,17 +161,19 @@ export default async function VisaPage({ params }) {
       {/* 4. Thuật ngữ chuẩn EN / ZH */}
       <section className="bg-cream-100 py-14 lg:py-[4.5rem]">
         <Container>
-          <SectionHeading title={v.termsTitle} subtitle={v.termsSubtitle} />
+          <SectionHeading title={p.termsTitle} subtitle={p.termsSubtitle} />
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {visaTerms.map((x, i) => (
+            {p.terms.map((x, i) => (
               <Reveal
                 as="div"
-                key={x.term.en}
+                key={i}
                 delay={(i % 4) * 70}
                 className={cn("rounded-2xl bg-white p-5 ring-1 ring-sand-300/70", subgrid(2, "sm"))}
               >
-                <dt className="font-bold text-forest-700">{tr(x.term, lang)}</dt>
-                <dd className="mt-2 text-sm leading-relaxed text-ink/75">{tr(x.def, lang)}</dd>
+                <dt className="font-bold text-forest-700">{x.term}</dt>
+                <dd className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink/75">
+                  {x.meaning}
+                </dd>
               </Reveal>
             ))}
           </dl>
@@ -172,7 +183,7 @@ export default async function VisaPage({ params }) {
       {/* 5. Các loại visa */}
       <section id="visa" className="scroll-mt-32 py-14 lg:py-[4.5rem]">
         <Container>
-          <SectionHeading title={v.typesTitle} />
+          <SectionHeading title={p.typesTitle} />
           <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-sand-300/70">
             <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)] gap-6 border-b border-sand-300/60 bg-cream-100 px-6 py-3.5 text-xs font-bold tracking-[0.12em] text-forest-700 uppercase md:grid">
               <span>{v.typeCol}</span>
@@ -220,7 +231,7 @@ export default async function VisaPage({ params }) {
             })}
           </div>
           <p className="mt-4 flex items-start gap-2 text-sm text-muted">
-            <Info className="mt-0.5 size-4 shrink-0" /> {v.note}
+            <Info className="mt-0.5 size-4 shrink-0" /> {p.typesNote}
           </p>
         </Container>
       </section>
@@ -230,25 +241,18 @@ export default async function VisaPage({ params }) {
         id="book-visa"
         className="relative isolate scroll-mt-32 overflow-clip bg-cream-50 py-14 lg:py-[4.5rem]"
       >
-        <BgImage src="/images/tours/v2/ho-chi-minh-city-1018478.jpg" tone="mist" />
+        <BgImage src={p.formImage} tone="mist" />
         <Container className="grid items-start gap-10 lg:grid-cols-[1.25fr_0.75fr]">
           <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-sand-300/70 sm:p-8">
-            <h2 className="mb-6 text-3xl font-bold tracking-tight text-ink">{v.formTitle}</h2>
-            <VisaForm
-              lang={lang}
-              t={v}
-              c={c}
-              airports={ap}
-              levels={levels}
-              groupLabels={v.groups}
-            />
+            <h2 className="mb-6 text-3xl font-bold tracking-tight text-ink">{p.formTitle}</h2>
+            <VisaForm lang={lang} t={v} c={c} airports={ap} levels={levels} groupLabels={groups} />
           </div>
           <div className="lg:sticky lg:top-32">
-            <h2 className="mb-5 text-2xl font-bold text-ink">{v.faqTitle}</h2>
+            <h2 className="mb-5 text-2xl font-bold text-ink">{p.faqTitle}</h2>
             <div className="space-y-3">
               {faq.map((f, i) => (
                 <details
-                  key={f.q}
+                  key={i}
                   open={i === 0}
                   className="group rounded-2xl bg-white ring-1 ring-sand-300/70"
                 >
@@ -258,7 +262,7 @@ export default async function VisaPage({ params }) {
                       +
                     </span>
                   </summary>
-                  <p className="px-5 pb-5 text-muted">{f.a}</p>
+                  <p className="px-5 pb-5 whitespace-pre-line text-muted">{f.a}</p>
                 </details>
               ))}
             </div>

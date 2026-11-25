@@ -19,6 +19,7 @@ import {
 } from "../services/modules.service.js";
 import { idParam } from "../validators/common.validator.js";
 import { reviewImportService } from "../services/review-import.service.js";
+import { auditService } from "../services/audit.service.js";
 import { limiter } from "../middlewares/rate-limit.middleware.js";
 import { ok } from "../utils/response.js";
 import { reviewImportQuery, reviewSchema } from "../validators/review.validator.js";
@@ -89,17 +90,17 @@ router.use("/car-areas", crud(carAreaService, carAreaSchema, "car_area", "cars")
 router.use("/visa-types", crud(visaTypeService, visaTypeSchema, "visa_type", "visa"));
 router.use("/fast-track", crud(fastTrackService, fastTrackSchema, "fast_track", "visa"));
 
-// Lấy đánh giá mới nhất (Tripadvisor / Google, qua Apify — chạy nền 20–90 giây) để chọn thêm vào danh sách.
-// POST /preview bắt đầu, GET /preview xem trạng thái / kết quả. Chỉ xem trước — thêm thật đi qua POST /reviews
-// bình thường (kiểm tra dữ liệu + nhật ký). Quyền: sửa Đánh giá.
+// Lấy đánh giá mới nhất (Tripadvisor / Google, qua Apify — chạy ở Apify 10–60 giây) để chọn thêm vào danh sách.
+// POST /preview bắt đầu (trả ngay), GET /preview hỏi tiến độ / kết quả (lần lấy lưu trong MongoDB, không giữ
+// request dài). Chỉ xem trước — thêm thật đi qua POST /reviews bình thường (kiểm tra dữ liệu + nhật ký). Quyền: sửa Đánh giá.
 // Gắn TRƯỚC /reviews để "/import" không bị hiểu là mã đánh giá.
 const reviewImport = Router();
 reviewImport.use(requireStaff);
 reviewImport.get("/sources", requirePermission("reviews", "view"), async (_req, res) =>
   ok(res, await reviewImportService.sources()),
 );
-reviewImport.get("/preview", requirePermission("reviews", "edit"), (_req, res) =>
-  ok(res, reviewImportService.previewStatus()),
+reviewImport.get("/preview", requirePermission("reviews", "edit"), async (_req, res) =>
+  ok(res, await reviewImportService.previewStatus()),
 );
 reviewImport.post(
   "/preview",
@@ -110,8 +111,14 @@ reviewImport.post(
     message: "Bạn vừa lấy đánh giá nhiều lần, vui lòng thử lại sau ít phút",
   }),
   validate({ body: reviewImportQuery }),
-  async (req, res) =>
-    ok(res, await reviewImportService.startPreview({ source: req.validated.body.source })),
+  async (req, res) => {
+    const source = req.validated.body.source;
+    // Lần lấy MỚI (tốn hạn mức Apify) → ghi nhật ký ai bấm; đang có lần chạy dở thì chỉ trả lần đó, không ghi thêm
+    const wasRunning = (await reviewImportService.previewStatus()).status === "running";
+    const job = await reviewImportService.startPreview({ source });
+    if (!wasRunning) auditService.record(req, "review.fetch", { meta: { source: source ?? "" } });
+    ok(res, job);
+  },
 );
 router.use("/reviews/import", reviewImport);
 

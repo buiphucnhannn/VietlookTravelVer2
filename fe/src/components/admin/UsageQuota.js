@@ -8,7 +8,7 @@ import { fmtDate } from "./ui";
  * Hạn mức dùng dịch vụ lấy số đánh giá trong tháng (dữ liệu `quota` từ máy chủ — không bao giờ có mã / khoá).
  * Apify: tính bằng USD (gói Free 5 USD / chu kỳ). Nhà cung cấp không có số hạn mức → quota = null →
  * chỉ hiện "Lượt dùng: theo gói của nhà cung cấp".
- * Dùng ở Cài đặt → "Điểm & số lượt đánh giá" và hộp "Lấy đánh giá" (compact).
+ * Dùng ở thẻ "Điểm & số lượt đánh giá" (Cài đặt + trang Đánh giá) và hộp "Lấy đánh giá" (compact).
  * Backend: be/src/services/review-providers/index.js → quotaView().
  */
 

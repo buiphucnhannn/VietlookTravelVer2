@@ -21,9 +21,9 @@ import {
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, lp, tr } from "@/i18n/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";
-import { siteConfig } from "@/constants/site";
 import { airportFrom, carRoutes, places, quoteRoutes, routeTitle } from "@/data/cars";
-import { getCatalog, getReviews } from "@/lib/catalog";
+import { getCatalog, getContactInfo, getReviews } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 import { Breadcrumbs, Container, Reveal, SectionHeading, Stars } from "@/components/ui";
 import { CarQuoteForm, CarQuoteProvider, QuickQuote } from "@/components/car/CarQuote";
 import FleetStage from "@/components/car/FleetStage";
@@ -37,12 +37,13 @@ import { subgrid } from "@/lib/subgrid";
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const p = await getPageText("car-rental", lang, dict);
   return pageMetadata({
     lang,
     path: "/car-rental",
-    title: dict.car.eyebrow,
-    description: dict.car.text,
-    image: "/images/cars/luxury-v3a.webp",
+    title: p.heroEyebrow,
+    description: p.heroText,
+    image: p.asideImage,
   });
 }
 
@@ -88,6 +89,9 @@ export default async function CarRentalPage({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const t = dict.car;
+  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Thuê xe (chưa sửa = đúng chữ trong từ điển, ảnh có sẵn)
+  const p = await getPageText("car-rental", lang, dict);
+  const info = await getContactInfo(); // CMS → Cài đặt → Thông tin liên hệ
   const c = {
     ...dict.common,
     fullName: dict.tour.fullName,
@@ -137,7 +141,7 @@ export default async function CarRentalPage({ params }) {
     "@context": "https://schema.org",
     "@type": "Service",
     serviceType: "Private car hire with driver",
-    provider: { "@type": "TravelAgency", name: siteConfig.legalName },
+    provider: { "@type": "TravelAgency", name: info.legalName },
     areaServed: "Vietnam",
     offers: carRoutes
       .filter((r) => r.prices.sedan)
@@ -159,7 +163,7 @@ export default async function CarRentalPage({ params }) {
           Ảnh: Pexels #28315416 (giấy phép miễn phí thương mại). */}
       <section className="relative isolate flex flex-col overflow-hidden bg-[#0b1b2b] text-white lg:min-h-[min(100svh,960px)]">
         <Image
-          src="/images/heroes/car-ha-giang-road.webp"
+          src={p.heroImage}
           alt="Private car on the Ha Giang mountain pass, Vietnam"
           fill
           priority
@@ -174,33 +178,35 @@ export default async function CarRentalPage({ params }) {
             <Breadcrumbs
               light
               className="mb-5"
-              items={[{ label: "Vietlook", href: href(lang) }, { label: t.eyebrow }]}
+              items={[{ label: "Vietlook", href: href(lang) }, { label: p.heroEyebrow }]}
             />
             <p className="flex items-center gap-2 text-sm font-bold tracking-[0.18em] text-amber-brand uppercase">
-              <Car className="size-4" /> {t.eyebrow}
+              <Car className="size-4" /> {p.heroEyebrow}
             </p>
             <h1 className="mt-4 text-4xl leading-[1.05] font-extrabold tracking-[-0.035em] sm:text-5xl xl:text-[3.4rem]">
-              {t.title}
+              {p.heroTitle}
             </h1>
-            <p className="mt-4 max-w-xl text-lg leading-relaxed text-white/80">{t.text}</p>
+            <p className="mt-4 max-w-xl text-lg leading-relaxed whitespace-pre-line text-white/80">
+              {p.heroText}
+            </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <a
                 href="#quote"
                 className="inline-flex h-12 items-center rounded-xl bg-amber-brand px-7 font-bold text-ink shadow-lg shadow-amber-brand/25 transition hover:brightness-105 max-sm:px-5 sm:h-13"
               >
-                {t.ctaQuote}
+                {p.ctaQuote}
               </a>
               <a
                 href="#fleet"
                 className="inline-flex h-12 items-center rounded-xl border-2 border-white/40 px-7 font-semibold transition hover:bg-white hover:text-ink max-sm:px-5 sm:h-13"
               >
-                {t.ctaFleet}
+                {p.ctaFleet}
               </a>
             </div>
             <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-2.5">
-              {t.perks.map((p) => (
-                <li key={p} className="flex items-center gap-2.5 font-medium">
-                  <CheckCircle2 className="size-5 text-amber-brand" /> {p}
+              {p.perks.map((x, i) => (
+                <li key={i} className="flex items-center gap-2.5 font-medium">
+                  <CheckCircle2 className="size-5 text-amber-brand" /> {x}
                 </li>
               ))}
             </ul>
@@ -220,20 +226,20 @@ export default async function CarRentalPage({ params }) {
       <section className="border-t-2 border-amber-brand bg-white shadow-[0_10px_30px_-20px_rgba(0,0,0,0.3)]">
         <Container>
           <ul className="grid gap-6 py-8 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
-            {t.trust.map((x, i) => {
+            {p.trust.map((x, i) => {
               const Icon = trustIcons[i];
               return (
                 // Từ sm: subgrid 2 hàng (tiêu đề · mô tả), biểu tượng chiếm cả 2 hàng → các ô thẳng hàng nhau
                 <li
-                  key={x.t}
+                  key={i}
                   className="flex items-center gap-4 sm:row-span-2 sm:grid sm:grid-cols-[auto_1fr] sm:grid-rows-subgrid sm:items-start sm:gap-y-0 lg:px-6 lg:first:pl-0"
                 >
                   <span className="grid size-13 shrink-0 place-items-center rounded-2xl bg-amber-brand/15 text-[#a26a00] sm:row-span-2 sm:self-center">
                     <Icon className="size-5" />
                   </span>
                   <span className="leading-tight sm:contents">
-                    <span className="block font-bold text-ink">{x.t}</span>
-                    <span className="text-sm text-muted">{x.d}</span>
+                    <span className="block font-bold text-ink">{x.title}</span>
+                    <span className="text-sm text-muted">{x.text}</span>
                   </span>
                 </li>
               );
@@ -250,8 +256,8 @@ export default async function CarRentalPage({ params }) {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px]" />
         <Container className="relative">
           <header className="mx-auto mb-10 max-w-2xl text-center">
-            <h2 className="heading-lg text-white">{t.fleetTitle}</h2>
-            <p className="mt-3 text-white/70">{t.fleetSubtitle}</p>
+            <h2 className="heading-lg text-white">{p.fleetTitle}</h2>
+            <p className="mt-3 text-white/70">{p.fleetSubtitle}</p>
           </header>
           <FleetStage
             lang={lang}
@@ -265,14 +271,14 @@ export default async function CarRentalPage({ params }) {
       <section id="services" className="scroll-mt-28 py-14 lg:py-[4.5rem]">
         <Container>
           <header className="mb-10 max-w-2xl">
-            <h2 className="heading-lg text-ink">{t.servicesTitle}</h2>
+            <h2 className="heading-lg text-ink">{p.servicesTitle}</h2>
             <span className="mt-4 block h-1 w-14 rounded-full bg-amber-brand" />
           </header>
           <div className="rail grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {t.services.map((s, i) => {
+            {p.services.map((s, i) => {
               const Icon = serviceIcons[i];
               return (
-                <Reveal key={s.title} delay={(i % 3) * 80} className={subgrid(3, "sm")}>
+                <Reveal key={i} delay={(i % 3) * 80} className={subgrid(3, "sm")}>
                   <div
                     className={cn(
                       "group relative h-full overflow-hidden rounded-3xl bg-surface p-7 transition duration-300 hover:-translate-y-1 hover:bg-brand-950 hover:text-white",
@@ -284,7 +290,7 @@ export default async function CarRentalPage({ params }) {
                       <Icon className="size-6" />
                     </span>
                     <h3 className="relative mt-5 text-xl font-bold">{s.title}</h3>
-                    <p className="relative mt-2 leading-relaxed text-muted transition group-hover:text-white/75">
+                    <p className="relative mt-2 leading-relaxed whitespace-pre-line text-muted transition group-hover:text-white/75">
                       {s.text}
                     </p>
                   </div>
@@ -299,8 +305,8 @@ export default async function CarRentalPage({ params }) {
       <section className="bg-[#f6f1e8] py-14 lg:py-[4.5rem]">
         <Container>
           <header className="mb-10 max-w-2xl">
-            <h2 className="heading-lg text-ink">{t.routesTitle}</h2>
-            <p className="mt-3 text-lg text-muted">{t.routesSubtitle}</p>
+            <h2 className="heading-lg text-ink">{p.routesTitle}</h2>
+            <p className="mt-3 text-lg text-muted">{p.routesSubtitle}</p>
           </header>
           <RoutesExplorer areas={areas} routes={routes} classes={classes} t={t} lang={lang} />
         </Container>
@@ -310,8 +316,8 @@ export default async function CarRentalPage({ params }) {
       <section className="py-14 lg:py-[4.5rem]">
         <Container>
           <header className="mb-10 max-w-2xl">
-            <h2 className="heading-lg text-ink">{t.areasTitle}</h2>
-            <p className="mt-3 text-lg text-muted">{t.areasSubtitle}</p>
+            <h2 className="heading-lg text-ink">{p.areasTitle}</h2>
+            <p className="mt-3 text-lg text-muted">{p.areasSubtitle}</p>
             <span className="mt-4 block h-1 w-14 rounded-full bg-amber-brand" />
           </header>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -339,7 +345,7 @@ export default async function CarRentalPage({ params }) {
             ))}
             <div className="col-span-2 flex min-h-44 flex-col justify-center rounded-3xl bg-amber-brand/15 p-6">
               <Globe2 className="size-8 text-[#a26a00]" />
-              <p className="mt-3 font-bold text-ink">{t.areasMore}</p>
+              <p className="mt-3 font-bold whitespace-pre-line text-ink">{p.areasMore}</p>
             </div>
           </div>
         </Container>
@@ -347,18 +353,18 @@ export default async function CarRentalPage({ params }) {
 
       {/* ========== GIÁ ĐÃ BAO GỒM ========== */}
       <section className="relative isolate overflow-hidden pt-8 pb-14 lg:pt-10 lg:pb-[4.5rem]">
-        <BgImage src="/images/cars/ext-saigon-street.webp" tone="light" />
+        <BgImage src={p.includedImage} tone="light" />
         <Container>
           <header className="mb-10 max-w-2xl">
-            <h2 className="heading-lg text-ink">{t.includedTitle}</h2>
+            <h2 className="heading-lg text-ink">{p.includedTitle}</h2>
             <span className="mt-4 block h-1 w-14 rounded-full bg-amber-brand" />
           </header>
           <div className="rail grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {t.included.map((x, i) => {
+            {p.included.map((x, i) => {
               const Icon = includedIcons[i];
               return (
                 <div
-                  key={x.title}
+                  key={i}
                   className={cn(
                     "relative overflow-hidden rounded-3xl border border-border bg-white p-7",
                     subgrid(3, "sm"),
@@ -371,7 +377,7 @@ export default async function CarRentalPage({ params }) {
                     <Icon className="size-5" />
                   </span>
                   <h3 className="mt-5 text-lg font-bold text-ink">{x.title}</h3>
-                  <p className="mt-1.5 text-muted">{x.text}</p>
+                  <p className="mt-1.5 whitespace-pre-line text-muted">{x.text}</p>
                 </div>
               );
             })}
@@ -382,8 +388,8 @@ export default async function CarRentalPage({ params }) {
       {/* ========== DẢI ẢNH ĐỘI XE (marquee) ========== */}
       <section className="overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
         <Container className="mb-8 text-center lg:mb-10">
-          <h2 className="heading-lg text-ink">{t.galleryTitle}</h2>
-          <p className="mt-3 text-lg text-muted">{t.gallerySubtitle}</p>
+          <h2 className="heading-lg text-ink">{p.galleryTitle}</h2>
+          <p className="mt-3 text-lg text-muted">{p.gallerySubtitle}</p>
         </Container>
         {/* 3 dải ảnh chạy ngược chiều nhau: 2 dải ngoại thất + 1 dải nội thất; bấm ảnh để xem lớn */}
         <FleetMarquee
@@ -397,16 +403,16 @@ export default async function CarRentalPage({ params }) {
 
       {/* ========== CÁCH ĐẶT XE ========== */}
       <section className="relative isolate overflow-hidden bg-[#0b1b2b] py-14 text-white lg:py-[4.5rem]">
-        <BgImage src="/images/cars/int-limo-white.webp" tone="night" />
+        <BgImage src={p.howImage} tone="night" />
         <div className="absolute -top-40 -right-40 size-[520px] rounded-full bg-amber-brand/10 blur-3xl" />
         <Container className="relative">
-          <h2 className="heading-lg">{t.howTitle}</h2>
+          <h2 className="heading-lg">{p.howTitle}</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {t.how.map((s, i) => {
+            {p.how.map((s, i) => {
               const Icon = [CalendarCheck, MapPinned, ShieldCheck][i];
               return (
                 <Reveal
-                  key={s.title}
+                  key={i}
                   delay={i * 120}
                   className={cn(
                     "relative rounded-3xl bg-white/5 p-7 ring-1 ring-white/10",
@@ -420,7 +426,7 @@ export default async function CarRentalPage({ params }) {
                     </span>
                   </span>
                   <h3 className="mt-6 text-2xl font-bold">{s.title}</h3>
-                  <p className="mt-2 text-white/70">{s.text}</p>
+                  <p className="mt-2 whitespace-pre-line text-white/70">{s.text}</p>
                   {i < 2 && (
                     <span className="route-dash absolute top-14 -right-6 hidden h-0.5 w-6 text-amber-brand md:block" />
                   )}
@@ -435,7 +441,7 @@ export default async function CarRentalPage({ params }) {
       {reviews.length > 0 && (
         <section className="bg-[#f6f1e8] py-14 lg:py-[4.5rem]">
           <Container>
-            <SectionHeading title={t.reviewsTitle} subtitle={t.reviewsSub} />
+            <SectionHeading title={p.reviewsTitle} subtitle={p.reviewsSub} />
             <div className="rail grid gap-6 md:grid-cols-3">
               {reviews.map((r) => (
                 <figure
@@ -486,10 +492,10 @@ export default async function CarRentalPage({ params }) {
       <section className="py-14 lg:py-[4.5rem]">
         <Container className="grid items-start gap-10 lg:grid-cols-[0.75fr_1.25fr]">
           <div className="lg:sticky lg:top-32">
-            <h2 className="heading-lg text-ink">{t.faqTitle}</h2>
-            <p className="mt-3 text-lg text-muted">{t.faqSub}</p>
+            <h2 className="heading-lg text-ink">{p.faqTitle}</h2>
+            <p className="mt-3 text-lg text-muted">{p.faqSub}</p>
             <a
-              href={siteConfig.messaging.whatsapp}
+              href={info.messaging.whatsapp}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-6 inline-flex h-12 items-center rounded-xl bg-amber-brand px-6 font-bold text-ink hover:brightness-105"
@@ -498,9 +504,9 @@ export default async function CarRentalPage({ params }) {
             </a>
           </div>
           <div className="space-y-3">
-            {t.faq.map((f, i) => (
+            {p.faq.map((f, i) => (
               <details
-                key={f.q}
+                key={i}
                 className="group rounded-2xl bg-[#f6f1e8] ring-1 ring-black/5 open:bg-white open:shadow-md"
               >
                 <summary className="flex cursor-pointer list-none items-center gap-4 p-5 font-semibold text-ink">
@@ -512,7 +518,9 @@ export default async function CarRentalPage({ params }) {
                     +
                   </span>
                 </summary>
-                <p className="px-5 pb-5 pl-[4.75rem] leading-relaxed text-muted">{f.a}</p>
+                <p className="px-5 pb-5 pl-[4.75rem] leading-relaxed whitespace-pre-line text-muted">
+                  {f.a}
+                </p>
               </details>
             ))}
           </div>
@@ -523,8 +531,8 @@ export default async function CarRentalPage({ params }) {
       <section id="quote" className="scroll-mt-28 pt-6 pb-14 lg:pt-8 lg:pb-[4.5rem]">
         <Container className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <h2 className="heading-lg text-ink">{t.formTitle}</h2>
-            <p className="mt-3 mb-6 text-lg text-muted">{t.formSubtitle}</p>
+            <h2 className="heading-lg text-ink">{p.formTitle}</h2>
+            <p className="mt-3 mb-6 text-lg text-muted">{p.formSubtitle}</p>
             <div className="rounded-3xl bg-white p-6 shadow-[0_30px_80px_-40px_rgba(15,62,95,0.5)] ring-1 ring-border sm:p-7">
               <CarQuoteForm lang={lang} t={t} c={c} vehicles={vehicles} />
             </div>
@@ -533,10 +541,10 @@ export default async function CarRentalPage({ params }) {
             <div className="relative overflow-hidden rounded-3xl bg-white p-8 text-ink shadow-[0_30px_80px_-40px_rgba(60,40,10,0.35)] ring-1 ring-sand-300/70">
               <div className="absolute inset-0 bg-[radial-gradient(rgba(197,115,59,0.10)_1px,transparent_1px)] bg-[size:16px_16px]" />
               <div className="relative">
-                <h3 className="text-2xl font-extrabold">{t.talkTitle}</h3>
-                <p className="mt-2 text-muted">{t.talkText}</p>
+                <h3 className="text-2xl font-extrabold">{p.talkTitle}</h3>
+                <p className="mt-2 text-muted">{p.talkText}</p>
                 <a
-                  href={`tel:${siteConfig.contact.hotlineRaw}`}
+                  href={`tel:${info.contact.hotlineRaw}`}
                   className="mt-6 flex items-center gap-4 rounded-2xl bg-cream-50 p-4 ring-1 ring-sand-300/70 transition hover:bg-cream-100 hover:ring-clay-500"
                 >
                   <span className="grid size-12 place-items-center rounded-xl bg-amber-brand text-ink">
@@ -545,7 +553,7 @@ export default async function CarRentalPage({ params }) {
                   <span>
                     <span className="block text-xs text-muted">{t.hotline}</span>
                     <span className="text-xl font-extrabold text-forest-900">
-                      {siteConfig.contact.hotline}
+                      {info.contact.hotline}
                     </span>
                   </span>
                 </a>
@@ -555,13 +563,13 @@ export default async function CarRentalPage({ params }) {
                       icon: WhatsAppIcon,
                       label: "WhatsApp",
                       color: "bg-[#25d366]",
-                      href: siteConfig.messaging.whatsapp,
+                      href: info.messaging.whatsapp,
                     },
                     {
                       icon: ZaloIcon,
                       label: "Zalo",
                       color: "bg-white ring-1 ring-sand-300/70",
-                      href: siteConfig.messaging.zalo,
+                      href: info.messaging.zalo,
                     },
                     {
                       icon: WeChatIcon,
@@ -588,7 +596,7 @@ export default async function CarRentalPage({ params }) {
             </div>
             <div className="relative mt-6 h-56 overflow-hidden rounded-3xl">
               <Image
-                src="/images/cars/luxury-v3a.webp"
+                src={p.asideImage}
                 alt="Private MPV with captain seats"
                 fill
                 sizes="(min-width: 1024px) 35vw, 100vw"

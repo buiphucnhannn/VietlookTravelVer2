@@ -1,23 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "@/components/admin/Link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  CalendarX2,
-  Check,
-  ChevronDown,
-  CreditCard,
-  ExternalLink,
-  FileText,
-  Info,
-  PencilLine,
-  Save,
-  Search,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowLeft, ChevronDown, ExternalLink, Save, Search } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ADMIN_BASE } from "@/config/urls.mjs";
@@ -33,9 +19,7 @@ import { AutoTranslate, useAutoFill } from "./translate";
 import { SeoFields } from "./ArticleEditor";
 import { AboutBody, MiniHero, MiniSite, PolicyBody } from "./pages/canvas";
 import {
-  Badge,
   Button,
-  LANGS,
   LangTabs,
   LoadingBlock,
   Notice,
@@ -50,48 +34,15 @@ import {
 } from "./ui";
 import { usePendingImages } from "./pendingImages";
 import { ReadOnlyArea, usePermission } from "./permissions";
-import { PAGE_LABELS } from "./labels";
+import { pageCopyOf } from "@/lib/page-copy/registry.mjs";
+import { CONTENT_PAGES } from "./pages/list";
+import PageCopyEditor from "./page-copy/PageCopyEditor";
+import PagesHub from "./page-copy/PagesHub";
 
 const TAGS = ["pages"];
 const BASE = `${ADMIN_BASE}/pages`;
 
-const PAGES = [
-  {
-    key: "about",
-    label: PAGE_LABELS.about,
-    icon: Info,
-    url: "/about",
-    text: "Câu chuyện, tầm nhìn, sứ mệnh và giá trị cốt lõi của Vietlook.",
-  },
-  {
-    key: "terms",
-    label: PAGE_LABELS.terms,
-    icon: FileText,
-    url: "/policies/terms",
-    text: "Điều khoản khi khách sử dụng website và dịch vụ.",
-  },
-  {
-    key: "privacy",
-    label: PAGE_LABELS.privacy,
-    icon: ShieldCheck,
-    url: "/policies/privacy",
-    text: "Cách thu thập, sử dụng và bảo vệ thông tin khách hàng.",
-  },
-  {
-    key: "payment",
-    label: PAGE_LABELS.payment,
-    icon: CreditCard,
-    url: "/policies/payment",
-    text: "Hình thức thanh toán, đặt cọc và hoàn tiền.",
-  },
-  {
-    key: "cancellation",
-    label: PAGE_LABELS.cancellation,
-    icon: CalendarX2,
-    url: "/policies/cancellation",
-    text: "Điều kiện và phí khi khách hủy hoặc đổi tour.",
-  },
-];
+const PAGES = CONTENT_PAGES;
 const pageOf = (key) => PAGES.find((p) => p.key === key);
 
 const LANG_KEYS = ["en", "zh", "vi"];
@@ -230,183 +181,19 @@ const toPayload = (d, isAbout) => ({
   isActive: d.isActive,
 });
 
+/**
+ * CMS → Giao diện trang (/admin/pages):
+ *   ?key=about | terms | privacy | payment | cancellation → trình sửa trang giới thiệu / chính sách (bên dưới)
+ *   ?key=<khoá trong lib/page-copy/registry.mjs>           → PageCopyEditor (Thuê xe, Visa…)
+ *   không có key                                             → danh sách mọi trang (PagesHub)
+ */
 export default function ContentPagesPage() {
   const params = useSearchParams();
   const key = params.get("key");
-  return pageOf(key) ? <PageEditor key={key} page={pageOf(key)} /> : <PageList />;
-}
-
-/* =========================================================================
- * Danh sách 5 trang
- * ========================================================================= */
-
-function PageList() {
-  const [state, setState] = useState({ loading: true, error: "", items: [] });
-  useEffect(() => {
-    let alive = true;
-    api("/settings/pages")
-      .then((r) => alive && setState({ loading: false, error: "", items: r.data ?? [] }))
-      .catch((err) => alive && setState({ loading: false, error: errorMessage(err), items: [] }));
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const docOf = (key) => state.items.find((x) => x.key === key);
-
-  return (
-    <>
-      <PageHeader
-        title="Giới thiệu & chính sách"
-        description="Chọn một trang để sửa chữ và ảnh ngay trên bản xem trước."
-      />
-      {state.error && (
-        <Notice tone="error" className="mb-4">
-          {state.error}
-        </Notice>
-      )}
-      {state.loading ? (
-        <LoadingBlock />
-      ) : (
-        <div className="space-y-8">
-          {/* Trang Giới thiệu: thẻ lớn nằm ngang · 4 trang chính sách: một hàng đều nhau */}
-          <section>
-            <ListHeading>Trang giới thiệu</ListHeading>
-            <PageCard wide page={PAGES[0]} doc={docOf(PAGES[0].key)} />
-          </section>
-          <section>
-            <ListHeading>Các trang chính sách</ListHeading>
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {PAGES.slice(1).map((p) => (
-                <PageCard key={p.key} page={p} doc={docOf(p.key)} />
-              ))}
-            </div>
-          </section>
-        </div>
-      )}
-    </>
-  );
-}
-
-function ListHeading({ children }) {
-  return (
-    <h2 className="mb-3 flex items-center gap-3 text-xs font-bold tracking-[0.16em] text-slate-500 uppercase">
-      {children}
-      <span className="h-px flex-1 bg-slate-200" />
-    </h2>
-  );
-}
-
-function PageCard({ page, doc, wide }) {
-  const Icon = page.icon;
-  const isAbout = page.key === "about";
-  // "đã có nội dung" theo từng ngôn ngữ: trang Giới thiệu xét tiêu đề + câu chuyện, chính sách xét bài viết
-  const filled = Object.fromEntries(
-    LANG_KEYS.map((l) => [
-      l,
-      isAbout
-        ? Boolean(doc?.title?.[l]?.trim() || doc?.data?.story?.[l]?.length)
-        : Boolean(doc?.body?.[l]?.trim()),
-    ]),
-  );
-  const image = doc?.image || (isAbout ? ABOUT_HERO_IMAGES[0] : "");
-  return (
-    <Link
-      href={`${BASE}?key=${page.key}`}
-      className={cn(
-        "group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand-200 focus-visible:ring-4 focus-visible:ring-brand-200 focus-visible:outline-none",
-        wide && "md:flex-row",
-      )}
-    >
-      {/* Ảnh thu nhỏ của trang */}
-      <div
-        className={cn(
-          "relative isolate flex aspect-[16/9] items-center justify-center overflow-hidden bg-gradient-to-br from-brand-800 to-brand-950 px-5 text-center text-white",
-          wide && "md:aspect-auto md:min-h-[230px] md:w-[46%] md:shrink-0",
-        )}
-      >
-        {image && (
-          <Image
-            src={image}
-            alt=""
-            fill
-            sizes="(min-width: 1280px) 30vw, (min-width: 640px) 45vw, 100vw"
-            className="-z-10 object-cover transition duration-500 group-hover:scale-105"
-          />
-        )}
-        <span className="absolute inset-0 -z-10 bg-gradient-to-b from-black/45 via-black/25 to-black/55" />
-        <span className="flex flex-col items-center gap-2">
-          <Icon className="size-6 opacity-90" />
-          <span
-            className={cn(
-              "line-clamp-2 text-lg leading-tight font-extrabold tracking-tight drop-shadow-md",
-              wide && "md:text-2xl",
-            )}
-          >
-            {anyLang(doc?.title, "vi") || page.label}
-          </span>
-        </span>
-        <span className="absolute top-3 right-3">
-          {!doc ? (
-            <Badge tone="amber">Chưa có nội dung</Badge>
-          ) : doc.isActive === false ? (
-            <Badge>Đang ẩn</Badge>
-          ) : (
-            <Badge tone="green">Đang hiện</Badge>
-          )}
-        </span>
-      </div>
-
-      <div className={cn("flex min-w-0 flex-1 flex-col p-5", wide && "md:justify-center md:p-7")}>
-        <p
-          className={cn(
-            "font-bold text-slate-900 group-hover:text-brand-700",
-            wide && "md:text-xl",
-          )}
-        >
-          {page.label}
-        </p>
-        <p
-          className={cn(
-            "mt-1 text-sm leading-relaxed text-slate-500",
-            wide ? "md:max-w-xl md:text-[15px]" : "flex-1",
-          )}
-        >
-          {wide
-            ? "Đầu trang, câu chuyện và 4 ảnh, tầm nhìn – sứ mệnh, giá trị cốt lõi, lý do chọn Vietlook, video và những con số."
-            : page.text}
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-1.5">
-          {LANGS.map((l) => (
-            <span
-              key={l.key}
-              title={
-                filled[l.key]
-                  ? `Đã có bản ${l.label}`
-                  : `Chưa có bản ${l.label} — sẽ tự dịch khi lưu`
-              }
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                filled[l.key] ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-400",
-              )}
-            >
-              {filled[l.key] && <Check className="size-3" />}
-              {l.short}
-            </span>
-          ))}
-          <span className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
-            <PencilLine className="size-3.5" />
-            Sửa trang
-          </span>
-        </div>
-        {doc?.updatedAt && (
-          <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-400">
-            Cập nhật {fmtDateTime(doc.updatedAt)}
-          </p>
-        )}
-      </div>
-    </Link>
-  );
+  if (pageOf(key)) return <PageEditor key={key} page={pageOf(key)} />;
+  const copy = pageCopyOf(key);
+  if (copy) return <PageCopyEditor key={key} pageKey={key} entry={copy} />;
+  return <PagesHub />;
 }
 
 /* =========================================================================
@@ -456,7 +243,7 @@ function BackLink({ onClick }) {
       className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-brand-700"
     >
       <ArrowLeft className="size-3.5" />
-      Giới thiệu & chính sách
+      Giao diện trang
     </Link>
   );
 }

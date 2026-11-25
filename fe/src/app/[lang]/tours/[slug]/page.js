@@ -40,7 +40,15 @@ import MobileBookBar from "@/components/tours/MobileBookBar";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { parseVideo } from "@/lib/video";
 import { GoogleIcon, TripAdvisorIcon, WeChatIcon, WhatsAppIcon } from "@/components/ui/BrandIcons";
-import { getCatalog, getPaymentConfig, getSmallGroup, getTour, tourText } from "@/lib/catalog";
+import {
+  getCatalog,
+  getContactInfo,
+  getPaymentConfig,
+  getSmallGroup,
+  getTour,
+  tourText,
+} from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 /**
  * Dựng sẵn lúc build CHỈ các tour quan trọng (nổi bật + dài ngày ở trang chủ + 40 tour đầu danh sách) × 3 ngôn ngữ
@@ -340,6 +348,9 @@ async function TourPageContent({ params }) {
   // 9Pay bật trong CMS → sau khi gửi đơn có bước "Thanh toán"; tắt → đặt tour như cũ
   const paymentConfig = await getPaymentConfig();
   const smallGroup = await getSmallGroup();
+  const info = await getContactInfo(); // CMS → Cài đặt → Thông tin liên hệ
+  // Chữ chung sửa được trong CMS → Giao diện trang → Chữ chung trên trang chi tiết (chưa sửa = từ điển)
+  const p = await getPageText("detail", lang, dict);
   const title = tx.title;
   const destNames = tour.destinations.map((d) => tr(getDestination(d)?.name, lang)).filter(Boolean);
   const duration =
@@ -401,7 +412,6 @@ async function TourPageContent({ params }) {
 
   // Bảng tóm tắt chỉ khi ít nhất 1 ngày có bữa ăn / nghỉ đêm / đi kèm (tour cũ chưa nhập → chỉ hiện danh sách ngày)
   const showGlance = tx.itinerary.some((d) => d.meals?.length || d.overnight || d.support);
-  const ax = dict.access;
 
   const related = relatedTours(tour, 4).map((x) => toCard(x, lang));
   const labels = cardLabels(dict);
@@ -424,7 +434,7 @@ async function TourPageContent({ params }) {
         name: d.title,
       })),
     },
-    provider: { "@type": "TravelAgency", name: siteConfig.legalName, url: siteConfig.url },
+    provider: { "@type": "TravelAgency", name: info.legalName, url: siteConfig.url },
     ...(tour.price && {
       offers: {
         "@type": "Offer",
@@ -517,12 +527,12 @@ async function TourPageContent({ params }) {
               <Ear className="size-4" />
             </span>
             <span className="min-w-0 leading-snug">
-              <span className="font-semibold text-ink">{ax.badge}</span>
+              <span className="font-semibold text-ink">{p.tourAccessBadge}</span>
               <a
                 href="#book"
                 className="ml-2 inline-block font-semibold whitespace-nowrap text-brand-600 hover:text-sun-500 hover:underline"
               >
-                {ax.cta} →
+                {p.tourAccessCta} →
               </a>
             </span>
           </p>
@@ -617,7 +627,7 @@ async function TourPageContent({ params }) {
             {c.bookNow}
           </a>
           <a
-            href={`${siteConfig.messaging.whatsapp}?text=${encodeURIComponent(`Hi Vietlook, I'm interested in: ${title}`)}`}
+            href={`${info.messaging.whatsapp}?text=${encodeURIComponent(`Hi Vietlook, I'm interested in: ${title}`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 flex h-12 items-center justify-center gap-2 rounded-md border-2 border-brand-600 font-semibold text-brand-700 transition hover:bg-brand-600 hover:text-white"
@@ -626,7 +636,7 @@ async function TourPageContent({ params }) {
           </a>
           <p className="mt-4 flex items-center justify-center gap-2 text-sm text-muted">
             <WhatsAppIcon className="size-4 text-[#25d366]" />
-            <WeChatIcon className="size-4 text-[#07c160]" /> {t.askTitle}
+            <WeChatIcon className="size-4 text-[#07c160]" /> {p.tourAskTitle}
           </p>
         </aside>
       </Container>
@@ -934,23 +944,23 @@ async function TourPageContent({ params }) {
             <TourSide
               cardClassName="rounded-2xl bg-white p-5 shadow-[0_24px_60px_-30px_rgba(15,62,95,0.5)] ring-1 ring-border lg:flex lg:max-h-[calc(100dvh-8.25rem)] lg:flex-col xl:p-6 bk-mid:p-5 bk-compact:p-4"
               contact={{
-                title: t.askTitle,
-                text: t.contactText,
-                signoff: t.contactSignoff,
-                team: t.contactTeam,
-                emailLabel: t.contactEmail,
-                channelsNote: tr(siteConfig.contact.channels.hotline, lang),
+                title: p.tourAskTitle,
+                text: p.tourContactText,
+                signoff: p.tourContactSignoff,
+                team: p.tourContactTeam,
+                emailLabel: p.tourContactEmail,
+                channelsNote: tr(info.contact.channels.hotline, lang),
                 labels: {
                   whatsapp: dict.floating.whatsapp,
                   zalo: dict.floating.zalo,
                   wechat: dict.floating.wechat,
                   line: dict.floating.line,
                 },
-                hotline: siteConfig.contact.hotline,
-                hotlineRaw: siteConfig.contact.hotlineRaw,
-                email: siteConfig.contact.email,
-                whatsapp: siteConfig.messaging.whatsapp,
-                zalo: siteConfig.messaging.zalo,
+                hotline: info.contact.hotline,
+                hotlineRaw: info.contact.hotlineRaw,
+                email: info.contact.email,
+                whatsapp: info.messaging.whatsapp,
+                zalo: info.messaging.zalo,
               }}
             >
               {/* leading-none: bỏ khoảng trống dòng chữ thừa → lề trên (tới chữ) bằng lề dưới (dưới nút đặt) */}
@@ -995,7 +1005,7 @@ async function TourPageContent({ params }) {
       {/* "Có thể bạn thích": luôn có dưới mọi tour (relatedTours tự bù tour phổ biến khi không có tour cùng điểm đến) */}
       <section className="py-14 lg:py-[4.5rem]">
         <Container>
-          <SectionHeading title={t.related} />
+          <SectionHeading title={p.tourRelated} />
           <div className="rail grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {related.map((card) => (
               <TourCard key={card.slug} card={card} lang={lang} labels={labels} />

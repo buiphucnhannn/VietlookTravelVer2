@@ -1,0 +1,128 @@
+[
+  {
+    "id": "ta-1",
+    "url": "https://www.tripadvisor.com/ShowUserReviews-g17733187-d27950353-rta1-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "title": "Great guide",
+    "lang": "en",
+    "originalLanguage": "en",
+    "isMachineTranslated": false,
+    "locationId": "27950353",
+    "publishedDate": "2026-11-14",
+    "publishedPlatform": null,
+    "rating": 5,
+    "helpfulVotes": 0,
+    "text": "Everything was well organised and our guide was friendly.",
+    "travelDate": "2026-11",
+    "tripType": "FAMILY",
+    "user": {
+      "userId": "user-1",
+      "name": "Traveller A",
+      "contributions": {
+        "totalContributions": 1
+      },
+      "username": "traveller1",
+      "userLocation": null,
+      "avatar": {
+        "id": "0",
+        "width": 1200,
+        "height": 1200,
+        "image": "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1a/f6/eb/6d/default-avatar-2020-19.jpg"
+      },
+      "link": "www.tripadvisor.com/Profile/traveller1"
+    },
+    "ownerResponse": null,
+    "subratings": [],
+    "photos": [],
+    "placeInfo": {
+      "id": "27950353",
+      "name": "Vietlook Travel",
+      "rating": 5,
+      "numberOfReviews": 93,
+      "webUrl": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html"
+    }
+  },
+  {
+    "id": "ta-2",
+    "url": "https://www.tripadvisor.com/ShowUserReviews-g17733187-d27950353-rta2-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "title": "Perfect",
+    "lang": "en",
+    "originalLanguage": "en",
+    "isMachineTranslated": false,
+    "locationId": "27950353",
+    "publishedDate": "2026-11-05",
+    "publishedPlatform": null,
+    "rating": 5,
+    "helpfulVotes": 0,
+    "text": "Lovely trip, would book again.",
+    "travelDate": "2026-11",
+    "tripType": "FAMILY",
+    "user": {
+      "userId": "user-2",
+      "name": "Traveller B",
+      "contributions": {
+        "totalContributions": 1
+      },
+      "username": "traveller2",
+      "userLocation": null,
+      "avatar": {
+        "id": "0",
+        "width": 1200,
+        "height": 1200,
+        "image": "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1a/f6/eb/6d/default-avatar-2020-19.jpg"
+      },
+      "link": "www.tripadvisor.com/Profile/traveller2"
+    },
+    "ownerResponse": null,
+    "subratings": [],
+    "photos": [],
+    "placeInfo": {
+      "id": "27950353",
+      "name": "Vietlook Travel",
+      "rating": 5,
+      "numberOfReviews": 93,
+      "webUrl": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html"
+    }
+  },
+  {
+    "id": "ta-3",
+    "url": "https://www.tripadvisor.com/ShowUserReviews-g17733187-d27950353-rta3-Vietlook_Travel-Ha_Dong_Hanoi.html",
+    "title": "很好",
+    "lang": "zh-CN",
+    "originalLanguage": "zh-CN",
+    "isMachineTranslated": false,
+    "locationId": "27950353",
+    "publishedDate": "2026-10-02",
+    "publishedPlatform": null,
+    "rating": 5,
+    "helpfulVotes": 0,
+    "text": "非常满意，导游中文说得很好",
+    "travelDate": "2026-10",
+    "tripType": "COUPLES",
+    "user": {
+      "userId": "user-3",
+      "name": "旅客 C",
+      "contributions": {
+        "totalContributions": 1
+      },
+      "username": "traveller3",
+      "userLocation": null,
+      "avatar": {
+        "id": "0",
+        "width": 1200,
+        "height": 1200,
+        "image": "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1a/f6/eb/6d/default-avatar-2020-19.jpg"
+      },
+      "link": "www.tripadvisor.com/Profile/traveller3"
+    },
+    "ownerResponse": null,
+    "subratings": [],
+    "photos": [],
+    "placeInfo": {
+      "id": "27950353",
+      "name": "Vietlook Travel",
+      "rating": 5,
+      "numberOfReviews": 93,
+      "webUrl": "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html"
+    }
+  }
+]

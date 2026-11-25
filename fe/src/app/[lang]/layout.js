@@ -8,7 +8,8 @@ import { A11yProvider } from "@/components/layout/A11y";
 import SmoothScroll from "@/components/fx/SmoothScroll";
 import { siteConfig } from "@/constants/site";
 import { buildNavigation } from "@/data/navigation";
-import { getCatalog, getTracking } from "@/lib/catalog";
+import { getCatalog, getContactInfo, getTracking } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 import Tracking from "@/components/layout/Tracking";
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, locales, localeMeta, tr } from "@/i18n/config";
@@ -62,26 +63,36 @@ export default async function LangLayout({ children, params }) {
   const catalog = await getCatalog();
   const nav = buildNavigation(lang, dict, catalog);
   const tracking = await getTracking();
+  // Thông tin liên hệ: CMS → Cài đặt → Thông tin liên hệ · chữ đầu & chân trang: CMS → Giao diện trang → Đầu & chân trang
+  const [info, g] = await Promise.all([getContactInfo(), getPageText("global", lang, dict)]);
+  const headerLabels = {
+    ...dict.topbar,
+    dmc: g.topTagline,
+    partners: g.partnersLabel,
+    planTrip: g.planTrip,
+    menu: dict.nav.menu,
+    close: dict.nav.close,
+  };
 
   const org = {
     "@context": "https://schema.org",
     "@type": "TravelAgency",
-    name: siteConfig.legalName,
+    name: info.legalName,
     alternateName: siteConfig.name,
     url: `${siteConfig.url}${href(lang)}`,
     logo: `${siteConfig.url}/images/logo/vietlook-logo.png`,
-    telephone: siteConfig.contact.hotline,
-    email: siteConfig.contact.email,
+    telephone: info.contact.hotline,
+    email: info.contact.email,
     foundingDate: String(siteConfig.since),
     address: {
       "@type": "PostalAddress",
-      streetAddress: "01 Lien Ke 20, Van Khe Urban Area, Ha Dong",
-      addressLocality: "Hanoi",
-      postalCode: "12113",
+      streetAddress: info.postal.streetAddress,
+      addressLocality: info.postal.city,
+      ...(info.postal.postalCode && { postalCode: info.postal.postalCode }),
       addressCountry: "VN",
     },
-    hasMap: siteConfig.maps.link,
-    sameAs: [siteConfig.social.facebook, siteConfig.social.tripadvisor, siteConfig.social.google],
+    hasMap: info.maps.link,
+    sameAs: [info.social.facebook, info.social.tripadvisor, info.social.google],
   };
 
   return (
@@ -111,35 +122,15 @@ export default async function LangLayout({ children, params }) {
           </Suspense>
           <Suspense
             fallback={
-              <HeaderStatic
-                lang={lang}
-                nav={nav}
-                contact={siteConfig.contact}
-                labels={{
-                  ...dict.topbar,
-                  planTrip: dict.nav.planTrip,
-                  menu: dict.nav.menu,
-                  close: dict.nav.close,
-                }}
-              />
+              <HeaderStatic lang={lang} nav={nav} contact={info.contact} labels={headerLabels} />
             }
           >
-            <Header
-              lang={lang}
-              nav={nav}
-              contact={siteConfig.contact}
-              labels={{
-                ...dict.topbar,
-                planTrip: dict.nav.planTrip,
-                menu: dict.nav.menu,
-                close: dict.nav.close,
-              }}
-            />
+            <Header lang={lang} nav={nav} contact={info.contact} labels={headerLabels} />
           </Suspense>
           <main id="main" tabIndex={-1} className="flex-1 outline-none">
             {children}
           </main>
-          <Footer lang={lang} dict={dict} policies={catalog.policies} />
+          <Footer lang={lang} dict={dict} policies={catalog.policies} info={info} copy={g} />
           <FloatingContact
             labels={{
               ...dict.floating,
@@ -150,8 +141,8 @@ export default async function LangLayout({ children, params }) {
               copy: dict.common.copy,
               copied: dict.common.copied,
             }}
-            contact={siteConfig.contact}
-            messaging={siteConfig.messaging}
+            contact={info.contact}
+            messaging={info.messaging}
           />
         </A11yProvider>
       </body>

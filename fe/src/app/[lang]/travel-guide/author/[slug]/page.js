@@ -9,6 +9,7 @@ import { Container } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import PostCard from "@/components/guide/PostCard";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 export async function generateStaticParams() {
   const { authors } = await getCatalog();
@@ -36,6 +37,8 @@ async function GuideAuthorPageContent({ params }) {
   if (!author) notFound();
   const dict = await getDictionary(lang);
   const posts = allPosts.filter((p) => p.author === slug);
+  // tên trang Cẩm nang đã sửa trong CMS → Giao diện trang (breadcrumb khớp tiêu đề trang Cẩm nang)
+  const guidePage = await getPageText("travel-guide", lang, dict);
 
   return (
     <>
@@ -45,7 +48,7 @@ async function GuideAuthorPageContent({ params }) {
         images={posts.map((p) => p.image).filter(Boolean)}
         breadcrumbs={[
           { label: "Vietlook", href: href(lang) },
-          { label: dict.guide.title, href: `${lp(lang)}/travel-guide` },
+          { label: guidePage.heroTitle, href: `${lp(lang)}/travel-guide` },
           { label: tr(author.name, lang) },
         ]}
       >

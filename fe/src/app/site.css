@@ -8,6 +8,36 @@
 @source not "../components/admin";
 @source not "./(system)";
 
+/* Mọi thứ bấm được → con trỏ bàn tay (Tailwind v4 mặc định để mũi tên cho <button>). Đang tắt → mũi tên cấm. */
+@layer base {
+  :where(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"],
+    [role="checkbox"],
+    [role="radio"],
+    summary,
+    select,
+    label[for],
+    input[type="checkbox"],
+    input[type="radio"],
+    input[type="file"],
+    input[type="range"],
+    input[type="color"],
+    input[type="submit"],
+    input[type="button"],
+    input[type="reset"]
+  ):not(:disabled, [aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  :where(button, [role="button"], select, input):is(:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed;
+  }
+}
+
 /* Viền focus chung khi dùng bàn phím (Tab) — chuột bấm không hiện; ô nào tự có kiểu focus riêng thì giữ kiểu đó */
 @layer base {
   :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {

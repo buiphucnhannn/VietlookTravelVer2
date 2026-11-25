@@ -3,15 +3,29 @@ import Link from "next/link";
 import { href, lp, tr } from "@/i18n/config";
 import { cn } from "@/lib/utils";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 import { Container } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import GuideExplorer from "./GuideExplorer";
 import PostCard from "./PostCard";
 
-/** Trang danh sách cẩm nang (dùng chung cho /travel-guide và /travel-guide/category/[slug]). */
+/**
+ * Trang danh sách cẩm nang (dùng chung cho /travel-guide và /travel-guide/category/[slug]).
+ * Chữ sửa được ở CMS → Giao diện trang → Cẩm nang du lịch (tiêu đề + giới thiệu: trang /travel-guide;
+ * chữ thanh lọc / tìm kiếm / nút xem thêm: cả trang chuyên mục). Chưa sửa = đúng chữ trong từ điển.
+ */
 export default async function GuideIndex({ lang, dict, category }) {
   const { guideCategories, allPosts } = await getCatalog();
-  const g = dict.guide;
+  const p = await getPageText("travel-guide", lang, dict);
+  const g = {
+    ...dict.guide,
+    title: p.heroTitle,
+    intro: p.heroIntro,
+    allCategories: p.allCategories,
+    searchPlaceholder: p.searchPlaceholder,
+    noResults: p.noResults,
+    loadMore: p.loadMore,
+  };
   const cats = guideCategories.map((c) => ({ slug: c.slug, name: tr(c.name, lang) }));
   // Chỉ gửi xuống trình duyệt đúng các trường thẻ bài viết cần, chữ đã chọn sẵn theo ngôn ngữ
   // (hàng trăm bài × 3 ngôn ngữ → giảm mạnh dung lượng trang)

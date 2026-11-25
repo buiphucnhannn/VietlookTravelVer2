@@ -21,8 +21,11 @@ import { clip, httpsUrl, mapLang, round1, stars, toCount, toDay } from "./normal
  * - Google điểm: 0,0062 USD (place-scraped 0,004 + place-details-scraped 0,002 + khởi động + máy chủ), ~9 giây
  * - Tripadvisor điểm: 0,0051 USD (result-scraped 0,005 + khởi động), ~13 giây
  *   → ~0,012 USD mỗi lần cập nhật điểm ≈ 0,35 USD/tháng nếu chạy hằng ngày.
- * - Google 20 đánh giá: 0,0162 USD (review-scraped 0,0005/đánh giá), ~21 giây
- * - Tripadvisor 19 đánh giá: 0,0951 USD (review-scraped 0,005/đánh giá — đắt) → chỉ lấy 10 (~0,05 USD), ~8 giây
+ * - Google 20 đánh giá: 0,0162 USD (review-scraped 0,0005/đánh giá), 10–20 giây
+ * - Tripadvisor 19 đánh giá: 0,0951 USD (review-scraped 0,005/đánh giá — đắt) → chỉ lấy 10 (0,0501 USD), 5–25 giây
+ *   → 1 lần "Lấy đánh giá" (2 nền tảng) ĐO THẬT ≈ 0,066 USD.
+ * Lấy đánh giá chạy KHÔNG đồng bộ (POST /acts/<actor>/runs → GET /actor-runs/<id> → GET /datasets/<id>/items),
+ * cập nhật điểm vẫn dùng run-sync-get-dataset-items (nhanh, ~10 giây).
  * Mỗi lần chạy còn bị chặn trần chi phí bằng maxTotalChargeUsd.
  */
 const API = "https://api.apify.com/v2";
@@ -121,17 +124,34 @@ export async function runActor(actor, input, { fetchImpl = fetch, maxCharge } = 
 }
 
 /** Lỗi Apify → câu tiếng Việt dễ hiểu (không chứa mã) */
-export function apifyErrorText(err, { retryHint = "sẽ thử lại lần sau" } = {}) {
+export function apifyErrorText(
+  err,
+  {
+    retryHint = "sẽ thử lại lần sau",
+    quotaHint = "số giữ nguyên, tự chạy lại khi sang chu kỳ mới",
+  } = {},
+) {
   const s = err?.status;
   const t = `${err?.apifyType ?? ""} ${err?.apifyMessage ?? ""}`.toLowerCase();
   if (err?.code === "NO_KEY") return "Chưa cài mã Apify trên máy chủ";
   if (err?.code === "EMPTY") return `Apify không trả về số của công ty, ${retryHint}`;
+  if (err?.code === "EMPTY_REVIEWS") return `Không nhận được đánh giá nào, ${retryHint}`;
+  if (err?.code === "NO_TEXT")
+    return "Các đánh giá mới nhất chỉ chấm sao, không có lời khách để hiện trên website";
+  if (err?.code === "RUN_TIMED_OUT" || err?.code === "STALE")
+    return `Dịch vụ chạy quá lâu nên đã dừng, ${retryHint}`;
+  if (err?.code === "RUN_ABORTED") return `Lần chạy bị dừng giữa chừng, ${retryHint}`;
+  if (err?.code === "RUN_FAILED" && /usage|credit|limit|charge/i.test(err?.apifyMessage ?? ""))
+    return `Đã chạm hạn mức chi phí của Apify — ${quotaHint}`;
+  if (err?.code === "RUN_FAILED")
+    return `Trang đánh giá tạm thời không đọc được (dịch vụ gặp lỗi), ${retryHint}`;
+  if (err?.code === "BAD_RESPONSE") return `Apify trả về dữ liệu không đúng, ${retryHint}`;
   if (err?.name === "TimeoutError" || err?.name === "AbortError" || s === 408)
     return `Apify chạy quá lâu chưa xong, ${retryHint}`;
   if (s === 401) return "Mã Apify trên máy chủ không đúng — kiểm tra lại APIFY_TOKEN";
   if (s === 429) return `Apify đang bận (gọi quá nhiều lần), ${retryHint}`;
   if (s === 402 || /usage|credit|insufficient|payment|hard limit|monthly/.test(t))
-    return "Đã dùng hết hạn mức Apify tháng này — số giữ nguyên, tự chạy lại khi sang chu kỳ mới";
+    return `Đã dùng hết hạn mức Apify tháng này — ${quotaHint}`;
   if (s === 403) return "Mã Apify không được phép chạy công cụ này — kiểm tra quyền của mã";
   if (s === 404) return "Không tìm thấy công cụ lấy số trên Apify";
   if (err?.name === "FetchError") return `Không kết nối được Apify, ${retryHint}`;
@@ -141,6 +161,9 @@ export function apifyErrorText(err, { retryHint = "sẽ thử lại lần sau" }
 /** Mã lỗi ngắn để ghi log (không bao giờ có mã / URL) */
 export const apifyErrorCode = (err) =>
   err?.status ? `HTTP ${err.status}` : err?.code || err?.name || "error";
+
+/** Lỗi khi hỏi trạng thái lần chạy có nên dừng hẳn không (mã sai / không còn lần chạy) — còn lại: hỏi lại sau */
+export const apifyErrorFinal = (err) => [400, 401, 402, 403, 404].includes(err?.status);
 
 /* ---------- Hạn mức tháng (users/me/limits) ---------- */
 
@@ -248,44 +271,37 @@ export async function fetchTripadvisorStats(fetchImpl = fetch) {
   }
 }
 
-/* ---------- Lấy đánh giá ---------- */
+/* ---------- Lấy đánh giá (chạy KHÔNG đồng bộ: bắt đầu → hỏi trạng thái → đọc dataset) ---------- */
+// Không giữ request chờ 20–90 giây: POST /acts/<actor>/runs trả ngay mã lần chạy, CMS hỏi lại
+// GET /actor-runs/<id> (miễn phí) đến khi xong rồi đọc GET /datasets/<id>/items. Máy chủ ngủ / khởi động lại giữa
+// chừng cũng không mất — mã lần chạy lưu trong MongoDB (services/review-import.service.js).
+// https://docs.apify.com/api/v2/act-runs-post · /actor-run-get · /dataset-items-get
 
-/** Google: 20 đánh giá mới nhất — `text` là lời gốc (không lấy textTranslated) */
-export async function fetchGoogleReviews(fetchImpl = fetch) {
-  try {
-    const [p] = await runActor(actorOf("google"), googleInput(REVIEWS_LIMIT.google), {
-      fetchImpl,
-      maxCharge: MAX_CHARGE.google,
-    });
-    return (Array.isArray(p?.reviews) ? p.reviews : []).slice(0, REVIEWS_LIMIT.google).map((r) => ({
-      source: "google",
-      name: clip(r?.name, 100) || "Google user",
-      title: "",
-      text: clip(r?.text, 5000),
-      rating: stars(r?.stars),
-      date: toDay(r?.publishedAtDate),
-      url: httpsUrl(r?.reviewUrl) || httpsUrl(p?.url) || REVIEW_DEFAULTS.google.url,
-      language: mapLang(r?.originalLanguage),
-    }));
-  } finally {
-    invalidateLimits();
-  }
+/** Trạng thái lần chạy Apify còn đang chạy (chưa có kết quả cuối) */
+const RUNNING_STATUSES = new Set(["READY", "RUNNING", "TIMING-OUT", "ABORTING"]);
+
+/** Google: lời gốc (không lấy textTranslated), ngày theo giờ VN */
+export function mapGoogleReviews(items) {
+  const p =
+    (Array.isArray(items) ? items : []).find((x) => Array.isArray(x?.reviews)) ?? items?.[0];
+  return (Array.isArray(p?.reviews) ? p.reviews : []).slice(0, REVIEWS_LIMIT.google).map((r) => ({
+    source: "google",
+    name: clip(r?.name, 100) || "Google user",
+    title: "",
+    text: clip(r?.text, 5000),
+    rating: stars(r?.stars ?? r?.rating),
+    date: toDay(r?.publishedAtDate),
+    url: httpsUrl(r?.reviewUrl) || httpsUrl(p?.url) || REVIEW_DEFAULTS.google.url,
+    language: mapLang(r?.originalLanguage),
+  }));
 }
 
-/** Tripadvisor: 10 đánh giá mới nhất, tắt máy dịch (giữ nguyên văn) */
-export async function fetchTripadvisorReviews(fetchImpl = fetch) {
-  try {
-    const items = await runActor(
-      actorOf("tripadvisorReviews"),
-      {
-        startUrls: [{ url: REVIEW_DEFAULTS.tripadvisor.url }],
-        maxItemsPerQuery: REVIEWS_LIMIT.tripadvisor,
-        scrapeReviewerInfo: true,
-        disableMachineTranslations: true,
-      },
-      { fetchImpl, maxCharge: MAX_CHARGE.tripadvisor },
-    );
-    return items.slice(0, REVIEWS_LIMIT.tripadvisor).map((r) => ({
+/** Tripadvisor: nguyên văn (đã tắt máy dịch), tên, ngày, ngôn ngữ, link bài gốc */
+export function mapTripadvisorReviews(items) {
+  return (Array.isArray(items) ? items : [])
+    .filter((r) => r && typeof r === "object")
+    .slice(0, REVIEWS_LIMIT.tripadvisor)
+    .map((r) => ({
       source: "tripadvisor",
       name: clip(r?.user?.name, 100) || clip(r?.user?.username, 100) || "Tripadvisor traveller",
       title: clip(r?.title, 200),
@@ -295,9 +311,112 @@ export async function fetchTripadvisorReviews(fetchImpl = fetch) {
       url: httpsUrl(r?.url) || REVIEW_DEFAULTS.tripadvisor.url,
       language: mapLang(r?.originalLanguage || r?.lang),
     }));
+}
+
+/** Cấu hình lần chạy lấy đánh giá mỗi nền tảng: actor, input, trần chi phí, hàm chuẩn hoá */
+const REVIEW_RUNS = {
+  google: () => ({
+    actor: actorOf("google"),
+    input: googleInput(REVIEWS_LIMIT.google), // maxReviews 20, reviewsSort newest
+    maxCharge: MAX_CHARGE.google,
+    map: mapGoogleReviews,
+  }),
+  tripadvisor: () => ({
+    actor: actorOf("tripadvisorReviews"),
+    input: {
+      startUrls: [{ url: REVIEW_DEFAULTS.tripadvisor.url }],
+      maxItemsPerQuery: REVIEWS_LIMIT.tripadvisor,
+      scrapeReviewerInfo: true,
+      disableMachineTranslations: true,
+    },
+    maxCharge: MAX_CHARGE.tripadvisor,
+    map: mapTripadvisorReviews,
+  }),
+};
+
+const runErr = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
+
+/**
+ * Bắt đầu lần chạy lấy đánh giá (trả ngay, không chờ actor xong).
+ * @returns {Promise<{ runId: string, datasetId: string }>}
+ */
+export async function startReviewsRun(src, { fetchImpl = fetch } = {}) {
+  const cfg = REVIEW_RUNS[src]?.();
+  if (!cfg) throw runErr("BAD_SOURCE");
+  const qs = new URLSearchParams({ timeout: String(RUN_TIMEOUT_S) });
+  if (cfg.maxCharge) qs.set("maxTotalChargeUsd", String(cfg.maxCharge));
+  try {
+    const body = await apifyFetch(
+      `/acts/${encodeURIComponent(cfg.actor)}/runs?${qs}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(cfg.input),
+      },
+      fetchImpl,
+      30_000,
+    );
+    const id = typeof body?.data?.id === "string" ? body.data.id : "";
+    if (!id) throw runErr("BAD_RESPONSE");
+    return { runId: id, datasetId: String(body.data.defaultDatasetId ?? "") };
   } finally {
     invalidateLimits();
   }
+}
+
+/**
+ * Hỏi trạng thái lần chạy; xong → đọc dataset + chuẩn hoá.
+ * Lỗi mạng / HTTP khi hỏi → ném (service tự quyết định thử lại lần hỏi sau hay dừng).
+ * @returns {Promise<
+ *   | { status: "running" }
+ *   | { status: "done", items: object[], durationS: number|null, runStatus: string }
+ *   | { status: "error", error: Error, durationS: number|null, runStatus: string }>}
+ */
+export async function checkReviewsRun(src, { runId, datasetId } = {}, { fetchImpl = fetch } = {}) {
+  const cfg = REVIEW_RUNS[src]?.();
+  if (!cfg || !runId) throw runErr("BAD_SOURCE");
+  const body = await apifyFetch(
+    `/actor-runs/${encodeURIComponent(runId)}`,
+    { method: "GET" },
+    fetchImpl,
+    15_000,
+  );
+  const run = body?.data ?? {};
+  const runStatus = String(run.status ?? "");
+  if (RUNNING_STATUSES.has(runStatus)) return { status: "running" };
+  invalidateLimits();
+  const t0 = Date.parse(run.startedAt);
+  const t1 = Date.parse(run.finishedAt);
+  const durationS =
+    Number.isFinite(t0) && Number.isFinite(t1) ? Math.round((t1 - t0) / 1000) : null;
+  const meta = { durationS, runStatus };
+  const ds = String(run.defaultDatasetId || datasetId || "");
+  let raw = [];
+  if (ds) {
+    const items = await apifyFetch(
+      `/datasets/${encodeURIComponent(ds)}/items?${new URLSearchParams({ clean: "true", format: "json", limit: "50" })}`,
+      { method: "GET" },
+      fetchImpl,
+      30_000,
+    );
+    raw = Array.isArray(items) ? items : [];
+  }
+  const items = cfg.map(raw);
+  // Chạy dở (hết giờ / bị dừng / chạm trần chi phí) nhưng vẫn có đánh giá → vẫn dùng phần đã lấy được
+  if (items.length) return { status: "done", items, ...meta };
+  if (runStatus === "SUCCEEDED")
+    return { status: "error", error: runErr("EMPTY_REVIEWS"), ...meta };
+  const code =
+    runStatus === "TIMED-OUT"
+      ? "RUN_TIMED_OUT"
+      : runStatus === "ABORTED"
+        ? "RUN_ABORTED"
+        : "RUN_FAILED";
+  return {
+    status: "error",
+    error: runErr(code, { apifyMessage: redactToken(run.statusMessage ?? "").slice(0, 300) }),
+    ...meta,
+  };
 }
 
 /* ---------- Giao diện nhà cung cấp (xem review-providers/index.js) ---------- */
@@ -332,8 +451,10 @@ export const apifyProvider = Object.freeze({
   quota: ({ fetchImpl = fetch } = {}) => usageLimits(fetchImpl),
   errorText: apifyErrorText,
   errorCode: apifyErrorCode,
+  errorFinal: apifyErrorFinal,
   canImportReviews: true,
   reviewCost: (list) => round2(list.reduce((n, s) => n + (COST.reviews[s] ?? 0), 0)),
-  fetchReviews: (src, { fetchImpl = fetch } = {}) =>
-    src === "google" ? fetchGoogleReviews(fetchImpl) : fetchTripadvisorReviews(fetchImpl),
+  startReviews: (src, { fetchImpl = fetch } = {}) => startReviewsRun(src, { fetchImpl }),
+  checkReviews: (src, handle, { fetchImpl = fetch } = {}) =>
+    checkReviewsRun(src, handle, { fetchImpl }),
 });

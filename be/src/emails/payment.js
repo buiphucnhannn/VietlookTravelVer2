@@ -112,7 +112,8 @@ const remainingUsd = (e) => {
   return Math.max(0, Math.round((total - paid) * 100) / 100);
 };
 
-export function paymentCustomerEmail(e, attempt) {
+/** company: thông tin công ty từ CMS → Cài đặt → Thông tin liên hệ (payment.service truyền vào); thiếu → mặc định */
+export function paymentCustomerEmail(e, attempt, company = COMPANY) {
   const lang = pickLang(e.lang);
   const t = T[lang];
   const deposit = e.paymentStatus === "deposit";
@@ -137,10 +138,10 @@ export function paymentCustomerEmail(e, attempt) {
     subhead(t.next),
     p(escape(t.nextText), { margin: "0" }),
     p(escape(t.questions), { margin: "24px 0 0" }),
-    button(COMPANY.whatsapp, t.whatsapp, { top: 16 }),
+    button(company.whatsapp, t.whatsapp, { top: 16 }),
     p(`${escape(t.signoff)}<br>${escape(t.team)}`, { margin: `${SPACE.section}px 0 0` }),
   ].join("\n");
-  const footer = `<p class="mu" style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><b>${escape(COMPANY.legalName[lang])}</b><br>${escape(COMPANY.address[lang])}</p>`;
+  const footer = `<p class="mu" style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><b>${escape(company.legalName[lang])}</b><br>${escape(company.address[lang])}</p>`;
   const subject = t.subject(e, deposit);
   const html = shell({ lang, title: subject, preheader: t.preheader(amount), body, footer });
   const text = [
@@ -157,14 +158,14 @@ export function paymentCustomerEmail(e, attempt) {
     t.nextText,
     "",
     t.questions,
-    `WhatsApp: ${COMPANY.whatsapp}`,
+    `WhatsApp: ${company.whatsapp}`,
     "",
     t.signoff,
     t.team,
     "",
     "--",
-    COMPANY.legalName[lang],
-    COMPANY.address[lang],
+    company.legalName[lang],
+    company.address[lang],
   ].join("\n");
   return { subject, html, text, headers: { "X-Entity-Ref-ID": `${e.code}-${attempt.invoiceNo}` } };
 }

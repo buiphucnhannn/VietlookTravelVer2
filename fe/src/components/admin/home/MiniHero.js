@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -9,7 +9,6 @@ import {
   HelpCircle,
   ImageIcon,
   ImagePlus,
-  Link2,
   MapPin,
   Monitor,
   Plus,
@@ -564,7 +563,6 @@ function SlideVideo({ value, onChange, onCopied }) {
 /** Ảnh của slide (dọc hoặc ngang) trong khung cùng chiều cao với ô video */
 function SlideImage({ icon, label, hint, portrait, value, onChange }) {
   const { toast } = useUi();
-  const input = useRef(null);
   const [busy, setBusy] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [over, setOver] = useState(false);
@@ -593,7 +591,6 @@ function SlideImage({ icon, label, hint, portrait, value, onChange }) {
   };
   const fromFiles = (files) => {
     const file = [...(files ?? [])].find((f) => f.type.startsWith("image/"));
-    if (input.current) input.current.value = "";
     if (file) run(async () => (await cropper.uploadFiles([file], { max: 1 }))[0], "Đã chọn ảnh");
   };
   const fromLinks = async ([link]) => {
@@ -663,18 +660,9 @@ function SlideImage({ icon, label, hint, portrait, value, onChange }) {
         size="sm"
         icon={Upload}
         className="min-w-0 flex-1 px-2"
-        onClick={() => input.current?.click()}
-      >
-        {value ? "Đổi ảnh" : "Tải từ máy"}
-      </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={Link2}
-        className="min-w-0 flex-1 px-2"
         onClick={() => setLinkOpen(true)}
       >
-        Dán link
+        {value ? "Đổi ảnh" : "Thêm ảnh"}
       </Button>
       {canRecrop(value) && (
         <Button
@@ -698,17 +686,11 @@ function SlideImage({ icon, label, hint, portrait, value, onChange }) {
           <Trash2 className="size-4" />
         </Button>
       )}
-      <input
-        ref={input}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-        hidden
-        onChange={(e) => fromFiles(e.target.files)}
-      />
       <ImageUrlDialog
         open={linkOpen}
         onClose={() => setLinkOpen(false)}
         onSubmit={fromLinks}
+        onFiles={fromFiles}
         busy={busy}
       />
       {cropper.dialog}

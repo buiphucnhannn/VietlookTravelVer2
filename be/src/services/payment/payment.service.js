@@ -134,7 +134,7 @@ async function notify(enquiry, attempt) {
       await mailService.send({
         to: enquiry.email,
         replyTo: notif.replyTo || recipients[0],
-        ...paymentCustomerEmail(enquiry, attempt),
+        ...paymentCustomerEmail(enquiry, attempt, await settingsService.emailCompany()),
       });
   } catch (err) {
     logger.error({ err, code: enquiry.code }, "[payment] lỗi gửi email thanh toán");

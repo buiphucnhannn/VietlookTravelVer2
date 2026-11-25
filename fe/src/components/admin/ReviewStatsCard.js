@@ -14,10 +14,12 @@ import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
 import UsageQuota, { fmtUsd } from "./UsageQuota";
+import { usePermission } from "./permissions";
 import { Button, Card, LoadingBlock, Notice, fmtDateTime, useUi } from "./ui";
 
 /**
- * Cài đặt → "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)" — chỉ xem (admin).
+ * "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)" — ở Cài đặt (admin) và cuối trang Đánh giá (nhân viên có quyền).
+ * Quyền "Đánh giá": Xem → thấy số, trạng thái, hạn mức; Sửa trở lên → thêm nút "Cập nhật ngay" (tốn hạn mức Apify).
  * Điểm + số lượt đánh giá công ty trên Google / Tripadvisor tự cập nhật mỗi sáng qua dịch vụ Apify (mã đặt trên
  * máy chủ, không nhập ở đây). Thẻ hiện số đang dùng, trạng thái lần chạy cuối, lần tự cập nhật tiếp theo,
  * hạn mức tháng và nút "Cập nhật ngay" (chạy nền 20–90 giây; trang tự hỏi lại đến khi xong).
@@ -59,6 +61,7 @@ export default function ReviewStatsCard() {
   const [starting, setStarting] = useState(false);
   const watch = useRef(null); // { since: thời điểm bấm, until: hạn chờ } khi đang chờ kết quả
   const { toast } = useUi();
+  const { canEdit } = usePermission("reviews"); // "Cập nhật ngay" tốn hạn mức → cần quyền sửa Đánh giá
 
   const load = useCallback(async () => {
     try {
@@ -142,13 +145,15 @@ export default function ReviewStatsCard() {
 
   const hint = busy
     ? "Đang lấy số mới từ Google và Tripadvisor… có thể mất khoảng 1 phút. Bạn cứ làm việc khác, kết quả sẽ tự hiện ở đây."
-    : !configured
-      ? "Nút cập nhật sẽ dùng được khi máy chủ có mã Apify."
-      : noQuota
-        ? "Tạm chưa bấm được vì hạn mức tháng này còn quá ít — số tự cập nhật lại khi sang chu kỳ mới."
-        : waitMin > 0
-          ? `Vừa cập nhật — có thể bấm lại sau ${waitMin} phút.`
-          : "Muốn có số mới ngay mà không chờ đến sáng mai? Bấm “Cập nhật ngay”.";
+    : !canEdit
+      ? "Máy chủ tự lấy số mới mỗi sáng. Bạn đang ở chế độ chỉ xem nên không bấm “Cập nhật ngay” được."
+      : !configured
+        ? "Nút cập nhật sẽ dùng được khi máy chủ có mã Apify."
+        : noQuota
+          ? "Tạm chưa bấm được vì hạn mức tháng này còn quá ít — số tự cập nhật lại khi sang chu kỳ mới."
+          : waitMin > 0
+            ? `Vừa cập nhật — có thể bấm lại sau ${waitMin} phút.`
+            : "Muốn có số mới ngay mà không chờ đến sáng mai? Bấm “Cập nhật ngay”.";
 
   return (
     <Card
@@ -214,21 +219,23 @@ export default function ReviewStatsCard() {
           {busy && <Loader2 className="mt-px size-3.5 shrink-0 animate-spin" />}
           {hint}
         </p>
-        <Button
-          variant="secondary"
-          icon={RefreshCw}
-          onClick={syncNow}
-          loading={busy}
-          disabled={disabled}
-          className="ml-auto"
-        >
-          {busy ? "Đang cập nhật…" : "Cập nhật ngay"}
-          {!busy && configured && provider?.syncCost > 0 && (
-            <span className="ml-1 text-xs font-normal text-slate-500">
-              · {money(provider, provider.syncCost)}
-            </span>
-          )}
-        </Button>
+        {canEdit && (
+          <Button
+            variant="secondary"
+            icon={RefreshCw}
+            onClick={syncNow}
+            loading={busy}
+            disabled={disabled}
+            className="ml-auto"
+          >
+            {busy ? "Đang cập nhật…" : "Cập nhật ngay"}
+            {!busy && configured && provider?.syncCost > 0 && (
+              <span className="ml-1 text-xs font-normal text-slate-500">
+                · {money(provider, provider.syncCost)}
+              </span>
+            )}
+          </Button>
+        )}
       </div>
     </Card>
   );

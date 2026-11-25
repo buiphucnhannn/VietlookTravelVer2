@@ -1,8 +1,10 @@
+import { Fragment } from "react";
 import Image from "next/image";
 import BgImage from "@/components/ui/BgImage";
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { siteConfig } from "@/constants/site";
+import { DEFAULT_CONTACT_VIEW } from "@/lib/contact.mjs";
 import { href, tr } from "@/i18n/config";
 import { regions } from "@/data/regions";
 import { Button, Container } from "@/components/ui";
@@ -17,11 +19,30 @@ import {
 import Logo from "./Logo";
 import { CookieSettingsLink } from "./ConsentBanner";
 
-export default function Footer({ lang, dict, policies }) {
-  const f = dict.footer;
+/**
+ * info: thông tin liên hệ (CMS → Cài đặt → Thông tin liên hệ, lib/catalog getContactInfo)
+ * copy: chữ & ảnh đầu / chân trang (CMS → Giao diện trang → Đầu & chân trang) — thiếu → chữ từ điển như cũ
+ */
+export default function Footer({ lang, dict, policies, info = DEFAULT_CONTACT_VIEW, copy }) {
+  const g = copy ?? {};
+  const f = {
+    ...dict.footer,
+    ...(copy && {
+      knowUs: g.knowUs,
+      ctaTitle: g.ctaTitle,
+      ctaText: g.ctaText,
+      ctaButton: g.ctaButton,
+      aboutVietnam: g.colAbout,
+      ourServices: g.colServices,
+      company: g.colCompany,
+      contact: g.colContact,
+      rights: g.rights,
+      payments: g.payments,
+    }),
+  };
   const n = dict.nav;
   const h = (p) => href(lang, p);
-  const { contact, social, messaging } = siteConfig;
+  const { contact, social, messaging } = info;
 
   const columns = [
     {
@@ -64,7 +85,7 @@ export default function Footer({ lang, dict, policies }) {
   ]
     .filter((l) => !policies || policies[l.key])
     .map(({ key, label }) => ({ label, href: h(`/policies/${key}`) }));
-  const legal = siteConfig.legal || {};
+  const legal = info.legal || {};
 
   return (
     <footer className="mt-auto">
@@ -89,7 +110,7 @@ export default function Footer({ lang, dict, policies }) {
               {
                 icon: FacebookIcon,
                 label: "Facebook",
-                sub: "/vietlooktravelhanoi",
+                sub: social.facebookHandle,
                 href: social.facebook,
               },
             ].map((s) => (
@@ -123,11 +144,11 @@ export default function Footer({ lang, dict, policies }) {
 
       {/* Dải CTA */}
       <div className="relative isolate overflow-hidden bg-[#2b3640] text-white">
-        <BgImage src="/images/tours/v2/hanoi-33946371.jpg" tone="night" />
+        <BgImage src={g.ctaImage || "/images/tours/v2/hanoi-33946371.jpg"} tone="night" />
         <Container className="grid items-center gap-8 py-12 md:grid-cols-[auto_1fr_auto]">
           <div className="relative hidden h-28 w-44 md:block">
             <Image
-              src="/images/tours/v2/halong-bay-1018475.jpg"
+              src={g.ctaPhoto || "/images/tours/v2/halong-bay-1018475.jpg"}
               alt=""
               fill
               sizes="176px"
@@ -239,22 +260,21 @@ export default function Footer({ lang, dict, policies }) {
               <li className="flex gap-3">
                 <Phone className="mt-0.5 size-4 shrink-0 text-sun-500" />
                 <span>
-                  <a
-                    href={`tel:${contact.hotlineRaw}`}
-                    className="font-semibold text-ink hover:text-sun-600"
-                  >
-                    {contact.hotline}
-                  </a>
-                  <span className="block text-xs text-muted">
-                    {tr(contact.channels.hotline, lang)}
-                  </span>
-                  <a
-                    href={`tel:${contact.hotline2Raw}`}
-                    className="mt-2 block font-semibold text-ink hover:text-sun-600"
-                  >
-                    {contact.hotline2}
-                  </a>
-                  <span className="block text-xs text-muted">{contact.channels.hotline2}</span>
+                  {contact.phones.map((ph, i) => (
+                    <Fragment key={ph.raw}>
+                      <a
+                        href={`tel:${ph.raw}`}
+                        className={
+                          i
+                            ? "mt-2 block font-semibold text-ink hover:text-sun-600"
+                            : "font-semibold text-ink hover:text-sun-600"
+                        }
+                      >
+                        {ph.number}
+                      </a>
+                      <span className="block text-xs text-muted">{tr(ph.channels, lang)}</span>
+                    </Fragment>
+                  ))}
                 </span>
               </li>
               <li className="flex gap-3">
@@ -307,7 +327,7 @@ export default function Footer({ lang, dict, policies }) {
         {/* Tầng 2: bản quyền – mobile xếp dọc từng dòng (không tràn ngang); từ md nối 1 hàng, ngắt theo cụm */}
         <Container className="flex flex-col items-center gap-1 pt-3 pb-20 text-center text-xs text-muted sm:pb-3 md:flex-row md:flex-wrap md:justify-center md:gap-x-2">
           <span className="md:whitespace-nowrap">
-            © {siteConfig.since}–2026 {siteConfig.legalName}. {f.rights}
+            © {siteConfig.since}–2026 {info.legalName}. {f.rights}
           </span>
           <span aria-hidden className="hidden text-ink/25 md:inline">
             ·

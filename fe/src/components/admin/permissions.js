@@ -34,10 +34,12 @@ export const levelLabel = (l) => LEVELS.find((x) => x.value === l)?.long ?? "Kh�
 
 /**
  * Các mục cấp được, nhóm như thanh menu. hint: mục này là gì; edit / full: "Sửa" / "Toàn quyền" làm được gì thêm.
- * levels: mức cho phép (Nhật ký thao tác chỉ xem).
+ * levels: mức cho phép — giống MODULES ở backend: mục không có gì để xoá (Trang chủ, Giao diện trang) chỉ tới
+ * "Sửa"; Nhật ký thao tác chỉ xem. Quyền cũ lưu cao hơn → tự hiểu là mức cao nhất của mục (clamp).
  */
 const CONTENT_EDIT = "Thêm mới, sửa, ẩn/hiện, sắp xếp";
 const CONTENT_FULL = "Như Sửa, thêm quyền xoá";
+const NO_DELETE = ["none", "view", "edit"];
 export const PERMISSION_GROUPS = [
   {
     group: "Khách hàng",
@@ -88,7 +90,14 @@ export const PERMISSION_GROUPS = [
   {
     group: "Nội dung",
     items: [
-      { key: "home", label: "Trang chủ", hint: "Banner, các mục trên trang chủ", href: A("/home") },
+      {
+        key: "home",
+        label: "Trang chủ",
+        hint: "Banner, tour nổi bật, chữ & ảnh các khối trên trang chủ",
+        edit: "Sửa chữ, ảnh, sắp xếp các khối rồi lưu",
+        href: A("/home"),
+        levels: NO_DELETE,
+      },
       { key: "articles", label: "Bài viết", hint: "Cẩm nang du lịch", href: A("/articles") },
       {
         key: "taxonomy",
@@ -98,14 +107,18 @@ export const PERMISSION_GROUPS = [
       },
       {
         key: "pages",
-        label: "Giới thiệu & chính sách",
-        hint: "Trang giới thiệu, điều khoản, chính sách",
+        label: "Giao diện trang",
+        hint: "Chữ & ảnh: đầu & chân trang, trang 404, chữ chung các trang chi tiết, giới thiệu, chính sách, thuê xe, visa…",
+        edit: "Sửa chữ, ảnh, ẩn/hiện trang rồi lưu",
         href: A("/pages"),
+        levels: NO_DELETE,
       },
       {
         key: "reviews",
         label: "Đánh giá",
-        hint: "Đánh giá của khách hiện trên website",
+        hint: "Đánh giá của khách và điểm Tripadvisor / Google hiện trên website",
+        edit: "Thêm, sửa, ẩn/hiện, sắp xếp, lấy đánh giá tự động, cập nhật điểm ngay",
+        full: "Như Sửa, thêm quyền xoá đánh giá",
         href: A("/reviews"),
       },
     ],
@@ -159,7 +172,7 @@ export const PRESETS = [
   {
     key: "content",
     label: "Biên tập nội dung",
-    hint: "Toàn quyền tour, dịch vụ, trang chủ, bài viết",
+    hint: "Toàn quyền tour, dịch vụ, trang chủ, giao diện trang, bài viết, đánh giá",
     value: () => fill((k) => (CONTENT_KEYS.includes(k) ? "full" : "none")),
   },
   {

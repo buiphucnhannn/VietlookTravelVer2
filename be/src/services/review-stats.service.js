@@ -118,7 +118,7 @@ async function quotaOf(provider, cost, fetchImpl) {
 }
 
 /**
- * Dữ liệu cho CMS (admin, chỉ xem): số đang dùng, lần cập nhật cuối, lần tự cập nhật tiếp theo,
+ * Dữ liệu cho CMS (quyền xem Đánh giá): số đang dùng, lần cập nhật cuối, lần tự cập nhật tiếp theo,
  * nhà cung cấp + đã cấu hình chưa, số lượt còn lại (null = không có API lượt dùng) — KHÔNG BAO GIỜ có khoá.
  */
 async function view(v, { fetchImpl = fetch, now = Date.now() } = {}) {
@@ -150,7 +150,7 @@ export const reviewStatsService = {
   },
 
   /**
-   * Nút "Cập nhật ngay" (admin): kiểm tra đã cấu hình, chờ đủ 5 phút từ lần bấm trước, còn đủ hạn mức
+   * Nút "Cập nhật ngay" (quyền sửa Đánh giá): kiểm tra đã cấu hình, chờ đủ 5 phút từ lần bấm trước, còn đủ hạn mức
    * (giữ phần dự trữ cho cập nhật tự động) → BẮT ĐẦU chạy nền, trả ngay { promise } (không chờ 20–90 giây).
    * Đang có lần chạy khác → trả lần đó. Không đạt → ApiError (câu tiếng Việt).
    * @returns {Promise<{ promise: Promise<{ changed: boolean, lastSync: object }>, already: boolean }>}

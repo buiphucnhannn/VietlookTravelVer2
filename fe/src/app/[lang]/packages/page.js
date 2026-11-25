@@ -19,15 +19,17 @@ import { pageMetadata } from "@/lib/seo";
 import { Button, Container, Reveal } from "@/components/ui";
 import { AdviceBox, BrushHero } from "@/components/ui/PageHero";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const pc = await getPageText("packages", lang, dict);
   return pageMetadata({
     lang,
     path: "/packages",
-    title: dict.packages.title,
-    description: dict.packages.intro,
+    title: pc.heroTitle,
+    description: pc.heroIntro,
   });
 }
 
@@ -110,44 +112,47 @@ export default async function PackagesPage({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = dict.packages;
+  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Gói tour 1–3 tuần (chưa sửa = nội dung mặc định)
+  const pc = await getPageText("packages", lang, dict);
   const weeks = [
-    { n: 1, id: "1-week", ...p.week1 },
-    { n: 2, id: "2-weeks", ...p.week2 },
-    { n: 3, id: "3-weeks", ...p.week3 },
-  ];
+    { n: 1, id: "1-week" },
+    { n: 2, id: "2-weeks" },
+    { n: 3, id: "3-weeks" },
+  ].map((w) => ({
+    ...w,
+    title: pc[`week${w.n}Title`],
+    text: pc[`week${w.n}Text`],
+    best: {
+      title: pc[`week${w.n}BestTitle`],
+      text: pc[`week${w.n}BestText`],
+      ctaTitle: pc[`week${w.n}CtaTitle`],
+      ctaText: pc[`week${w.n}CtaText`],
+    },
+  }));
 
   return (
     <>
       <BrushHero
-        title={p.title}
-        subtitle={p.intro}
-        images={[
-          "/images/tours/v2/ha-giang-14025581.jpg",
-          "/images/tours/v2/sapa-6130917.jpg",
-          "/images/tours/v2/hoi-an-746921.jpg",
-          "/images/tours/v2/mekong-delta-3180637.jpg",
-        ]}
-        collage={[
-          "/images/tours/v2/hoi-an-746921.jpg",
-          "/images/tours/v2/ha-giang-14025581.jpg",
-          "/images/tours/v2/mekong-delta-3180637.jpg",
-        ]}
-        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: p.title }]}
+        title={pc.heroTitle}
+        subtitle={pc.heroIntro}
+        images={pc.heroImages}
+        collage={pc.collageImages}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: pc.heroTitle }]}
       />
 
       <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
-        <BgImage src="/images/tours/hd/bao-lac-cao-bang.jpg" tone="light" />
+        <BgImage src={pc.whyImage} tone="light" />
         <Container>
           <h2 className="mb-10 text-center text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-            {p.whyTitle}
+            {pc.whyTitle}
           </h2>
           <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-            {p.why.map((w, i) => {
+            {pc.why.map((w, i) => {
               const Icon = whyIcons[i];
               return (
                 // Subgrid 2 hàng (tiêu đề · mô tả): tiêu đề xuống 2 dòng không làm lệch mô tả các ô cùng hàng
                 <Reveal
-                  key={w.title}
+                  key={i}
                   delay={(i % 3) * 70}
                   className="row-span-2 grid grid-cols-[auto_1fr] grid-rows-subgrid gap-x-4 gap-y-1"
                 >
@@ -164,7 +169,7 @@ export default async function PackagesPage({ params }) {
       {/* Mỗi nhóm 1 / 2 / 3 tuần là một khối riêng (~1 màn hình), nền xen kẽ; xem đủ qua liên kết "See all" */}
       {weeks.map((w, wi) => {
         const list = packagesByWeeks(w.n).slice(0, 3);
-        const best = p.best[w.n];
+        const best = w.best;
         return (
           <section
             key={w.id}
@@ -174,7 +179,7 @@ export default async function PackagesPage({ params }) {
             <Container>
               {wi === 0 && (
                 <h2 className="mb-10 text-center text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                  {p.ourPackages}
+                  {pc.ourPackages}
                 </h2>
               )}
               <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
@@ -215,7 +220,7 @@ export default async function PackagesPage({ params }) {
                     <AdviceBox
                       title={best.ctaTitle}
                       text={best.ctaText}
-                      cta={p.ctaButton}
+                      cta={pc.ctaButton}
                       href={`${lp(lang)}/plan-your-trip`}
                     />
                   </div>

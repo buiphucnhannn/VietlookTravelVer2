@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { after, afterEach, beforeEach, describe, it } from "node:test";
+import mongoose from "mongoose";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import { env } from "../src/config/env.js";
 import { reviewRepository, settingRepository } from "../src/repositories/content.repository.js";
 import { auditLogRepository } from "../src/repositories/audit-log.repository.js";
 import { userRepository } from "../src/repositories/user.repository.js";
+import { Review } from "../src/models/review.model.js";
 import {
+  JOB_KEY,
   _resetPreviewJob,
   mapLang,
   markExisting,
@@ -21,8 +25,8 @@ import { quotaView, reviewProvider } from "../src/services/review-providers/inde
 import {
   _resetLimitsCache,
   apifyProvider,
-  fetchGoogleReviews,
-  fetchTripadvisorReviews,
+  mapGoogleReviews,
+  mapTripadvisorReviews,
   parseLimits,
   usageLimits,
 } from "../src/services/review-providers/apify.provider.js";
@@ -78,7 +82,6 @@ const bodyOf = (call) => JSON.parse(call.init.body);
 // Mẫu rút gọn theo README các actor trên Apify Store + https://docs.apify.com/api/v2/users-me-limits-get
 const G_ACT = "compass~crawler-google-places/run-sync-get-dataset-items";
 const TA_ACT = "maxcopell~tripadvisor/run-sync-get-dataset-items";
-const TAR_ACT = "maxcopell~tripadvisor-reviews/run-sync-get-dataset-items";
 const G_PLACE =
   (totalScore = 4.8, reviewsCount = 33, extra = {}) =>
   () =>
@@ -410,74 +413,341 @@ describe("điểm đánh giá — tự cập nhật qua Apify (fetch giả)", ()
   });
 });
 
-describe("lấy đánh giá qua Apify (fetch giả)", () => {
-  // Mẫu rút gọn theo https://apify.com/maxcopell/tripadvisor-reviews và compass/crawler-google-places
-  const TA_REVIEWS =
-    (n = 22) =>
-    () =>
-      json(
-        Array.from({ length: n }, (_, i) => ({
-          id: `r${i}`,
-          url: `https://www.tripadvisor.com/ShowUserReviews-r${i}`,
-          title: "Great trip",
-          text: "Wonderful guide",
-          rating: 5,
-          lang: "en",
-          originalLanguage: "en",
-          publishedDate: "2026-10-01",
-          user: { name: `User ${i}`, username: `user${i}` },
-        })),
-      );
-  const G_REVIEWS = G_PLACE(4.8, 33, {
-    reviews: [
-      {
-        name: "Lin",
-        text: "非常好的导游",
-        textTranslated: "Very good guide",
-        publishedAtDate: "2026-09-01T01:00:00.000Z",
-        stars: 4,
-        reviewUrl: "https://www.google.com/maps/reviews/data=abc",
-        originalLanguage: "zh-Hant",
+describe("lấy đánh giá qua Apify — chạy không đồng bộ (fetch giả)", () => {
+  // Mẫu THẬT lấy từ Apify 25/11/2026 (đã thay tên / mã người viết / lời khách — không có dữ liệu cá nhân)
+  const G_ITEMS = JSON.parse(
+    readFileSync(new URL("./fixtures/apify-google-reviews.json", import.meta.url), "utf8"),
+  );
+  const TA_ITEMS = JSON.parse(
+    readFileSync(new URL("./fixtures/apify-tripadvisor-reviews.json", import.meta.url), "utf8"),
+  );
+  const G_START = "/acts/compass~crawler-google-places/runs?";
+  const TA_START = "/acts/maxcopell~tripadvisor-reviews/runs?";
+  const started = (id) => () =>
+    json({ data: { id, status: "READY", defaultDatasetId: `${id}-ds` } }, 201);
+  // Dạng trả về của GET /actor-runs/<id> (rút gọn từ lần chạy thật)
+  const runInfo = (id, status, { events = {}, prices = {}, usage = 0.0001 } = {}) => ({
+    data: {
+      id,
+      status,
+      statusMessage: status === "SUCCEEDED" ? "Finished!" : `run ${status} ${TOKEN}`,
+      startedAt: "2026-11-25T08:00:08.000Z",
+      finishedAt: "2026-11-25T08:00:18.000Z",
+      defaultDatasetId: `${id}-ds`,
+      usageTotalUsd: usage,
+      chargedEventCounts: events,
+      pricingInfo: {
+        pricingModel: "PAY_PER_EVENT",
+        pricingPerEvent: {
+          actorChargeEvents: Object.fromEntries(
+            Object.entries(prices).map(([k, eventPriceUsd]) => [k, { eventPriceUsd }]),
+          ),
+        },
       },
-    ],
+    },
+  });
+  const G_DONE = runInfo("g-run", "SUCCEEDED", { usage: 0.0162 });
+  const TA_DONE = runInfo("ta-run", "SUCCEEDED", {
+    events: { "apify-actor-start": 2, "review-scraped": 10 },
+    prices: { "apify-actor-start": 0.00005, "review-scraped": 0.005 },
+  });
+  /** fetch giả cho Apify: trạng thái lần chạy / dataset đổi được giữa các lần hỏi */
+  function apify({
+    g = () => json(G_DONE),
+    ta = () => json(TA_DONE),
+    gItems = () => json(G_ITEMS),
+    gStart,
+    taStart,
+    used,
+  } = {}) {
+    return fakeFetch([
+      ["/users/me/limits", LIMITS(used)],
+      [G_START, gStart ?? started("g-run")],
+      [TA_START, taStart ?? started("ta-run")],
+      ["/actor-runs/g-run", () => g()],
+      ["/actor-runs/ta-run", () => ta()],
+      ["/datasets/g-run-ds/items", () => gItems()],
+      ["/datasets/ta-run-ds/items", () => json(TA_ITEMS)],
+    ]);
+  }
+  let T;
+  const clock = () => T;
+  const later = (ms = 4000) => {
+    T += ms;
+  };
+  const status = (f) => reviewImportService.previewStatus({ fetchImpl: f, now: clock });
+  const start = (f) => reviewImportService.startPreview({ fetchImpl: f, now: clock });
+  const fresh = () => {
+    _resetPreviewJob();
+    _resetLimitsCache();
+    store = {};
+  };
+  let filters;
+  beforeEach(() => {
+    T = Date.parse("2026-11-25T08:00:00.000Z");
+    filters = [];
+    stub(reviewRepository, "find", async (filter) => {
+      filters.push(filter);
+      return [{ source: "tripadvisor", name: "Traveller B", date: "2026-11-05", text: "x" }];
+    });
   });
 
-  it("Tripadvisor: tối đa 10, tắt máy dịch, giữ nguyên văn, tên, ngày, ngôn ngữ, link gốc", async () => {
-    withToken();
-    const f = fakeFetch([[TAR_ACT, TA_REVIEWS()]]);
-    const items = await fetchTripadvisorReviews(f);
-    assert.equal(items.length, 10);
+  it("chuẩn hoá mẫu thật: lời gốc, tên, ngày giờ VN, ngôn ngữ, link — không mang mã / ảnh người viết", () => {
+    const g = mapGoogleReviews(G_ITEMS);
+    assert.equal(g.length, 4);
     assert.deepEqual(
-      { ...items[0] },
+      { ...g[0] },
       {
-        source: "tripadvisor",
-        name: "User 0",
-        title: "Great trip",
-        text: "Wonderful guide",
-        rating: 5,
-        date: "2026-10-01",
-        url: "https://www.tripadvisor.com/ShowUserReviews-r0",
-        language: "en",
+        source: "google",
+        name: "Guest A",
+        title: "",
+        text: "Tour lead was late",
+        rating: 1,
+        date: "2026-11-23",
+        url: "https://www.google.com/maps/reviews/data=!4m8!14m7!1m6!2m5!1sreview-1",
+        language: "vi",
       },
     );
-    const input = bodyOf(f.calls[0]);
-    assert.equal(input.maxItemsPerQuery, 10);
-    assert.equal(input.disableMachineTranslations, true);
+    assert.equal(g[1].text, ""); // chỉ chấm sao → service bỏ
+    assert.equal(g[2].text, "导游很好，车很干净"); // không lấy bản dịch
+    assert.equal(g[2].language, "zh"); // zh-Hans → zh
+    const ta = mapTripadvisorReviews(TA_ITEMS);
+    assert.deepEqual(
+      { ...ta[2] },
+      {
+        source: "tripadvisor",
+        name: "旅客 C",
+        title: "很好",
+        text: "非常满意，导游中文说得很好",
+        rating: 5,
+        date: "2026-10-02",
+        url: "https://www.tripadvisor.com/ShowUserReviews-g17733187-d27950353-rta3-Vietlook_Travel-Ha_Dong_Hanoi.html",
+        language: "zh",
+      },
+    );
+    const out = JSON.stringify([g, ta]);
+    for (const leak of ["reviewer-", "user-1", "googleusercontent", "avatar", "Profile"])
+      assert.ok(!out.includes(leak), leak);
+    assert.equal(mapTripadvisorReviews(Array(15).fill(TA_ITEMS[0])).length, 10);
   });
 
-  it("Google: lời gốc (không lấy bản dịch), ngày theo giờ VN, zh-Hant → zh, link review", async () => {
+  it("thành công: bắt đầu trả ngay, hỏi lại đến khi xong; máy chủ khởi động lại giữa chừng vẫn lấy tiếp", async () => {
     withToken();
-    const f = fakeFetch([[G_ACT, G_REVIEWS]]);
-    const [r] = await fetchGoogleReviews(f);
-    assert.equal(r.text, "非常好的导游");
-    assert.equal(r.name, "Lin");
-    assert.equal(r.rating, 4);
-    assert.equal(r.date, "2026-09-01");
-    assert.equal(r.language, "zh");
-    assert.equal(r.url, "https://www.google.com/maps/reviews/data=abc");
-    const input = bodyOf(f.calls[0]);
-    assert.equal(input.maxReviews, 20);
-    assert.equal(input.reviewsSort, "newest");
+    let gState = "RUNNING";
+    const f = apify({ g: () => json(gState === "RUNNING" ? runInfo("g-run", "RUNNING") : G_DONE) });
+    assert.equal((await status(f)).status, "idle");
+    const s1 = await start(f);
+    assert.equal(s1.status, "running");
+    assert.deepEqual(s1.pending.sort(), ["google", "tripadvisor"]);
+    // bắt đầu = POST /runs (không chờ), đúng input tiết kiệm, trần chi phí, mã chỉ ở header
+    const gCall = f.calls.find((c) => c.url.includes(G_START));
+    const taCall = f.calls.find((c) => c.url.includes(TA_START));
+    assert.equal(gCall.init.method, "POST");
+    assert.match(gCall.url, /timeout=120/);
+    assert.match(gCall.url, /maxTotalChargeUsd=0\.5/);
+    assert.match(taCall.url, /maxTotalChargeUsd=0\.1/);
+    assert.equal(bodyOf(gCall).maxReviews, 20);
+    assert.equal(bodyOf(gCall).reviewsSort, "newest");
+    assert.equal(bodyOf(taCall).maxItemsPerQuery, 10);
+    assert.equal(bodyOf(taCall).disableMachineTranslations, true);
+    assert.equal(gCall.init.headers.authorization, `Bearer ${TOKEN}`);
+    assert.ok(f.calls.every((c) => !c.url.includes(TOKEN)));
+    assert.ok(!f.calls.some((c) => c.url.includes("run-sync")));
+    // lần lấy lưu trong MongoDB (cài đặt), không chỉ trong bộ nhớ
+    assert.equal(store[JOB_KEY].status, "running");
+    assert.equal(store[JOB_KEY].runs.google.runId, "g-run");
+
+    later();
+    const s2 = await status(f);
+    assert.equal(s2.status, "running");
+    assert.deepEqual(s2.pending, ["google"]); // Tripadvisor xong trước
+    assert.equal(store[JOB_KEY].runs.tripadvisor.state, "done");
+
+    _resetPreviewJob(); // giả lập máy chủ khởi động lại (mất bộ nhớ) — lần lấy vẫn còn trong DB
+    gState = "SUCCEEDED";
+    later();
+    const s3 = await status(f);
+    assert.equal(s3.status, "done");
+    assert.deepEqual(s3.result.counts, { tripadvisor: 3, google: 3 }); // bỏ 1 đánh giá chỉ chấm sao
+    assert.deepEqual(s3.result.errors, {});
+    assert.deepEqual(
+      s3.result.items.map((x) => [x.source, x.name, x.exists]),
+      [
+        ["tripadvisor", "Traveller A", false],
+        ["tripadvisor", "Traveller B", true],
+        ["tripadvisor", "旅客 C", false],
+        ["google", "Guest A", false],
+        ["google", "客人 C", false],
+        ["google", "Guest D", false],
+      ],
+    );
+    // Nguyên nhân lỗi production: { source: { $in } } bị sanitizeFilter bọc $eq → CastError → mất cả kết quả.
+    // Bộ lọc phải qua được bước kiểm tra của Mongoose khi sanitizeFilter bật.
+    assert.equal(filters.length, 1);
+    const prev = mongoose.get("sanitizeFilter");
+    mongoose.set("sanitizeFilter", true);
+    try {
+      const q = Review.find(filters[0]);
+      q._castConditions();
+      assert.ok(!q.error());
+      const old = Review.find({ source: { $in: ["google"] } });
+      old._castConditions();
+      assert.equal(old.error()?.name, "CastError"); // truy vấn cũ — đúng lỗi đã gặp trên production
+    } finally {
+      mongoose.set("sanitizeFilter", prev);
+    }
+    noLeak(s3);
+    assert.ok(!JSON.stringify(s3).includes("g-run")); // CMS không thấy mã lần chạy
+    // mở lại hộp: trả kết quả đã lưu, không gọi Apify nữa
+    const n = f.calls.length;
+    later(60_000);
+    assert.equal((await status(f)).status, "done");
+    assert.equal(f.calls.length, n);
+    // quá 12 giờ → về trạng thái ban đầu
+    later(13 * 3600_000);
+    assert.equal((await status(f)).status, "idle");
+  });
+
+  it("đang chạy: bấm lại không tốn thêm; hỏi dồn dập → mỗi lần chạy chỉ hỏi Apify ~3 giây/lần", async () => {
+    withToken();
+    const f = apify({
+      g: () => json(runInfo("g-run", "RUNNING")),
+      ta: () => json(runInfo("ta-run", "RUNNING")),
+    });
+    await start(f);
+    const again = await start(f);
+    assert.equal(again.status, "running");
+    assert.equal(f.calls.filter((c) => c.url.includes("/runs?")).length, 2);
+    const polls = () => f.calls.filter((c) => c.url.includes("/actor-runs/")).length;
+    const n = polls();
+    later();
+    await Promise.all([status(f), status(f), status(f)]);
+    await status(f);
+    assert.equal(polls() - n, 2); // 1 lần / nền tảng
+    later();
+    await status(f);
+    assert.equal(polls() - n, 4);
+  });
+
+  it("1 nền tảng lỗi (hết hạn mức khi bắt đầu / lần chạy lỗi) → nền tảng kia vẫn có kết quả, câu báo riêng", async () => {
+    withToken();
+    const f = apify({
+      taStart: () =>
+        json(
+          {
+            error: {
+              type: "platform-feature-disabled",
+              message: `Monthly usage hard limit exceeded ${TOKEN}`,
+            },
+          },
+          402,
+        ),
+    });
+    const s1 = await start(f);
+    assert.deepEqual(s1.pending, ["google"]);
+    later();
+    const s2 = await status(f);
+    assert.equal(s2.status, "done");
+    assert.match(
+      s2.result.errors.tripadvisor,
+      /hết hạn mức Apify tháng này — thử lại khi sang chu kỳ mới/,
+    );
+    assert.deepEqual(s2.result.counts, { tripadvisor: 0, google: 3 });
+    assert.equal(s2.result.items.length, 3);
+    noLeak(s2);
+    noLeak(store);
+
+    fresh();
+    const f2 = apify({
+      g: () => json(runInfo("g-run", "FAILED", { usage: 0.004 })),
+      gItems: () => json([]),
+    });
+    await start(f2);
+    later();
+    const s3 = await status(f2);
+    assert.equal(s3.status, "done");
+    assert.match(s3.result.errors.google, /không đọc được/);
+    assert.equal(s3.result.counts.tripadvisor, 3);
+    noLeak(s3);
+    noLeak(store);
+  });
+
+  it("cả 2 không bắt đầu được → báo từng nền tảng ngay (không còn câu chung chung)", async () => {
+    withToken();
+    const f = apify({
+      gStart: () => json({ error: { type: "rate-limit-exceeded" } }, 429),
+      taStart: () => json({ error: { type: "record-not-found" } }, 404),
+    });
+    const s = await start(f);
+    assert.equal(s.status, "done");
+    assert.match(s.result.errors.google, /bận/);
+    assert.match(s.result.errors.tripadvisor, /Không tìm thấy công cụ/);
+    assert.deepEqual(s.result.items, []);
+  });
+
+  it("hết giờ / mất dấu / lỗi mạng khi hỏi: báo 'chạy quá lâu', lỗi tạm thời thì hỏi lại", async () => {
+    withToken();
+    let gRes = () => {
+      throw new TypeError(`fetch failed ${TOKEN}`);
+    };
+    const f = apify({
+      g: () => gRes(),
+      ta: () => json(runInfo("ta-run", "RUNNING")),
+      gItems: () => json([]), // hết giờ khi chưa lấy được gì
+    });
+    await start(f);
+    later();
+    assert.equal((await status(f)).status, "running"); // lỗi mạng khi hỏi → chưa kết luận
+    assert.equal(store[JOB_KEY].runs.google.state, "running");
+    gRes = () => json(runInfo("g-run", "TIMED-OUT"));
+    later();
+    const s1 = await status(f);
+    assert.deepEqual(s1.pending, ["tripadvisor"]);
+    assert.match(store[JOB_KEY].runs.google.error, /chạy quá lâu nên đã dừng/);
+    // Tripadvisor kẹt "đang chạy" quá 6 phút → dừng chờ, trả phần đã có
+    later(7 * 60_000);
+    const s2 = await status(f);
+    assert.equal(s2.status, "done");
+    assert.match(s2.result.errors.tripadvisor, /chạy quá lâu/);
+    assert.match(s2.result.errors.google, /chạy quá lâu/);
+    noLeak(store);
+  });
+
+  it("chỉ có đánh giá chấm sao → báo rõ; chưa cài mã / không đủ hạn mức → chặn trước, không chạy", async () => {
+    withToken();
+    const noText = [
+      { ...G_ITEMS[0], reviews: G_ITEMS[0].reviews.map((r) => ({ ...r, text: "" })) },
+    ];
+    const f = apify({ gItems: () => json(noText) });
+    await start(f);
+    later();
+    const s = await status(f);
+    assert.match(s.result.errors.google, /chỉ chấm sao/);
+    assert.equal(s.result.counts.google, 0);
+
+    fresh();
+    const poor = apify({ used: 4.95 });
+    await assert.rejects(start(poor), /giữ lại cho cập nhật tự động/);
+    assert.ok(!poor.calls.some((c) => c.url.includes("/runs?")));
+    _resetLimitsCache();
+    const none = apify({ used: 5 });
+    await assert.rejects(start(none), /Đã dùng hết hạn mức Apify tháng này/);
+    assert.equal((await status(none)).status, "idle");
+
+    env.reviews.apifyToken = "";
+    await assert.rejects(start(apify()), /Chưa cài mã Apify/);
+    assert.deepEqual(await reviewImportService.sources(), {
+      tripadvisor: false,
+      google: false,
+      provider: "Apify",
+      cost: 0,
+      quota: null,
+    });
+    withToken();
+    _resetLimitsCache();
+    const src = await reviewImportService.sources({ fetchImpl: apify() });
+    assert.equal(src.google, true);
+    assert.equal(src.cost, 0.07); // ước tính ≈ đo thật 0,066 USD
   });
 
   it("mapLang + đánh dấu Đã có (cùng nguồn + tên + ngày hoặc 40 ký tự đầu)", () => {
@@ -509,69 +779,6 @@ describe("lấy đánh giá qua Apify (fetch giả)", () => {
       [true, true, false],
     );
   });
-
-  it("preview: chưa cài mã → báo; lỗi 1 nền tảng không chặn nền tảng kia; không lộ mã", async () => {
-    await assert.rejects(reviewImportService.preview(), /Chưa cài mã Apify/);
-    assert.deepEqual(await reviewImportService.sources(), {
-      tripadvisor: false,
-      google: false,
-      provider: "Apify",
-      cost: 0,
-      quota: null,
-    });
-
-    withToken();
-    stub(reviewRepository, "find", async () => [
-      { source: "tripadvisor", name: "User 1", date: "2026-10-01", text: "x" },
-    ]);
-    const f = fakeFetch([
-      ["/users/me/limits", LIMITS()],
-      [TAR_ACT, TA_REVIEWS(2)],
-      [G_ACT, () => json({ error: { type: "rate-limit-exceeded" } }, 429)],
-    ]);
-    const r = await reviewImportService.preview({ fetchImpl: f });
-    assert.deepEqual(r.sources, ["tripadvisor", "google"]);
-    assert.match(r.errors.google, /bận/);
-    assert.deepEqual(
-      r.items.map((x) => [x.name, x.exists]),
-      [
-        ["User 0", false],
-        ["User 1", true],
-      ],
-    );
-    noLeak(r);
-    const src = await reviewImportService.sources({ fetchImpl: f });
-    assert.equal(src.tripadvisor, true);
-    assert.equal(src.quota.left, 4.85);
-    assert.ok(src.cost > 0); // chi phí ước tính cho 1 lần xem (USD)
-  });
-
-  it("chạy nền: startPreview trả 'running' ngay, xong → 'done' kèm kết quả; không đủ hạn mức → chặn trước", async () => {
-    withToken();
-    stub(reviewRepository, "find", async () => []);
-    const f = fakeFetch([
-      ["/users/me/limits", LIMITS()],
-      [TAR_ACT, TA_REVIEWS(1)],
-      [G_ACT, G_REVIEWS],
-    ]);
-    assert.equal(reviewImportService.previewStatus().status, "idle");
-    const s1 = await reviewImportService.startPreview({ fetchImpl: f });
-    assert.equal(s1.status, "running");
-    for (let i = 0; i < 10; i++) await tick();
-    const s2 = reviewImportService.previewStatus();
-    assert.equal(s2.status, "done");
-    assert.equal(s2.result.items.length, 2);
-
-    _resetPreviewJob();
-    _resetLimitsCache();
-    const poor = fakeFetch([["/users/me/limits", LIMITS(4.95, 5)]]);
-    await assert.rejects(
-      reviewImportService.startPreview({ fetchImpl: poor }),
-      /giữ lại cho cập nhật tự động/,
-    );
-    assert.equal(poor.calls.length, 1);
-    assert.equal(reviewImportService.previewStatus().status, "idle");
-  });
 });
 
 describe("điểm đánh giá — quyền truy cập API", () => {
@@ -594,23 +801,38 @@ describe("điểm đánh giá — quyền truy cập API", () => {
     assert.ok(!JSON.stringify(res.body).includes("enc:v1"));
   });
 
-  it("chỉ admin xem / cập nhật; PUT đã bỏ; nhân viên bị chặn", async () => {
+  it("theo quyền Đánh giá: xem số = xem, “Cập nhật ngay” = sửa; PUT đã bỏ", async () => {
     const admin = user("admin");
     const editor = user("editor", { reviews: "full" });
     stub(userRepository, "findById", async (id) => (String(id) === admin._id ? admin : editor));
     stub(auditLogRepository, "create", async () => ({}));
-    for (const [method, path] of [
-      ["get", "/api/v1/settings/review-stats"],
-      ["post", "/api/v1/settings/review-stats/sync"],
-    ]) {
-      const anon = await request(app)[method](path).set("X-Requested-With", "fetch");
-      assert.equal(anon.status, 401, `${method} ${path}`);
+    const hit = (method, path) => {
       const agent = request(app);
-      const staff = await agent[method](path)
+      return agent[method](path)
         .set("Cookie", cookie(editor))
         .set("X-Requested-With", "fetch")
         .send({});
-      assert.equal(staff.status, 403, `${method} ${path}`);
+    };
+    const GET = ["get", "/api/v1/settings/review-stats"];
+    const SYNC = ["post", "/api/v1/settings/review-stats/sync"];
+    for (const [method, path] of [GET, SYNC]) {
+      const anon = await request(app)[method](path).set("X-Requested-With", "fetch");
+      assert.equal(anon.status, 401, `${method} ${path}`);
+    }
+    try {
+      // không có quyền Đánh giá → chặn cả 2
+      editor.permissions = { tours: "full" };
+      assert.equal((await hit(...GET)).status, 403);
+      assert.equal((await hit(...SYNC)).status, 403);
+      // chỉ xem → xem được số + hạn mức, không bấm cập nhật (tốn hạn mức Apify)
+      editor.permissions = { reviews: "view" };
+      assert.equal((await hit(...GET)).status, 200);
+      assert.equal((await hit(...SYNC)).status, 403);
+      // sửa → bấm được (chưa có mã Apify → 400 báo rõ, không gọi gì)
+      editor.permissions = { reviews: "edit" };
+      assert.equal((await hit(...SYNC)).status, 400);
+    } finally {
+      editor.permissions = { reviews: "full" };
     }
     const put = await request(app)
       .put("/api/v1/settings/review-stats")
@@ -640,6 +862,23 @@ describe("điểm đánh giá — quyền truy cập API", () => {
       cost: 0,
       quota: null,
     });
+    // trạng thái lần lấy đọc từ MongoDB (route bất đồng bộ) — chưa lấy lần nào → idle
+    const prev = await request(app)
+      .get("/api/v1/admin/reviews/import/preview")
+      .set("Cookie", cookie(editor));
+    assert.equal(prev.status, 200);
+    assert.deepEqual(prev.body.data, { status: "idle" });
+    // bắt đầu lấy (tốn hạn mức) cần quyền sửa: chỉ xem → 403; sửa → tới bước kiểm tra cấu hình (400)
+    try {
+      editor.permissions = { reviews: "view" };
+      assert.equal((await hit("post", "/api/v1/admin/reviews/import/preview")).status, 403);
+      editor.permissions = { reviews: "edit" };
+      const start = await hit("post", "/api/v1/admin/reviews/import/preview");
+      assert.equal(start.status, 400);
+      assert.match(start.body.error.message, /Apify/);
+    } finally {
+      editor.permissions = { reviews: "full" };
+    }
   });
 });
 

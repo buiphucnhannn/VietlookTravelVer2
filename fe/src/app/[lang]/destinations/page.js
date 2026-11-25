@@ -5,16 +5,18 @@ import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { BannerHero } from "@/components/ui/PageHero";
 import { DestinationTile } from "@/components/tours/TourCard";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const p = await getPageText("destinations", lang, dict);
   return pageMetadata({
     lang,
     path: "/destinations",
-    title: dict.destination.allTitle,
-    description: dict.destination.allIntro,
-    image: "/images/tours/hd/du-lich-tay-bac.jpg",
+    title: p.heroTitle,
+    description: p.heroIntro,
+    image: p.heroImages[0],
   });
 }
 
@@ -26,15 +28,16 @@ export default async function DestinationsPage({ params }) {
   const { destinationsByRegion, regions, countFor } = await getCatalog();
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  const d = dict.destination;
+  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Tất cả điểm đến (chưa sửa = từ điển + data/regions.js)
+  const p = await getPageText("destinations", lang, dict);
 
   return (
     <>
       <BannerHero
-        title={d.allTitle}
-        subtitle={d.allIntro}
-        images={regions.map((r) => r.image)}
-        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: d.allTitle }]}
+        title={p.heroTitle}
+        subtitle={p.heroIntro}
+        images={p.heroImages}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: p.heroTitle }]}
       />
 
       {/* Thanh nhảy nhanh theo miền */}
@@ -62,9 +65,9 @@ export default async function DestinationsPage({ params }) {
           >
             <Container>
               <SectionHeading
-                eyebrow={`${list.length} ${d.placesCount}`}
+                eyebrow={`${list.length} ${p.placesCount}`}
                 title={tr(r.name, lang)}
-                subtitle={tr(r.intro, lang)}
+                subtitle={p.regionIntros[ri]?.intro ?? tr(r.intro, lang)}
               />
               {/* hàng cuối thiếu ô → căn giữa */}
               <div className="flex flex-wrap justify-center gap-4 lg:gap-6">

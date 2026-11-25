@@ -5,35 +5,53 @@ import { BrushHero } from "@/components/ui/PageHero";
 import TourListing from "@/components/tours/TourListing";
 import { href, lp } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const p = await getPageText("tours", lang, dict);
   return pageMetadata({
     lang,
     path: "/tours",
-    title: dict.tours.allTitle,
-    description: dict.tours.allIntro,
+    title: p.heroTitle,
+    description: p.heroIntro,
   });
 }
+
+/** Lời giới thiệu + hộp thiết kế riêng khi lọc 1 / 2 / 3 tuần: dùng chung nội dung khối 1 / 2 / 3 tuần của trang Gói tour */
+const weekCopyOf = (pk) => ({
+  ...Object.fromEntries(
+    [1, 2, 3].map((n) => [
+      n,
+      {
+        title: pk[`week${n}BestTitle`],
+        text: pk[`week${n}BestText`],
+        ctaTitle: pk[`week${n}CtaTitle`],
+        ctaText: pk[`week${n}CtaText`],
+      },
+    ]),
+  ),
+  button: pk.ctaButton,
+});
 
 export default async function ToursPage({ params }) {
   const { allTours } = await getCatalog();
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  const t = dict.tours;
+  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Tất cả tour (+ khối 1 / 2 / 3 tuần ở trang Gói tour)
+  const [p, pk] = await Promise.all([
+    getPageText("tours", lang, dict),
+    getPageText("packages", lang, dict),
+  ]);
 
   return (
     <>
       <BrushHero
-        title={t.allTitle}
-        subtitle={t.allIntro}
-        images={[
-          "/images/tours/cao-bang.jpg",
-          "/images/tours/v2/hoi-an-92090.jpg",
-          "/images/tours/v2/phu-quoc-14012373.jpg",
-        ]}
-        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: t.allTitle }]}
+        title={p.heroTitle}
+        subtitle={p.heroIntro}
+        images={p.heroImages}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: p.heroTitle }]}
       />
       <section className="bg-surface pt-4 pb-14 lg:pb-[4.5rem]">
         <Container>
@@ -44,12 +62,12 @@ export default async function ToursPage({ params }) {
             dict={dict}
             tours={allTours}
             advice={{
-              title: t.notSureTitle,
-              text: t.notSureText,
-              cta: t.notSureCta,
+              title: p.adviceTitle,
+              text: p.adviceText,
+              cta: p.adviceCta,
               href: `${lp(lang)}/plan-your-trip`,
             }}
-            weekCopy={{ ...dict.packages.best, button: dict.packages.ctaButton }}
+            weekCopy={weekCopyOf(pk)}
           />
         </Container>
       </section>

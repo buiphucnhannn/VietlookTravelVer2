@@ -16,7 +16,7 @@
  * - Ảnh từ link: hệ thống lấy ảnh về giúp (kiểm tra link là ảnh thật, công khai) rồi xử lý như ảnh từ máy.
  * - Cắt lại ảnh chưa lưu → cắt từ ẢNH GỐC (không cắt chồng lên bản đã cắt).
  * - Ảnh ra luôn vẽ từ ẢNH GỐC đủ độ phân giải (đúng chiều EXIF), thu nhỏ từng nửa / phóng to từng bước ≤ 2×,
- *   làm nét nhẹ sau khi phóng to; xuất WebP 0.92 (JPEG nếu trình duyệt không hỗ trợ), ảnh có nền trong suốt → PNG.
+ *   làm nét nhẹ sau khi phóng to / thu nhỏ nhiều; giữ thêm điểm ảnh cho màn hình Retina (≤ 1.6× khung); xuất WebP 0.95 (JPEG nếu trình duyệt không hỗ trợ), ảnh có nền trong suốt → PNG.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -111,7 +111,13 @@ const SERVER_LIMIT = 8 * 1024 * 1024; // be/src/middlewares/upload.middleware.js
 const TARGET_LIMIT = 7.5 * 1024 * 1024;
 const MAX_INPUT = 40 * 1024 * 1024; // ảnh lớn hơn 8MB vẫn nhận: thu nhỏ + nén lại trên máy trước khi gửi
 const HUGE_SIDE = 4000; // vừa khung nhưng lớn hơn thế này → thu nhỏ
-const HUGE_TARGET = 2560;
+const HUGE_TARGET = 3200;
+/** Ảnh gốc lớn hơn khung khuyến nghị → giữ thêm điểm ảnh (tới 1.6× khung, tối đa 3200px) để màn hình Retina vẫn nét;
+ *  website tự thu nhỏ đúng cỡ từng màn hình qua Cloudinary nên ảnh lớn hơn không làm trang chậm. */
+const RETINA_FACTOR = 1.6;
+const MAX_OUT_SIDE = 3200;
+/** Ảnh gốc nhỏ hơn khung: phóng to tối đa 2× (phóng nhiều hơn chỉ làm file nặng, không nét hơn) */
+const MAX_UPSCALE = 2;
 const MAX_CANVAS_AREA = 16_000_000; // an toàn cho Safari iOS
 
 const CLOUDINARY = /^https:\/\/res\.cloudinary\.com\/[\w-]+\/image\/upload\//;
@@ -227,7 +233,11 @@ function renderRegion(src, area, rotation, outW, outH, alpha) {
   while (w / 2 >= outW) step(Math.round(w / 2), Math.round(h / 2));
   while (w * 2 < outW) step(w * 2, h * 2);
   if (w !== outW || h !== outH) step(outW, outH);
-  if (scale > 1.15 && !alpha) sharpen(cur, scale > 2 ? 0.45 : 0.3);
+  if (!alpha) {
+    // phóng to → làm nét bù độ mềm; thu nhỏ nhiều → làm nét rất nhẹ cho chi tiết rõ như ảnh gốc
+    if (scale > 1.15) sharpen(cur, scale > 1.6 ? 0.42 : 0.3);
+    else if (scale < 0.75) sharpen(cur, scale < 0.4 ? 0.16 : 0.1);
+  }
   return cur;
 }
 
@@ -242,7 +252,7 @@ async function encode(canvas, alpha, name) {
       return new File([png], `${base}.png`, { type: "image/png" });
   }
   let blob = null;
-  for (const q of [0.92, 0.88, 0.84, 0.78, 0.7, 0.6, 0.5]) {
+  for (const q of [0.95, 0.92, 0.88, 0.84, 0.78, 0.7, 0.6, 0.5]) {
     blob = await toBlob(canvas, "image/webp", q);
     if (!blob || blob.type !== "image/webp") blob = await toBlob(canvas, "image/jpeg", q);
     if (blob && blob.size <= TARGET_LIMIT) break;
@@ -270,9 +280,16 @@ function areaPixels(src, pct, rotation) {
 async function cropToFile(src, alpha, decision, spec, name) {
   const area = areaPixels(src, decision.area, decision.rotation);
   let { w, h } = outSize(spec, decision.ratio);
-  // vùng chọn quá nhỏ: không phóng to quá 4× (chỉ to thêm file, không nét hơn)
-  if (w > area.width * 4) {
-    w = Math.round(area.width * 4);
+  const long = (a, b) => Math.max(a, b);
+  // ảnh gốc dư điểm ảnh → giữ thêm cho màn hình Retina (không vượt ảnh gốc, cạnh dài ≤ 3200px)
+  const room = Math.min(area.width / w, RETINA_FACTOR, MAX_OUT_SIDE / long(w, h));
+  if (room > 1) {
+    w = Math.round(w * room);
+    h = Math.max(1, Math.round(w / decision.ratio));
+  }
+  // vùng chọn nhỏ hơn khung: phóng to tối đa 2×
+  if (w > area.width * MAX_UPSCALE) {
+    w = Math.round(area.width * MAX_UPSCALE);
     h = Math.max(1, Math.round(w / decision.ratio));
   }
   const canvas = renderRegion(src, area, decision.rotation, w, h, alpha);
@@ -631,6 +648,17 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
   const chosenW = area ? (area.width / 100) * (swap ? job.natural.h : job.natural.w) : Infinity;
   const need = outSize(spec, ratio).w;
   const small = chosenW < need * 0.8;
+  // Nhãn độ nét theo số điểm ảnh thật của vùng đang chọn (đổi ngay khi kéo / phóng to)
+  const sharp = !area
+    ? null
+    : chosenW >= need * 1.4
+      ? {
+          tone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+          text: "Rất nét — đủ cho màn hình Retina",
+        }
+      : chosenW >= need * 0.8
+        ? { tone: "bg-emerald-50 text-emerald-700 ring-emerald-100", text: "Nét" }
+        : { tone: "bg-amber-50 text-amber-800 ring-amber-100", text: "Có thể hơi mờ" };
   // đã ở mức nhỏ nhất mà vẫn thiếu → do ảnh gốc nhỏ; còn phóng to thì do phóng to quá tay
   const blurHint = !small
     ? ""
@@ -747,6 +775,15 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
             <p className="flex items-center gap-1.5 font-semibold text-slate-700">
               <ImageIcon className="size-3.5" /> Ảnh sẽ hiện như thế này
             </p>
+            {sharp && (
+              <p className="flex flex-wrap items-center gap-1.5">
+                <span className="text-slate-500">Độ nét:</span>
+                <span className={cn("rounded-full px-2 py-0.5 font-semibold ring-1", sharp.tone)}>
+                  {sharp.text}
+                </span>
+                <span className="text-slate-400">rộng {Math.round(chosenW)}px</span>
+              </p>
+            )}
             {blurHint && (
               <p className="rounded-lg bg-amber-50 px-2.5 py-2 text-amber-800 ring-1 ring-amber-100">
                 {blurHint}

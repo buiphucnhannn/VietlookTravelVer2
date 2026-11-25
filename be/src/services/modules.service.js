@@ -1,4 +1,6 @@
-import { MAX_THEMES, REGION_VALUES } from "../constants/content.js";
+import { MAX_THEMES, PAGE_KEYS, REGION_VALUES } from "../constants/content.js";
+import { PAGE_COPY_KEYS, PAGE_COPY_SCHEMA } from "../constants/page-copy.js";
+import { trusted } from "../repositories/base.repository.js";
 import {
   articleRepository,
   authorRepository,
@@ -253,8 +255,9 @@ export const reviewService = createContentService({
 /* ---------- Trang giới thiệu & chính sách ---------- */
 
 export const pageService = {
+  /** Trang giới thiệu + chính sách (không gồm bản "Giao diện trang" lưu chung collection) */
   async list() {
-    return pageRepository.find({}, { sort: { key: 1 } });
+    return pageRepository.find({ key: trusted({ $in: PAGE_KEYS }) }, { sort: { key: 1 } });
   },
 
   async get(key) {
@@ -272,5 +275,66 @@ export const pageService = {
     });
     cleanupMedia(prev, next); // ảnh bị thay / bỏ → dọn nền
     return next;
+  },
+};
+
+/* ---------- Giao diện các trang công khai (CMS → Giao diện trang) ---------- */
+
+const isObj = (v) => v != null && typeof v === "object" && !Array.isArray(v);
+const emptyLeaf = (v) =>
+  v == null || v === "" || (isObj(v) && LANGS.every((l) => !String(v[l] ?? "").trim()));
+
+/** Bỏ ô trống (ô không có = website dùng mặc định); danh sách giữ vị trí, bỏ phần trống ở cuối */
+export function compactPageCopy(data, fields = {}) {
+  const out = {};
+  for (const [k, spec] of Object.entries(fields)) {
+    const v = data?.[k];
+    if (spec.type !== "list") {
+      if (!emptyLeaf(v)) out[k] = v;
+      continue;
+    }
+    if (!Array.isArray(v)) continue;
+    const items = v.map((x) =>
+      spec.item.type
+        ? emptyLeaf(x)
+          ? spec.item.type === "image"
+            ? ""
+            : {}
+          : x
+        : Object.fromEntries(Object.entries(x ?? {}).filter(([, y]) => !emptyLeaf(y))),
+    );
+    while (items.length && Object.keys(items.at(-1) ?? {}).length === 0) items.pop();
+    if (items.length) out[k] = items;
+  }
+  return out;
+}
+
+export const pageCopyService = {
+  /** Mọi trang đã từng lưu: [{ key, data, updatedAt }] (trang chưa lưu không có trong danh sách) */
+  async list() {
+    return pageRepository.find(
+      { key: trusted({ $in: PAGE_COPY_KEYS }) },
+      { sort: { key: 1 }, select: "key data updatedAt" },
+    );
+  },
+
+  /** Bản đã lưu của 1 trang — chưa lưu bao giờ → data rỗng (website dùng toàn bộ mặc định) */
+  async get(key) {
+    const doc = await pageRepository.findByIdent(key, { select: "key data updatedAt" });
+    return { key, data: doc?.data ?? {}, updatedAt: doc?.updatedAt ?? null };
+  },
+
+  /** Website: chỉ phần dữ liệu */
+  async publicData(key) {
+    const doc = await pageRepository.findByIdent(key, { select: "data isActive" });
+    return doc && doc.isActive !== false ? (doc.data ?? {}) : {};
+  },
+
+  async save(key, input) {
+    const prev = await pageRepository.findByIdent(key);
+    const data = compactPageCopy(input.data, PAGE_COPY_SCHEMA[key]);
+    const next = await pageRepository.upsertByIdent(key, { key, data, isActive: true });
+    cleanupMedia(prev, next); // ảnh bị thay / về ảnh mặc định → dọn nền
+    return { key, data: next.data ?? {}, updatedAt: next.updatedAt ?? null };
   },
 };

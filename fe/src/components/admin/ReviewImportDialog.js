@@ -20,7 +20,9 @@ import { Badge, Button, EmptyState, Modal, Notice, fmtDate, fmtDateTime, useUi }
 /**
  * CMS → Đánh giá → "Lấy đánh giá từ Tripadvisor / Google": xem các đánh giá mới nhất (Google 20, Tripadvisor 10)
  * qua dịch vụ Apify (mã đặt trên máy chủ). Trước khi lấy hiện hạn mức còn lại + chi phí ước tính; bấm "Lấy đánh giá"
- * → máy chủ chạy nền 20–90 giây, hộp tự hỏi lại đến khi xong. Tick chọn → "Thêm vào danh sách" tạo đánh giá qua
+ * → máy chủ bắt đầu lần chạy ở Apify (trả ngay), hộp hỏi lại mỗi 4 giây đến khi xong (thường 15–30 giây; lần lấy lưu
+ * trong DB nên đóng hộp / máy chủ khởi động lại vẫn xem tiếp được). Nền tảng nào lỗi thì báo riêng, vẫn hiện
+ * đánh giá của nền tảng kia. Tick chọn → "Thêm vào danh sách" tạo đánh giá qua
  * đúng luồng thêm thường (POST /admin/reviews: kiểm tra dữ liệu + nhật ký).
  * Lời khách giữ nguyên văn + link bài gốc + nhãn nguồn. Backend: be/src/services/review-import.service.js.
  */
@@ -30,6 +32,22 @@ export const IMPORT_NAMES = { tripadvisor: "Tripadvisor", google: "Google" };
 const LANG_LABEL = { en: "Tiếng Anh", zh: "Tiếng Trung", vi: "Tiếng Việt", other: "Ngôn ngữ khác" };
 const POLL_MS = 4000;
 const POLL_MAX_MS = 4 * 60_000;
+
+/** "Google và Tripadvisor" — các nền tảng còn đang lấy (không rõ → cả hai) */
+const pendingNames = (pending) => {
+  const names = (pending?.length ? pending : ["google", "tripadvisor"])
+    .map((s) => IMPORT_NAMES[s])
+    .filter(Boolean);
+  return names.join(" và ") || "Google và Tripadvisor";
+};
+
+/** " · Tripadvisor 10 · Google 18" — số đánh giá có nội dung lấy được mỗi nền tảng */
+const resultSummary = (result) => {
+  const parts = Object.entries(result?.counts ?? {})
+    .filter(([s]) => IMPORT_NAMES[s])
+    .map(([s, n]) => `${IMPORT_NAMES[s]} ${n}`);
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+};
 
 /** "Lấy đánh giá từ Tripadvisor / Google" theo các nền tảng dùng được */
 export const importTitle = (sources) =>
@@ -186,7 +204,7 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
             // giữ chỗ trong lúc chờ số chi phí → chữ không nhảy dòng khi dữ liệu về
             <span className="invisible">, tốn khoảng 0,07 USD hạn mức mỗi lần</span>
           )}
-          . Mất khoảng 1 phút.
+          . Thường mất dưới 1 phút.
         </p>
         <Button
           variant={again ? "secondary" : "primary"}
@@ -245,8 +263,8 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
             aria-live="polite"
           >
             <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
-            Đang lấy đánh giá mới nhất từ Google và Tripadvisor… có thể mất khoảng 1 phút. Bạn có
-            thể đóng hộp này, mở lại sau để xem kết quả.
+            Đang lấy đánh giá mới nhất từ {pendingNames(job.pending)}… thường mất dưới 1 phút. Bạn
+            có thể đóng hộp này, mở lại sau để xem kết quả.
           </p>
           <SkeletonRows />
         </div>
@@ -262,7 +280,10 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
       ) : (
         <div className="space-y-3">
           {job.finishedAt && (
-            <p className="px-1 text-xs text-slate-500">Lấy lúc {fmtDateTime(job.finishedAt)}</p>
+            <p className="px-1 text-xs text-slate-500">
+              Lấy lúc {fmtDateTime(job.finishedAt)}
+              {resultSummary(result)}
+            </p>
           )}
           {Object.entries(errors).map(([src, msg]) => (
             <Notice key={src} tone="warn" title={`${IMPORT_NAMES[src]}: chưa lấy được đánh giá`}>

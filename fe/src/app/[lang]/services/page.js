@@ -4,31 +4,30 @@ import { ArrowRight, BookOpen, Car, CheckCircle2, Map, Stamp, Users } from "luci
 import { getDictionary } from "@/i18n/dictionaries";
 import { pageMetadata } from "@/lib/seo";
 import { href } from "@/i18n/config";
+import { getPageText } from "@/lib/page-copy/server";
 import { cn } from "@/lib/utils";
 import { Container, Reveal } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 
-// 5 dịch vụ chính theo tài liệu yêu cầu (thứ tự giữ nguyên)
+// 5 dịch vụ chính theo tài liệu yêu cầu (thứ tự, biểu tượng, trang đích cố định;
+// ảnh + chữ sửa được trong CMS → Giao diện trang → Dịch vụ)
 const meta = [
-  {
-    icon: Users,
-    path: "/group-tailor-made-tours",
-    image: "/images/tours/hd/hoang-su-phi-ha-giang.jpg",
-  },
-  { icon: Map, path: "/packages", image: "/images/tours/v2/hoi-an-746921.jpg" },
-  { icon: Car, path: "/car-rental", image: "/images/rent-car/download.jpeg" },
-  { icon: Stamp, path: "/visa-fast-track", image: "/images/tours/welcome-vietlook.png" },
-  { icon: BookOpen, path: "/travel-guide", image: "/images/tours/v2/hanoi-32123175.jpg" },
+  { icon: Users, path: "/group-tailor-made-tours" },
+  { icon: Map, path: "/packages" },
+  { icon: Car, path: "/car-rental" },
+  { icon: Stamp, path: "/visa-fast-track" },
+  { icon: BookOpen, path: "/travel-guide" },
 ];
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const p = await getPageText("services", lang, dict);
   return pageMetadata({
     lang,
     path: "/services",
-    title: dict.servicesPage.title,
-    description: dict.servicesPage.subtitle,
+    title: p.heroTitle,
+    description: p.heroSubtitle,
   });
 }
 
@@ -36,32 +35,34 @@ export async function generateMetadata({ params }) {
 export default async function ServicesPage({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  const s = dict.servicesPage;
+  const p = await getPageText("services", lang, dict);
+  const items = p.items.map((item, i) => ({
+    ...item,
+    image: p.images[i],
+    points: p[`points${i}`],
+  }));
 
   return (
     <>
       <BrushHero
-        title={s.title}
-        subtitle={s.subtitle}
-        images={meta.map((m) => m.image)}
-        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: s.title }]}
+        title={p.heroTitle}
+        subtitle={p.heroSubtitle}
+        images={p.images}
+        breadcrumbs={[{ label: "Vietlook", href: href(lang) }, { label: p.heroTitle }]}
       />
 
       <section className="py-14 lg:py-[4.5rem]">
         <Container>
           <p className="mb-10 text-center text-xs font-bold tracking-[0.18em] text-brand-700 uppercase sm:text-sm lg:mb-14">
-            {s.intro}
+            {p.intro}
           </p>
 
           <div className="space-y-14 lg:space-y-20">
-            {s.items.map((item, i) => {
-              const { icon: Icon, path, image } = meta[i];
+            {items.map((item, i) => {
+              const { icon: Icon, path } = meta[i];
               const flip = i % 2 === 1;
               return (
-                <Reveal
-                  key={item.title}
-                  className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16"
-                >
+                <Reveal key={i} className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
                   <Link
                     href={href(lang, path)}
                     className={cn(
@@ -70,7 +71,7 @@ export default async function ServicesPage({ params }) {
                     )}
                   >
                     <Image
-                      src={image}
+                      src={item.image}
                       alt={item.title}
                       fill
                       sizes="(min-width: 1024px) 50vw, 100vw"
@@ -87,10 +88,12 @@ export default async function ServicesPage({ params }) {
                       <Icon className="size-6" />
                     </span>
                     <h2 className="heading-lg mt-5 text-ink">{item.title}</h2>
-                    <p className="mt-4 text-lg leading-relaxed text-ink/75">{item.text}</p>
+                    <p className="mt-4 text-lg leading-relaxed whitespace-pre-line text-ink/75">
+                      {item.text}
+                    </p>
                     <ul className="mt-6 space-y-2.5">
-                      {item.points.map((pt) => (
-                        <li key={pt} className="flex items-start gap-3 font-medium text-ink">
+                      {item.points.map((pt, j) => (
+                        <li key={j} className="flex items-start gap-3 font-medium text-ink">
                           <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-brand-500" />
                           {pt}
                         </li>

@@ -1,8 +1,17 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Check, ImageOff, Plus } from "lucide-react";
+import { Check, ImageOff, Pencil, Plus, X } from "lucide-react";
 import { cloudinaryVideo, parseVideo, videoThumb } from "@/lib/video";
 import { cn, foldSearch } from "@/lib/utils";
 import Link from "../Link";
@@ -98,18 +107,77 @@ export function Pic({ src, sizes = "240px", className }) {
 
 /* ---------- Chữ sửa trực tiếp trên bản thu nhỏ ---------- */
 
+/** Theo dõi vị trí 1 phần tử trên màn hình (đặt nhãn / thanh nổi bằng portal — không bị khung overflow-hidden cắt) */
+export function useRect(ref, active) {
+  const [rect, setRect] = useState(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!active || !el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.top, left: r.left, bottom: r.bottom, right: r.right, width: r.width });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+      ro.disconnect();
+      setRect(null);
+    };
+  }, [ref, active]);
+  return active ? rect : null;
+}
+
 /**
- * Ô nhập "vô hình": trông y như chữ trên trang, bấm vào là gõ được, tự giãn theo nội dung.
- * Kiểu chữ (cỡ, đậm, màu, căn lề) đặt ở `className` của khung ngoài.
+ * Chữ sửa TẠI CHỖ trên bản xem trước — giữ nguyên font, cỡ, màu của trang thật (kiểu chữ ở `className`).
+ * - Rê chuột: viền XANH nét đứt + nhãn "Bấm để sửa" (màn cảm ứng: viền mờ luôn hiện để biết chữ nào sửa được).
+ * - Bấm vào: gõ trực tiếp (viền CAM, nền cam nhạt) + thanh nổi "Xong · Bỏ · số ký tự".
+ * - Enter / "Xong": nhận · Esc / "Bỏ": trả lại chữ trước khi sửa · đoạn văn (multiline): Shift + Enter xuống dòng.
+ * - `light`: chữ trên nền sáng; không có → chữ trên nền tối / ảnh.
  */
-export function InlineText({ value, onChange, placeholder, label, multiline, className, light }) {
+export function InlineText({
+  value,
+  onChange,
+  placeholder,
+  label,
+  multiline,
+  className,
+  light,
+  maxLength,
+}) {
+  const wrap = useRef(null);
+  const area = useRef(null);
+  const before = useRef(value);
+  const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
+  const rect = useRect(wrap, hover || focus);
+  const count = (value ?? "").length;
+
+  const done = () => area.current?.blur();
+  const cancel = () => {
+    if ((value ?? "") !== (before.current ?? "")) onChange(before.current ?? "");
+    area.current?.blur();
+  };
+
   return (
     <span
+      ref={wrap}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       className={cn(
-        "relative inline-grid max-w-full cursor-text rounded-md outline-1 outline-offset-[5px] outline-transparent transition-[outline-color,background-color] outline-dashed",
-        light
-          ? "focus-within:bg-brand-50/60 focus-within:outline-brand-500 hover:outline-brand-300"
-          : "focus-within:bg-black/25 focus-within:outline-white hover:outline-white/60",
+        "relative inline-grid max-w-full cursor-text rounded-[4px] outline-2 outline-offset-[4px] transition-[outline-color,background-color] duration-150",
+        focus
+          ? cn("outline-orange-500 outline-solid", light ? "bg-orange-500/[0.08]" : "bg-black/30")
+          : cn(
+              "outline-transparent outline-dashed",
+              light
+                ? "hover:outline-blue-500 [@media(hover:none)]:outline-blue-500/40"
+                : "hover:outline-sky-300 [@media(hover:none)]:outline-sky-300/50",
+            ),
         className,
       )}
     >
@@ -120,24 +188,101 @@ export function InlineText({ value, onChange, placeholder, label, multiline, cla
         {(value || placeholder || "") + "​"}
       </span>
       <textarea
+        ref={area}
         rows={1}
         // giữ đúng cỡ chữ của trang thật (không bị quy tắc "ô nhập 16px trên điện thoại" trong theme.css ghi đè)
         data-inline
         // cols=1: bề rộng do dòng chữ "bóng" phía trên quyết định (mặc định 20 cột làm nút / nhãn ngắn bị kéo dài)
         cols={1}
         value={value}
-        aria-label={label}
-        title={label}
+        aria-label={label ? `Sửa: ${label}` : "Sửa chữ"}
         placeholder={placeholder}
+        maxLength={maxLength}
         spellCheck={false}
+        onFocus={() => {
+          before.current = value;
+          setFocus(true);
+          setHover(false);
+        }}
+        onBlur={() => setFocus(false)}
         onChange={(e) =>
           onChange(multiline ? e.target.value : e.target.value.replace(/[\r\n]+/g, " "))
         }
         onKeyDown={(e) => {
-          if (!multiline && e.key === "Enter") e.preventDefault();
+          if (e.key === "Enter" && !(multiline && e.shiftKey)) {
+            e.preventDefault();
+            done();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            cancel();
+          }
         }}
-        className="col-start-1 row-start-1 size-full resize-none overflow-hidden bg-transparent p-0 [text-align:inherit] [letter-spacing:inherit] text-inherit [text-transform:inherit] outline-none [font:inherit] [text-shadow:inherit] placeholder:text-current placeholder:opacity-45"
+        className="col-start-1 row-start-1 size-full cursor-text resize-none overflow-hidden bg-transparent p-0 [text-align:inherit] [letter-spacing:inherit] text-inherit [text-transform:inherit] caret-orange-500 outline-none [font:inherit] [text-shadow:inherit] placeholder:text-current placeholder:opacity-45"
       />
+      {rect &&
+        hover &&
+        !focus &&
+        createPortal(
+          <span
+            aria-hidden
+            className="pointer-events-none fixed z-[200] flex max-w-[20rem] items-center gap-1 rounded-md bg-blue-600 px-2 py-1 font-sans text-[11px] leading-none font-semibold tracking-normal whitespace-nowrap text-white normal-case not-italic shadow-lg"
+            style={{ top: Math.max(4, rect.top - 30), left: Math.max(4, rect.left - 4) }}
+          >
+            <Pencil className="size-3 shrink-0" />
+            Bấm để sửa
+            {label && <span className="truncate font-normal text-white/75">· {label}</span>}
+          </span>,
+          document.body,
+        )}
+      {rect &&
+        focus &&
+        createPortal(
+          <span
+            // giữ con trỏ trong ô chữ khi bấm các nút trên thanh
+            onMouseDown={(e) => e.preventDefault()}
+            className="fixed z-[200] flex items-center gap-0.5 rounded-lg bg-slate-900 p-1 font-sans text-xs leading-none font-semibold tracking-normal text-white normal-case not-italic shadow-xl ring-1 ring-white/10"
+            style={{
+              top: rect.top > 64 ? rect.top - 50 : rect.bottom + 12,
+              left: Math.max(8, Math.min(rect.left - 4, window.innerWidth - 360)),
+            }}
+          >
+            <button
+              type="button"
+              onClick={done}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 transition hover:bg-white/15"
+            >
+              <Check className="size-3.5" strokeWidth={2.5} /> Xong
+            </button>
+            <button
+              type="button"
+              onClick={cancel}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 transition hover:bg-white/15"
+            >
+              <X className="size-3.5" strokeWidth={2.5} /> Bỏ
+            </button>
+            {maxLength > 0 && (
+              <span
+                className={cn(
+                  "px-2 font-normal tabular-nums",
+                  count >= maxLength
+                    ? "text-red-300"
+                    : count >= maxLength * 0.9
+                      ? "text-orange-300"
+                      : "text-white/55",
+                )}
+              >
+                {count}/{maxLength}
+              </span>
+            )}
+            {multiline && (
+              <span className="hidden pr-2 font-normal text-white/45 sm:inline">
+                Shift + Enter: xuống dòng
+              </span>
+            )}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }
@@ -422,7 +567,7 @@ export function T({ k, className, multiline, dark, label }) {
       value={node[lang] ?? ""}
       placeholder={getIn(defs[lang], keys) || getIn(defs.en, keys) || "…"}
       onChange={(v) => setCopy((c) => setIn(c, [...keys, lang], v))}
-      label={label ?? "Bấm để sửa chữ"}
+      label={label}
       multiline={multiline}
       light={!dark}
       className={className}

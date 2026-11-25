@@ -6,16 +6,18 @@ import { Breadcrumbs, Container } from "@/components/ui";
 import TripPlannerForm from "@/components/forms/TripPlannerForm";
 import { href } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const p = await getPageText("plan-your-trip", lang, dict);
   return pageMetadata({
     lang,
     path: "/plan-your-trip",
-    title: dict.home.plannerTitle,
-    description: `${dict.home.plannerSubtitle} ${dict.home.customPoints.slice(0, 3).join(" · ")}`,
-    image: "/images/tours/v2/sapa-235925.jpg",
+    title: p.title,
+    description: `${p.subtitle} ${p.points.slice(0, 3).join(" · ")}`,
+    image: p.heroImage,
   });
 }
 
@@ -23,10 +25,12 @@ export default async function PlanYourTripPage({ params }) {
   const { plannerOptions } = await getCatalog();
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Lên kế hoạch chuyến đi (ô của form giữ trong từ điển)
+  const p = await getPageText("plan-your-trip", lang, dict);
   return (
     <section className="relative isolate overflow-clip bg-brand-950 pt-28 pb-16 lg:flex lg:min-h-[min(100svh,960px)] lg:items-center lg:pt-[120px] lg:pb-12">
       <Image
-        src="/images/tours/v2/sapa-235925.jpg"
+        src={p.heroImage}
         alt=""
         fill
         priority
@@ -38,19 +42,19 @@ export default async function PlanYourTripPage({ params }) {
         <div className="text-white lg:sticky lg:top-32">
           <Breadcrumbs
             light
-            items={[{ label: "Vietlook", href: href(lang) }, { label: dict.nav.planTrip }]}
+            items={[{ label: "Vietlook", href: href(lang) }, { label: p.crumb }]}
           />
-          <h1 className="heading-xl mt-6">{dict.home.plannerTitle}</h1>
-          <p className="mt-4 text-lg text-white/80">{dict.home.plannerSubtitle}</p>
+          <h1 className="heading-xl mt-6">{p.title}</h1>
+          <p className="mt-4 text-lg whitespace-pre-line text-white/80">{p.subtitle}</p>
           <ul className="mt-8 space-y-3">
-            {dict.home.customPoints.map((p) => (
-              <li key={p} className="flex gap-3">
-                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-amber-brand" /> {p}
+            {p.points.map((point, i) => (
+              <li key={i} className="flex gap-3">
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-amber-brand" /> {point}
               </li>
             ))}
           </ul>
           <p className="mt-8 flex items-center gap-2 text-sm text-white/70">
-            <Clock className="size-4" /> {dict.common.weReply}
+            <Clock className="size-4" /> {p.replyNote}
           </p>
         </div>
         <TripPlannerForm

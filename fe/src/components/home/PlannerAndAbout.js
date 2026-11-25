@@ -10,10 +10,14 @@ import YouTubeLite from "@/components/ui/YouTubeLite";
 import { WhatsAppIcon } from "@/components/ui/BrandIcons";
 import { lp, tr } from "@/i18n/config";
 import { DEFAULT_HOME_IMAGES } from "./images";
+import { getContactInfo } from "@/lib/catalog";
+import { phoneDigits } from "@/lib/contact.mjs";
 
 /** Form lên kế hoạch chuyến đi trên trang chủ. */
-export function PlannerBlock({ lang, dict, destinationOptions }) {
+export async function PlannerBlock({ lang, dict, destinationOptions }) {
   const t = dict.home;
+  // Số WhatsApp + email: CMS → Cài đặt → Thông tin liên hệ
+  const { contact } = await getContactInfo();
   return (
     <section className="relative isolate overflow-clip py-14 lg:py-[4.5rem]" id="plan">
       <Image
@@ -28,40 +32,29 @@ export function PlannerBlock({ lang, dict, destinationOptions }) {
         <div className="text-white lg:sticky lg:top-36">
           <SectionHeading title={t.plannerTitle} subtitle={t.plannerSubtitle} align="left" light />
           <div className="space-y-3">
+            {contact.phones
+              .filter((ph) => ph.whatsapp)
+              .map((ph) => (
+                <a
+                  key={ph.raw}
+                  href={`https://wa.me/${phoneDigits(ph.number)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 hover:bg-white/15"
+                >
+                  <WhatsAppIcon className="size-6 text-[#25d366]" />
+                  <span>
+                    <span className="block text-xs text-white/70">{tr(ph.channels, lang)}</span>
+                    <span className="font-semibold">{ph.number}</span>
+                  </span>
+                </a>
+              ))}
             <a
-              href={siteConfig.messaging.whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 hover:bg-white/15"
-            >
-              <WhatsAppIcon className="size-6 text-[#25d366]" />
-              <span>
-                <span className="block text-xs text-white/70">
-                  {tr(siteConfig.contact.channels.hotline, lang)}
-                </span>
-                <span className="font-semibold">{siteConfig.contact.hotline}</span>
-              </span>
-            </a>
-            <a
-              href={siteConfig.messaging.whatsapp2}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 hover:bg-white/15"
-            >
-              <WhatsAppIcon className="size-6 text-[#25d366]" />
-              <span>
-                <span className="block text-xs text-white/70">
-                  {siteConfig.contact.channels.hotline2}
-                </span>
-                <span className="font-semibold">{siteConfig.contact.hotline2}</span>
-              </span>
-            </a>
-            <a
-              href={`mailto:${siteConfig.contact.email}`}
+              href={`mailto:${contact.email}`}
               className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 hover:bg-white/15"
             >
               <Mail className="size-6 text-amber-brand" />
-              <span className="font-semibold break-all">{siteConfig.contact.email}</span>
+              <span className="font-semibold break-all">{contact.email}</span>
             </a>
           </div>
         </div>

@@ -1,6 +1,9 @@
 // Nhãn tiếng Việt dùng chung trong khu quản trị (Đơn đặt tour / Yêu cầu, Nhật ký thao tác, Trang giới thiệu
 // & chính sách) — sửa chữ ở đây là mọi nơi cùng đổi.
 
+// đường dẫn tương đối (không dùng "@/"): be/tests/emails.test.js đọc thẳng file này bằng Node
+import { PAGE_COPY } from "../../lib/page-copy/registry.mjs";
+
 /** Trạng thái xử lý đơn / yêu cầu */
 export const STATUSES = [
   { value: "new", label: "Mới", tone: "red" },
@@ -17,13 +20,14 @@ export const PAYMENT_STATUSES = [
   { value: "paid", label: "Đã thanh toán", tone: "green" },
 ];
 
-/** Tên các trang giới thiệu & chính sách (theo khoá trang) */
+/** Tên các trang sửa được trong CMS → Giao diện trang (theo khoá trang): giới thiệu, chính sách, Thuê xe, Visa… */
 export const PAGE_LABELS = {
   about: "Giới thiệu",
   terms: "Điều khoản sử dụng",
   privacy: "Chính sách bảo mật",
   payment: "Thanh toán & hoàn tiền",
   cancellation: "Huỷ / đổi tour",
+  ...Object.fromEntries(Object.entries(PAGE_COPY).map(([k, e]) => [k, e.name])),
 };
 
 const toMap = (list) => Object.fromEntries(list.map((s) => [s.value, s.label]));

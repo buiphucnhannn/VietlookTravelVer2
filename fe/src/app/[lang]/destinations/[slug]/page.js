@@ -10,6 +10,7 @@ import TourListing from "@/components/tours/TourListing";
 import { DestinationTile } from "@/components/tours/TourCard";
 import PostCard from "@/components/guide/PostCard";
 import { getCatalog } from "@/lib/catalog";
+import { getPageText } from "@/lib/page-copy/server";
 import { PHOTO_LABEL, photoCredit } from "@/data/photo-credits";
 
 export async function generateStaticParams() {
@@ -18,6 +19,8 @@ export async function generateStaticParams() {
     [...regions, ...destinations].map((d) => ({ lang, slug: d.slug })),
   );
 }
+
+const isRegionSlug = (slug, regions) => regions.some((x) => x.slug === slug);
 
 function resolve(slug, { getRegion, getDestination }) {
   const region = getRegion(slug);
@@ -32,11 +35,12 @@ export async function generateMetadata({ params }) {
   const r = resolve(slug, await getCatalog());
   if (!r) return notFoundMetadata();
   const dict = await getDictionary(lang);
+  const p = await getPageText("detail", lang, dict);
   const name = tr(r.item.name, lang);
   return pageMetadata({
     lang,
     path: `/destinations/${slug}`,
-    title: fill(dict.destination.bestTours, { name }),
+    title: fill(p.destBestTours, { name }),
     // Mô tả ngắn → thêm câu ngữ cảnh để đủ ý cho kết quả tìm kiếm
     description:
       lang === "zh"
@@ -51,6 +55,7 @@ export async function generateMetadata({ params }) {
 async function DestinationPageContent({ params }) {
   const {
     destinations,
+    regions,
     destinationsByRegion,
     getRegion,
     countFor,
@@ -62,6 +67,12 @@ async function DestinationPageContent({ params }) {
   const r = resolve(slug, await getCatalog());
   if (!r) notFound();
   const dict = await getDictionary(lang);
+  // Chữ chung (CMS → Giao diện trang → Chữ chung trên trang chi tiết) + lời giới thiệu miền dùng chung với
+  // trang Tất cả điểm đến (CMS → Giao diện trang → Tất cả điểm đến) — chưa sửa = từ điển / data/regions.js
+  const [p, all] = await Promise.all([
+    getPageText("detail", lang, dict),
+    isRegionSlug(slug, regions) ? getPageText("destinations", lang, dict) : null,
+  ]);
   const { item, isRegion } = r;
   const credit = photoCredit(item.hero || item.image);
   const name = tr(item.name, lang);
@@ -79,18 +90,21 @@ async function DestinationPageContent({ params }) {
       <BlobHero
         title={
           isRegion
-            ? fill(dict.destination.regionTours, { name })
+            ? fill(p.destRegionTours, { name })
             : lang === "vi"
               ? `Tour ${name}`
               : lang === "zh"
                 ? `${name}线路`
                 : `${name} Tours`
         }
-        text={tr(item.intro, lang)}
+        text={
+          (isRegion && all?.regionIntros[regions.findIndex((x) => x.slug === slug)]?.intro) ||
+          tr(item.intro, lang)
+        }
         images={[item.hero || item.image]}
         // Khung ảnh ghép kiểu localvietnam (màn hình lớn): ảnh điểm đến + ảnh 2 tour đầu danh sách
         collage={[item.hero || item.image, ...tours.slice(0, 4).map((t) => t.image)]}
-        link={{ href: "#tours", label: dict.destination.viewTours }}
+        link={{ href: "#tours", label: p.destViewTours }}
         breadcrumbs={[
           { label: "Vietlook", href: href(lang) },
           ...(isRegion
@@ -116,7 +130,7 @@ async function DestinationPageContent({ params }) {
         <Container>
           <div className="mb-8 rounded-2xl bg-white px-6 py-5 shadow-sm ring-1 ring-border sm:px-8">
             <h2 className="text-center text-2xl font-extrabold tracking-tight text-ink sm:text-[2rem]">
-              {fill(dict.destination.bestTours, { name })}
+              {fill(p.destBestTours, { name })}
             </h2>
           </div>
           <TourListing
@@ -128,9 +142,9 @@ async function DestinationPageContent({ params }) {
 
           <div className="mt-10">
             <AdviceBox
-              title={dict.tours.notSureTitle}
-              text={dict.tours.notSureText}
-              cta={dict.tours.notSureCta}
+              title={p.adviceTitle}
+              text={p.adviceText}
+              cta={p.adviceCta}
               href={`${lp(lang)}/plan-your-trip`}
             />
           </div>
@@ -139,7 +153,7 @@ async function DestinationPageContent({ params }) {
 
       <section className="py-14 lg:py-[4.5rem]">
         <Container>
-          <SectionHeading title={fill(dict.destination.places, { name: tr(region.name, lang) })} />
+          <SectionHeading title={fill(p.destPlaces, { name: tr(region.name, lang) })} />
           {/* hàng cuối thiếu ô → căn giữa */}
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
             {places.map((d) => (
@@ -160,7 +174,7 @@ async function DestinationPageContent({ params }) {
       {guides.length > 0 && (
         <section className="bg-brand-50 py-14 lg:py-[4.5rem]">
           <Container>
-            <SectionHeading title={fill(dict.destination.guide, { name })} />
+            <SectionHeading title={fill(p.destGuide, { name })} />
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {guides.map((p) => (
                 <PostCard

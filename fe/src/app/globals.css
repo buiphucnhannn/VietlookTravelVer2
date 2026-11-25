@@ -14,6 +14,36 @@ input::-webkit-contacts-auto-fill-button {
   pointer-events: none;
 }
 
+/* Mọi thứ bấm được → con trỏ bàn tay (Tailwind v4 mặc định để mũi tên cho <button>). Đang tắt → mũi tên cấm. */
+@layer base {
+  :where(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"],
+    [role="checkbox"],
+    [role="radio"],
+    summary,
+    select,
+    label[for],
+    input[type="checkbox"],
+    input[type="radio"],
+    input[type="file"],
+    input[type="range"],
+    input[type="color"],
+    input[type="submit"],
+    input[type="button"],
+    input[type="reset"]
+  ):not(:disabled, [aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  :where(button, [role="button"], select, input):is(:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed;
+  }
+}
+
 /* CSS của khu quản trị (CMS) + trang đăng nhập. Website dùng site.css (nhẹ hơn, không kèm lớp của CMS). */
 
 /* ===== CMS: nội dung trong trình soạn thảo (RichText) ===== */

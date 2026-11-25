@@ -45,6 +45,7 @@ import {
 } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
 import ReviewImportDialog, { IMPORT_NAMES, IMPORT_PATH, importTitle } from "./ReviewImportDialog";
+import ReviewStatsCard from "./ReviewStatsCard";
 import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { useAutoFill } from "./translate";
@@ -314,6 +315,12 @@ export default function ReviewsPage() {
         )}
         <Pagination meta={paged.meta} onPage={paged.setPage} unit="đánh giá" />
       </Card>
+
+      {/* Điểm Tripadvisor / Google (cũng có ở Cài đặt cho quản trị viên): nhân viên có quyền Đánh giá xem được;
+          nút "Cập nhật ngay" chỉ hiện với quyền sửa */}
+      <div className="mt-6">
+        <ReviewStatsCard />
+      </div>
 
       {importing && (
         <ReviewImportDialog

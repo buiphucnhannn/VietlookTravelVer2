@@ -10,6 +10,7 @@ import { uploadService } from "./upload.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js";
 import { SMALL_GROUP_DEFAULT } from "../utils/pricing.js";
+import { CONTACT_KEY, emailCompany, mergeContact } from "../constants/contact.js";
 
 const KEYS = {
   home: "home",
@@ -17,6 +18,7 @@ const KEYS = {
   payment: "payment",
   tracking: "tracking",
   smallGroup: "smallGroup",
+  contact: CONTACT_KEY,
 };
 
 /** % phụ thu nhóm nhỏ đã lưu → số nguyên 0–200; thiếu / sai → mặc định */
@@ -139,6 +141,26 @@ export const settingsService = {
   async saveTracking(data, actor) {
     await settingRepository.set(KEYS.tracking, data, actor?.username);
     return this.getTracking();
+  },
+
+  /* ----- Thông tin liên hệ công ty (điện thoại, email, địa chỉ, mạng xã hội…) — website + email dùng chung ----- */
+  /** Đủ mọi ô: ô chưa lưu = mặc định (đúng thông tin đang có trên website, constants/contact.js) */
+  async getContact() {
+    return mergeContact(await settingRepository.get(KEYS.contact));
+  },
+
+  async saveContact(data, actor) {
+    await settingRepository.set(KEYS.contact, data, actor?.username);
+    return this.getContact();
+  },
+
+  /** Thông tin công ty cho mẫu email — đọc lại mỗi lần gửi (sửa trong CMS áp dụng ngay); lỗi → mặc định */
+  async emailCompany() {
+    try {
+      return emailCompany(await settingRepository.get(KEYS.contact));
+    } catch {
+      return emailCompany(null);
+    }
   },
 
   /* ----- Phụ thu nhóm nhỏ: % cộng thêm khi đoàn ít khách — CHỈ tour chưa có bảng giá theo số khách ----- */

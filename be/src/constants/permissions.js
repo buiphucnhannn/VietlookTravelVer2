@@ -6,16 +6,25 @@ import { ROLES } from "./roles.js";
  * Mỗi mục (= 1 tab trong trang quản trị) có 1 mức:
  *   none  Không truy cập
  *   view  Chỉ xem
- *   edit  Thêm & sửa (gồm ẩn/hiện, đổi thứ tự, tải ảnh, dịch tự động; với đơn: đổi trạng thái, ghi chú, gửi lại email)
+ *   edit  Thêm & sửa (gồm ẩn/hiện, đổi thứ tự, tải ảnh, dịch tự động; với đơn: đổi trạng thái, ghi chú, gửi lại email;
+ *         với Đánh giá: lấy đánh giá tự động + "Cập nhật ngay" điểm số — tốn hạn mức Apify)
  *   full  Toàn quyền (thêm cả xoá)
  *
- * Cài đặt + Tài khoản quản trị KHÔNG cấp được — luôn chỉ admin.
+ * Mục không có gì để xoá chỉ có tới mức "edit": Trang chủ, Giao diện trang (chỉ sửa chữ / ảnh / ẩn hiện, không xoá
+ * được trang). Nhật ký thao tác chỉ có "view". Quyền đã lưu cao hơn mức tối đa của mục (vd. "full" lưu trước đây cho
+ * Giao diện trang) tự hiểu thành mức cao nhất của mục đó (clampLevel) — không cần sửa dữ liệu cũ.
+ *
+ * Cài đặt (liên hệ công ty, email thông báo, 9Pay, phụ thu nhóm nhỏ, mã đo lường) + Tài khoản quản trị KHÔNG cấp
+ * được — luôn chỉ admin.
  * Đồng bộ danh sách mục với fe/src/components/admin/permissions.js.
  */
 export const LEVELS = Object.freeze(["none", "view", "edit", "full"]);
 const RANK = Object.freeze({ none: 0, view: 1, edit: 2, full: 3 });
 
-/** Mục → các mức được phép (Nhật ký thao tác chỉ xem) */
+/** Mục chỉ sửa được, không có thao tác xoá → không có mức "Toàn quyền" */
+const NO_DELETE = Object.freeze(["none", "view", "edit"]);
+
+/** Mục → các mức được phép (Trang chủ / Giao diện trang tới "sửa"; Nhật ký thao tác chỉ xem) */
 export const MODULES = Object.freeze({
   bookings: LEVELS,
   requests: LEVELS,
@@ -24,10 +33,10 @@ export const MODULES = Object.freeze({
   themes: LEVELS,
   cars: LEVELS,
   visa: LEVELS,
-  home: LEVELS,
+  home: NO_DELETE,
   articles: LEVELS,
   taxonomy: LEVELS,
-  pages: LEVELS,
+  pages: NO_DELETE,
   reviews: LEVELS,
   audit: Object.freeze(["none", "view"]),
 });
@@ -59,7 +68,7 @@ export const MODULE_LABELS = Object.freeze({
   home: "Trang chủ",
   articles: "Bài viết",
   taxonomy: "Chuyên mục & tác giả",
-  pages: "Giới thiệu & chính sách",
+  pages: "Giao diện trang",
   reviews: "Đánh giá",
   audit: "Nhật ký thao tác",
 });
@@ -87,7 +96,7 @@ function clampLevel(module, level) {
   const allowed = MODULES[module];
   if (!allowed) return "none";
   if (allowed.includes(level)) return level;
-  // mức cao hơn mức tối đa của mục (vd. "full" cho Nhật ký) → mức cao nhất cho phép
+  // mức cao hơn mức tối đa của mục (vd. "full" cho Nhật ký / Giao diện trang) → mức cao nhất cho phép
   return RANK[level] > RANK[allowed.at(-1)] ? allowed.at(-1) : "none";
 }
 

@@ -84,7 +84,12 @@ export async function emailLookups(e) {
 async function deliver(enquiry, { paymentOnline = false } = {}) {
   const settings = await settingsService.getNotifications();
   const recipients = await settingsService.recipients();
-  const lookups = { ...(await emailLookups(enquiry)), paymentOnline };
+  // company: thông tin liên hệ công ty (CMS → Cài đặt → Thông tin liên hệ) — chân thư, nút WhatsApp, số gọi
+  const lookups = {
+    ...(await emailLookups(enquiry)),
+    paymentOnline,
+    company: await settingsService.emailCompany(),
+  };
   const status = { customer: "skipped", company: "skipped", error: "" };
   const errors = [];
 

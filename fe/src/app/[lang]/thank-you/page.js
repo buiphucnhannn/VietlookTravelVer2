@@ -4,7 +4,8 @@ import { CheckCircle2, Clock } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
 import { lp } from "@/i18n/config";
 import { pageMetadata } from "@/lib/seo";
-import { siteConfig } from "@/constants/site";
+import { getPageText } from "@/lib/page-copy/server";
+import { getContactInfo } from "@/lib/catalog";
 import { Container } from "@/components/ui";
 import { WhatsAppIcon } from "@/components/ui/BrandIcons";
 import ThankYouCode from "@/components/forms/ThankYouCode";
@@ -14,12 +15,13 @@ import PaymentResult from "@/components/forms/PaymentResult";
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  const t = await getPageText("thank-you", lang, dict);
   return {
     ...pageMetadata({
       lang,
       path: "/thank-you",
-      title: dict.thanks.title,
-      description: dict.thanks.text,
+      title: t.title,
+      description: t.text,
     }),
     // Trang đích chuyển đổi (Google Ads) – không cho lập chỉ mục
     robots: { index: false, follow: false },
@@ -33,7 +35,9 @@ export async function generateMetadata({ params }) {
 export default async function ThankYouPage({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  const t = dict.thanks;
+  // Chữ sửa được trong CMS → Giao diện trang → Trang cảm ơn (chưa sửa = nội dung mặc định)
+  const t = await getPageText("thank-you", lang, dict);
+  const { messaging } = await getContactInfo(); // CMS → Cài đặt → Thông tin liên hệ
   return (
     <section className="flex min-h-[calc(100svh-4rem)] items-center bg-cream-50 py-8 lg:min-h-[calc(100svh-6.75rem)] short:py-4">
       <Container className="max-w-3xl text-center">
@@ -41,7 +45,7 @@ export default async function ThankYouPage({ params }) {
         <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-forest-900 sm:text-[2.6rem] sm:leading-tight lg:[text-wrap:nowrap] short:mt-4 short:text-[2.2rem]">
           {t.title}
         </h1>
-        <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink/75 sm:text-lg short:mt-4">
+        <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed whitespace-pre-line text-ink/75 sm:text-lg short:mt-4">
           {t.text}
         </p>
         <Suspense fallback={null}>
@@ -50,7 +54,7 @@ export default async function ThankYouPage({ params }) {
         </Suspense>
         <Suspense fallback={null}>
           {/* Kết quả thanh toán 9Pay (?payment=…) — không có thì không hiện gì */}
-          <PaymentResult lang={lang} p={dict.payment} contactHref={siteConfig.messaging.whatsapp} />
+          <PaymentResult lang={lang} p={dict.payment} contactHref={messaging.whatsapp} />
         </Suspense>
         <Suspense fallback={null}>
           <ThankYouCode
@@ -65,7 +69,7 @@ export default async function ThankYouPage({ params }) {
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-4 short:mt-7">
           <a
-            href={siteConfig.messaging.whatsapp}
+            href={messaging.whatsapp}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex h-12 items-center gap-2 rounded-full bg-[#25d366] px-6 font-semibold text-white transition hover:brightness-105"

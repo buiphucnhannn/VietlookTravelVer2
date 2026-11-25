@@ -7,6 +7,7 @@ import { regions } from "@/data/regions";
 import { autoFeaturedTours, autoLongTours, pushBack } from "@/lib/tour-picks";
 import { cruiseKind, durationCounts } from "@/lib/tour-categories";
 import { normalizeReviewStats } from "@/lib/review-stats";
+import { contactView } from "@/lib/contact.mjs";
 
 /**
  * Nội dung website lấy từ backend (be/) — quản lý trong CMS.
@@ -145,6 +146,14 @@ async function loadPaymentConfig() {
 }
 export const getPaymentConfig = cache(loadPaymentConfig);
 
+/** Giao diện 1 trang công khai (CMS → Giao diện trang): các ô đã sửa — xem lib/page-copy/server.js */
+async function loadPageCopy(key) {
+  "use cache";
+  cacheTag("pages", `page:${key}`);
+  cacheLife("hours");
+  return (await get(`/page-copy/${encodeURIComponent(key)}`)) ?? {};
+}
+
 /**
  * Phụ thu nhóm nhỏ (CMS → Cài đặt): { enabled, one, two, threeFour, fivePlus } — % theo số khách, chỉ áp dụng
  * cho tour chưa có bảng giá theo số khách. null = máy chủ chưa có cài đặt này → khung đặt tour không cộng.
@@ -166,6 +175,19 @@ export const getReviewStats = cache(async () => {
 
 /** Mã đo lường Google nhập trong CMS (Cài đặt) — { gtmId, ga4Id, adsId } */
 export const getTracking = cache(async () => (await loadSite()).tracking ?? {});
+
+/**
+ * Thông tin liên hệ công ty (CMS → Cài đặt → Thông tin liên hệ): điện thoại, email, địa chỉ, mạng xã hội…
+ * cùng dạng siteConfig (contact / messaging / social / maps / legal) — xem lib/contact.mjs.
+ * Thẻ "settings": CMS lưu xong → website làm mới ngay. Backend lỗi → đúng giá trị mặc định (siteConfig).
+ */
+export const getContactInfo = cache(async () => {
+  try {
+    return contactView((await loadSite()).contact);
+  } catch {
+    return contactView(null);
+  }
+});
 
 /* ---------- Chuẩn hoá ---------- */
 
@@ -409,6 +431,19 @@ export const getCatalog = cache(async () => {
 export const getReviews = cache(async (place) => {
   const list = await loadReviews();
   return place ? list.filter((r) => (r.showOn ?? []).includes(place)) : list;
+});
+
+/**
+ * Các ô đã sửa của 1 trang trong CMS → Giao diện trang ({} = chưa sửa gì). Lỗi → {} (trang dùng nội dung mặc
+ * định, không hỏng) — lần lỗi không được cache nên lượt xem sau tự lấy lại.
+ */
+export const getPageCopy = cache(async (key) => {
+  try {
+    return await loadPageCopy(key);
+  } catch (err) {
+    console.warn(`[vietlook] Chưa tải được giao diện trang ${key}: ${err.message}`);
+    return {};
+  }
 });
 
 /* ---------- Chi tiết (đầy đủ nội dung) ---------- */

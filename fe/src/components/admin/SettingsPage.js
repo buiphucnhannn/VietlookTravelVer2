@@ -5,6 +5,7 @@ import { BarChart3, CreditCard, Mail, Save, Users } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { toastError, useMutation } from "./hooks";
 import ReviewStatsCard from "./ReviewStatsCard";
+import ContactSettingsCard from "./ContactSettingsCard";
 import { SECRET_RULES, SecretKeyField, secretError, useReauth } from "./secrets";
 import {
   Button,
@@ -29,9 +30,10 @@ export default function SettingsPage() {
     <>
       <PageHeader
         title="Cài đặt"
-        description="Email nhận thông báo, thanh toán 9Pay, phụ thu nhóm nhỏ, điểm đánh giá Tripadvisor / Google và mã đo lường của Google."
+        description="Thông tin liên hệ công ty, email nhận thông báo, thanh toán 9Pay, phụ thu nhóm nhỏ, điểm đánh giá Tripadvisor / Google và mã đo lường của Google."
       />
       <div className="space-y-6">
+        <ContactSettingsCard />
         <NotificationsCard />
         <PaymentCard />
         <SmallGroupCard />

@@ -43,8 +43,15 @@ const CONTENT = {
   car_area: { noun: "khu vực xe", module: "cars", list: "/cars" },
   visa_type: { noun: "loại visa", module: "visa", list: "/visa" },
   fast_track: { noun: "gói fast-track", module: "visa", list: "/visa" },
-  review: { noun: "đánh giá khách", module: "reviews", list: "/reviews" },
+  review: {
+    noun: "đánh giá khách",
+    module: "reviews",
+    list: "/reviews",
+    extra: ["review.fetch", "settings.review_sync"], // lấy đánh giá tự động, cập nhật ngay điểm số
+  },
 };
+/** Nền tảng lấy đánh giá tự động */
+const SOURCE_NAMES = { tripadvisor: "Tripadvisor", google: "Google" };
 const CONTENT_VERBS = {
   create: "Thêm",
   update: "Sửa",
@@ -69,7 +76,7 @@ const FOLDER_LABELS = {
   themes: "Chủ đề tour",
   authors: "Tác giả",
   cars: "Xe",
-  pages: "Trang giới thiệu / chính sách",
+  pages: "Giao diện trang",
   home: "Trang chủ",
   reviews: "Đánh giá",
 };
@@ -94,15 +101,17 @@ const FIXED = {
   "media.drive_video": "Thêm video từ Google Drive",
   "media.cleanup": "Tự dọn ảnh không còn dùng",
   "media.discard": "Bỏ ảnh / video chưa lưu",
-  "page.update": "Sửa trang giới thiệu / chính sách",
+  "page.update": "Sửa nội dung trang",
   "settings.home": "Sửa trang chủ",
   "settings.notifications": "Sửa email nhận thông báo",
   "settings.test_email": "Gửi email thử",
   "settings.payment": "Sửa cài đặt thanh toán 9Pay",
   "settings.tracking": "Sửa mã đo lường",
+  "settings.contact": "Sửa thông tin liên hệ",
   "settings.smallGroup": "Sửa phụ thu nhóm nhỏ",
   "settings.review_stats": "Sửa điểm & số lượt đánh giá", // nhật ký cũ (nay tự cập nhật, không sửa tay)
   "settings.review_sync": "Cập nhật ngay điểm đánh giá",
+  "review.fetch": "Lấy đánh giá tự động từ Tripadvisor / Google",
   "settings.secret": "Thay / xoá khoá bảo mật",
   "user.create": "Thêm tài khoản",
   "user.update": "Sửa tài khoản",
@@ -143,6 +152,8 @@ const BADGES = {
   "media.cleanup": ["Dọn ảnh", "gray"],
   "media.discard": ["Dọn ảnh", "gray"],
   "page.update": ["Sửa", "blue"],
+  "review.fetch": ["Lấy đánh giá", "blue"],
+  "settings.review_sync": ["Điểm đánh giá", "blue"],
   "user.create": ["Tài khoản", "violet"],
   "user.update": ["Tài khoản", "violet"],
   "user.permissions": ["Phân quyền", "violet"],
@@ -329,7 +340,7 @@ export function describeLog(x) {
             href: PAGE_LABELS[id] ? `/pages?key=${id}` : "/pages",
             module: "pages",
           }
-        : plain("Sửa trang giới thiệu / chính sách");
+        : plain("Sửa nội dung trang");
     }
     case "settings.home":
       return { before: "Sửa nội dung ", name: "trang chủ", href: "/home", module: "home" };
@@ -356,6 +367,14 @@ export function describeLog(x) {
                 : " — đang bật, chạy thử"
               : "",
         href: "/settings",
+        module: "admin",
+      };
+    case "settings.contact":
+      return {
+        before: "Sửa ",
+        name: "thông tin liên hệ công ty",
+        after: m.phones ? ` — ${m.phones} số điện thoại${m.email ? `, ${m.email}` : ""}` : "",
+        href: "/settings#contact",
         module: "admin",
       };
     case "settings.tracking":
@@ -387,8 +406,16 @@ export function describeLog(x) {
         before: "Bấm cập nhật ngay ",
         name: "điểm & số lượt đánh giá",
         after: m.ok === false ? " — có lỗi" : m.ok ? " — thành công" : "",
-        href: "/settings",
-        module: "admin",
+        href: "/reviews",
+        module: "reviews",
+      };
+    case "review.fetch":
+      return {
+        before: "Bấm lấy ",
+        name: "đánh giá mới",
+        after: ` từ ${SOURCE_NAMES[m.source] ?? "Tripadvisor / Google"} (xem trước để chọn thêm)`,
+        href: "/reviews",
+        module: "reviews",
       };
     case "settings.smallGroup":
       return {
@@ -491,6 +518,7 @@ function detailRows(x) {
       );
   }
   if (x.action === "settings.review_sync") add("Kết quả", m.message);
+  if (x.action === "review.fetch") add("Lấy từ", SOURCE_NAMES[m.source] ?? "Tripadvisor và Google");
   if (x.action === "settings.secret") {
     add("Khoá", m.name);
     add("Thao tác", m.op === "clear" ? "Xoá khoá" : "Thay khoá mới (lưu mã hoá)");
@@ -524,7 +552,7 @@ const FILTER_GROUPS = [
   },
   ...Object.keys(CONTENT).map((t) => ({
     label: CONTENT[t].noun,
-    actions: Object.keys(CONTENT_VERBS).map((v) => `${t}.${v}`),
+    actions: [...Object.keys(CONTENT_VERBS).map((v) => `${t}.${v}`), ...(CONTENT[t].extra ?? [])],
   })),
   {
     label: "Trang & ảnh",
@@ -546,9 +574,9 @@ const FILTER_GROUPS = [
       "settings.test_email",
       "settings.payment",
       "settings.tracking",
+      "settings.contact",
       "settings.smallGroup",
       "settings.review_stats",
-      "settings.review_sync",
       "settings.secret",
     ],
   },

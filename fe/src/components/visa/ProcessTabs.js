@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const icons = {
+export const PROCESS_ICONS = {
   send: Send,
   plane: Plane,
   stamp: Stamp,
@@ -69,10 +69,10 @@ export default function ProcessTabs({ processes, tabs }) {
           className="absolute top-7 right-[10%] left-[10%] hidden border-t-2 border-dashed border-sand-300 md:block"
         />
         {steps.map((s, i) => {
-          const Icon = icons[s.icon] || Send;
+          const Icon = PROCESS_ICONS[s.icon] || Send;
           return (
             <li
-              key={s.title}
+              key={i}
               // Từ md: subgrid 3 hàng (biểu tượng · tiêu đề · mô tả) → mô tả các bước bắt đầu cùng một mức
               className="relative flex gap-4 md:row-span-3 md:grid md:grid-rows-subgrid md:justify-items-center md:gap-y-0 md:text-center"
             >
