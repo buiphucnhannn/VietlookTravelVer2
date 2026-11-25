@@ -301,8 +301,8 @@ const LINKABLE = new Set([Input, Textarea, Select, LocInput, DateInput]);
 
 export function PageHeader({ title, description, actions, back, eyebrow }) {
   return (
-    <div className="mb-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-      <div className="min-w-0">
+    <div className="mb-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-4 lg:flex-nowrap">
+      <div className="min-w-0 lg:flex-1">
         {back}
         {eyebrow && (
           <p className="mb-1 text-[11px] font-semibold tracking-[0.2em] text-sun-500 uppercase">
@@ -314,7 +314,11 @@ export function PageHeader({ title, description, actions, back, eyebrow }) {
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-500">{description}</p>
         )}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto lg:shrink-0">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

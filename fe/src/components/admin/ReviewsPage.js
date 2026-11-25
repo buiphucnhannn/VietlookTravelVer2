@@ -211,10 +211,10 @@ export default function ReviewsPage() {
         description={`Đánh giá thật của khách, hiện ở trang chủ, trang giới thiệu, trang tour đoàn và trang thuê xe. Thứ tự trong danh sách là thứ tự trên website.${canEdit ? " Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh." : ""}`}
         actions={
           canEdit && (
-            <div className="flex flex-wrap gap-2">
+            <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
               {apiSources.length > 0 && (
                 <Button variant="secondary" icon={CloudDownload} onClick={() => setImporting(true)}>
-                  {importTitle(apiSources)}
+                  Tự động {importTitle(apiSources).replace(/^L/, "l")}
                 </Button>
               )}
               <Button icon={Plus} onClick={() => setEditing({ ...EMPTY, order: nextOrder })}>

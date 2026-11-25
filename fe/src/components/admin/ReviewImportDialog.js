@@ -160,29 +160,40 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
   };
 
   const count = [...picked].filter((k) => fresh.some((r) => keyOf(r) === k)).length;
-  const cost = info?.cost > 0 ? `~${fmtUsd(info.cost)} USD` : "";
+  const cost = info?.cost > 0 ? `${fmtUsd(info.cost)} USD` : "";
   const blocked = info?.quota && !info.quota.error && info.quota.canManual === false;
   const running = job.status === "running" || starting;
 
   /** Khung hạn mức + chi phí + nút lấy (hiện trước khi lấy và ở cuối kết quả để lấy lại) */
+  const checking = job.status === "loading"; // đang hỏi máy chủ lần lấy gần nhất (rất nhanh)
   const startPanel = (again) => (
     <div className="space-y-3 rounded-2xl bg-slate-50/80 p-4 ring-1 ring-slate-200/80">
       {info ? (
         <UsageQuota quota={info.quota ?? null} compact />
       ) : (
-        <div className="h-8 animate-pulse rounded-lg bg-slate-100" />
+        <div className="h-[50px] animate-pulse rounded-lg bg-slate-100 sm:h-8" />
       )}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <p className="min-w-0 flex-1 basis-56 text-xs leading-relaxed text-slate-500">
           Lấy tối đa 20 đánh giá Google và 10 đánh giá Tripadvisor mới nhất
-          {cost ? `, tốn khoảng ${cost} hạn mức mỗi lần` : ""}. Mất khoảng 1 phút.
+          {info ? (
+            cost ? (
+              `, tốn khoảng ${cost} hạn mức mỗi lần`
+            ) : (
+              ""
+            )
+          ) : (
+            // giữ chỗ trong lúc chờ số chi phí → chữ không nhảy dòng khi dữ liệu về
+            <span className="invisible">, tốn khoảng 0,07 USD hạn mức mỗi lần</span>
+          )}
+          . Mất khoảng 1 phút.
         </p>
         <Button
           variant={again ? "secondary" : "primary"}
           icon={again ? RefreshCw : CloudDownload}
           onClick={start}
           loading={starting}
-          disabled={blocked || running}
+          disabled={blocked || running || checking}
           className="ml-auto"
         >
           {again ? "Lấy lại" : "Lấy đánh giá mới nhất"}
@@ -224,8 +235,9 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
         </>
       }
     >
-      {job.status === "loading" ? (
-        <SkeletonRows />
+      {checking ? (
+        // Giữ đúng khung "Lấy đánh giá" ngay từ đầu → hộp không phóng to rồi thu lại khi máy chủ trả lời
+        <div className="space-y-3">{startPanel(false)}</div>
       ) : running ? (
         <div className="space-y-3">
           <p

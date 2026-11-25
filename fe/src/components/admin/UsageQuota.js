@@ -51,12 +51,12 @@ export default function UsageQuota({ quota, compact = false, className }) {
     <div className={cn("min-w-0", className)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[13px]">
         <span className="font-semibold text-slate-800">
-          Đã dùng{" "}
+          Còn{" "}
           <span className={cn("tabular-nums", empty ? "text-sun-700" : low && "text-amber-700")}>
-            {used != null && total != null
+            {total != null
               ? quota.unit === "usd"
-                ? `${fmtUsd(used)} / ${fmtUsd(total)} USD`
-                : `${used} / ${total} lượt`
+                ? `${fmtUsd(left)} / ${fmtUsd(total)} USD`
+                : `${left} / ${total} lượt`
               : amount(quota, left)}
           </span>{" "}
           tháng này
@@ -80,7 +80,9 @@ export default function UsageQuota({ quota, compact = false, className }) {
           style={{ width: `${pctLeft}%` }}
         />
       </div>
-      {!compact && <p className="mt-1 text-xs text-slate-500">Còn {amount(quota, left)}.</p>}
+      {!compact && used != null && (
+        <p className="mt-1 text-xs text-slate-500">Đã dùng {amount(quota, used)}.</p>
+      )}
       {empty ? (
         <p className="mt-1.5 text-xs leading-relaxed text-sun-700">
           Đã dùng hết hạn mức tháng này — cập nhật tự động tạm dừng, số trên website giữ nguyên và
