@@ -21,6 +21,7 @@ const SENSITIVE = [
   "secret",
   "apiSecret",
   "apiKey",
+  "apifyToken", // mã Apify
   "secretKey", // mã 9Pay
   "checksumKey",
   "authorization",

@@ -3,7 +3,7 @@ import { siteConfig } from "@/constants/site";
 /**
  * Điểm & số lượt đánh giá của công ty (Tripadvisor / Google) — NGUỒN DUY NHẤT cho mọi chỗ hiện trên website
  * (chân trang, huy hiệu banner trang chủ, dải uy tín, khối đánh giá, "con số nổi bật", trang tour…).
- * Số lấy từ CMS → Cài đặt → "Điểm & số lượt đánh giá" (nhập tay hoặc máy chủ tự cập nhật mỗi ngày qua API),
+ * Số do máy chủ tự cập nhật mỗi ngày (qua Apify — be/src/services/review-stats.service.js; CMS → Cài đặt chỉ xem),
  * qua /public/site (lib/catalog.js → getReviewStats). Mất kết nối / chưa có cài đặt → số dự phòng dưới đây.
  *
  * Câu chữ trong từ điển (i18n/dictionaries/*) dùng ô thay thế, getDictionary() tự điền:

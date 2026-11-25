@@ -21,6 +21,13 @@ const csv = z
       .filter(Boolean),
   );
 
+/** Mã actor Apify tuỳ chọn: "user/tên" hoặc "user~tên" (trống = dùng mặc định trong code) */
+const actorId = z
+  .string()
+  .trim()
+  .default("")
+  .refine((v) => !v || /^[\w.-]+[/~][\w.-]+$/.test(v), 'dạng "user/tên-actor"');
+
 const DEFAULT_SITE_URL = "https://vietlooktravel.vercel.app";
 // Giữ khớp với PROVIDER_NAMES trong services/translate.service.js
 const TRANSLATE_PROVIDER_NAMES = [
@@ -161,9 +168,16 @@ const schema = z
     LIBRETRANSLATE_API_KEY: z.string().trim().default(""),
     MYMEMORY_EMAIL: z.string().trim().default(""),
 
-    // Điểm & số lượt đánh giá tự cập nhật mỗi ngày (services/review-stats.service.js) — API CHÍNH THỨC, không cào trang.
-    // Khoá API + mã địa điểm CHỈ nhập trong CMS (Cài đặt → Điểm & số lượt đánh giá), lưu mã hoá trong DB —
-    // KHÔNG còn biến môi trường dự phòng. Chưa có khoá → website dùng số nhập tay.
+    // Điểm & số lượt đánh giá Tripadvisor / Google tự cập nhật mỗi ngày (services/review-stats.service.js)
+    // + "Lấy đánh giá" trong CMS (services/review-import.service.js), qua nhà cung cấp chọn ở đây
+    // (services/review-providers/). Khoá CHỈ đặt ở biến môi trường — CMS không có ô nhập khoá.
+    REVIEW_STATS_PROVIDER: z.enum(["apify"]).default("apify"),
+    // Apify (apify.com) — Personal API token. Trống → không gọi, số giữ nguyên lần lưu cuối.
+    APIFY_TOKEN: z.string().trim().default(""),
+    // Tuỳ chọn: đổi actor Apify (mặc định trong services/review-providers/apify.provider.js), dạng "user/tên"
+    APIFY_GOOGLE_ACTOR: actorId,
+    APIFY_TRIPADVISOR_ACTOR: actorId,
+    APIFY_TRIPADVISOR_REVIEWS_ACTOR: actorId,
     // Giờ chạy hằng ngày (giờ Việt Nam, 0–23)
     REVIEW_SYNC_HOUR_VN: z.coerce.number().int().min(0).max(23).default(6),
 
@@ -289,6 +303,11 @@ export const env = Object.freeze({
   },
   reviews: {
     syncHourVn: e.REVIEW_SYNC_HOUR_VN,
+    provider: e.REVIEW_STATS_PROVIDER,
+    apifyToken: e.APIFY_TOKEN, // chỉ dùng trong review-providers/apify.provider.js — không log / trả ra ngoài
+    apifyGoogleActor: e.APIFY_GOOGLE_ACTOR,
+    apifyTripadvisorActor: e.APIFY_TRIPADVISOR_ACTOR,
+    apifyTripadvisorReviewsActor: e.APIFY_TRIPADVISOR_REVIEWS_ACTOR,
     // Lịch hằng ngày: không chạy khi test
     daily: e.NODE_ENV !== "test",
   },

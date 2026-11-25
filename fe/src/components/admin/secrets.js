@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button, Field, Input, Modal, fmtDateTime } from "./ui";
 
 /**
- * Ô nhập khoá bí mật trong Cài đặt (mã 9Pay, khoá API Tripadvisor / Google) + hộp "Nhập mật khẩu để xác nhận".
+ * Ô nhập khoá bí mật trong Cài đặt (mã 9Pay) + hộp "Nhập mật khẩu để xác nhận".
  * An toàn:
  * - Khoá chỉ đi 1 chiều trình duyệt → máy chủ (lưu mã hoá); máy chủ chỉ trả ••••abcd.
  * - Ô nhập dạng mật khẩu, tắt tự sửa / tự viết hoa / kiểm tra chính tả, trình quản lý mật khẩu bỏ qua ô này.
@@ -18,12 +18,6 @@ import { Button, Field, Input, Modal, fmtDateTime } from "./ui";
 
 /** Quy tắc dạng khoá (khớp kiểm tra ở máy chủ — be/src/validators/content.validator.js) */
 export const SECRET_RULES = {
-  apiKey: {
-    rx: /^[A-Za-z0-9_-]+$/,
-    min: 16,
-    max: 300,
-    charset: "chỉ gồm chữ không dấu, số, dấu gạch ngang (-) và gạch dưới (_)",
-  },
   ninePay: {
     rx: /^[\x21-\x7E]+$/,
     min: 8,

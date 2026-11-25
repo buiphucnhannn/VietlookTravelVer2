@@ -1,31 +1,36 @@
 import assert from "node:assert/strict";
-import { after, beforeEach, describe, it } from "node:test";
+import { after, afterEach, beforeEach, describe, it } from "node:test";
 import request from "supertest";
 import { createApp } from "../src/app.js";
+import { env } from "../src/config/env.js";
 import { reviewRepository, settingRepository } from "../src/repositories/content.repository.js";
 import { auditLogRepository } from "../src/repositories/audit-log.repository.js";
 import { userRepository } from "../src/repositories/user.repository.js";
 import {
-  fetchGoogleReviews,
-  fetchTripadvisorReviews,
+  _resetPreviewJob,
   mapLang,
   markExisting,
   reviewImportService,
 } from "../src/services/review-import.service.js";
 import {
-  GOOGLE_MAPS_CID,
-  NO_KEY_MESSAGE,
   insane,
   reviewStatsService,
   scheduleDailyReviewSync,
 } from "../src/services/review-stats.service.js";
+import { quotaView, reviewProvider } from "../src/services/review-providers/index.js";
+import {
+  _resetLimitsCache,
+  apifyProvider,
+  fetchGoogleReviews,
+  fetchTripadvisorReviews,
+  parseLimits,
+  usageLimits,
+} from "../src/services/review-providers/apify.provider.js";
 import { passwordService } from "../src/services/password.service.js";
 import { fxService } from "../src/services/payment/fx.service.js";
 import { signAccessToken } from "../src/services/token.service.js";
-import { encryptSecret } from "../src/utils/crypto.js";
-import { reviewStatsSettingsSchema } from "../src/validators/content.validator.js";
 
-/** Điểm & số lượt đánh giá + lấy đánh giá từ API — fetch giả, repository giả, không cần MongoDB / key thật */
+/** Điểm & số lượt đánh giá + lấy đánh giá qua Apify — fetch giả, repository giả, không cần MongoDB / mã thật */
 const saved = [];
 const stub = (obj, name, fn) => {
   saved.push([obj, name, obj[name]]);
@@ -35,6 +40,7 @@ after(() => {
   for (const [obj, name, fn] of saved.reverse()) obj[name] = fn;
 });
 
+const TOKEN = "apify_api_TESTtoken0123456789abcdef";
 let store = {};
 stub(settingRepository, "get", async (key) => store[key] ?? null);
 stub(settingRepository, "set", async (key, value) => {
@@ -43,77 +49,71 @@ stub(settingRepository, "set", async (key, value) => {
 });
 beforeEach(() => {
   store = {};
+  env.reviews.apifyToken = "";
+  _resetLimitsCache();
+  _resetPreviewJob();
 });
-
-// Khoá chỉ lấy từ CMS (đã mã hoá trong kho cài đặt) — không còn biến môi trường dự phòng
-const REAUTH_OK = { reauth: async () => {} }; // controller xác nhận mật khẩu; test service bỏ qua bước này
-/** Gắn khoá (mã hoá) vào cài đặt đã lưu */
-const withKeys = (stored = {}, { ta, g } = {}) => ({
-  ...stored,
-  tripadvisor: { ...stored.tripadvisor, ...(ta && { key: encryptSecret(ta) }) },
-  google: { ...stored.google, ...(g && { key: encryptSecret(g) }) },
+afterEach(() => {
+  env.reviews.apifyToken = "";
 });
-const BOTH = { ta: "ta-secret-key-1234", g: "g-secret-key-9876" };
+const withToken = () => {
+  env.reviews.apifyToken = TOKEN;
+};
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
+const tick = () => new Promise((r) => setImmediate(r));
 
-/** fetch giả: trả theo host; ghi lại các lần gọi */
+/** fetch giả: trả theo đường dẫn; ghi lại các lần gọi */
 function fakeFetch(routes) {
   const calls = [];
   const fn = async (url, init = {}) => {
     calls.push({ url: String(url), init });
     for (const [match, res] of routes) if (String(url).includes(match)) return res(url, init);
-    throw new TypeError("fetch failed");
+    throw new TypeError(`fetch failed ${url} ${TOKEN}`); // lỗi mạng giả — cố ý kèm mã để kiểm tra không lộ
   };
   fn.calls = calls;
   return fn;
 }
-const TA_OK = () =>
-  json({ rating: "5.0", num_reviews: "94", web_url: "https://www.tripadvisor.com/x" });
-const G_OK = () =>
-  json({
-    rating: 4.8,
-    userRatingCount: 33,
-    googleMapsUri: `https://maps.google.com/?cid=${GOOGLE_MAPS_CID}`,
-  });
+const bodyOf = (call) => JSON.parse(call.init.body);
 
-const manualBody = {
-  tripadvisor: { rating: 5, count: 93, url: "https://www.tripadvisor.com/a", auto: false },
-  google: { rating: 4.7, count: 31, url: "https://maps.google.com/?cid=1", auto: false },
-};
+// Mẫu rút gọn theo README các actor trên Apify Store + https://docs.apify.com/api/v2/users-me-limits-get
+const G_ACT = "compass~crawler-google-places/run-sync-get-dataset-items";
+const TA_ACT = "maxcopell~tripadvisor/run-sync-get-dataset-items";
+const TAR_ACT = "maxcopell~tripadvisor-reviews/run-sync-get-dataset-items";
+const G_PLACE =
+  (totalScore = 4.8, reviewsCount = 33, extra = {}) =>
+  () =>
+    json([
+      {
+        title: "Vietlook Travel",
+        totalScore,
+        reviewsCount,
+        url: "https://www.google.com/maps/place/?cid=12890319484623913190",
+        ...extra,
+      },
+    ]);
+const TA_PLACE =
+  (rating = 5, numberOfReviews = 94) =>
+  () =>
+    json([{ id: "27950353", name: "Vietlook Travel", rating, numberOfReviews }]);
+const limitsBody = (used = 0.15, max = 5) => ({
+  data: {
+    monthlyUsageCycle: {
+      startAt: "2026-11-10T00:00:00.000Z",
+      endAt: "2026-12-10T00:00:00.000Z",
+    },
+    limits: { maxMonthlyUsageUsd: max, maxMonthlyActorComputeUnits: 50 },
+    current: { monthlyUsageUsd: used, monthlyActorComputeUnits: 1.2 },
+  },
+});
+const LIMITS = (used, max) => () => json(limitsBody(used, max));
+const OK_ROUTES = (ta = TA_PLACE(), g = G_PLACE()) => [
+  [TA_ACT, ta],
+  [G_ACT, g],
+  ["/users/me/limits", LIMITS()],
+];
+const noLeak = (x) => assert.ok(!JSON.stringify(x).includes(TOKEN), "lộ mã Apify");
 
-describe("điểm đánh giá — kiểm tra dữ liệu", () => {
-  it("nhận số hợp lệ, làm tròn 1 chữ số, mặc định mã địa điểm Tripadvisor", () => {
-    const d = reviewStatsSettingsSchema.parse({
-      tripadvisor: { rating: "4.86", count: "93", url: "https://t.com/x" },
-      google: { rating: 4.7, count: 31, url: "https://g.com/x" },
-    });
-    assert.equal(d.tripadvisor.rating, 4.9);
-    assert.equal(d.tripadvisor.count, 93);
-    assert.equal(d.tripadvisor.locationId, "27950353");
-    assert.equal(d.tripadvisor.auto, true);
-    assert.equal(d.google.placeId, "");
-  });
-
-  it("ô trống được phép (service quyết theo chế độ); số sai / link sai báo tiếng Việt", () => {
-    const ok = reviewStatsSettingsSchema.safeParse({
-      tripadvisor: { rating: "", count: "", url: "https://t.com" },
-      google: { rating: null, url: "https://g.com" },
-    });
-    assert.equal(ok.success, true);
-    const bad = reviewStatsSettingsSchema.safeParse({
-      tripadvisor: { rating: 6, count: -1, url: "http://t.com", locationId: "d123" },
-      google: { rating: 4, count: 1.5, url: "https://g.com", placeId: "x y" },
-    });
-    assert.equal(bad.success, false);
-    const msgs = bad.error.issues.map((i) => i.message).join(" | ");
-    assert.match(msgs, /Tripadvisor: điểm là số từ 0 đến 5/);
-    assert.match(msgs, /không được âm/);
-    assert.match(msgs, /https:\/\//);
-    assert.match(msgs, /chỉ gồm chữ số/);
-    assert.match(msgs, /Google: số lượt đánh giá là số nguyên/);
-    assert.match(msgs, /Place ID/);
-  });
-
+describe("điểm đánh giá — kiểm tra số", () => {
   it("insane(): chặn điểm ngoài 0–5, số lượt không nguyên, số lượt tụt quá 5", () => {
     assert.equal(insane({ count: 93 }, { rating: 5, count: 94 }), "");
     assert.equal(insane({ count: 93 }, { rating: 5, count: 88 }), "");
@@ -124,195 +124,257 @@ describe("điểm đánh giá — kiểm tra dữ liệu", () => {
   });
 });
 
-describe("điểm đánh giá — lưu & khoá API", () => {
-  it("chưa lưu gì → số mặc định 5.0 · 93 và 4.7 · 31, chưa có khoá", async () => {
+describe("điểm đánh giá — dữ liệu cho CMS / website", () => {
+  it("chưa lưu gì → số mặc định 5.0 · 93 và 4.7 · 31; chưa cài mã Apify", async () => {
     const d = await reviewStatsService.get();
     assert.equal(d.tripadvisor.count, 93);
     assert.equal(d.google.rating, 4.7);
-    assert.equal(d.tripadvisor.keyConfigured, false);
-    assert.equal(d.lastSync.message, NO_KEY_MESSAGE);
+    assert.equal(d.configured, false);
+    assert.equal(d.provider.name, "Apify");
+    assert.equal(d.quota, null);
+    assert.equal(d.nextAutoAt, null);
+    assert.equal(d.running, null);
+    assert.deepEqual(Object.keys(d.tripadvisor).sort(), ["count", "rating", "updatedAt", "url"]);
     const pub = await reviewStatsService.publicStats();
     assert.deepEqual(Object.keys(pub.tripadvisor).sort(), ["count", "rating", "url"]);
   });
 
-  it("nhập tay: bắt buộc điểm + số lượt", async () => {
-    const body = reviewStatsSettingsSchema.parse({
-      ...manualBody,
-      google: { ...manualBody.google, count: "" },
-    });
-    await assert.rejects(
-      reviewStatsService.save(body, null, REAUTH_OK),
-      /Google: vui lòng nhập số lượt/,
-    );
-  });
-
-  it("khoá lưu MÃ HOÁ, chỉ trả 4 ký tự cuối; để trống = giữ; Xoá khoá = xoá", async () => {
-    const body = reviewStatsSettingsSchema.parse({
-      ...manualBody,
-      tripadvisor: { ...manualBody.tripadvisor, key: "ta-secret-key-1234" },
-    });
-    const { data, keyChanges } = await reviewStatsService.save(body, { username: "a" }, REAUTH_OK);
-    assert.deepEqual(keyChanges, [{ source: "tripadvisor", op: "replace" }]);
-    assert.equal(data.tripadvisor.keyConfigured, true);
-    assert.equal(data.tripadvisor.keyMasked, "••••••1234");
-    assert.ok(store.reviewStats.tripadvisor.key.startsWith("enc:v1:"));
-    assert.ok(!JSON.stringify(store).includes("ta-secret-key-1234"));
-    assert.ok(!JSON.stringify(data).includes("ta-secret-key-1234"));
-
-    const keep = await reviewStatsService.save(
-      reviewStatsSettingsSchema.parse(manualBody),
-      null,
-      REAUTH_OK,
-    );
-    assert.equal(keep.data.tripadvisor.keyConfigured, true);
-    assert.deepEqual(keep.keyChanges, []);
-
-    const cleared = await reviewStatsService.save(
-      reviewStatsSettingsSchema.parse({
-        ...manualBody,
-        tripadvisor: { ...manualBody.tripadvisor, clearKey: true },
-      }),
-      null,
-      REAUTH_OK,
-    );
-    assert.equal(cleared.data.tripadvisor.keyConfigured, false);
-    assert.deepEqual(cleared.keyChanges, [{ source: "tripadvisor", op: "clear" }]);
-  });
-
-  it("tự động (có khoá + bật): ô số trống vẫn lưu được, giữ số đã đồng bộ", async () => {
+  it("dữ liệu cũ (khoá mã hoá, mã địa điểm, công tắc) không bao giờ lộ ra", async () => {
     store.reviewStats = {
-      tripadvisor: { rating: 5, count: 95, auto: true, key: encryptSecret("k") },
+      tripadvisor: { rating: 5, count: 95, key: "enc:v1:abc", auto: false, locationId: "1" },
+      google: { key: "enc:v1:def", placeId: "ChIJ", keyUpdatedBy: "boss" },
     };
-    const { data } = await reviewStatsService.save(
-      reviewStatsSettingsSchema.parse({
-        tripadvisor: { url: "https://t.com/x", auto: true },
-        google: manualBody.google,
-      }),
-      null,
-      REAUTH_OK,
+    const d = await reviewStatsService.get();
+    const dump = JSON.stringify(d);
+    assert.equal(d.tripadvisor.count, 95);
+    for (const word of ["enc:v1", "locationId", "placeId", "auto", "keyUpdated"])
+      assert.ok(!dump.includes(word), word);
+  });
+
+  it("có mã: hạn mức tháng (USD), lần tự cập nhật tiếp theo — không có mã trong dữ liệu", async () => {
+    withToken();
+    const f = fakeFetch(OK_ROUTES());
+    const d = await reviewStatsService.get({ fetchImpl: f });
+    assert.equal(d.configured, true);
+    assert.deepEqual(
+      { unit: d.quota.unit, used: d.quota.used, total: d.quota.total, left: d.quota.left },
+      { unit: "usd", used: 0.15, total: 5, left: 4.85 },
     );
-    assert.equal(data.tripadvisor.count, 95);
-    assert.equal(data.tripadvisor.autoActive, true);
-    assert.equal(data.google.autoActive, false);
+    assert.equal(d.quota.resetsAt, "2026-12-10T00:00:00.000Z");
+    assert.equal(d.quota.canManual, true);
+    assert.ok(d.provider.syncCost > 0);
+    assert.ok(Date.parse(d.nextAutoAt) > Date.now());
+    const limitsCall = f.calls.find((c) => c.url.includes("/users/me/limits"));
+    assert.equal(limitsCall.init.headers.authorization, `Bearer ${TOKEN}`);
+    assert.ok(!limitsCall.url.includes(TOKEN)); // mã chỉ ở header, không trong URL
+    noLeak(d);
   });
 });
 
-describe("điểm đánh giá — tự cập nhật qua API (fetch giả)", () => {
-  it("không có khoá → bỏ qua, không gọi mạng, không ghi DB", async () => {
+describe("hạn mức Apify (users/me/limits)", () => {
+  it("parseLimits: chỉ lấy USD + ngày đặt lại; thiếu số → null; dùng quá → còn 0", () => {
+    assert.deepEqual(parseLimits(limitsBody(1.234, 5)), {
+      unit: "usd",
+      total: 5,
+      used: 1.23,
+      left: 3.77,
+      resetsAt: "2026-12-10T00:00:00.000Z",
+    });
+    assert.deepEqual(parseLimits({}), {
+      unit: "usd",
+      total: null,
+      used: null,
+      left: null,
+      resetsAt: null,
+    });
+    assert.equal(parseLimits(limitsBody(6, 5)).left, 0);
+  });
+
+  it("đệm 10 phút; mã sai báo tiếng Việt, không ném", async () => {
+    withToken();
+    const f = fakeFetch([["/users/me/limits", LIMITS(1)]]);
+    const t0 = Date.now();
+    assert.equal((await usageLimits(f, { now: t0 })).left, 4);
+    await usageLimits(f, { now: t0 + 9 * 60_000 });
+    assert.equal(f.calls.length, 1);
+    await usageLimits(f, { now: t0 + 11 * 60_000 });
+    assert.equal(f.calls.length, 2);
+
+    _resetLimitsCache();
+    const bad = await usageLimits(
+      fakeFetch([["/users/me/limits", () => json({ error: { type: "token-not-valid" } }, 401)]]),
+    );
+    assert.match(bad.error, /không đúng/);
+    _resetLimitsCache();
+    const net = await usageLimits(fakeFetch([]));
+    assert.match(net.error, /Chưa xem được/);
+    noLeak([bad, net]);
+  });
+
+  it("quotaView: còn < 0,5 USD nhắc nhẹ; giữ ~3 lần cập nhật tự động; hết → không cho bấm", () => {
+    const P = apifyProvider;
+    const c = P.syncCost;
+    assert.equal(reviewProvider(), P); // mặc định REVIEW_STATS_PROVIDER=apify
+    assert.equal(quotaView(P, { total: 5, left: 4.85 }, c).low, false);
+    const low = quotaView(P, { total: 5, left: 0.3 }, c);
+    assert.equal(low.low, true);
+    assert.equal(low.canManual, true);
+    assert.equal(quotaView(P, { total: 5, left: c * 3 }, c).canManual, false); // < chi phí + 3 lần dự trữ
+    assert.equal(quotaView(P, { total: 5, left: 0 }, c).canManual, false);
+    assert.equal(quotaView(P, { error: "x" }, c).canManual, true); // không rõ → Apify tự từ chối nếu hết
+    assert.equal(quotaView(P, null, c), null); // nhà cung cấp không có API hạn mức → CMS ẩn thanh
+  });
+});
+
+describe("điểm đánh giá — tự cập nhật qua Apify (fetch giả)", () => {
+  it("chưa có APIFY_TOKEN → không gọi mạng, không ghi DB, báo chưa cài mã", async () => {
     const f = fakeFetch([]);
     const r = await reviewStatsService.sync({ fetchImpl: f, notify: () => true });
     assert.equal(r.changed, false);
-    assert.equal(r.lastSync.message, NO_KEY_MESSAGE);
+    assert.equal(r.lastSync.message, "Chưa cài mã Apify trên máy chủ");
     assert.equal(f.calls.length, 0);
     assert.equal(store.reviewStats, undefined);
+    await assert.rejects(reviewStatsService.manualSync({ fetchImpl: f }), /Chưa cài mã Apify/);
   });
 
-  it("thành công: cập nhật cả 2 nguồn, gửi đúng header Google, báo website làm mới", async () => {
-    store.reviewStats = withKeys({ google: { placeId: "ChIJ_test_place_1234" } }, BOTH);
-    const f = fakeFetch([
-      ["api.content.tripadvisor.com", TA_OK],
-      ["places.googleapis.com/v1/places/ChIJ_test_place_1234", G_OK],
-    ]);
+  it("thành công: đúng actor + input tiết kiệm, mã ở header, cập nhật 2 nguồn, báo website", async () => {
+    withToken();
+    const f = fakeFetch(OK_ROUTES());
     let notified = 0;
-    const r = await reviewStatsService.sync({
-      fetchImpl: f,
-      notify: () => notified++,
-    });
+    const r = await reviewStatsService.sync({ fetchImpl: f, notify: () => notified++ });
     assert.equal(r.lastSync.ok, true);
     assert.equal(store.reviewStats.tripadvisor.count, 94);
-    assert.equal(store.reviewStats.tripadvisor.rating, 5);
     assert.equal(store.reviewStats.google.count, 33);
     assert.equal(store.reviewStats.google.rating, 4.8);
-    assert.ok(store.reviewStats.tripadvisor.updatedAt);
+    assert.ok(store.reviewStats.google.updatedAt);
     assert.equal(notified, 1);
-    const ta = f.calls.find((c) => c.url.includes("tripadvisor"));
-    assert.match(ta.url, /location\/27950353\/details\?key=ta-secret-key-1234&language=en/);
-    const g = f.calls.find((c) => c.url.includes("googleapis"));
-    assert.equal(g.init.headers["X-Goog-Api-Key"], "g-secret-key-9876");
-    assert.equal(g.init.headers["X-Goog-FieldMask"], "rating,userRatingCount,googleMapsUri");
-    // thông báo trạng thái không bao giờ chứa khoá
-    assert.ok(!JSON.stringify(store.reviewStats.lastSync).includes("secret"));
+    assert.equal(r.lastSync.sources.google.message, "4.7 · 31 đánh giá → 4.8 · 33 đánh giá");
+    assert.deepEqual(r.lastSync.sources.google.after, { rating: 4.8, count: 33 });
+
+    const g = f.calls.find((c) => c.url.includes(G_ACT));
+    const gu = new URL(g.url);
+    assert.equal(gu.origin, "https://api.apify.com");
+    assert.equal(gu.pathname, `/v2/acts/${G_ACT}`);
+    assert.ok(Number(gu.searchParams.get("maxTotalChargeUsd")) > 0);
+    assert.equal(g.init.method, "POST");
+    assert.equal(g.init.headers.authorization, `Bearer ${TOKEN}`);
+    const gi = bodyOf(g);
+    assert.deepEqual(gi.startUrls, [{ url: "https://maps.google.com/?cid=12890319484623913190" }]);
+    assert.equal(gi.maxReviews, 0);
+    assert.equal(gi.maxImages, 0);
+    assert.equal(gi.scrapeContacts, false);
+    const ti = bodyOf(f.calls.find((c) => c.url.includes(TA_ACT)));
+    assert.match(ti.startUrls[0].url, /Attraction_Review-g17733187-d27950353/);
+    assert.equal(ti.maxItemsPerQuery, 1);
+    assert.equal(f.calls.length, 2);
+    for (const c of f.calls) assert.ok(!c.url.includes(TOKEN));
+    assert.deepEqual(Object.keys(store.reviewStats).sort(), ["google", "lastSync", "tripadvisor"]);
+    noLeak(store);
   });
 
-  it("số bất thường bị bỏ qua, giữ số cũ; lỗi khoá báo tiếng Việt", async () => {
-    store.reviewStats = withKeys(
-      {
-        tripadvisor: { rating: 5, count: 93 },
-        google: { rating: 4.7, count: 31, placeId: "ChIJ_test_place_1234" },
-      },
-      BOTH,
-    );
-    const f = fakeFetch([
-      ["api.content.tripadvisor.com", () => json({ rating: "5.0", num_reviews: "12" })],
-      ["places.googleapis.com", () => json({ error: {} }, 403)],
-    ]);
-    const r = await reviewStatsService.sync({ fetchImpl: f, notify: () => true });
-    assert.equal(r.lastSync.ok, false);
+  it("số lượt dạng chuỗi '1,291' vẫn đọc đúng; không đổi → không báo website", async () => {
+    withToken();
+    store.reviewStats = {
+      tripadvisor: { rating: 5, count: 1291 },
+      google: { rating: 4.7, count: 31 },
+    };
+    const f = fakeFetch(OK_ROUTES(TA_PLACE(5, "1,291"), G_PLACE(4.7, 31)));
+    let notified = 0;
+    const r = await reviewStatsService.sync({ fetchImpl: f, notify: () => notified++ });
+    assert.equal(r.changed, false);
+    assert.equal(notified, 0);
+    assert.match(r.lastSync.sources.tripadvisor.message, /Không đổi \(5\.0 · 1291/);
+  });
+
+  it("số bất thường / mã sai / hết hạn mức / lỗi mạng / dataset rỗng → giữ số cũ, không lộ mã", async () => {
+    withToken();
+    store.reviewStats = {
+      tripadvisor: { rating: 5, count: 93 },
+      google: { rating: 4.7, count: 31 },
+    };
+    const err =
+      (status, type, message = "") =>
+      () =>
+        json({ error: { type, message: `${message} ${TOKEN}` } }, status);
+    const r1 = await reviewStatsService.sync({
+      fetchImpl: fakeFetch([
+        [TA_ACT, TA_PLACE(5, 12)],
+        [G_ACT, err(401, "token-not-valid")],
+      ]),
+      notify: () => true,
+    });
+    assert.equal(r1.lastSync.ok, false);
+    assert.match(r1.lastSync.sources.tripadvisor.message, /giảm bất thường.*giữ số cũ/);
+    assert.match(r1.lastSync.sources.google.message, /Mã Apify.*không đúng.*giữ số cũ/);
+
+    const r2 = await reviewStatsService.sync({
+      fetchImpl: fakeFetch([
+        [TA_ACT, TA_PLACE(9, 93)],
+        [G_ACT, err(402, "platform-feature-disabled", "Monthly usage hard limit exceeded")],
+      ]),
+      notify: () => true,
+    });
+    assert.match(r2.lastSync.sources.tripadvisor.message, /điểm nhận về không hợp lệ/);
+    assert.match(r2.lastSync.sources.google.message, /hết hạn mức Apify/);
+
+    const r3 = await reviewStatsService.sync({ fetchImpl: fakeFetch([]), notify: () => true });
+    assert.match(r3.lastSync.sources.google.message, /Không kết nối được Apify/);
+    const r4 = await reviewStatsService.sync({
+      fetchImpl: fakeFetch([
+        [TA_ACT, () => json([])],
+        [G_ACT, () => json({}, 408)],
+      ]),
+      notify: () => true,
+    });
+    assert.match(r4.lastSync.sources.tripadvisor.message, /không trả về số/);
+    assert.match(r4.lastSync.sources.google.message, /chạy quá lâu/);
     assert.equal(store.reviewStats.tripadvisor.count, 93);
     assert.equal(store.reviewStats.google.count, 31);
-    assert.match(r.lastSync.sources.tripadvisor.message, /giảm bất thường/);
-    assert.match(r.lastSync.sources.google.message, /Khoá không hợp lệ hoặc chưa bật Places API/);
+    noLeak(store);
   });
 
-  it("điểm ngoài 0–5 bị bỏ qua; lỗi mạng không làm hỏng gì", async () => {
-    store.reviewStats = withKeys({ google: { placeId: "ChIJ_test_place_1234" } }, BOTH);
+  it("Cập nhật ngay: chạy nền (trả ngay), đang chạy hiện trong dữ liệu, chờ 5 phút giữa 2 lần", async () => {
+    withToken();
+    let release;
+    const gate = new Promise((r) => {
+      release = r;
+    });
     const f = fakeFetch([
-      ["api.content.tripadvisor.com", () => json({ rating: "9", num_reviews: "93" })],
+      [TA_ACT, async () => (await gate, TA_PLACE()())],
+      [G_ACT, async () => (await gate, G_PLACE()())],
+      ["/users/me/limits", LIMITS()],
     ]);
-    const r = await reviewStatsService.sync({ fetchImpl: f, notify: () => true });
-    assert.match(r.lastSync.sources.tripadvisor.message, /điểm nhận về không hợp lệ/);
-    assert.match(r.lastSync.sources.google.message, /lỗi kết nối/);
-    assert.equal(store.reviewStats.tripadvisor.count, 93); // giữ số cũ (mặc định)
-  });
-
-  it("đang tắt tự động: lịch hằng ngày bỏ qua; bấm Cập nhật ngay chỉ kiểm tra khoá, không áp dụng", async () => {
-    store.reviewStats = withKeys(
-      { tripadvisor: { auto: false, rating: 5, count: 90 } },
-      { ta: "k" },
+    const { promise, already } = await reviewStatsService.manualSync({
+      fetchImpl: f,
+      by: "boss",
+      notify: () => true,
+    });
+    assert.equal(already, false);
+    const mid = await reviewStatsService.get({ fetchImpl: f });
+    assert.equal(mid.running.manual, true);
+    const again = await reviewStatsService.manualSync({ fetchImpl: f, notify: () => true });
+    assert.equal(again.already, true); // bấm lại khi đang chạy → không chạy thêm
+    release();
+    const r = await promise;
+    assert.equal(r.lastSync.manual, true);
+    assert.equal(r.lastSync.by, "boss");
+    assert.equal((await reviewStatsService.get({ fetchImpl: f })).running, null);
+    await assert.rejects(
+      reviewStatsService.manualSync({ fetchImpl: f, notify: () => true }),
+      (e) => e.statusCode === 429 && /bấm lại sau \d+ phút/.test(e.message),
     );
-    const f = fakeFetch([["api.content.tripadvisor.com", TA_OK]]);
-    const daily = await reviewStatsService.sync({
-      fetchImpl: f,
-      notify: () => true,
-    });
-    assert.equal(f.calls.length, 0);
-    assert.match(daily.lastSync.sources.tripadvisor.message, /tắt tự động/);
-    const now = await reviewStatsService.sync({
-      fetchImpl: f,
-      manual: true,
-      notify: () => true,
-    });
-    assert.match(now.lastSync.sources.tripadvisor.message, /Khoá dùng được \(5\.0 · 94/);
-    assert.equal(store.reviewStats.tripadvisor.count, 90);
+
+    store.reviewStats.lastSync.at = new Date(Date.now() - 6 * 60_000).toISOString();
+    _resetLimitsCache();
+    const empty = fakeFetch([["/users/me/limits", LIMITS(5, 5)]]);
+    await assert.rejects(
+      reviewStatsService.manualSync({ fetchImpl: empty, notify: () => true }),
+      /hết hạn mức Apify tháng này/,
+    );
+    assert.equal(empty.calls.filter((c) => c.url.includes("/acts/")).length, 0);
   });
 
-  it("Google chưa có Place ID → tự tìm, chỉ nhận đúng cid của công ty", async () => {
-    store.reviewStats = withKeys({}, { g: "g" });
-    const f = fakeFetch([
-      [
-        "places:searchText",
-        () =>
-          json({
-            places: [
-              { id: "ChIJ_other_company_00", googleMapsUri: "https://maps.google.com/?cid=111" },
-              {
-                id: "ChIJ_vietlook_place_0",
-                googleMapsUri: `https://maps.google.com/?cid=${GOOGLE_MAPS_CID}`,
-              },
-            ],
-          }),
-      ],
-      ["places/ChIJ_vietlook_place_0", G_OK],
-    ]);
-    const r = await reviewStatsService.sync({
-      fetchImpl: f,
-      notify: () => true,
-    });
-    assert.equal(r.lastSync.sources.google.ok, true);
-    assert.equal(store.reviewStats.google.resolvedPlaceId, "ChIJ_vietlook_place_0");
-  });
-
-  it("lịch hằng ngày: chạy bù khi lâu chưa cập nhật, lỗi không làm sập", async (t) => {
+  it("lịch hằng ngày: chạy bù khi lâu (>24 giờ) chưa cập nhật, lỗi không làm sập", async (t) => {
     t.mock.timers.enable({ apis: ["setTimeout"] });
     let runs = 0;
     const stop = scheduleDailyReviewSync({
@@ -322,69 +384,105 @@ describe("điểm đánh giá — tự cập nhật qua API (fetch giả)", () =
       },
       clock: () => Date.now(),
       hour: 6,
-      lastSyncAt: async () => null,
+      lastSyncAt: async () => new Date(Date.now() - 25 * 3600_000).toISOString(),
     });
     t.mock.timers.tick(60_000);
-    await new Promise((r) => setImmediate(r));
-    await new Promise((r) => setImmediate(r));
+    await tick();
+    await tick();
     assert.equal(runs, 1);
+    stop();
+  });
+
+  it("lịch hằng ngày: vừa cập nhật (<24 giờ) → không chạy bù", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let runs = 0;
+    const stop = scheduleDailyReviewSync({
+      run: async () => runs++,
+      clock: () => Date.now(),
+      hour: 6,
+      lastSyncAt: async () => new Date(Date.now() - 3 * 3600_000).toISOString(),
+    });
+    t.mock.timers.tick(60_000);
+    await tick();
+    await tick();
+    assert.equal(runs, 0);
     stop();
   });
 });
 
-describe("lấy đánh giá từ Tripadvisor / Google (fetch giả)", () => {
-  it("Tripadvisor: tối đa 5, giữ nguyên văn, ngày theo giờ VN, ngôn ngữ, link gốc", async () => {
-    const data = Array.from({ length: 7 }, (_, i) => ({
-      user: { username: `User ${i}` },
-      title: "Great trip",
-      text: "Wonderful guide",
-      rating: 5,
-      published_date: "2026-10-01T20:00:00Z",
-      url: `https://www.tripadvisor.com/ShowUserReviews-r${i}`,
-      lang: "en",
-    }));
-    const f = fakeFetch([["/reviews?key=", () => json({ data })]]);
-    const items = await fetchTripadvisorReviews({ key: "k", locationId: "27950353" }, f);
-    assert.equal(items.length, 5);
-    assert.equal(items[0].date, "2026-10-02"); // 20:00 UTC = 03:00 hôm sau giờ VN
-    assert.equal(items[0].language, "en");
-    assert.equal(items[0].source, "tripadvisor");
-    assert.match(items[0].url, /ShowUserReviews-r0/);
+describe("lấy đánh giá qua Apify (fetch giả)", () => {
+  // Mẫu rút gọn theo https://apify.com/maxcopell/tripadvisor-reviews và compass/crawler-google-places
+  const TA_REVIEWS =
+    (n = 22) =>
+    () =>
+      json(
+        Array.from({ length: n }, (_, i) => ({
+          id: `r${i}`,
+          url: `https://www.tripadvisor.com/ShowUserReviews-r${i}`,
+          title: "Great trip",
+          text: "Wonderful guide",
+          rating: 5,
+          lang: "en",
+          originalLanguage: "en",
+          publishedDate: "2026-10-01",
+          user: { name: `User ${i}`, username: `user${i}` },
+        })),
+      );
+  const G_REVIEWS = G_PLACE(4.8, 33, {
+    reviews: [
+      {
+        name: "Lin",
+        text: "非常好的导游",
+        textTranslated: "Very good guide",
+        publishedAtDate: "2026-09-01T01:00:00.000Z",
+        stars: 4,
+        reviewUrl: "https://www.google.com/maps/reviews/data=abc",
+        originalLanguage: "zh-Hant",
+      },
+    ],
   });
 
-  it("Google: lấy originalText (không lấy bản dịch), link review, ngôn ngữ zh-Hant → zh", async () => {
-    const f = fakeFetch([
-      [
-        "places.googleapis.com",
-        () =>
-          json({
-            googleMapsUri: "https://maps.google.com/?cid=1",
-            reviews: [
-              {
-                rating: 4,
-                publishTime: "2026-09-01T01:00:00Z",
-                text: { text: "Translated", languageCode: "en" },
-                originalText: { text: "非常好的导游", languageCode: "zh-Hant" },
-                authorAttribution: {
-                  displayName: "Lin",
-                  uri: "https://www.google.com/maps/contrib/1",
-                },
-                googleMapsUri: "https://www.google.com/maps/reviews/data=abc",
-              },
-            ],
-          }),
-      ],
-    ]);
-    const [r] = await fetchGoogleReviews({ key: "k", placeId: "ChIJ_test_place_1234" }, f);
+  it("Tripadvisor: tối đa 10, tắt máy dịch, giữ nguyên văn, tên, ngày, ngôn ngữ, link gốc", async () => {
+    withToken();
+    const f = fakeFetch([[TAR_ACT, TA_REVIEWS()]]);
+    const items = await fetchTripadvisorReviews(f);
+    assert.equal(items.length, 10);
+    assert.deepEqual(
+      { ...items[0] },
+      {
+        source: "tripadvisor",
+        name: "User 0",
+        title: "Great trip",
+        text: "Wonderful guide",
+        rating: 5,
+        date: "2026-10-01",
+        url: "https://www.tripadvisor.com/ShowUserReviews-r0",
+        language: "en",
+      },
+    );
+    const input = bodyOf(f.calls[0]);
+    assert.equal(input.maxItemsPerQuery, 10);
+    assert.equal(input.disableMachineTranslations, true);
+  });
+
+  it("Google: lời gốc (không lấy bản dịch), ngày theo giờ VN, zh-Hant → zh, link review", async () => {
+    withToken();
+    const f = fakeFetch([[G_ACT, G_REVIEWS]]);
+    const [r] = await fetchGoogleReviews(f);
     assert.equal(r.text, "非常好的导游");
-    assert.equal(r.language, "zh");
+    assert.equal(r.name, "Lin");
     assert.equal(r.rating, 4);
+    assert.equal(r.date, "2026-09-01");
+    assert.equal(r.language, "zh");
     assert.equal(r.url, "https://www.google.com/maps/reviews/data=abc");
-    assert.equal(f.calls[0].init.headers["X-Goog-FieldMask"], "reviews,googleMapsUri");
+    const input = bodyOf(f.calls[0]);
+    assert.equal(input.maxReviews, 20);
+    assert.equal(input.reviewsSort, "newest");
   });
 
   it("mapLang + đánh dấu Đã có (cùng nguồn + tên + ngày hoặc 40 ký tự đầu)", () => {
     assert.equal(mapLang("vi"), "vi");
+    assert.equal(mapLang("zh-Hant"), "zh");
     assert.equal(mapLang("fr"), "other");
     assert.equal(mapLang(""), "");
     const items = [
@@ -412,51 +510,67 @@ describe("lấy đánh giá từ Tripadvisor / Google (fetch giả)", () => {
     );
   });
 
-  it("preview: chỉ nền tảng có khoá; lỗi hạn mức báo tiếng Việt, nền tảng kia vẫn hiện", async () => {
+  it("preview: chưa cài mã → báo; lỗi 1 nền tảng không chặn nền tảng kia; không lộ mã", async () => {
+    await assert.rejects(reviewImportService.preview(), /Chưa cài mã Apify/);
+    assert.deepEqual(await reviewImportService.sources(), {
+      tripadvisor: false,
+      google: false,
+      provider: "Apify",
+      cost: 0,
+      quota: null,
+    });
+
+    withToken();
     stub(reviewRepository, "find", async () => [
-      { source: "tripadvisor", name: "Ann", date: "2026-10-01", text: "x" },
+      { source: "tripadvisor", name: "User 1", date: "2026-10-01", text: "x" },
     ]);
-    store.reviewStats = withKeys({ google: { placeId: "ChIJ_test_place_1234" } }, BOTH);
     const f = fakeFetch([
-      [
-        "/reviews?key=",
-        () =>
-          json({
-            data: [
-              {
-                user: { username: "Ann" },
-                text: "Hi",
-                rating: 5,
-                published_date: "2026-10-01T01:00:00Z",
-              },
-              {
-                user: { username: "Tom" },
-                text: "Yo",
-                rating: 4,
-                published_date: "2026-10-02T01:00:00Z",
-              },
-            ],
-          }),
-      ],
-      ["places.googleapis.com", () => json({}, 429)],
+      ["/users/me/limits", LIMITS()],
+      [TAR_ACT, TA_REVIEWS(2)],
+      [G_ACT, () => json({ error: { type: "rate-limit-exceeded" } }, 429)],
     ]);
     const r = await reviewImportService.preview({ fetchImpl: f });
     assert.deepEqual(r.sources, ["tripadvisor", "google"]);
-    assert.match(r.errors.google, /quá nhiều lần|hạn mức/);
+    assert.match(r.errors.google, /bận/);
     assert.deepEqual(
       r.items.map((x) => [x.name, x.exists]),
       [
-        ["Tom", false],
-        ["Ann", true],
+        ["User 0", false],
+        ["User 1", true],
       ],
     );
-    store.reviewStats = withKeys({}, { ta: "k" });
-    assert.deepEqual(await reviewImportService.sources(), {
-      tripadvisor: true,
-      google: false,
-    });
-    store.reviewStats = {};
-    await assert.rejects(reviewImportService.preview(), /Chưa cài khoá/);
+    noLeak(r);
+    const src = await reviewImportService.sources({ fetchImpl: f });
+    assert.equal(src.tripadvisor, true);
+    assert.equal(src.quota.left, 4.85);
+    assert.ok(src.cost > 0); // chi phí ước tính cho 1 lần xem (USD)
+  });
+
+  it("chạy nền: startPreview trả 'running' ngay, xong → 'done' kèm kết quả; không đủ hạn mức → chặn trước", async () => {
+    withToken();
+    stub(reviewRepository, "find", async () => []);
+    const f = fakeFetch([
+      ["/users/me/limits", LIMITS()],
+      [TAR_ACT, TA_REVIEWS(1)],
+      [G_ACT, G_REVIEWS],
+    ]);
+    assert.equal(reviewImportService.previewStatus().status, "idle");
+    const s1 = await reviewImportService.startPreview({ fetchImpl: f });
+    assert.equal(s1.status, "running");
+    for (let i = 0; i < 10; i++) await tick();
+    const s2 = reviewImportService.previewStatus();
+    assert.equal(s2.status, "done");
+    assert.equal(s2.result.items.length, 2);
+
+    _resetPreviewJob();
+    _resetLimitsCache();
+    const poor = fakeFetch([["/users/me/limits", LIMITS(4.95, 5)]]);
+    await assert.rejects(
+      reviewImportService.startPreview({ fetchImpl: poor }),
+      /giữ lại cho cập nhật tự động/,
+    );
+    assert.equal(poor.calls.length, 1);
+    assert.equal(reviewImportService.previewStatus().status, "idle");
   });
 });
 
@@ -472,22 +586,21 @@ describe("điểm đánh giá — quyền truy cập API", () => {
   });
   const cookie = (u) => `vl_at=${signAccessToken(u)}`;
 
-  it("trang công khai /public/site có reviewStats, không có khoá", async () => {
-    store.reviewStats = { tripadvisor: { key: encryptSecret("secret-xyz"), count: 94 } };
+  it("trang công khai /public/site có reviewStats, không gọi Apify, không có dữ liệu cũ", async () => {
+    store.reviewStats = { tripadvisor: { key: "enc:v1:secret", count: 94 } };
     const res = await request(app).get("/api/v1/public/site");
     assert.equal(res.status, 200);
     assert.equal(res.body.data.reviewStats.tripadvisor.count, 94);
     assert.ok(!JSON.stringify(res.body).includes("enc:v1"));
   });
 
-  it("chỉ admin xem / sửa / cập nhật; nhân viên bị chặn", async () => {
+  it("chỉ admin xem / cập nhật; PUT đã bỏ; nhân viên bị chặn", async () => {
     const admin = user("admin");
     const editor = user("editor", { reviews: "full" });
     stub(userRepository, "findById", async (id) => (String(id) === admin._id ? admin : editor));
     stub(auditLogRepository, "create", async () => ({}));
     for (const [method, path] of [
       ["get", "/api/v1/settings/review-stats"],
-      ["put", "/api/v1/settings/review-stats"],
       ["post", "/api/v1/settings/review-stats/sync"],
     ]) {
       const anon = await request(app)[method](path).set("X-Requested-With", "fetch");
@@ -499,19 +612,38 @@ describe("điểm đánh giá — quyền truy cập API", () => {
         .send({});
       assert.equal(staff.status, 403, `${method} ${path}`);
     }
+    const put = await request(app)
+      .put("/api/v1/settings/review-stats")
+      .set("Cookie", cookie(admin))
+      .set("X-Requested-With", "fetch")
+      .send({});
+    assert.equal(put.status, 404);
     const ok = await request(app).get("/api/v1/settings/review-stats").set("Cookie", cookie(admin));
     assert.equal(ok.status, 200);
-    assert.equal(ok.body.data.tripadvisor.keyConfigured, false);
-    // lấy đánh giá từ API: nhân viên có quyền Đánh giá xem được nền tảng nào có khoá
+    assert.equal(ok.body.data.configured, false);
+    // chưa có mã → "Cập nhật ngay" báo rõ, không gọi gì
+    const sync = await request(app)
+      .post("/api/v1/settings/review-stats/sync")
+      .set("Cookie", cookie(admin))
+      .set("X-Requested-With", "fetch");
+    assert.equal(sync.status, 400);
+    assert.match(sync.body.error.message, /Chưa cài mã Apify/);
+    // lấy đánh giá: nhân viên có quyền Đánh giá xem được máy chủ đã cấu hình chưa (true / false)
     const src = await request(app)
       .get("/api/v1/admin/reviews/import/sources")
       .set("Cookie", cookie(editor));
     assert.equal(src.status, 200);
-    assert.deepEqual(src.body.data, { tripadvisor: false, google: false });
+    assert.deepEqual(src.body.data, {
+      tripadvisor: false,
+      google: false,
+      provider: "Apify",
+      cost: 0,
+      quota: null,
+    });
   });
 });
 
-describe("khoá bí mật trong Cài đặt — xác nhận mật khẩu, nhật ký, không lộ khoá", () => {
+describe("khoá bí mật 9Pay — xác nhận mật khẩu, nhật ký, không lộ khoá", () => {
   const app = createApp();
   const PASSWORD = "Admin-Pass-2026!";
   const admin = {
@@ -556,90 +688,45 @@ describe("khoá bí mật trong Cài đặt — xác nhận mật khẩu, nhật
     });
   });
   const flush = () => new Promise((r) => setImmediate(r));
-  const KEY = "TA0123456789abcdef0123456789ABCD";
-  // confirmPassword ở cấp ngoài cùng, các trường còn lại thuộc nguồn Tripadvisor
-  const body = ({ confirmPassword, ...extra } = {}) => ({
-    ...manualBody,
-    tripadvisor: { ...manualBody.tripadvisor, ...extra },
-    ...(confirmPassword && { confirmPassword }),
-  });
+  const base = { enabled: false, merchantKey: "", accountName: "VL", depositPercent: 100 };
+  const SECRET = "9pay-Secret-Value-XYZ";
 
-  it("đổi khoá thiếu / sai mật khẩu → báo lỗi tiếng Việt, không lưu; sai được tính vào khoá tài khoản", async () => {
-    const none = await put("review-stats", body({ key: KEY }));
+  it("đổi mã thiếu / sai mật khẩu → báo lỗi tiếng Việt, không lưu; sai được tính vào khoá tài khoản", async () => {
+    const none = await put("payment", { ...base, merchantKey: "MERCH01", secretKey: SECRET });
     assert.equal(none.status, 400);
     assert.equal(none.body.error.code, "REAUTH_REQUIRED");
     assert.equal(none.body.error.details[0].field, "body.confirmPassword");
     assert.match(none.body.error.message, /Nhập mật khẩu của bạn để xác nhận/);
 
-    const wrong = await put("review-stats", body({ key: KEY, confirmPassword: "nope" }));
+    const wrong = await put("payment", {
+      ...base,
+      merchantKey: "MERCH01",
+      secretKey: SECRET,
+      confirmPassword: "nope",
+    });
     assert.equal(wrong.status, 400);
     assert.equal(wrong.body.error.code, "REAUTH_FAILED");
     assert.match(wrong.body.error.message, /Mật khẩu không đúng/);
     assert.equal(fails, 1);
-    assert.equal(store.reviewStats, undefined); // không ghi gì
     await flush();
     assert.ok(audits.some((a) => a.action === "auth.reauth_failed"));
 
     lockNext = true;
-    const locked = await put("review-stats", body({ key: KEY, confirmPassword: "nope" }));
+    const locked = await put("payment", {
+      ...base,
+      merchantKey: "MERCH01",
+      secretKey: SECRET,
+      confirmPassword: "nope",
+    });
     assert.equal(locked.status, 423);
     await flush();
     assert.ok(audits.some((a) => a.action === "auth.locked"));
     assert.ok(!JSON.stringify(audits).includes("nope"));
   });
 
-  it("đúng mật khẩu → lưu mã hoá + nhật ký 'đã thay khoá' (không có khoá, không có mật khẩu)", async () => {
-    const res = await put("review-stats", body({ key: KEY, confirmPassword: PASSWORD }));
-    assert.equal(res.status, 200);
-    assert.equal(res.headers["cache-control"], "no-store");
-    assert.equal(res.body.data.tripadvisor.keyConfigured, true);
-    assert.equal(res.body.data.tripadvisor.keyUpdatedBy, "boss");
-    assert.ok(res.body.data.tripadvisor.keyUpdatedAt);
-    assert.equal(res.body.data.tripadvisor.keySource, undefined);
-    assert.ok(!JSON.stringify(res.body).includes(KEY));
-    assert.ok(store.reviewStats.tripadvisor.key.startsWith("enc:v1:"));
-    await flush();
-    const secret = audits.find((a) => a.action === "settings.secret");
-    assert.deepEqual(secret.meta, {
-      key: "review.tripadvisor",
-      name: "Khoá API Tripadvisor",
-      op: "replace",
-    });
-    const dump = JSON.stringify(audits);
-    assert.ok(!dump.includes(KEY) && !dump.includes(KEY.slice(-4)) && !dump.includes(PASSWORD));
-
-    // chỉ sửa số / công tắc → KHÔNG cần mật khẩu; dán lại đúng khoá cũ cũng không tính là đổi
-    audits = [];
-    const nums = await put("review-stats", body({ count: 99, key: KEY }));
-    assert.equal(nums.status, 200);
-    await flush();
-    assert.ok(!audits.some((a) => a.action === "settings.secret"));
-
-    // xoá khoá → cần mật khẩu, nhật ký "đã xoá"
-    const clearNoPw = await put("review-stats", body({ clearKey: true }));
-    assert.equal(clearNoPw.body.error.code, "REAUTH_REQUIRED");
-    const cleared = await put("review-stats", body({ clearKey: true, confirmPassword: PASSWORD }));
-    assert.equal(cleared.status, 200);
-    assert.equal(cleared.body.data.tripadvisor.keyConfigured, false);
-    await flush();
-    assert.equal(audits.find((a) => a.action === "settings.secret").meta.op, "clear");
-  });
-
-  it("khoá API sai dạng → báo tiếng Việt", async () => {
-    const res = await put("review-stats", body({ key: "short" }));
-    assert.equal(res.status, 422);
-    assert.match(JSON.stringify(res.body), /chưa đúng dạng/);
-  });
-
-  it("9Pay: đổi mã cần mật khẩu; chỉ đổi tỷ lệ cọc thì không; nhật ký không có mã", async () => {
-    const base = { enabled: false, merchantKey: "", accountName: "VL", depositPercent: 100 };
+  it("đổi mã cần mật khẩu; chỉ đổi tỷ lệ cọc thì không; nhật ký không có mã", async () => {
     const ok1 = await put("payment", { ...base, depositPercent: 30 });
     assert.equal(ok1.status, 200);
-
-    const SECRET = "9pay-Secret-Value-XYZ";
-    const noPw = await put("payment", { ...base, merchantKey: "MERCH01", secretKey: SECRET });
-    assert.equal(noPw.status, 400);
-    assert.equal(noPw.body.error.code, "REAUTH_REQUIRED");
 
     audits = [];
     const res = await put("payment", {
@@ -649,13 +736,19 @@ describe("khoá bí mật trong Cài đặt — xác nhận mật khẩu, nhật
       confirmPassword: PASSWORD,
     });
     assert.equal(res.status, 200);
+    assert.equal(res.headers["cache-control"], "no-store");
     assert.equal(res.body.data.secretKeySet, true);
     assert.equal(res.body.data.keyInfo.secretKey.by, "boss");
     assert.ok(!JSON.stringify(res.body).includes(SECRET));
     await flush();
-    const keys = audits.filter((a) => a.action === "settings.secret").map((a) => a.meta.key);
-    assert.deepEqual(keys, ["9pay.merchantKey", "9pay.secretKey"]);
-    assert.ok(!JSON.stringify(audits).includes(SECRET));
+    const secrets = audits.filter((a) => a.action === "settings.secret");
+    assert.deepEqual(
+      secrets.map((a) => a.meta.key),
+      ["9pay.merchantKey", "9pay.secretKey"],
+    );
+    assert.equal(secrets[1].meta.name, "Mã bí mật 9Pay (Secret Key)");
+    const dump = JSON.stringify(audits);
+    assert.ok(!dump.includes(SECRET) && !dump.includes(PASSWORD));
 
     const clear = await put("payment", {
       ...base,

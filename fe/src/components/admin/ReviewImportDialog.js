@@ -1,59 +1,112 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { CheckCheck, CloudDownload, ExternalLink, MessageSquareQuote, Star } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CheckCheck,
+  CloudDownload,
+  ExternalLink,
+  Loader2,
+  MessageSquareQuote,
+  RefreshCw,
+  Star,
+} from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
 import { useMutation } from "./hooks";
-import { Badge, Button, EmptyState, Modal, Notice, fmtDate, useUi } from "./ui";
+import UsageQuota, { fmtUsd } from "./UsageQuota";
+import { Badge, Button, EmptyState, Modal, Notice, fmtDate, fmtDateTime, useUi } from "./ui";
 
 /**
- * CMS → Đánh giá → "Lấy đánh giá từ Tripadvisor / Google": xem tối đa 5 đánh giá mới nhất mỗi nền tảng
- * (qua API chính thức, dùng khoá nhập ở Cài đặt → Điểm & số lượt đánh giá), tick chọn → "Thêm vào danh sách"
- * tạo đánh giá qua đúng luồng thêm thường (POST /admin/reviews: kiểm tra dữ liệu + nhật ký).
- * Lời khách giữ nguyên văn + link bài gốc + nhãn nguồn (điều khoản API của Tripadvisor / Google).
- * Backend: be/src/services/review-import.service.js.
+ * CMS → Đánh giá → "Lấy đánh giá từ Tripadvisor / Google": xem các đánh giá mới nhất (Google 20, Tripadvisor 10)
+ * qua dịch vụ Apify (mã đặt trên máy chủ). Trước khi lấy hiện hạn mức còn lại + chi phí ước tính; bấm "Lấy đánh giá"
+ * → máy chủ chạy nền 20–90 giây, hộp tự hỏi lại đến khi xong. Tick chọn → "Thêm vào danh sách" tạo đánh giá qua
+ * đúng luồng thêm thường (POST /admin/reviews: kiểm tra dữ liệu + nhật ký).
+ * Lời khách giữ nguyên văn + link bài gốc + nhãn nguồn. Backend: be/src/services/review-import.service.js.
  */
 export const IMPORT_PATH = "/admin/reviews/import";
 const PLACES = ["home", "about", "group", "car"];
 export const IMPORT_NAMES = { tripadvisor: "Tripadvisor", google: "Google" };
 const LANG_LABEL = { en: "Tiếng Anh", zh: "Tiếng Trung", vi: "Tiếng Việt", other: "Ngôn ngữ khác" };
+const POLL_MS = 4000;
+const POLL_MAX_MS = 4 * 60_000;
 
-/** "Lấy đánh giá từ Tripadvisor / Google" theo các nền tảng có khoá */
+/** "Lấy đánh giá từ Tripadvisor / Google" theo các nền tảng dùng được */
 export const importTitle = (sources) =>
   `Lấy đánh giá từ ${sources.map((s) => IMPORT_NAMES[s]).join(" / ")}`;
 
 const keyOf = (r) => `${r.source}|${r.name}|${r.date}|${r.text.slice(0, 40)}`;
 
 export default function ReviewImportDialog({ open, sources, nextOrder, onClose, onImported }) {
-  const [state, setState] = useState({ loading: true, items: [], errors: {}, error: "" });
+  const [info, setInfo] = useState(null); // { quota, cost, provider } — hạn mức + chi phí ước tính
+  const [job, setJob] = useState({ status: "loading" }); // idle | running | done | error (máy chủ)
+  const [startErr, setStartErr] = useState("");
+  const [starting, setStarting] = useState(false);
   const [picked, setPicked] = useState(() => new Set());
-  const [nonce, setNonce] = useState(0);
+  const since = useRef(0);
   const { run, busy } = useMutation(["reviews"]);
   const { toast } = useUi();
 
+  const loadJob = useCallback(async () => {
+    try {
+      const r = await api(`${IMPORT_PATH}/preview`);
+      setJob(r.data);
+      return r.data;
+    } catch (err) {
+      setJob({ status: "error", error: errorMessage(err) });
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     let alive = true;
+    api(`${IMPORT_PATH}/sources`)
+      .then((r) => alive && setInfo(r.data))
+      .catch(() => alive && setInfo({}));
     api(`${IMPORT_PATH}/preview`)
-      .then((r) => alive && setState({ loading: false, error: "", ...r.data }))
-      .catch(
-        (err) =>
-          alive && setState({ loading: false, items: [], errors: {}, error: errorMessage(err) }),
-      );
+      .then((r) => alive && setJob(r.data))
+      .catch((err) => alive && setJob({ status: "error", error: errorMessage(err) }));
     return () => {
       alive = false;
     };
-  }, [open, nonce]);
-  // (popup chỉ gắn khi mở → lần đầu đã ở trạng thái đang tải; "Thử lại" đặt lại trạng thái rồi tải lại)
-  const retry = useCallback(() => {
-    setState({ loading: true, items: [], errors: {}, error: "" });
-    setPicked(new Set());
-    setNonce((n) => n + 1);
-  }, []);
+  }, [open]);
 
-  const { loading, items, errors, error } = state;
+  // Đang chạy → hỏi lại mỗi 4 giây (tối đa 4 phút)
+  useEffect(() => {
+    if (job.status !== "running") return undefined;
+    const t = setTimeout(async () => {
+      const j = await loadJob();
+      if (j?.status === "running" && since.current && Date.now() - since.current > POLL_MAX_MS) {
+        since.current = 0;
+        setJob({
+          status: "error",
+          error:
+            "Dịch vụ chạy lâu hơn bình thường. Đóng hộp này và mở lại sau ít phút để xem kết quả.",
+        });
+      }
+    }, POLL_MS);
+    return () => clearTimeout(t);
+  }, [job, loadJob]);
+
+  const start = async () => {
+    setStartErr("");
+    setPicked(new Set());
+    setStarting(true);
+    try {
+      const r = await api(`${IMPORT_PATH}/preview`, { method: "POST", body: {} });
+      since.current = Date.now();
+      setJob(r.data);
+    } catch (err) {
+      setStartErr(errorMessage(err));
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const result = job.status === "done" ? job.result : null;
+  const items = result?.items ?? [];
+  const errors = result?.errors ?? {};
   const fresh = items.filter((r) => !r.exists);
   const toggle = (k) =>
     setPicked((s) => {
@@ -107,6 +160,37 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
   };
 
   const count = [...picked].filter((k) => fresh.some((r) => keyOf(r) === k)).length;
+  const cost = info?.cost > 0 ? `~${fmtUsd(info.cost)} USD` : "";
+  const blocked = info?.quota && !info.quota.error && info.quota.canManual === false;
+  const running = job.status === "running" || starting;
+
+  /** Khung hạn mức + chi phí + nút lấy (hiện trước khi lấy và ở cuối kết quả để lấy lại) */
+  const startPanel = (again) => (
+    <div className="space-y-3 rounded-2xl bg-slate-50/80 p-4 ring-1 ring-slate-200/80">
+      {info ? (
+        <UsageQuota quota={info.quota ?? null} compact />
+      ) : (
+        <div className="h-8 animate-pulse rounded-lg bg-slate-100" />
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <p className="min-w-0 flex-1 basis-56 text-xs leading-relaxed text-slate-500">
+          Lấy tối đa 20 đánh giá Google và 10 đánh giá Tripadvisor mới nhất
+          {cost ? `, tốn khoảng ${cost} hạn mức mỗi lần` : ""}. Mất khoảng 1 phút.
+        </p>
+        <Button
+          variant={again ? "secondary" : "primary"}
+          icon={again ? RefreshCw : CloudDownload}
+          onClick={start}
+          loading={starting}
+          disabled={blocked || running}
+          className="ml-auto"
+        >
+          {again ? "Lấy lại" : "Lấy đánh giá mới nhất"}
+        </Button>
+      </div>
+      {startErr && <Notice tone="error">{startErr}</Notice>}
+    </div>
+  );
 
   return (
     <Modal
@@ -115,7 +199,7 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
       size="lg"
       icon={CloudDownload}
       title={importTitle(sources)}
-      description="Chỉ hiện tối đa 5 đánh giá mới nhất mỗi nền tảng (giới hạn của TripAdvisor/Google)."
+      description="Xem đánh giá mới nhất của công ty, tick chọn đánh giá muốn hiện trên website."
       footer={
         <>
           <span className="flex w-full items-center text-[13px] text-slate-500 sm:mr-auto sm:w-auto">
@@ -123,36 +207,54 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
               <>
                 Đã chọn <b className="mx-1 text-slate-800">{count}</b> đánh giá
               </>
-            ) : (
+            ) : result ? (
               "Tick chọn đánh giá muốn hiện trên website"
+            ) : (
+              ""
             )}
           </span>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Đóng
           </Button>
-          <Button icon={CheckCheck} onClick={add} loading={busy} disabled={!count}>
-            Thêm vào danh sách
-          </Button>
+          {result && (
+            <Button icon={CheckCheck} onClick={add} loading={busy} disabled={!count}>
+              Thêm vào danh sách
+            </Button>
+          )}
         </>
       }
     >
-      {error ? (
-        <Notice tone="error" title="Chưa lấy được đánh giá">
-          {error}{" "}
-          <button type="button" onClick={retry} className="font-semibold underline">
-            Thử lại
-          </button>
-        </Notice>
-      ) : loading ? (
+      {job.status === "loading" ? (
         <SkeletonRows />
+      ) : running ? (
+        <div className="space-y-3">
+          <p
+            className="flex items-start gap-2 rounded-xl bg-brand-50/70 px-4 py-3 text-sm text-brand-900 ring-1 ring-brand-100"
+            aria-live="polite"
+          >
+            <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+            Đang lấy đánh giá mới nhất từ Google và Tripadvisor… có thể mất khoảng 1 phút. Bạn có
+            thể đóng hộp này, mở lại sau để xem kết quả.
+          </p>
+          <SkeletonRows />
+        </div>
+      ) : !result ? (
+        <div className="space-y-3">
+          {job.status === "error" && job.error && (
+            <Notice tone="error" title="Lần lấy trước chưa thành công">
+              {job.error}
+            </Notice>
+          )}
+          {startPanel(false)}
+        </div>
       ) : (
         <div className="space-y-3">
-          {Object.entries(errors ?? {}).map(([src, msg]) => (
+          {job.finishedAt && (
+            <p className="px-1 text-xs text-slate-500">Lấy lúc {fmtDateTime(job.finishedAt)}</p>
+          )}
+          {Object.entries(errors).map(([src, msg]) => (
             <Notice key={src} tone="warn" title={`${IMPORT_NAMES[src]}: chưa lấy được đánh giá`}>
-              {msg}{" "}
-              <button type="button" onClick={retry} className="font-semibold underline">
-                Thử lại
-              </button>
+              {msg}
             </Notice>
           ))}
           {items.length ? (
@@ -185,7 +287,7 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
               </ul>
             </>
           ) : (
-            !Object.keys(errors ?? {}).length && (
+            !Object.keys(errors).length && (
               <EmptyState
                 icon={MessageSquareQuote}
                 title="Chưa có đánh giá nào để lấy"
@@ -193,6 +295,7 @@ export default function ReviewImportDialog({ open, sources, nextOrder, onClose, 
               />
             )
           )}
+          {startPanel(true)}
         </div>
       )}
     </Modal>

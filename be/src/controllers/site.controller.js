@@ -11,12 +11,13 @@ import { fxService } from "../services/payment/fx.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { noContent, ok } from "../utils/response.js";
 
-/* ---------- Khoá bí mật trong Cài đặt (mã 9Pay, khoá API đánh giá) ---------- */
+/* ---------- Khoá bí mật trong Cài đặt (mã 9Pay) ---------- */
 
-/** Tên dễ đọc của từng khoá — ghi vào nhật ký (KHÔNG BAO GIỜ ghi giá trị hay 4 ký tự cuối) */
+/**
+ * Tên dễ đọc của từng khoá — ghi vào nhật ký (KHÔNG BAO GIỜ ghi giá trị hay 4 ký tự cuối).
+ * (Nhật ký cũ về khoá API Tripadvisor / Google — đã bỏ — vẫn hiện đúng nhờ tên lưu sẵn trong meta.name.)
+ */
 export const SECRET_LABELS = Object.freeze({
-  "review.tripadvisor": "Khoá API Tripadvisor",
-  "review.google": "Khoá API Google",
   "9pay.merchantKey": "Mã cửa hàng 9Pay (Merchant Key)",
   "9pay.secretKey": "Mã bí mật 9Pay (Secret Key)",
   "9pay.checksumKey": "Mã kiểm tra 9Pay (Checksum Key)",
@@ -197,30 +198,23 @@ export const settingsController = {
     ok(res, data);
   },
 
-  /* Điểm & số lượt đánh giá (Tripadvisor / Google) — chỉ admin; khoá API không bao giờ trả về / ghi nhật ký */
+  /* Điểm & số lượt đánh giá (Tripadvisor / Google) — chỉ admin xem; tự cập nhật qua Apify (mã trên máy chủ) */
   getReviewStats: async (_req, res) => ok(res, await reviewStatsService.get()),
-  async saveReviewStats(req, res) {
-    const { data, keyChanges } = await reviewStatsService.save(req.validated.body, req.user, {
-      reauth: reauthOf(req),
-    });
-    auditService.record(req, "settings.review_stats", {
-      meta: {
-        tripadvisor: `${data.tripadvisor.rating} · ${data.tripadvisor.count}`,
-        google: `${data.google.rating} · ${data.google.count}`,
-        tripadvisorAuto: data.tripadvisor.autoActive,
-        googleAuto: data.google.autoActive,
-      },
-    });
-    for (const c of keyChanges) recordSecret(req, `review.${c.source}`, c.op);
-    ok(res, data);
-  },
-  /** Nút "Cập nhật ngay": lấy số qua API ngay (kiểm tra khoá vừa nhập) */
+  /**
+   * Nút "Cập nhật ngay": BẮT ĐẦU lấy số mới (chạy nền 20–90 giây) rồi trả ngay; CMS hỏi lại GET để biết kết quả.
+   * Nhật ký ghi khi chạy xong.
+   */
   async syncReviewStats(req, res) {
-    const result = await reviewStatsService.sync({ by: req.user?.username, manual: true });
-    auditService.record(req, "settings.review_sync", {
-      meta: { ok: result.lastSync.ok, message: result.lastSync.message },
-    });
-    ok(res, { ...(await reviewStatsService.get()), result: result.lastSync });
+    const { promise, already } = await reviewStatsService.manualSync({ by: req.user?.username });
+    if (!already)
+      promise
+        .then((r) =>
+          auditService.record(req, "settings.review_sync", {
+            meta: { ok: r.lastSync.ok, message: r.lastSync.message },
+          }),
+        )
+        .catch(() => {});
+    ok(res, await reviewStatsService.get());
   },
 
   // kèm tỷ giá USD → VND đang dùng (tự động) để admin xem

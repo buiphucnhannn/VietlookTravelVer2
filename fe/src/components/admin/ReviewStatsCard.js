@@ -1,430 +1,316 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState } from "react";
-import { CheckCircle2, RefreshCw, Save, Star, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  RefreshCw,
+  Star,
+  TriangleAlert,
+} from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { GoogleIcon, TripAdvisorIcon } from "@/components/ui/BrandIcons";
-import { useMutation } from "./hooks";
-import { SECRET_RULES, SecretKeyField, secretError, useReauth } from "./secrets";
-import {
-  Badge,
-  Button,
-  Card,
-  Field,
-  Input,
-  LoadingBlock,
-  Notice,
-  Toggle,
-  fmtDateTime,
-  useUi,
-} from "./ui";
+import UsageQuota, { fmtUsd } from "./UsageQuota";
+import { Button, Card, LoadingBlock, Notice, fmtDateTime, useUi } from "./ui";
 
 /**
- * Cài đặt → "Điểm & số lượt đánh giá" (chỉ admin): điểm + số lượt đánh giá công ty trên Tripadvisor / Google,
- * hiện ở chân trang, banner trang chủ, dải uy tín, trang tour… (fe/src/lib/review-stats.js).
- * Mỗi nguồn: có khoá API + bật "Tự động cập nhật mỗi ngày" → máy chủ tự lấy số (ô số chỉ để xem);
- * chưa có khoá / tắt → nhập tay (bắt buộc). Khoá CHỈ nhập ở đây (máy chủ không còn khoá dự phòng), lưu mã hoá,
- * ở đây chỉ thấy ••••abcd; đổi / xoá khoá phải nhập lại mật khẩu (secrets.js → useReauth).
- * Backend: be/src/services/review-stats.service.js.
+ * Cài đặt → "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)" — chỉ xem (admin).
+ * Điểm + số lượt đánh giá công ty trên Google / Tripadvisor tự cập nhật mỗi sáng qua dịch vụ Apify (mã đặt trên
+ * máy chủ, không nhập ở đây). Thẻ hiện số đang dùng, trạng thái lần chạy cuối, lần tự cập nhật tiếp theo,
+ * hạn mức tháng và nút "Cập nhật ngay" (chạy nền 20–90 giây; trang tự hỏi lại đến khi xong).
+ * Backend: be/src/services/review-stats.service.js (GET /settings/review-stats, POST /settings/review-stats/sync).
  */
 const PATH = "/settings/review-stats";
+const POLL_MS = 4000;
+const POLL_MAX_MS = 4 * 60_000;
 
 const SOURCES = [
+  { id: "google", name: "Google", Logo: GoogleIcon, logoClass: "size-5" },
   {
     id: "tripadvisor",
     name: "Tripadvisor",
     Logo: TripAdvisorIcon,
     logoClass: "size-6 text-[#00af87]",
-    keyLabel: "Khoá API Tripadvisor",
-    idField: "locationId",
-    idLabel: "Mã địa điểm Tripadvisor",
-    idHint: "Số đứng sau chữ “-d” trong link trang Tripadvisor của công ty.",
-    idPlaceholder: "27950353",
-    linkHint: "Khách bấm vào điểm Tripadvisor trên website sẽ mở trang này.",
-  },
-  {
-    id: "google",
-    name: "Google",
-    Logo: GoogleIcon,
-    logoClass: "size-5",
-    keyLabel: "Khoá API Google",
-    idField: "placeId",
-    idLabel: "Mã địa điểm Google (Place ID)",
-    idHint: "Để trống — máy chủ tự tìm đúng hồ sơ Google Maps của công ty.",
-    idPlaceholder: "ChIJ…",
-    linkHint: "Khách bấm vào điểm Google trên website sẽ mở trang này.",
   },
 ];
 
-const toForm = (d) =>
-  Object.fromEntries(
-    SOURCES.map((s) => [
-      s.id,
-      {
-        rating: d[s.id].rating == null ? "" : Number(d[s.id].rating).toFixed(1),
-        count: d[s.id].count == null ? "" : String(d[s.id].count),
-        url: d[s.id].url ?? "",
-        auto: d[s.id].auto ?? true,
-        key: "",
-        editingKey: false,
-        clearKey: false,
-        [s.idField]: d[s.id][s.idField] ?? "",
-      },
-    ]),
-  );
+const fmtStats = (s) => `${Number(s.rating).toFixed(1)} · ${s.count} đánh giá`;
+const money = (p, v) => (p?.unit === "searches" ? `${v} lượt` : `~${fmtUsd(v)} USD`);
 
-const ratingOk = (v) => /^\d(\.\d)?$/.test(String(v).trim()) && Number(v) <= 5;
-const countOk = (v) => /^\d{1,8}$/.test(String(v).trim());
-
-/** Nguồn này đang ở chế độ tự động (theo form đang sửa): có khoá (đã lưu / vừa nhập) + bật công tắc */
-const hasKey = (d, f) => Boolean(f.key.trim()) || (d.keyConfigured && !f.clearKey);
-const isAuto = (d, f) => hasKey(d, f) && f.auto;
-
-function errorsOf(d, f) {
-  const e = {};
-  const keyErr = secretError(f.key, SECRET_RULES.apiKey);
-  if (keyErr) e.key = keyErr;
-  if (isAuto(d, f)) return e;
-  if (!String(f.rating).trim()) e.rating = "Vui lòng nhập điểm";
-  else if (!ratingOk(f.rating)) e.rating = "Điểm từ 0 đến 5, tối đa 1 chữ số thập phân";
-  if (!String(f.count).trim()) e.count = "Vui lòng nhập số lượt";
-  else if (!countOk(f.count)) e.count = "Số lượt là số nguyên";
-  return e;
+/** Số phút còn phải chờ trước khi bấm lại (0 = bấm được) — tự đếm lùi */
+function useCooldown(until) {
+  const [now, setNow] = useState(() => Date.now());
+  const end = until ? new Date(until).getTime() : 0;
+  useEffect(() => {
+    if (!end || end <= Date.now()) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, [end]);
+  return end > now ? Math.ceil((end - now) / 60_000) : 0;
 }
 
 export default function ReviewStatsCard() {
-  const title = "Điểm & số lượt đánh giá";
-  const [state, setState] = useState({ data: null, form: null, error: "" });
-  const [nonce, setNonce] = useState(0);
-  const [checked, setChecked] = useState(false); // đã bấm Lưu → hiện lỗi ô trống
-  const { run, busy } = useMutation(["settings"]); // website đọc lại số mới ngay sau khi lưu
-  const sync = useMutation(["settings"]);
-  const { confirm, toast } = useUi();
-  const reauth = useReauth();
+  const title = "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)";
+  const [state, setState] = useState({ data: null, error: "" });
+  const [result, setResult] = useState(null); // kết quả lần bấm "Cập nhật ngay" vừa rồi
+  const [starting, setStarting] = useState(false);
+  const watch = useRef(null); // { since: thời điểm bấm, until: hạn chờ } khi đang chờ kết quả
+  const { toast } = useUi();
 
+  const load = useCallback(async () => {
+    try {
+      const r = await api(PATH);
+      setState({ data: r.data, error: "" });
+      return r.data;
+    } catch (err) {
+      setState((s) => ({ ...s, error: s.data ? "" : errorMessage(err) }));
+      return null;
+    }
+  }, []);
   useEffect(() => {
-    let alive = true;
-    api(PATH)
-      .then((r) => alive && setState({ data: r.data, form: toForm(r.data), error: "" }))
-      .catch((err) => alive && setState((s) => ({ ...s, error: errorMessage(err) })));
-    return () => {
-      alive = false;
-    };
-  }, [nonce]);
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
-  const apply = (data) => {
-    setState({ data, form: toForm(data), error: "" });
-    setChecked(false);
-  };
+    load();
+  }, [load]);
 
-  const { data, form, error } = state;
-  if (error || !form)
+  const { data, error } = state;
+  const running = Boolean(data?.running);
+  const waitMin = useCooldown(data?.cooldownUntil);
+
+  // Đang chạy (do mình bấm hoặc lịch tự động) → hỏi lại mỗi 4 giây; xong thì hiện kết quả
+  useEffect(() => {
+    if (!running) return undefined;
+    const t = setTimeout(async () => {
+      const d = await load();
+      const w = watch.current;
+      if (d && !d.running && w) {
+        watch.current = null;
+        const res = d.lastSync;
+        // (số đổi → máy chủ tự báo website làm mới)
+        if (res?.at && Date.parse(res.at) >= w.since - 1000) setResult(res);
+      } else if (w && Date.now() > w.until) {
+        watch.current = null;
+        toast.error(
+          "Dịch vụ chạy lâu hơn bình thường. Số mới (nếu lấy được) sẽ tự hiện khi bạn mở lại trang này.",
+          { title: "Chưa có kết quả" },
+        );
+      }
+    }, POLL_MS);
+    return () => clearTimeout(t);
+  }, [running, data, load, toast]);
+
+  if (error || !data)
     return (
       <Card icon={Star} title={title}>
         {error ? (
           <Notice tone="error">
             {error}{" "}
-            <button type="button" onClick={reload} className="font-semibold underline">
+            <button type="button" onClick={load} className="font-semibold underline">
               Thử lại
             </button>
           </Notice>
         ) : (
-          <LoadingBlock rows={3} />
+          <LoadingBlock rows={2} />
         )}
       </Card>
     );
 
-  const set = (src, patch) =>
-    setState((s) => ({ ...s, form: { ...s.form, [src]: { ...s.form[src], ...patch } } }));
-  const errors = Object.fromEntries(SOURCES.map((s) => [s.id, errorsOf(data[s.id], form[s.id])]));
-  const firstError = SOURCES.flatMap((s) =>
-    Object.values(errors[s.id]).map((m) => `${s.name}: ${m.toLowerCase()}`),
-  )[0];
-  const anyKey = SOURCES.some((s) => hasKey(data[s.id], form[s.id]));
-  const dirty = JSON.stringify(form) !== JSON.stringify(toForm(data));
-
-  const body = () =>
-    Object.fromEntries(
-      SOURCES.map((s) => {
-        const f = form[s.id];
-        return [
-          s.id,
-          {
-            rating: String(f.rating).trim() === "" ? null : Number(f.rating),
-            count: String(f.count).trim() === "" ? null : Number(f.count),
-            url: f.url.trim(),
-            auto: f.auto,
-            [s.idField]: f[s.idField].trim(),
-            ...(f.key.trim() ? { key: f.key.trim() } : {}),
-            clearKey: f.clearKey && !f.key.trim(),
-          },
-        ];
-      }),
-    );
-
-  /** Lưu (khi cần) — trả dữ liệu mới, null nếu lỗi */
-  const save = async ({ quiet } = {}) => {
-    setChecked(true);
-    if (firstError) {
-      toast.error(firstError);
-      return null;
-    }
-    // khoá sắp đổi / xoá → hộp xác nhận mật khẩu (máy chủ kiểm tra lại)
-    const changes = SOURCES.flatMap((s) => {
-      const f = form[s.id];
-      if (f.key.trim()) return [{ label: s.keyLabel, op: "replace" }];
-      if (f.clearKey && data[s.id].keyConfigured) return [{ label: s.keyLabel, op: "clear" }];
-      return [];
-    });
-    const b = body();
-    const send = (confirmPassword) =>
-      api(PATH, { method: "PUT", body: { ...b, ...(confirmPassword && { confirmPassword }) } });
-    const r = await run(() => reauth.run(send, changes), quiet ? "" : "Đã lưu điểm đánh giá");
-    if (r?.data) apply(r.data);
-    return r?.data ?? null;
-  };
+  const { configured, quota, lastSync, provider } = data;
+  const lastOk = SOURCES.map((s) => data[s.id].updatedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  const noQuota = configured && quota && !quota.error && quota.canManual === false;
+  const busy = starting || running;
+  const disabled = !configured || noQuota || waitMin > 0 || busy;
 
   const syncNow = async () => {
-    if (dirty && !(await save({ quiet: true }))) return;
-    const r = await sync.run(() => api(`${PATH}/sync`, { method: "POST" }));
-    if (!r?.data) return;
-    apply(r.data);
-    const res = r.data.result ?? {};
-    const lines = SOURCES.filter((s) => res.sources?.[s.id] && !res.sources[s.id].skipped).map(
-      (s) => `${s.name}: ${res.sources[s.id].message}`,
-    );
-    const msg = lines.join("\n") || res.message || "Đã kiểm tra";
-    if (res.ok) toast(msg, "success");
-    else toast.error(msg, { title: "Chưa cập nhật được hết" });
+    setResult(null);
+    setStarting(true);
+    try {
+      const r = await api(`${PATH}/sync`, { method: "POST" });
+      watch.current = { since: Date.now(), until: Date.now() + POLL_MAX_MS };
+      setState({ data: r.data, error: "" });
+    } catch (err) {
+      toast.error(errorMessage(err), { title: "Chưa cập nhật được" });
+      load(); // để thấy thời gian chờ / hạn mức mới
+    } finally {
+      setStarting(false);
+    }
   };
 
-  const confirmRemove = (s) =>
-    confirm({
-      title: `Xoá ${s.keyLabel.toLowerCase()}?`,
-      message: `Sau khi lưu, ${s.name} chuyển về nhập tay: website dùng điểm và số lượt bạn nhập.`,
-      confirmText: "Xoá khoá",
-      danger: true,
-    });
-
-  const last = data.lastSync;
+  const hint = busy
+    ? "Đang lấy số mới từ Google và Tripadvisor… có thể mất khoảng 1 phút. Bạn cứ làm việc khác, kết quả sẽ tự hiện ở đây."
+    : !configured
+      ? "Nút cập nhật sẽ dùng được khi máy chủ có mã Apify."
+      : noQuota
+        ? "Tạm chưa bấm được vì hạn mức tháng này còn quá ít — số tự cập nhật lại khi sang chu kỳ mới."
+        : waitMin > 0
+          ? `Vừa cập nhật — có thể bấm lại sau ${waitMin} phút.`
+          : "Muốn có số mới ngay mà không chờ đến sáng mai? Bấm “Cập nhật ngay”.";
 
   return (
     <Card
       icon={Star}
       title={title}
-      description="Điểm và số lượt đánh giá của công ty trên Tripadvisor và Google — hiện ở chân trang, banner trang chủ, trang tour và nhiều chỗ khác trên website."
+      description="Điểm và số lượt đánh giá của công ty trên Google và Tripadvisor — hiện ở đầu trang, trang chủ, chân trang và trang tour. Máy chủ tự lấy số mới mỗi sáng, không cần nhập tay."
     >
-      {/* 2 nguồn cạnh nhau (máy tính) — subgrid giữ các hàng thẳng nhau giữa 2 thẻ; điện thoại xếp chồng */}
-      <div className="grid gap-5 lg:grid-cols-2 lg:gap-x-6 lg:gap-y-0">
+      {!configured && (
+        <Notice tone="info" className="mb-4" title="Chưa bật tự cập nhật — số đang giữ nguyên">
+          Cài mã {provider?.name ?? "Apify"} trên máy chủ để bật tự cập nhật (nhờ đơn vị phát triển
+          website).
+        </Notice>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
         {SOURCES.map((s) => (
-          <SourcePanel
+          <SourceTile
             key={s.id}
             s={s}
             d={data[s.id]}
-            f={form[s.id]}
-            set={(patch) => set(s.id, patch)}
-            errors={checked ? errors[s.id] : {}}
-            status={last?.sources?.[s.id]}
-            onRequestClear={() => confirmRemove(s)}
+            busy={running}
+            status={configured ? lastSync?.sources?.[s.id] : null}
           />
         ))}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-slate-100 pt-5">
-        <div className="min-w-0 text-xs leading-relaxed text-slate-500">
-          {anyKey ? (
-            <>
-              Máy chủ tự cập nhật mỗi ngày lúc 6 giờ sáng cho mục đang bật tự động.
-              <span className="mt-0.5 block">
-                {last?.at
-                  ? `Lần tự cập nhật gần nhất: ${fmtDateTime(last.at)}${last.ok ? "" : " (có lỗi — xem từng mục)"}`
-                  : "Chưa tự cập nhật lần nào — bấm “Cập nhật ngay” để thử."}
-              </span>
-            </>
-          ) : (
-            <>
-              Chưa có khoá API nên website dùng số nhập tay. Nhập khoá để máy chủ tự cập nhật mỗi
-              ngày.
-              <span className="mt-0.5 block">Bấm Lưu là website hiện số mới ngay.</span>
-            </>
+      <dl className="mt-4 grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-2">
+        <InfoRow icon={CalendarClock} label="Lần tự cập nhật tiếp theo">
+          {configured && data.nextAutoAt ? fmtDateTime(data.nextAutoAt) : "Chưa bật"}
+        </InfoRow>
+        <InfoRow icon={CheckCircle2} label="Cập nhật thành công gần nhất">
+          {lastOk ? fmtDateTime(lastOk) : "Chưa có"}
+        </InfoRow>
+      </dl>
+
+      {configured && (
+        <div className="mt-4 space-y-2 rounded-xl bg-slate-50/80 p-3.5 ring-1 ring-slate-200/80">
+          <UsageQuota quota={quota} />
+          {provider?.syncCost > 0 && (
+            <p className="text-xs leading-relaxed text-slate-500">
+              Chi phí ước tính: tự cập nhật mỗi ngày {money(provider, provider.syncCost)}/lần (
+              {money(provider, provider.syncCost * 30)}/tháng) · mỗi lần bấm “Cập nhật ngay”{" "}
+              {money(provider, provider.syncCost)}
+              {provider.reviewCost
+                ? ` · mỗi lần “Lấy đánh giá” ở mục Đánh giá ${money(provider, provider.reviewCost)}`
+                : ""}
+              .
+            </p>
           )}
         </div>
-        <div className="ml-auto flex flex-wrap justify-end gap-2">
-          {anyKey && (
-            <Button
-              variant="secondary"
-              icon={RefreshCw}
-              onClick={syncNow}
-              loading={sync.busy}
-              disabled={busy}
-            >
-              Cập nhật ngay
-            </Button>
+      )}
+
+      {result && <SyncResult result={result} />}
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-slate-100 pt-4">
+        <p
+          className={cn(
+            "flex min-w-0 flex-1 basis-64 items-start gap-2 text-xs leading-relaxed",
+            busy ? "text-brand-800" : "text-slate-500",
           )}
-          <Button icon={Save} onClick={() => save()} loading={busy} disabled={sync.busy}>
-            Lưu
-          </Button>
-        </div>
+          aria-live="polite"
+        >
+          {busy && <Loader2 className="mt-px size-3.5 shrink-0 animate-spin" />}
+          {hint}
+        </p>
+        <Button
+          variant="secondary"
+          icon={RefreshCw}
+          onClick={syncNow}
+          loading={busy}
+          disabled={disabled}
+          className="ml-auto"
+        >
+          {busy ? "Đang cập nhật…" : "Cập nhật ngay"}
+          {!busy && configured && provider?.syncCost > 0 && (
+            <span className="ml-1 text-xs font-normal text-slate-500">
+              · {money(provider, provider.syncCost)}
+            </span>
+          )}
+        </Button>
       </div>
-      {reauth.dialog}
     </Card>
   );
 }
 
-/** Ô điểm / số lượt: chế độ tự động → chỉ xem (nền xám, huy hiệu "Tự động") */
-function NumberField({ label, value, onChange, auto, error, ...props }) {
-  const id = useId();
+function InfoRow({ icon: Icon, label, children }) {
   return (
-    <Field label={label} error={error} required={!auto} htmlFor={id}>
-      <div className="relative">
-        <Input
-          id={id}
-          inputMode="decimal"
-          value={value}
-          readOnly={auto}
-          aria-readonly={auto || undefined}
-          aria-invalid={!!error}
-          onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            "tabular-nums",
-            auto &&
-              "cursor-default border-dashed bg-slate-50 pr-[4.75rem] font-semibold text-slate-600 hover:border-slate-200 focus:border-slate-200 focus:ring-0",
-          )}
-          {...props}
-        />
-        {auto && (
-          <Badge
-            tone="green"
-            className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2"
-          >
-            Tự động
-          </Badge>
-        )}
-      </div>
-    </Field>
+    <div className="flex min-w-0 flex-wrap items-start gap-x-2">
+      <Icon className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+      <dt className="shrink-0 text-slate-500">{label}:</dt>
+      <dd className="min-w-0 font-medium text-slate-800">{children}</dd>
+    </div>
   );
 }
 
-function SourcePanel({ s, d, f, set, errors, status, onRequestClear }) {
-  const auto = isAuto(d, f);
-  const keyOn = hasKey(d, f);
-  const keyMode = f.clearKey ? "clear" : f.editingKey || !d.keyConfigured ? "edit" : "view";
-
+function SourceTile({ s, d, status, busy }) {
+  const bad = status && !status.ok;
+  const Icon = busy ? Loader2 : !status ? Clock3 : bad ? TriangleAlert : CheckCircle2;
   return (
-    // 7 hàng: tiêu đề · điểm + số lượt · link · khoá · mã địa điểm · tự động · cập nhật lần cuối
-    <div className="grid min-w-0 content-start gap-y-5 rounded-2xl bg-slate-50/60 p-4 ring-1 ring-slate-200/80 sm:p-5 lg:row-span-7 lg:grid-rows-subgrid">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-slate-200">
-            <s.Logo className={s.logoClass} />
-          </span>
-          <h3 className="truncate text-sm font-bold text-slate-900">{s.name}</h3>
+    <div className="flex min-w-0 flex-col gap-2.5 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-50 ring-1 ring-slate-200">
+          <s.Logo className={s.logoClass} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-900">{s.name}</p>
+          <p className="flex items-center gap-1 text-[15px] font-semibold text-slate-800 tabular-nums">
+            <Star className="size-4 shrink-0 fill-amber-400 text-amber-400" />
+            {fmtStats(d)}
+          </p>
         </div>
-        {auto ? <Badge tone="green">Tự động cập nhật</Badge> : <Badge tone="gray">Nhập tay</Badge>}
       </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <NumberField
-          label="Điểm (0–5)"
-          value={f.rating}
-          auto={auto}
-          error={errors.rating}
-          placeholder="5.0"
-          onChange={(rating) => set({ rating: rating.replace(",", ".") })}
+      <p
+        className={cn(
+          "flex min-w-0 items-start gap-1.5 text-xs leading-relaxed",
+          bad && !busy ? "text-amber-800" : "text-slate-500",
+        )}
+      >
+        <Icon
+          className={cn(
+            "mt-px size-3.5 shrink-0",
+            busy
+              ? "animate-spin text-brand-600"
+              : !status
+                ? "text-slate-400"
+                : bad
+                  ? "text-amber-600"
+                  : "text-emerald-600",
+          )}
         />
-        <NumberField
-          label="Số lượt đánh giá"
-          value={f.count}
-          auto={auto}
-          error={errors.count}
-          inputMode="numeric"
-          placeholder="93"
-          onChange={(count) => set({ count: count.replace(/[^\d]/g, "") })}
-        />
-      </div>
-
-      <Field label="Link trang đánh giá" hint={s.linkHint}>
-        <Input
-          type="url"
-          value={f.url}
-          onChange={(e) => set({ url: e.target.value })}
-          placeholder="https://"
-          spellCheck={false}
-          className="truncate"
-        />
-      </Field>
-
-      <SecretKeyField
-        label={s.keyLabel}
-        hint="Không bắt buộc. Có khoá thì máy chủ tự lấy số mới mỗi ngày."
-        configured={d.keyConfigured}
-        masked={d.keyMasked}
-        info={{ at: d.keyUpdatedAt, by: d.keyUpdatedBy }}
-        value={f.key}
-        onChange={(key) => set({ key })}
-        mode={keyMode}
-        onMode={(m) =>
-          set({
-            key: "",
-            editingKey: m === "edit",
-            clearKey: m === "clear",
-            ...(m === "clear" && { auto: false }),
-          })
-        }
-        rule={SECRET_RULES.apiKey}
-        onRequestClear={onRequestClear}
-        placeholder="Dán khoá API vào đây"
-      />
-
-      <Field label={s.idLabel} hint={s.idHint}>
-        <Input
-          value={f[s.idField]}
-          placeholder={s.idPlaceholder}
-          spellCheck={false}
-          autoComplete="off"
-          onChange={(e) => set({ [s.idField]: e.target.value.trim() })}
-          className="font-mono"
-        />
-      </Field>
-
-      <div className="rounded-xl bg-white p-3.5 ring-1 ring-slate-200">
-        <p className="mb-2.5 text-[13px] font-semibold text-slate-700">Tự động cập nhật mỗi ngày</p>
-        <Toggle
-          checked={keyOn && f.auto}
-          disabled={!keyOn}
-          onChange={(v) => set({ auto: v })}
-          label={keyOn && f.auto ? "Đang bật" : "Đang tắt"}
-          hint={
-            !keyOn
-              ? "Nhập khoá API để bật tự động."
-              : f.auto
-                ? "Máy chủ tự lấy điểm và số lượt mới mỗi sáng."
-                : "Website dùng điểm và số lượt bạn nhập ở trên."
-          }
-        />
-      </div>
-
-      <SourceStatus d={d} status={keyOn ? status : null} />
+        <span className="min-w-0 break-words">
+          {busy
+            ? "Đang lấy số mới…"
+            : status?.message
+              ? `Lần chạy gần nhất: ${status.message}`
+              : "Chưa tự cập nhật lần nào"}
+          <span className="block text-slate-500">
+            Số này cập nhật lúc: {d.updatedAt ? fmtDateTime(d.updatedAt) : "chưa có"}
+          </span>
+        </span>
+      </p>
     </div>
   );
 }
 
-function SourceStatus({ d, status }) {
-  const bad = status && !status.ok && !status.skipped;
+/** Kết quả từng nền tảng sau khi bấm "Cập nhật ngay" */
+function SyncResult({ result }) {
+  const rows = SOURCES.filter((s) => result.sources?.[s.id]);
+  if (!rows.length) return null;
   return (
-    <div className="flex min-w-0 items-start gap-2 self-end text-xs leading-relaxed text-slate-500">
-      {bad ? (
-        <TriangleAlert className="mt-px size-3.5 shrink-0 text-amber-600" />
-      ) : (
-        <CheckCircle2 className="mt-px size-3.5 shrink-0 text-emerald-600" />
-      )}
-      <span className="min-w-0 break-words">
-        Cập nhật lần cuối: {d.updatedAt ? fmtDateTime(d.updatedAt) : "chưa có"}
-        {status?.message && (
-          <span className={cn("block", bad && "text-amber-700")}>{status.message}</span>
-        )}
-      </span>
-    </div>
+    <Notice
+      tone={result.ok ? "success" : "warn"}
+      className="mt-4"
+      title={result.ok ? "Đã cập nhật xong" : "Chưa cập nhật được hết"}
+    >
+      <ul className="mt-0.5 space-y-0.5">
+        {rows.map((s) => (
+          <li key={s.id}>
+            <b>{s.name}:</b> {result.sources[s.id].message}
+          </li>
+        ))}
+      </ul>
+    </Notice>
   );
 }

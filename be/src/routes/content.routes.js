@@ -89,25 +89,29 @@ router.use("/car-areas", crud(carAreaService, carAreaSchema, "car_area", "cars")
 router.use("/visa-types", crud(visaTypeService, visaTypeSchema, "visa_type", "visa"));
 router.use("/fast-track", crud(fastTrackService, fastTrackSchema, "fast_track", "visa"));
 
-// Lấy đánh giá mới nhất qua API chính thức (Tripadvisor / Google) để chọn thêm vào danh sách.
-// Chỉ xem trước — thêm thật đi qua POST /reviews bình thường (kiểm tra dữ liệu + nhật ký). Quyền: sửa Đánh giá.
+// Lấy đánh giá mới nhất (Tripadvisor / Google, qua Apify — chạy nền 20–90 giây) để chọn thêm vào danh sách.
+// POST /preview bắt đầu, GET /preview xem trạng thái / kết quả. Chỉ xem trước — thêm thật đi qua POST /reviews
+// bình thường (kiểm tra dữ liệu + nhật ký). Quyền: sửa Đánh giá.
 // Gắn TRƯỚC /reviews để "/import" không bị hiểu là mã đánh giá.
 const reviewImport = Router();
 reviewImport.use(requireStaff);
 reviewImport.get("/sources", requirePermission("reviews", "view"), async (_req, res) =>
   ok(res, await reviewImportService.sources()),
 );
-reviewImport.get(
+reviewImport.get("/preview", requirePermission("reviews", "edit"), (_req, res) =>
+  ok(res, reviewImportService.previewStatus()),
+);
+reviewImport.post(
   "/preview",
   requirePermission("reviews", "edit"),
   limiter({
-    windowMs: 10 * 60 * 1000,
-    limit: 10,
+    windowMs: 60 * 60 * 1000,
+    limit: 6,
     message: "Bạn vừa lấy đánh giá nhiều lần, vui lòng thử lại sau ít phút",
   }),
-  validate({ query: reviewImportQuery }),
+  validate({ body: reviewImportQuery }),
   async (req, res) =>
-    ok(res, await reviewImportService.preview({ source: req.validated.query.source })),
+    ok(res, await reviewImportService.startPreview({ source: req.validated.body.source })),
 );
 router.use("/reviews/import", reviewImport);
 

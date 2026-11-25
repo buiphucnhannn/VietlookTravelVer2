@@ -639,80 +639,11 @@ export const smallGroupSettingsSchema = z.object({
   fivePlus: groupPct,
 });
 
-/** Điểm & số lượt đánh giá của công ty (Tripadvisor / Google) — hiện ở chân trang, trang chủ, trang tour… */
-// Ô trống / null → chưa nhập (bắt buộc hay không do service quyết theo chế độ tự động / nhập tay)
-const blankToUndef = (v) => (v === "" || v === null ? undefined : v);
-const reviewSource = (label, extra) =>
-  z.object({
-    rating: z.preprocess(
-      blankToUndef,
-      z.coerce
-        .number({ error: `${label}: điểm là số từ 0 đến 5` })
-        .min(0, `${label}: điểm là số từ 0 đến 5`)
-        .max(5, `${label}: điểm là số từ 0 đến 5`)
-        .transform((n) => Math.round(n * 10) / 10)
-        .optional(),
-    ),
-    count: z.preprocess(
-      blankToUndef,
-      z.coerce
-        .number({ error: `${label}: số lượt đánh giá là số nguyên` })
-        .int(`${label}: số lượt đánh giá là số nguyên`)
-        .min(0, `${label}: số lượt đánh giá không được âm`)
-        .max(10_000_000, `${label}: số lượt đánh giá quá lớn`)
-        .optional(),
-    ),
-    url: z
-      .string()
-      .trim()
-      .max(500)
-      .refine(
-        (v) => /^https:\/\/[^\s<>"']+$/i.test(v),
-        `${label}: link phải bắt đầu bằng https://`,
-      ),
-    auto: z.boolean().default(true),
-    // khoá API: để trống = giữ khoá đã lưu; clearKey = xoá khoá đã lưu
-    key: z
-      .string()
-      .trim()
-      .max(300, `${label}: khoá API quá dài — kiểm tra lại đã dán đúng khoá chưa`)
-      .refine((v) => !/\s/.test(v), `${label}: khoá API không được có dấu cách`)
-      .refine(
-        (v) => v === "" || /^[A-Za-z0-9_-]{16,300}$/.test(v),
-        `${label}: khoá API chưa đúng dạng — chỉ gồm chữ, số, gạch ngang, dài ít nhất 16 ký tự`,
-      )
-      .optional(),
-    clearKey: z.boolean().default(false),
-    ...extra,
-  });
 /**
- * Mật khẩu của chính admin để xác nhận khi đổi / xoá khoá (step-up). Không trim (mật khẩu có thể có dấu cách).
+ * Mật khẩu của chính admin để xác nhận khi đổi / xoá mã 9Pay (step-up). Không trim (mật khẩu có thể có dấu cách).
  * Chỉ dùng để kiểm tra rồi bỏ — không lưu, không ghi nhật ký (logger che trường "confirmPassword").
  */
 const confirmPassword = z.string().max(128).optional();
-
-export const reviewStatsSettingsSchema = z.object({
-  confirmPassword,
-  tripadvisor: reviewSource("Tripadvisor", {
-    // số sau "-d" trong link Tripadvisor (…-d27950353-…)
-    locationId: z
-      .string()
-      .trim()
-      .regex(/^\d{1,15}$/, "Mã địa điểm Tripadvisor chỉ gồm chữ số (số sau -d trong link)")
-      .default("27950353"),
-  }),
-  google: reviewSource("Google", {
-    placeId: z
-      .string()
-      .trim()
-      .max(300)
-      .refine(
-        (v) => v === "" || /^[A-Za-z0-9_-]{10,300}$/.test(v),
-        "Mã địa điểm Google (Place ID) không đúng dạng — thường bắt đầu bằng ChIJ",
-      )
-      .default(""),
-  }),
-});
 
 /** Mã bí mật 9Pay: ký tự in được (không dấu cách / chữ có dấu), 8–500 ký tự */
 const ninePaySecret = (label) =>

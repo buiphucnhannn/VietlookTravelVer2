@@ -1,58 +1,44 @@
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
+import { REVIEW_DEFAULTS, REVIEW_STAT_SOURCES } from "../constants/company-reviews.js";
 import { settingRepository } from "../repositories/content.repository.js";
 import { ApiError } from "../utils/ApiError.js";
-import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js";
 import { nextRunAt } from "./media-cleanup.service.js";
+import {
+  notConfiguredText,
+  quotaBlockedText,
+  quotaView,
+  reviewProvider,
+} from "./review-providers/index.js";
+import { num } from "./review-providers/normalize.js";
+
+export {
+  DEFAULT_TRIPADVISOR_LOCATION,
+  GOOGLE_MAPS_CID,
+  REVIEW_DEFAULTS,
+} from "../constants/company-reviews.js";
 
 /**
- * Điểm & số lượt đánh giá của CÔNG TY trên Tripadvisor và Google (chân trang, trang chủ, trang tour…).
- * Mỗi nguồn có 2 chế độ (CMS → Cài đặt → "Điểm & số lượt đánh giá"):
- * - Tự động: có khoá API + bật "Tự động cập nhật mỗi ngày" → máy chủ lấy số mới ~06:00 giờ VN mỗi ngày
- *   (và khi admin bấm "Cập nhật ngay"); ô điểm / số lượt chỉ để xem.
- * - Nhập tay: chưa có khoá hoặc tắt tự động → dùng đúng số nhân viên nhập (bắt buộc nhập).
- * Khoá API CHỈ nhập trong CMS (không có biến môi trường dự phòng), lưu MÃ HOÁ như key 9Pay, không bao giờ trả về
- * trình duyệt (chỉ ••••abcd). Đổi / xoá khoá bắt buộc admin nhập lại mật khẩu (opts.reauth) + ghi nhật ký.
- * CHỈ dùng API chính thức (Tripadvisor Content API, Google Places API (New)) — KHÔNG cào trang.
- * Số nhận về bất thường (điểm ngoài 0–5, số lượt tụt quá MAX_DROP) → bỏ qua, giữ số cũ.
+ * Điểm & số lượt đánh giá của CÔNG TY trên Tripadvisor và Google (đầu trang, trang chủ, chân trang, trang tour…).
+ * Tự cập nhật HOÀN TOÀN qua nhà cung cấp chọn bằng REVIEW_STATS_PROVIDER (hiện là Apify, mã APIFY_TOKEN —
+ * xem services/review-providers/). Không có ô nhập khoá / nhập số trong CMS.
+ * Mỗi ngày ~06:00 giờ VN (REVIEW_SYNC_HOUR_VN) + 1 lần ngay sau khi máy chủ khởi động nếu lần cuối đã quá 24 giờ
+ * → Apify ~0,02 USD / lần ≈ 0,6 USD / tháng (gói Free 5 USD). Trang công khai KHÔNG BAO GIỜ gọi nhà cung cấp.
+ * Chưa cấu hình → không gọi gì, số giữ nguyên như lần lưu cuối (hoặc số mặc định).
+ * Số nhận về bất thường (điểm ngoài 0–5, số lượt không nguyên / tụt quá MAX_DROP) → bỏ qua, giữ số cũ.
  * Không bao giờ làm sập server: mọi lỗi được bắt, ghi trạng thái lần cập nhật cuối, log không kèm khoá.
  */
 const KEY = "reviewStats";
 const TIMEOUT_MS = 10_000;
 /** Số lượt được phép tụt so với số hiện tại (Tripadvisor / Google thỉnh thoảng ẩn bớt đánh giá) */
 export const MAX_DROP = 5;
-export const SOURCES = ["tripadvisor", "google"];
-
-// Mã hồ sơ doanh nghiệp trên Google Maps (giống fe/src/constants/site.js) — dùng để nhận đúng địa điểm
-export const GOOGLE_MAPS_CID = "12890319484623913190";
-const GOOGLE_TEXT_QUERY = "Vietlook Travel and Trading Company Limited, Ha Dong, Hanoi";
-export const DEFAULT_TRIPADVISOR_LOCATION = "27950353";
-
-/** Số đang dùng khi CMS chưa lưu gì (khách xác nhận 13/11/2026) */
-export const REVIEW_DEFAULTS = Object.freeze({
-  tripadvisor: {
-    rating: 5,
-    count: 93,
-    url: "https://www.tripadvisor.com/Attraction_Review-g17733187-d27950353-Reviews-Vietlook_Travel-Ha_Dong_Hanoi.html",
-    auto: true,
-    updatedAt: null,
-  },
-  google: {
-    rating: 4.7,
-    count: 31,
-    url: `https://maps.google.com/?cid=${GOOGLE_MAPS_CID}`,
-    auto: true,
-    updatedAt: null,
-  },
-});
-
-export const NO_KEY_MESSAGE = "Chưa cài khoá — đang dùng số nhập tay";
+export const SOURCES = REVIEW_STAT_SOURCES;
+/** "Cập nhật ngay": bấm lại sau ít nhất 5 phút */
+export const MANUAL_COOLDOWN_MS = 5 * 60_000;
 const NAMES = { tripadvisor: "Tripadvisor", google: "Google" };
 
-const num = (v) => (v == null || v === "" ? NaN : Number(v));
 const fmt = (s) => `${s.rating.toFixed(1)} · ${s.count} đánh giá`;
 const safeUrl = (u) => (typeof u === "string" && /^https:\/\/[^\s<>"']+$/i.test(u) ? u : "");
-const str = (v) => (typeof v === "string" ? v : "");
 
 /**
  * Báo website xoá cache "settings" ngay sau khi số đổi (POST {PUBLIC_SITE_URL}/api/revalidate, mã PROXY_SECRET)
@@ -73,7 +59,11 @@ export async function notifyWebsite(fetchImpl = fetch) {
   }
 }
 
-/** Gộp dữ liệu đã lưu với mặc định — luôn đủ trường, số hợp lệ (khoá vẫn ở dạng mã hoá) */
+/**
+ * Gộp dữ liệu đã lưu với mặc định — luôn đủ trường, số hợp lệ. Chỉ giữ đúng các trường dùng tới
+ * (trường cũ như khoá API / mã địa điểm / công tắc tự động bị bỏ ở lần ghi kế tiếp).
+ * @returns {{ tripadvisor: object, google: object, lastSync: object | null }}
+ */
 function merge(stored) {
   const out = {};
   for (const src of SOURCES) {
@@ -85,51 +75,16 @@ function merge(stored) {
       rating: Number.isFinite(rating) && rating >= 0 && rating <= 5 ? rating : d.rating,
       count: Number.isInteger(count) && count >= 0 ? count : d.count,
       url: safeUrl(v.url) || d.url,
-      auto: typeof v.auto === "boolean" ? v.auto : d.auto,
       updatedAt: v.updatedAt ?? d.updatedAt,
-      key: str(v.key), // mã hoá (enc:v1:…)
-      keyUpdatedAt: v.keyUpdatedAt ?? null, // lần đổi khoá gần nhất + người đổi (hiện trong CMS)
-      keyUpdatedBy: str(v.keyUpdatedBy),
     };
   }
-  out.tripadvisor.locationId = /^\d{1,15}$/.test(str(stored?.tripadvisor?.locationId))
-    ? stored.tripadvisor.locationId
-    : DEFAULT_TRIPADVISOR_LOCATION;
-  out.google.placeId = str(stored?.google?.placeId);
-  out.google.resolvedPlaceId = str(stored?.google?.resolvedPlaceId); // máy chủ tự tìm theo cid
   out.lastSync = stored?.lastSync ?? null;
   return out;
 }
 export const mergeStored = merge;
 
 /**
- * Khoá (đã giải mã) & mã địa điểm thực tế — CHỈ từ CMS. Chỉ dùng nội bộ máy chủ, không bao giờ trả ra ngoài.
- * @param {ReturnType<typeof merge>} v
- */
-export function credentials(v) {
-  return {
-    tripadvisor: {
-      key: decryptSecret(v.tripadvisor.key),
-      locationId: v.tripadvisor.locationId || DEFAULT_TRIPADVISOR_LOCATION,
-    },
-    google: {
-      key: decryptSecret(v.google.key),
-      placeId: v.google.placeId || v.google.resolvedPlaceId || "",
-      cid: GOOGLE_MAPS_CID,
-    },
-  };
-}
-
-/** Thiếu bước xác nhận mật khẩu → không cho đổi khoá (an toàn mặc định nếu nơi gọi quên truyền) */
-const NO_REAUTH = async () => {
-  throw ApiError.forbidden("Cần xác nhận mật khẩu trước khi đổi khoá");
-};
-
-/** Chế độ tự động thật sự: có khoá + đang bật */
-const isAuto = (v, cred, src) => Boolean(cred[src].key && v[src].auto);
-
-/**
- * Số nhận từ API có dùng được không: điểm 0–5, số lượt nguyên ≥ 0 và không tụt quá MAX_DROP so với hiện tại.
+ * Số nhận về có dùng được không: điểm 0–5, số lượt nguyên ≥ 0 và không tụt quá MAX_DROP so với hiện tại.
  * @returns {string} "" = dùng được; còn lại = lý do bỏ qua (tiếng Việt)
  */
 export function insane(prev, next) {
@@ -142,109 +97,79 @@ export function insane(prev, next) {
   return "";
 }
 
-async function getJson(fetchImpl, url, init = {}) {
-  const res = await fetchImpl(url, {
-    ...init,
-    headers: { accept: "application/json", ...init.headers },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const err = new Error(`HTTP ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
+/**
+ * Lần cập nhật đang chạy (actor Apify mất 20–90 giây): chỉ 1 lần một lúc — lịch hằng ngày, chạy bù và nút
+ * "Cập nhật ngay" dùng chung. CMS hỏi lại định kỳ (GET) để biết đã xong chưa.
+ * @type {{ since: string, manual: boolean, promise: Promise<{ changed: boolean, lastSync: object }> } | null}
+ */
+let running = null;
+
+/** Lần "Cập nhật ngay" kế tiếp được phép (ISO) — null = bấm được ngay */
+function cooldownUntil(lastSync, now) {
+  if (!lastSync?.manual || !lastSync.at) return null;
+  const until = new Date(lastSync.at).getTime() + MANUAL_COOLDOWN_MS;
+  return until > now ? new Date(until).toISOString() : null;
 }
 
-/** Tripadvisor Content API — Location Details: rating, num_reviews, web_url */
-export async function fetchTripadvisor({ key, locationId }, fetchImpl = fetch) {
-  const url = `https://api.content.tripadvisor.com/api/v1/location/${encodeURIComponent(locationId)}/details?key=${encodeURIComponent(key)}&language=en`;
-  const d = await getJson(fetchImpl, url);
-  return {
-    rating: Math.round(num(d?.rating) * 10) / 10,
-    count: num(String(d?.num_reviews ?? "").replace(/[^\d]/g, "")),
-    url: str(d?.web_url),
-  };
-}
-
-/** Google Places API (New) — Place Details, chỉ 3 trường (rating, userRatingCount, googleMapsUri) */
-export async function fetchGoogle({ key, placeId }, fetchImpl = fetch) {
-  const d = await getJson(
-    fetchImpl,
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
-    {
-      headers: {
-        "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask": "rating,userRatingCount,googleMapsUri",
-      },
-    },
-  );
-  return {
-    rating: Math.round(num(d?.rating) * 10) / 10,
-    count: num(d?.userRatingCount),
-    url: str(d?.googleMapsUri),
-  };
+/** Số lượt còn lại (nhà cung cấp có API lượt dùng) — null nếu chưa cấu hình / không có API */
+async function quotaOf(provider, cost, fetchImpl) {
+  if (!provider.configured() || !provider.quota) return null;
+  return quotaView(provider, await provider.quota({ fetchImpl }), cost);
 }
 
 /**
- * Chưa có Place ID → tìm 1 lần theo tên doanh nghiệp (Text Search) và CHỈ nhận kết quả có googleMapsUri
- * chứa đúng mã hồ sơ cid của công ty (tránh lấy nhầm doanh nghiệp khác). Không thấy → "".
+ * Dữ liệu cho CMS (admin, chỉ xem): số đang dùng, lần cập nhật cuối, lần tự cập nhật tiếp theo,
+ * nhà cung cấp + đã cấu hình chưa, số lượt còn lại (null = không có API lượt dùng) — KHÔNG BAO GIỜ có khoá.
  */
-export async function resolveGooglePlaceId({ key, cid }, fetchImpl = fetch) {
-  const d = await getJson(fetchImpl, "https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "X-Goog-Api-Key": key,
-      "X-Goog-FieldMask": "places.id,places.googleMapsUri",
+async function view(v, { fetchImpl = fetch, now = Date.now() } = {}) {
+  const provider = reviewProvider();
+  const configured = provider.configured();
+  return {
+    tripadvisor: v.tripadvisor,
+    google: v.google,
+    lastSync: v.lastSync,
+    // chi phí ước tính (cùng đơn vị với quota): 1 lần cập nhật điểm · 1 lần "Lấy đánh giá" cả 2 nền tảng
+    provider: {
+      name: provider.name,
+      envKey: provider.envKey,
+      unit: provider.costUnit ?? "usd",
+      syncCost: provider.syncCost,
+      reviewCost: provider.reviewCost ? provider.reviewCost(SOURCES) : null,
     },
-    body: JSON.stringify({ textQuery: GOOGLE_TEXT_QUERY, languageCode: "en" }),
-  });
-  const hit = (d?.places ?? []).find((p) => str(p?.googleMapsUri).includes(`cid=${cid}`));
-  return hit?.id ?? "";
-}
-
-/** Lỗi gọi API → câu tiếng Việt dễ hiểu cho admin */
-function errorText(src, err) {
-  const s = err?.status;
-  if (err?.name === "TimeoutError" || err?.name === "AbortError")
-    return "Máy chủ đánh giá không phản hồi, sẽ thử lại lần sau";
-  if (src === "google") {
-    if (s === 400 || s === 401 || s === 403)
-      return "Khoá không hợp lệ hoặc chưa bật Places API (New) cho khoá này";
-    if (s === 404) return "Không tìm thấy địa điểm — kiểm tra Mã địa điểm Google (Place ID)";
-  } else {
-    if (s === 401 || s === 403)
-      return "Khoá không hợp lệ hoặc chưa cho phép máy chủ này dùng khoá (kiểm tra trong trang Tripadvisor)";
-    if (s === 400 || s === 404) return "Không tìm thấy địa điểm — kiểm tra Mã địa điểm Tripadvisor";
-  }
-  if (s === 429) return "Đã gọi quá nhiều lần, thử lại sau";
-  return `Không lấy được số (${s ? `lỗi ${s}` : "lỗi kết nối"}), sẽ thử lại lần sau`;
-}
-
-/** Dữ liệu cho CMS (admin): số đang dùng, chế độ, khoá đã che, lần cập nhật cuối — KHÔNG có khoá thật */
-function view(v, cred) {
-  const out = {};
-  for (const src of SOURCES) {
-    // eslint-disable-next-line no-unused-vars
-    const { key, resolvedPlaceId, ...rest } = v[src];
-    out[src] = {
-      ...rest,
-      keyConfigured: Boolean(cred[src].key),
-      keyMasked: maskSecret(cred[src].key),
-      autoActive: isAuto(v, cred, src),
-    };
-  }
-  out.lastSync = SOURCES.some((s) => cred[s].key)
-    ? v.lastSync
-    : { at: null, ok: false, message: NO_KEY_MESSAGE };
-  return out;
+    configured,
+    nextAutoAt: configured ? nextRunAt(now, env.reviews.syncHourVn).toISOString() : null,
+    cooldownUntil: cooldownUntil(v.lastSync, now),
+    running: running ? { since: running.since, manual: running.manual } : null,
+    quota: await quotaOf(provider, provider.syncCost, fetchImpl),
+  };
 }
 
 export const reviewStatsService = {
-  async get() {
-    const v = merge(await settingRepository.get(KEY));
-    return view(v, credentials(v));
+  async get({ fetchImpl = fetch } = {}) {
+    return view(merge(await settingRepository.get(KEY)), { fetchImpl });
+  },
+
+  /**
+   * Nút "Cập nhật ngay" (admin): kiểm tra đã cấu hình, chờ đủ 5 phút từ lần bấm trước, còn đủ hạn mức
+   * (giữ phần dự trữ cho cập nhật tự động) → BẮT ĐẦU chạy nền, trả ngay { promise } (không chờ 20–90 giây).
+   * Đang có lần chạy khác → trả lần đó. Không đạt → ApiError (câu tiếng Việt).
+   * @returns {Promise<{ promise: Promise<{ changed: boolean, lastSync: object }>, already: boolean }>}
+   */
+  async manualSync({ fetchImpl = fetch, by = "", notify = notifyWebsite } = {}) {
+    const provider = reviewProvider();
+    if (!provider.configured()) throw ApiError.badRequest(notConfiguredText(provider));
+    if (running) return { promise: running.promise, already: true };
+    const stored = merge(await settingRepository.get(KEY));
+    const until = cooldownUntil(stored.lastSync, Date.now());
+    if (until) {
+      const min = Math.max(1, Math.ceil((new Date(until).getTime() - Date.now()) / 60_000));
+      throw new ApiError(429, `Vừa cập nhật xong — có thể bấm lại sau ${min} phút`, {
+        code: "COOLDOWN",
+      });
+    }
+    const q = await quotaOf(provider, provider.syncCost, fetchImpl);
+    if (q && !q.canManual) throw ApiError.badRequest(quotaBlockedText(provider, q));
+    return { promise: this.sync({ fetchImpl, by, manual: true, notify }), already: false };
   },
 
   /** Website: chỉ số & link (lỗi DB → số mặc định, website không bao giờ hỏng) */
@@ -261,69 +186,29 @@ export const reviewStatsService = {
   },
 
   /**
-   * Admin lưu. Khoá: trống = giữ, clearKey = xoá. Nguồn ở chế độ nhập tay → bắt buộc điểm + số lượt;
-   * chế độ tự động → giữ số đã đồng bộ (ô trên CMS chỉ để xem).
-   * Có đổi / xoá khoá thật sự → gọi opts.reauth() (xác nhận mật khẩu) TRƯỚC khi ghi; sửa số / link / công tắc thì không.
-   * @param {{ reauth?: () => Promise<unknown> }} [opts]
-   * @returns {Promise<{ data: object, keyChanges: { source: string, op: "replace" | "clear" }[] }>}
-   */
-  async save(input, actor, { reauth = NO_REAUTH } = {}) {
-    const prev = merge(await settingRepository.get(KEY));
-    const now = new Date().toISOString();
-    const next = { ...prev, tripadvisor: { ...prev.tripadvisor }, google: { ...prev.google } };
-    const keyChanges = [];
-    for (const src of SOURCES) {
-      const n = input[src];
-      const p = prev[src];
-      const t = next[src];
-      let op = "";
-      if (n.clearKey) {
-        if (p.key) op = "clear";
-        t.key = "";
-      } else if (n.key && n.key !== decryptSecret(p.key)) {
-        t.key = encryptSecret(n.key);
-        op = "replace";
-      }
-      if (op) {
-        keyChanges.push({ source: src, op });
-        t.keyUpdatedAt = now;
-        t.keyUpdatedBy = actor?.username ?? "";
-      }
-      t.url = n.url;
-      t.auto = n.auto;
-      if (src === "tripadvisor") t.locationId = n.locationId;
-      if (src === "google") {
-        if (n.placeId !== p.placeId) t.resolvedPlaceId = ""; // đổi mã → tìm lại nếu cần
-        t.placeId = n.placeId;
-      }
-    }
-    const cred = credentials(next);
-    for (const src of SOURCES) {
-      if (isAuto(next, cred, src)) continue; // tự động: giữ số đã đồng bộ
-      const n = input[src];
-      const missing = [n.rating == null && "điểm (0–5)", n.count == null && "số lượt đánh giá"];
-      if (missing.some(Boolean))
-        throw ApiError.badRequest(
-          `${NAMES[src]}: vui lòng nhập ${missing.filter(Boolean).join(" và ")} (đang nhập tay)`,
-        );
-      const changed = prev[src].rating !== n.rating || prev[src].count !== n.count;
-      next[src].rating = n.rating;
-      next[src].count = n.count;
-      if (changed) next[src].updatedAt = now;
-    }
-    if (keyChanges.length) await reauth(); // sai mật khẩu → ném lỗi, không ghi gì
-    await settingRepository.set(KEY, next, actor?.username);
-    return { data: view(next, cred), keyChanges };
-  },
-
-  /**
-   * Lấy số mới qua API chính thức. Không ném lỗi.
-   * - Lịch hằng ngày (manual=false): chỉ các nguồn đang bật tự động.
-   * - Admin bấm "Cập nhật ngay" (manual=true): mọi nguồn có khoá — để kiểm tra khoá; chỉ ÁP DỤNG số cho
-   *   nguồn đang bật tự động, nguồn đang tắt thì báo "khoá dùng được" kèm số lấy được.
+   * Lấy số mới qua nhà cung cấp (lịch hằng ngày, chạy bù khi khởi động, nút "Cập nhật ngay"). Không ném lỗi.
+   * Chưa cấu hình → không gọi mạng, không ghi DB. Đang chạy → dùng chung lần đang chạy.
    * @returns {Promise<{ changed: boolean, lastSync: object }>}
    */
-  async sync({ fetchImpl = fetch, by = "system", manual = false, notify = notifyWebsite } = {}) {
+  sync(opts = {}) {
+    const provider = reviewProvider();
+    if (!provider.configured())
+      return Promise.resolve({
+        changed: false,
+        lastSync: { at: null, ok: false, message: notConfiguredText(provider) },
+      });
+    if (running) return running.promise;
+    const promise = this._run(provider, opts).finally(() => {
+      running = null;
+    });
+    running = { since: new Date().toISOString(), manual: Boolean(opts.manual), promise };
+    return promise;
+  },
+
+  async _run(
+    provider,
+    { fetchImpl = fetch, by = "system", manual = false, notify = notifyWebsite } = {},
+  ) {
     let stored;
     try {
       stored = merge(await settingRepository.get(KEY));
@@ -334,79 +219,56 @@ export const reviewStatsService = {
         lastSync: { at: null, ok: false, message: "Không đọc được dữ liệu" },
       };
     }
-    const cred = credentials(stored);
-    if (!SOURCES.some((s) => cred[s].key))
-      return { changed: false, lastSync: { at: null, ok: false, message: NO_KEY_MESSAGE } };
 
     const next = {
-      ...stored,
       tripadvisor: { ...stored.tripadvisor },
       google: { ...stored.google },
+      lastSync: stored.lastSync,
     };
     const now = new Date().toISOString();
     const sources = {};
     let changed = false;
 
+    let stats;
+    try {
+      stats = await provider.fetchStats({ fetchImpl });
+    } catch (error) {
+      stats = { tripadvisor: { error }, google: { error } }; // nhà cung cấp lỡ ném lỗi — vẫn ghi trạng thái
+    }
     for (const src of SOURCES) {
-      const cfg = cred[src];
-      const auto = stored[src].auto;
-      if (!cfg.key) {
-        sources[src] = { ok: true, skipped: true, message: NO_KEY_MESSAGE };
-        continue;
-      }
-      if (!auto && !manual) {
-        sources[src] = { ok: true, skipped: true, message: "Đang tắt tự động cập nhật" };
-        continue;
-      }
       try {
-        let got;
-        if (src === "tripadvisor") got = await fetchTripadvisor(cfg, fetchImpl);
-        else {
-          let placeId = cfg.placeId;
-          if (!placeId) {
-            placeId = await resolveGooglePlaceId(cfg, fetchImpl);
-            if (!placeId) {
-              sources[src] = {
-                ok: false,
-                message:
-                  "Khoá dùng được nhưng chưa tìm ra địa điểm — nhập Mã địa điểm Google (Place ID)",
-              };
-              continue;
-            }
-            next.google.resolvedPlaceId = placeId; // nhớ lại, lần sau không phải tìm
-            changed = true;
-          }
-          got = await fetchGoogle({ ...cfg, placeId }, fetchImpl);
-        }
+        const got = stats?.[src] ?? { error: new Error("missing") };
+        if (got.error) throw got.error;
+        const before = { rating: stored[src].rating, count: stored[src].count };
         const why = insane(stored[src], got);
         if (why) {
-          sources[src] = { ok: false, message: `Bỏ qua: ${why}, giữ số cũ` };
-          logger.warn({ event: "reviews.sync_ignored", source: src, ...got }, `[reviews] ${why}`);
-          continue;
-        }
-        if (!auto) {
-          sources[src] = {
-            ok: true,
-            message: `Khoá dùng được (${fmt(got)}) — đang tắt tự động nên chưa áp dụng`,
-          };
+          sources[src] = { ok: false, before, message: `Bỏ qua vì ${why} — đang giữ số cũ` };
+          logger.warn(
+            { event: "reviews.sync_ignored", source: src, rating: got.rating, count: got.count },
+            `[reviews] ${why}`,
+          );
           continue;
         }
         const same = got.rating === stored[src].rating && got.count === stored[src].count;
-        Object.assign(next[src], {
-          rating: got.rating,
-          count: got.count,
-          url: safeUrl(got.url) || stored[src].url,
-          updatedAt: now,
-        });
-        changed = true;
+        next[src].rating = got.rating;
+        next[src].count = got.count;
+        next[src].url = safeUrl(got.url) || stored[src].url;
+        next[src].updatedAt = now;
+        if (!same) changed = true;
         sources[src] = {
           ok: true,
-          message: same ? `Không đổi (${fmt(got)})` : `Đã cập nhật ${fmt(got)}`,
+          changed: !same,
+          before,
+          after: { rating: got.rating, count: got.count },
+          message: same ? `Không đổi (${fmt(got)})` : `${fmt(before)} → ${fmt(got)}`,
         };
       } catch (err) {
-        // chỉ ghi mã lỗi — KHÔNG ghi URL (có khoá Tripadvisor trong đường dẫn)
-        const code = err?.status ? `HTTP ${err.status}` : err?.name || "error";
-        sources[src] = { ok: false, message: errorText(src, err) };
+        const code = provider.errorCode(err); // chỉ mã lỗi — không URL, không khoá
+        sources[src] = {
+          ok: false,
+          before: { rating: stored[src].rating, count: stored[src].count },
+          message: `${provider.errorText(err)} — đang giữ số cũ`,
+        };
         logger.warn(
           { event: "reviews.sync_failed", source: src, code },
           `[reviews] ${NAMES[src]}: ${code}`,
@@ -414,26 +276,25 @@ export const reviewStatsService = {
       }
     }
 
-    const tried = SOURCES.filter((s) => !sources[s].skipped);
-    const ok = tried.every((s) => sources[s].ok);
+    const ok = SOURCES.every((s) => sources[s].ok);
     const message = SOURCES.map((s) => `${NAMES[s]}: ${sources[s].message}`).join(" · ");
-    next.lastSync = { at: now, ok, message, sources };
+    next.lastSync = { at: now, ok, message, sources, manual, by, provider: provider.id };
     try {
       await settingRepository.set(KEY, next, by);
     } catch (err) {
       logger.warn({ err }, "[reviews] không lưu được kết quả cập nhật");
     }
     logger.info({ event: "reviews.sync", ok, by }, `[reviews] ${message}`);
-    // số đổi → website làm mới ngay (lịch hằng ngày; nút "Cập nhật ngay" trong CMS cũng tự làm mới)
+    // số đổi → website làm mới ngay
     if (changed) await Promise.resolve(notify()).catch(() => false);
     return { changed, lastSync: next.lastSync };
   },
 };
 
 /**
- * Lịch hằng ngày ~06:00 giờ VN (chuỗi setTimeout như dọn ảnh, không giữ tiến trình sống).
- * Luôn lên lịch (khoá có thể được nhập trong CMS bất cứ lúc nào) — chưa có khoá thì lần chạy dừng ngay,
- * không gọi mạng, không ghi DB. Khởi động lại mà lần cập nhật cuối đã quá 26 giờ → chạy bù sau 1 phút.
+ * Lịch hằng ngày ~06:00 giờ VN (chuỗi setTimeout như dọn ảnh, không giữ tiến trình sống)
+ * + chạy bù 1 phút sau khi khởi động nếu lần cập nhật cuối đã quá 24 giờ (hoặc chưa có).
+ * Chưa cấu hình nhà cung cấp thì lần chạy dừng ngay, không gọi mạng, không ghi DB.
  * @returns {() => void} hàm dừng lịch
  */
 export function scheduleDailyReviewSync({
@@ -464,7 +325,7 @@ export function scheduleDailyReviewSync({
   const catchUp = setTimeout(async () => {
     try {
       const last = await lastSyncAt();
-      if (!last || clock() - new Date(last).getTime() > 26 * 3600_000) await exec();
+      if (!last || clock() - new Date(last).getTime() > 24 * 3600_000) await exec();
     } catch {
       /* bỏ qua — lịch hằng ngày vẫn chạy */
     }

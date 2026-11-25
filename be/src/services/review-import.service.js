@@ -1,101 +1,25 @@
 import { logger } from "../config/logger.js";
-import { reviewRepository, settingRepository } from "../repositories/content.repository.js";
+import { reviewRepository } from "../repositories/content.repository.js";
 import { ApiError } from "../utils/ApiError.js";
-import { credentials, mergeStored, resolveGooglePlaceId } from "./review-stats.service.js";
+import {
+  notConfiguredText,
+  quotaBlockedText,
+  quotaView,
+  reviewProvider,
+} from "./review-providers/index.js";
+import { str } from "./review-providers/normalize.js";
+
+export { mapLang, toDay } from "./review-providers/normalize.js";
 
 /**
- * CMS → Đánh giá → "Lấy đánh giá từ Tripadvisor / Google": xem tối đa 5 đánh giá MỚI NHẤT mỗi nền tảng
- * qua API chính thức (giới hạn của Tripadvisor Content API & Google Places API (New)), nhân viên tick chọn
- * rồi thêm vào danh sách qua đúng luồng tạo đánh giá thường (POST /admin/reviews → kiểm tra dữ liệu + nhật ký).
- * Lời khách giữ NGUYÊN VĂN (Google: originalText — không lấy bản Google tự dịch), kèm link bài gốc
- * (điều khoản API: giữ nguồn + link về trang gốc — thẻ đánh giá trên website đã hiện huy hiệu nguồn + link).
- * Khoá API dùng chung với "Điểm & số lượt đánh giá" (CMS → Cài đặt).
+ * CMS → Đánh giá → "Lấy đánh giá từ Tripadvisor / Google": xem các đánh giá MỚI NHẤT mỗi nền tảng qua nhà cung cấp
+ * đang dùng (REVIEW_STATS_PROVIDER — hiện là Apify, mã trên máy chủ), nhân viên tick chọn rồi thêm vào danh sách
+ * qua đúng luồng tạo đánh giá thường (POST /admin/reviews → kiểm tra dữ liệu + nhật ký).
+ * Tên, ngày, số sao, lời khách giữ NGUYÊN VĂN (bản gốc, không lấy bản máy dịch), kèm link bài gốc.
+ * Apify mất 20–90 giây → chạy nền: POST bắt đầu (startPreview), CMS hỏi lại GET (previewStatus) đến khi xong.
+ * Chi phí ước tính mỗi lần ~0,025 USD / nền tảng — hiện trong CMS trước khi bấm.
  */
-const TIMEOUT_MS = 10_000;
 export const IMPORT_SOURCES = ["tripadvisor", "google"];
-const LIMIT = 5;
-
-const str = (v) => (typeof v === "string" ? v : "");
-const clip = (s, n) => str(s).trim().slice(0, n);
-const httpsUrl = (u) => (/^https?:\/\/[^\s<>"']+$/i.test(str(u)) ? str(u).slice(0, 1000) : "");
-
-/** "zh-Hant" → zh, "vi" → vi, "en-US" → en, ngôn ngữ khác → other, không rõ → "" */
-export function mapLang(code) {
-  const c = str(code).trim().toLowerCase();
-  if (!c) return "";
-  const base = c.split(/[-_]/)[0];
-  return ["en", "zh", "vi"].includes(base) ? base : "other";
-}
-
-/** ISO → "YYYY-MM-DD" theo giờ Việt Nam; sai / tương lai → "" */
-export function toDay(iso) {
-  const t = Date.parse(str(iso));
-  if (!Number.isFinite(t)) return "";
-  const day = new Date(t + 7 * 3600_000).toISOString().slice(0, 10);
-  const today = new Date(Date.now() + 14 * 3600_000).toISOString().slice(0, 10);
-  return day <= today ? day : "";
-}
-
-const stars = (v) => {
-  const n = Math.round(Number(v));
-  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : 5;
-};
-
-async function getJson(fetchImpl, url, headers = {}) {
-  const res = await fetchImpl(url, {
-    headers: { accept: "application/json", ...headers },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const err = new Error(`HTTP ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
-}
-
-/** Tripadvisor Content API — Location Reviews (tối đa 5 mới nhất) */
-export async function fetchTripadvisorReviews({ key, locationId }, fetchImpl = fetch) {
-  const d = await getJson(
-    fetchImpl,
-    `https://api.content.tripadvisor.com/api/v1/location/${encodeURIComponent(locationId)}/reviews?key=${encodeURIComponent(key)}&language=en`,
-  );
-  return (Array.isArray(d?.data) ? d.data : []).slice(0, LIMIT).map((r) => ({
-    source: "tripadvisor",
-    name: clip(r?.user?.username, 100) || "Tripadvisor traveller",
-    title: clip(r?.title, 200),
-    text: clip(r?.text, 5000),
-    rating: stars(r?.rating),
-    date: toDay(r?.published_date),
-    url: httpsUrl(r?.url),
-    language: mapLang(r?.lang),
-  }));
-}
-
-/** Google Places API (New) — Place Details trường `reviews` (tối đa 5) */
-export async function fetchGoogleReviews({ key, placeId }, fetchImpl = fetch) {
-  const d = await getJson(
-    fetchImpl,
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
-    { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "reviews,googleMapsUri" },
-  );
-  return (Array.isArray(d?.reviews) ? d.reviews : []).slice(0, LIMIT).map((r) => {
-    const orig = r?.originalText?.text ? r.originalText : r?.text;
-    return {
-      source: "google",
-      name: clip(r?.authorAttribution?.displayName, 100) || "Google user",
-      title: "",
-      text: clip(orig?.text, 5000),
-      rating: stars(r?.rating),
-      date: toDay(r?.publishTime),
-      url:
-        httpsUrl(r?.googleMapsUri) ||
-        httpsUrl(r?.authorAttribution?.uri) ||
-        httpsUrl(d?.googleMapsUri),
-      language: mapLang(orig?.languageCode),
-    };
-  });
-}
 
 const norm = (s) => str(s).replace(/\s+/g, " ").trim().toLowerCase();
 
@@ -113,72 +37,115 @@ export function markExisting(items, existing) {
   }));
 }
 
-function errorText(src, err) {
-  const s = err?.status;
-  if (err?.name === "TimeoutError" || err?.name === "AbortError")
-    return "Máy chủ không phản hồi, vui lòng thử lại sau ít phút";
-  if (s === 429) return "Đã gọi quá nhiều lần hoặc hết hạn mức trong ngày — thử lại sau";
-  if (src === "google") {
-    if (s === 400 || s === 401 || s === 403)
-      return "Khoá không hợp lệ hoặc chưa bật Places API (New) cho khoá này";
-    if (s === 404) return "Không tìm thấy địa điểm — kiểm tra Mã địa điểm Google trong Cài đặt";
-  } else {
-    if (s === 401 || s === 403) return "Khoá không hợp lệ hoặc chưa cho phép máy chủ này dùng khoá";
-    if (s === 400 || s === 404) return "Không tìm thấy địa điểm — kiểm tra Mã địa điểm Tripadvisor";
-  }
-  return s ? `Không lấy được đánh giá (lỗi ${s})` : "Không kết nối được, vui lòng thử lại";
-}
+const usable = (provider) => Boolean(provider.canImportReviews && provider.configured());
 
-/** Đọc khoá đã lưu (CHỈ từ CMS → Cài đặt → Điểm & số lượt đánh giá) */
-async function loadCred() {
-  return credentials(mergeStored(await settingRepository.get("reviewStats")));
-}
+const JOB_KEEP_MS = 15 * 60_000; // kết quả giữ 15 phút để mở lại hộp không phải chạy lại
+/** @type {{ status: "running"|"done"|"error", startedAt: string, finishedAt?: string, source?: string, result?: object, error?: string } | null} */
+let job = null;
+export const _resetPreviewJob = () => {
+  job = null;
+};
 
 export const reviewImportService = {
-  /** Nền tảng nào có khoá → CMS chỉ hiện nút cho các nền tảng đó (không bao giờ trả khoá) */
-  async sources() {
-    const cred = await loadCred();
-    return Object.fromEntries(IMPORT_SOURCES.map((s) => [s, Boolean(cred[s].key)]));
+  /**
+   * Máy chủ có lấy được đánh giá không (CMS chỉ hiện nút khi true — không bao giờ trả khoá)
+   * + tên nhà cung cấp, số lượt còn lại (null = không có API lượt dùng), lượt cần cho 1 lần xem.
+   */
+  async sources({ fetchImpl = fetch } = {}) {
+    const provider = reviewProvider();
+    const on = usable(provider);
+    const cost = on && provider.reviewCost ? provider.reviewCost(IMPORT_SOURCES) : 0;
+    return {
+      ...Object.fromEntries(IMPORT_SOURCES.map((s) => [s, on])),
+      provider: provider.name,
+      cost,
+      quota:
+        on && provider.quota
+          ? quotaView(provider, await provider.quota({ fetchImpl }), cost)
+          : null,
+    };
   },
 
   /**
-   * Lấy đánh giá mới nhất của các nền tảng có khoá + đánh dấu "Đã có".
+   * Bắt đầu lấy đánh giá (chạy nền) — kiểm tra cấu hình + hạn mức trước (lỗi → ApiError ngay).
+   * Đang chạy → trả lần đang chạy (không tốn thêm).
+   */
+  async startPreview({ source, fetchImpl = fetch } = {}) {
+    if (job?.status === "running") return this.previewStatus();
+    await this.checkPreview({ source, fetchImpl });
+    const started = {
+      status: "running",
+      startedAt: new Date().toISOString(),
+      source: source ?? "",
+    };
+    job = started;
+    this.preview({ source, fetchImpl, checked: true })
+      .then((result) => {
+        if (job === started)
+          job = { ...started, status: "done", finishedAt: new Date().toISOString(), result };
+      })
+      .catch((err) => {
+        if (job === started)
+          job = {
+            ...started,
+            status: "error",
+            finishedAt: new Date().toISOString(),
+            error: err?.statusCode
+              ? err.message
+              : "Chưa lấy được đánh giá, vui lòng thử lại sau ít phút",
+          };
+      });
+    return this.previewStatus();
+  },
+
+  /** Trạng thái lần lấy gần nhất: idle | running | done (kèm result) | error (kèm câu báo) */
+  previewStatus({ now = Date.now() } = {}) {
+    if (!job) return { status: "idle" };
+    if (job.status !== "running" && now - Date.parse(job.finishedAt) > JOB_KEEP_MS) {
+      job = null;
+      return { status: "idle" };
+    }
+    return { ...job };
+  },
+
+  /** Kiểm tra trước khi chạy: đã cấu hình + đủ hạn mức (giữ phần cho cập nhật tự động) */
+  async checkPreview({ source, fetchImpl = fetch } = {}) {
+    const provider = reviewProvider();
+    if (!usable(provider))
+      throw ApiError.badRequest(`${notConfiguredText(provider)} nên chưa lấy được đánh giá`);
+    const list = IMPORT_SOURCES.filter((s) => !source || source === s);
+    if (provider.quota) {
+      const q = quotaView(provider, await provider.quota({ fetchImpl }), provider.reviewCost(list));
+      if (q && !q.canManual) throw ApiError.badRequest(quotaBlockedText(provider, q));
+    }
+    return { provider, list };
+  },
+
+  /**
+   * Lấy đánh giá mới nhất + đánh dấu "Đã có".
    * @returns {Promise<{ items: object[], errors: Record<string, string>, sources: string[] }>}
    */
-  async preview({ source, fetchImpl = fetch } = {}) {
-    const cred = await loadCred();
-    const list = IMPORT_SOURCES.filter((s) => cred[s].key && (!source || source === s));
-    if (!list.length)
-      throw ApiError.badRequest(
-        "Chưa cài khoá — nhập khoá trong Cài đặt → Điểm & số lượt đánh giá trước",
-      );
+  async preview({ source, fetchImpl = fetch, checked = false } = {}) {
+    const provider = reviewProvider();
+    const list = checked
+      ? IMPORT_SOURCES.filter((s) => !source || source === s)
+      : (await this.checkPreview({ source, fetchImpl })).list;
     const items = [];
     const errors = {};
     await Promise.all(
       list.map(async (src) => {
         try {
-          if (src === "tripadvisor")
-            items.push(...(await fetchTripadvisorReviews(cred[src], fetchImpl)));
-          else {
-            const placeId =
-              cred.google.placeId || (await resolveGooglePlaceId(cred.google, fetchImpl));
-            if (!placeId) {
-              errors[src] =
-                "Chưa tìm ra địa điểm trên Google — nhập Mã địa điểm Google trong Cài đặt";
-              return;
-            }
-            items.push(...(await fetchGoogleReviews({ ...cred.google, placeId }, fetchImpl)));
-          }
+          items.push(...(await provider.fetchReviews(src, { fetchImpl })));
         } catch (err) {
-          errors[src] = errorText(src, err);
+          errors[src] = provider.errorText(err, { retryHint: "vui lòng thử lại sau ít phút" });
           logger.warn(
-            { event: "reviews.import_failed", source: src, code: err?.status ?? err?.name },
+            { event: "reviews.import_failed", source: src, code: provider.errorCode(err) },
             `[reviews] lấy đánh giá ${src} lỗi`,
           );
         }
       }),
     );
-    const usable = items.filter((x) => x.text);
+    const withText = items.filter((x) => str(x.text));
     const existing = await reviewRepository.find(
       { source: { $in: list } },
       { select: "source name date text" },
@@ -187,7 +154,7 @@ export const reviewImportService = {
     return {
       sources: list,
       errors,
-      items: markExisting(usable, existing).sort(
+      items: markExisting(withText, existing).sort(
         (a, b) => order(a) - order(b) || b.date.localeCompare(a.date),
       ),
     };

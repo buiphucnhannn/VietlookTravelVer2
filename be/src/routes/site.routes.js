@@ -24,7 +24,6 @@ import {
   pageKeyParam,
   pageSchema,
   paymentSettingsSchema,
-  reviewStatsSettingsSchema,
   smallGroupSettingsSchema,
   trackingSettingsSchema,
 } from "../validators/content.validator.js";
@@ -178,13 +177,14 @@ settingsRoutes.put(
   validate({ body: smallGroupSettingsSchema }),
   settingsController.saveSmallGroup,
 );
-// Điểm & số lượt đánh giá: chỉ admin (có khoá API). "Cập nhật ngay" gọi API ngoài → giới hạn 6 lần / 10 phút
+// Điểm & số lượt đánh giá (tự cập nhật qua Apify): chỉ admin xem. "Cập nhật ngay" tốn ~0,02 USD hạn mức Apify →
+// service chặn bấm lại trong 5 phút + giữ hạn mức cho cập nhật tự động; thêm giới hạn 6 lần / giờ phòng bấm lặp.
 const reviewSyncLimiter = limiter({
-  windowMs: 10 * 60 * 1000,
+  windowMs: 60 * 60 * 1000,
   limit: 6,
   message: "Bạn vừa cập nhật nhiều lần, vui lòng thử lại sau ít phút",
 });
-// Lưu mục có khoá bí mật (khoá API đánh giá, mã 9Pay): đổi / xoá khoá phải nhập lại mật khẩu (sai được tính vào
+// Lưu mục có khoá bí mật (mã 9Pay): đổi / xoá khoá phải nhập lại mật khẩu (sai được tính vào
 // khoá tài khoản như đăng nhập sai) + giới hạn 20 lần / 15 phút / tài khoản (chống thử mật khẩu, bấm lặp).
 // Cache-Control: no-store đã áp cho cả /settings (routes/index.js).
 const secretSaveLimiter = limiter({
@@ -194,13 +194,6 @@ const secretSaveLimiter = limiter({
   message: "Bạn vừa lưu nhiều lần, vui lòng thử lại sau ít phút",
 });
 settingsRoutes.get("/review-stats", requireAdmin, settingsController.getReviewStats);
-settingsRoutes.put(
-  "/review-stats",
-  requireAdmin,
-  secretSaveLimiter,
-  validate({ body: reviewStatsSettingsSchema }),
-  settingsController.saveReviewStats,
-);
 settingsRoutes.post(
   "/review-stats/sync",
   requireAdmin,

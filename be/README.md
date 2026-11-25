@@ -26,6 +26,7 @@ npm run dev              # http://localhost:4000/api/v1/health — lần đầu 
 | `npm run db:restore`     | `-- <file.json.gz>` xem trước; thêm `--yes` để khôi phục (tự sao lưu dữ liệu hiện tại trước), `--only tours,articles` chỉ vài bảng                                                                                                                          |
 | `npm run seed`           | Nạp dữ liệu ban đầu từ `seed-data/` — chỉ thêm bản ghi còn thiếu. ⚠ `-- --force` GHI ĐÈ nội dung đã sửa trong CMS                                                                                                                                           |
 | `npm run reviews:seed`   | Đưa 8 đánh giá Tripadvisor có sẵn (`seed-data/reviews.json`) vào mục Đánh giá khách — sao lưu trước, chỉ thêm đánh giá còn thiếu (chạy lại an toàn)                                                                                                         |
+| `npm run reviews:strip-keys` | MỘT LẦN: xoá khoá API Tripadvisor / Google cũ (từng nhập trong CMS) khỏi cài đặt `reviewStats` — mặc định chạy thử, thêm `-- --apply` để ghi |
 | `npm run images:upload`  | Đưa ảnh có sẵn trong `fe/public/images` lên Cloudinary (chỉ ảnh chưa có, chạy lại an toàn)                                                                                                                                                                  |
 | `npm run emails:preview` | Xem trước mọi email (6 loại form × nhân viên / khách en-zh-vi) ra file HTML trong thư mục tạm (`-- <thư mục>` để chọn nơi lưu) — không gửi email, không cần DB                                                                                              |
 
@@ -84,7 +85,7 @@ khi database chưa có tài khoản đó (`services/admin-bootstrap.service.js` 
 | Nội dung CMS      | `/admin/{tours,destinations,themes,articles,categories,authors,cars,car-areas,visa-types,fast-track,reviews}` — `GET / POST / GET :id / PUT :id / PATCH :id/visibility / PATCH order / DELETE :id` | admin, editor                              | CRUD + ẩn hiện + thứ tự                                                                                                                                     |
 | Đơn / yêu cầu     | `GET /enquiries`, `/enquiries/stats`, `/enquiries/code/:code`, `GET/PATCH/DELETE /enquiries/:id`, `POST/DELETE /enquiries/:id/notes`, `POST /enquiries/:id/resend-email`                           | theo quyền bookings / requests (xoá: full) | Trạng thái, thanh toán, ghi chú nội bộ, gửi lại email                                                                                                       |
 | Trang chủ & trang | `GET/PUT /settings/home`, `GET /settings/pages`, `GET/PUT /settings/pages/:key`                                                                                                                    | admin, editor                              | Banner, tour nổi bật, giới thiệu + 4 chính sách                                                                                                             |
-| Cài đặt           | `GET/PUT /settings/notifications`, `GET/PUT /settings/payment`, `GET/PUT /settings/tracking`, `GET/PUT /settings/review-stats`, `POST /settings/review-stats/sync` (6 lần / 10 phút)               | admin                                      | Email nhận thông báo, 9Pay (chỉ môi trường thật, key mã hoá, không bao giờ trả nguyên văn), mã Google                                                       |
+| Cài đặt           | `GET/PUT /settings/notifications`, `GET/PUT /settings/payment`, `GET/PUT /settings/tracking`, `GET /settings/review-stats`, `POST /settings/review-stats/sync` (chạy nền, 5 phút / lần, 6 lần / giờ) | admin                                      | Email nhận thông báo, 9Pay (chỉ môi trường thật, key mã hoá, không bao giờ trả nguyên văn), mã Google                                                       |
 | Ảnh               | `POST /uploads/images?folder=` (lưu ảnh), `POST /uploads/images/link-preview` (xem trước ảnh từ link), `DELETE /uploads/images`                                                                    | admin, editor                              | Cloudinary · kiểm tra chữ ký file · chặn link nội bộ · không xoá được ảnh hệ thống                                                                          |
 | Video             | `POST /uploads/videos/from-drive`, `GET /uploads/videos/from-drive/:jobId`                                                                                                                         | admin, editor                              | Không tải file video lên máy chủ: dán link YouTube / Google Drive đã chia sẻ (`utils/video.js`); riêng video nền trang chủ từ Drive được Cloudinary chép về |
 | Dịch tự động      | `POST /translate`                                                                                                                                                                                  | admin, editor                              | Dịch en / zh / vi (giữ nguyên thẻ HTML), giới hạn 30 lần / phút                                                                                             |
@@ -101,15 +102,19 @@ Google gtx, Google dict-chrome-ex, Lingva, LibreTranslate tự host; MyMemory cu
 `TRANSLATE_COOLDOWN_MINUTES` (hết hạn mức → tới 0h UTC) và bị bỏ qua ngay; mỗi request ≤ 8 giây, hỏng hết → báo "đang bận" trong ~15 giây.
 Chỉ gửi phần chữ (không gửi thẻ HTML); câu trả về là cảnh báo / captcha không bao giờ được ghi vào nội dung.
 
-**Điểm & số lượt đánh giá** (`services/review-stats.service.js`, cài đặt `reviewStats`): điểm + số lượt Tripadvisor / Google của công ty,
-website đọc qua `GET /public/site` → `reviewStats` (thẻ cache `settings`). Nhập tay, hoặc có khoá API (chỉ nhập trong CMS, lưu mã hoá)
-+ bật tự động → mỗi ngày ~06:00 giờ VN lấy số qua
-Tripadvisor Content API (`/location/{id}/details`) và Google Places API (New) (`places/{id}`, field mask `rating,userRatingCount,googleMapsUri`).
-Bỏ qua số bất thường (điểm ngoài 0–5, số lượt tụt > 5), timeout 10 giây, không bao giờ làm sập server, log không kèm khoá; số đổi →
-gọi `POST {PUBLIC_SITE_URL}/api/revalidate` (header `x-proxy-secret`) để website làm mới ngay. Cách lấy khoá: `docs/DEPLOY.md` mục 1.6.
-**Lấy đánh giá từ API** (`services/review-import.service.js`): `GET /admin/reviews/import/sources` (nền tảng nào có khoá),
-`GET /admin/reviews/import/preview?source=` (quyền sửa Đánh giá, 10 lần / 10 phút) → tối đa 5 đánh giá mới nhất mỗi nền tảng, đánh dấu "Đã có";
-thêm thật qua `POST /admin/reviews` bình thường.
+**Điểm & số lượt đánh giá** (`services/review-stats.service.js`, cài đặt `reviewStats` = { tripadvisor, google: {rating, count, url, updatedAt}, lastSync }):
+website đọc qua `GET /public/site` → `reviewStats` (thẻ cache `settings`; trang công khai không bao giờ gọi dịch vụ ngoài).
+Tự cập nhật qua nhà cung cấp chọn bằng `REVIEW_STATS_PROVIDER` (`services/review-providers/` — hiện chỉ `apify`, mã `APIFY_TOKEN`
+gửi bằng header `Authorization: Bearer`, không bao giờ nằm trong URL / log / DB): mỗi ngày ~06:00 giờ VN + chạy bù khi khởi động nếu
+lần cuối > 24 giờ; mỗi lần chạy 2 actor song song qua `POST /v2/acts/<actor>/run-sync-get-dataset-items` (Google
+`compass~crawler-google-places` → `totalScore` / `reviewsCount`; Tripadvisor `maxcopell~tripadvisor` → `rating` / `numberOfReviews`),
+~0,012 USD / lần. Hạn mức tháng: `GET /v2/users/me/limits` (đệm 10 phút). Bỏ qua số bất thường (điểm ngoài 0–5, số lượt tụt > 5),
+không bao giờ làm sập server; số đổi → gọi `POST {PUBLIC_SITE_URL}/api/revalidate` (header `x-proxy-secret`) để website làm mới ngay.
+Thêm nhà cung cấp khác (vd. API chính thức Google Places / Tripadvisor): xem chú thích trong `services/review-providers/index.js`.
+Cách lấy mã: `docs/DEPLOY.md` mục 1.6. Dọn khoá cũ trong DB (một lần): `npm run reviews:strip-keys` (thêm `-- --apply` để ghi).
+**Lấy đánh giá** (`services/review-import.service.js`): `GET /admin/reviews/import/sources` (dùng được không + hạn mức + chi phí ước tính),
+`POST /admin/reviews/import/preview` (bắt đầu chạy nền, quyền sửa Đánh giá, 6 lần / giờ) → `GET /admin/reviews/import/preview`
+(trạng thái / kết quả: 20 đánh giá Google + 10 Tripadvisor mới nhất, đánh dấu "Đã có"; ~0,07 USD / lần); thêm thật qua `POST /admin/reviews` bình thường.
 
 ## Bảo mật đã cấu hình sẵn
 

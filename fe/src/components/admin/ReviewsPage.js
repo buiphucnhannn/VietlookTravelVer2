@@ -44,7 +44,7 @@ import {
   useUi,
 } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
-import ReviewImportDialog, { IMPORT_PATH, importTitle } from "./ReviewImportDialog";
+import ReviewImportDialog, { IMPORT_NAMES, IMPORT_PATH, importTitle } from "./ReviewImportDialog";
 import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { useAutoFill } from "./translate";
@@ -154,14 +154,17 @@ export default function ReviewsPage() {
   const [editing, setEditing] = useState(null);
   const [q, setQ] = useState("");
   const [source, setSource] = useState("");
-  // Nền tảng đã có khoá API (Cài đặt → Điểm & số lượt đánh giá) → hiện nút "Lấy đánh giá từ …"
+  // Máy chủ đã cài mã Apify → hiện nút "Lấy đánh giá từ …" (kèm hạn mức còn lại để hiện trong hộp)
   const [apiSources, setApiSources] = useState([]);
   const [importing, setImporting] = useState(false);
   useEffect(() => {
     if (!canEdit) return;
     let alive = true;
     api(`${IMPORT_PATH}/sources`)
-      .then((r) => alive && setApiSources(Object.keys(r.data ?? {}).filter((k) => r.data[k])))
+      .then(
+        (r) =>
+          alive && setApiSources(Object.keys(IMPORT_NAMES).filter((k) => r.data?.[k] === true)),
+      )
       .catch(() => {});
     return () => {
       alive = false;

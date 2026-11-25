@@ -101,9 +101,9 @@ const FIXED = {
   "settings.payment": "Sửa cài đặt thanh toán 9Pay",
   "settings.tracking": "Sửa mã đo lường",
   "settings.smallGroup": "Sửa phụ thu nhóm nhỏ",
-  "settings.review_stats": "Sửa điểm & số lượt đánh giá",
+  "settings.review_stats": "Sửa điểm & số lượt đánh giá", // nhật ký cũ (nay tự cập nhật, không sửa tay)
   "settings.review_sync": "Cập nhật ngay điểm đánh giá",
-  "settings.secret": "Thay / xoá khoá bảo mật (9Pay, khoá API)",
+  "settings.secret": "Thay / xoá khoá bảo mật",
   "user.create": "Thêm tài khoản",
   "user.update": "Sửa tài khoản",
   "user.permissions": "Đổi quyền tài khoản",

@@ -92,8 +92,8 @@ export const siteConfig = {
   },
   // Video giới thiệu chính chủ (chỉ dùng để phát video, không phải link mạng xã hội)
   youtubeIds: ["-Si4zYv7gKs"],
-  // Điểm & số lượt đánh giá Tripadvisor / Google: KHÔNG để cứng ở đây — nhập trong CMS → Cài đặt →
-  // "Điểm & số lượt đánh giá" (hoặc máy chủ tự cập nhật mỗi ngày). Xem lib/review-stats.js.
+  // Điểm & số lượt đánh giá Tripadvisor / Google: KHÔNG để cứng ở đây — máy chủ tự cập nhật mỗi ngày
+  // (xem CMS → Cài đặt → "Điểm & số lượt đánh giá"). Xem lib/review-stats.js.
   messaging: {
     whatsapp: "https://wa.me/84983393588",
     whatsapp2: "https://wa.me/84983393488",
