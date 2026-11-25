@@ -83,3 +83,12 @@ export const reviewSchema = z.object({
 export const reviewImportQuery = z.object({
   source: z.enum(["tripadvisor", "google"]).optional(),
 });
+
+/** Gợi ý đánh giá cho 1 tour (CMS → Tour → 9. Đánh giá) — dữ liệu tour đang soạn (chưa lưu cũng được) */
+export const tourReviewSuggestSchema = z.object({
+  titles: z.array(z.string().max(300)).max(6).default([]),
+  route: z.array(z.string().max(200)).max(40).default([]),
+  destinations: z.array(z.string().max(120)).max(30).default([]),
+  code: z.string().max(40).default(""),
+  keywords: z.array(z.string().trim().min(2).max(60)).max(20).optional(),
+});

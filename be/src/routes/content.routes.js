@@ -22,7 +22,12 @@ import { reviewImportService } from "../services/review-import.service.js";
 import { auditService } from "../services/audit.service.js";
 import { limiter } from "../middlewares/rate-limit.middleware.js";
 import { ok } from "../utils/response.js";
-import { reviewImportQuery, reviewSchema } from "../validators/review.validator.js";
+import {
+  reviewImportQuery,
+  reviewSchema,
+  tourReviewSuggestSchema,
+} from "../validators/review.validator.js";
+import { suggestTourReviews } from "../services/tour-review-suggest.service.js";
 import {
   articleSchema,
   authorSchema,
@@ -76,6 +81,20 @@ function crud(service, schema, type, module, options) {
 }
 
 const router = Router();
+// Gợi ý đánh giá phù hợp cho tour đang soạn: dò trong kho đánh giá công ty (KHÔNG gọi Apify, không tốn hạn mức).
+// Gắn TRƯỚC crud /tours để "review-suggestions" không bị hiểu là mã tour. Quyền: sửa Tour.
+router.post(
+  "/tours/review-suggestions",
+  requireStaff,
+  requirePermission("tours", "edit"),
+  limiter({
+    windowMs: 60 * 1000,
+    limit: 30,
+    message: "Bạn tìm hơi nhiều, vui lòng thử lại sau ít giây",
+  }),
+  validate({ body: tourReviewSuggestSchema }),
+  async (req, res) => ok(res, await suggestTourReviews(req.validated.body)),
+);
 router.use("/tours", crud(tourService, tourSchema, "tour", "tours"));
 router.use(
   "/destinations",

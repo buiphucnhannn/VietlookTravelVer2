@@ -72,6 +72,7 @@ import {
 import { canonicalVideo, parseVideo } from "@/lib/video";
 import { REGIONS } from "./DestinationsPage";
 import { usePendingImages } from "./pendingImages";
+import TourReviewFinder from "./TourReviewFinder";
 import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
 
 /** Nhãn nổi bật trên thẻ tour (khớp TOUR_LABELS ở be/src/constants/content.js) */
@@ -2687,7 +2688,7 @@ const ReviewsSection = memoOn(
       <Section
         id="danh-gia"
         title="9. Đánh giá của khách"
-        description="Nên ghi rõ nguồn (TripAdvisor, Google…)."
+        description="Bấm “Tìm đánh giá phù hợp” để chọn từ đánh giá Tripadvisor / Google của công ty, hoặc tự nhập. Nên ghi rõ nguồn."
         actions={
           reviews.length > 0 && (
             <Badge tone="amber">
@@ -2757,25 +2758,33 @@ const ReviewsSection = memoOn(
             </div>
           )}
         </Sortable>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={Plus}
-          className="mt-3"
-          disabled={reviews.length >= 50}
-          onClick={() =>
-            emit([
-              ...reviews,
-              { _k: newKey(), name: "", country: "", rating: 5, text: "", date: "", source: "" },
-            ])
-          }
-        >
-          Thêm đánh giá
-        </Button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* Dò trong kho đánh giá công ty (Tripadvisor / Google đã lấy về) → chọn bài đúng tour */}
+          <TourReviewFinder
+            tour={t}
+            existing={reviews}
+            onAdd={(list) => emit([...reviews, ...list.map((r) => ({ _k: newKey(), ...r }))])}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Plus}
+            disabled={reviews.length >= 50}
+            onClick={() =>
+              emit([
+                ...reviews,
+                { _k: newKey(), name: "", country: "", rating: 5, text: "", date: "", source: "" },
+              ])
+            }
+          >
+            Tự nhập đánh giá
+          </Button>
+        </div>
       </Section>
     );
   },
-  ["reviews"],
+  // content / destinations / code: để hộp "Tìm đánh giá phù hợp" dùng đúng tên tour, chặng, điểm đến đang soạn
+  ["reviews", "content", "destinations", "code"],
 );
 
 /* =========================================================================
