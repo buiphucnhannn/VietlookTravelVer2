@@ -303,6 +303,7 @@ const en = {
     mapTitle: "Vietnam, North to South",
     mapSubtitle: "Tap a place to see our tours.",
     mapFeatured: "Featured tours",
+    mapHint: "Tap a dot on the map to explore a destination",
     heritageEyebrow: "Vietlook in numbers",
     heritageTitle: "17 years on the ground, North to South",
     heritageText: "Real numbers behind every trip we run.",
@@ -1220,7 +1221,8 @@ const en = {
         text: "Our tours are arranged to serve travellers with disabilities.",
       },
     ],
-    note: "Tell us your needs when booking.",
+    // Dòng nhỏ dưới nút (tuỳ chọn) — để trống: câu "cho chúng tôi biết nhu cầu" đã có ở đoạn mô tả + nút
+    note: "",
     cta: "Tell us your needs",
     badge: "Wheelchair & hearing-impaired support",
     badgeLong:

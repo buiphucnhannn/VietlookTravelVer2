@@ -14,6 +14,8 @@ import Container from "./Container";
  * - collage: [ảnh…] (tuỳ chọn, trang danh sách tour) → từ màn hình lớn: tiêu đề canh trái, bên phải là 1–3 ảnh
  *   ghép chéo trong khung "giọt nước" bo tròn (kiểu localvietnam); nền còn 1 ảnh phủ tối để khung ảnh nổi lên.
  *   Điện thoại / máy tính bảng: giữ nguyên hero canh giữa như cũ (không có khung ảnh).
+ * - ImageComponent: component vẽ ảnh (mặc định next/image) — bản xem trước trong CMS truyền component hiện được cả
+ *   ảnh vừa chọn chưa lưu. Website không dùng.
  */
 export function BrushHero({
   title,
@@ -26,6 +28,7 @@ export function BrushHero({
   children,
   credit,
   collage,
+  ImageComponent = Image,
 }) {
   const list = [...new Set(images.filter(Boolean))].slice(0, 3);
   const n = list.length;
@@ -44,7 +47,7 @@ export function BrushHero({
               i > 0 && split && "lg:hidden",
             )}
           >
-            <Image
+            <ImageComponent
               src={src}
               alt=""
               fill
@@ -97,7 +100,7 @@ export function BrushHero({
             </Button>
           )}
         </div>
-        {split && <BlobCollage images={tiles} />}
+        {split && <BlobCollage images={tiles} ImageComponent={ImageComponent} />}
       </Container>
       {credit?.text && n > 0 && <PhotoCredit {...credit} />}
     </section>
@@ -118,7 +121,7 @@ const BANDS = {
 };
 
 /** 1–3 ảnh ghép chéo trong khung bo tròn tự nhiên + "bóng" màu đất nung lệch nhẹ phía sau (trang trí) */
-function BlobCollage({ images }) {
+function BlobCollage({ images, ImageComponent = Image }) {
   const bands = BANDS[images.length];
   return (
     <div
@@ -136,7 +139,7 @@ function BlobCollage({ images }) {
       <div className="absolute inset-0 bg-white/95 [clip-path:url(#vl-hero-blob)]">
         {images.map((src, i) => (
           <div key={src} className="absolute inset-0" style={{ clipPath: bands[i] }}>
-            <Image src={src} alt="" fill sizes="448px" className="object-cover" />
+            <ImageComponent src={src} alt="" fill sizes="448px" className="object-cover" />
           </div>
         ))}
       </div>

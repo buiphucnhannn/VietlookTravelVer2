@@ -26,6 +26,7 @@ import AccessibleTravel from "@/components/ui/AccessibleTravel";
 import { href } from "@/i18n/config";
 import { getCatalog, getReviews } from "@/lib/catalog";
 import { getPageText } from "@/lib/page-copy/server";
+import { withAccessCopy } from "@/lib/page-copy/access.mjs";
 import { cn } from "@/lib/utils";
 import { subgrid } from "@/lib/subgrid";
 
@@ -47,8 +48,10 @@ export default async function GroupTailorMadePage({ params }) {
   const reviews = await getReviews("group");
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Tour nhóm & thiết kế riêng (chưa sửa = nội dung mặc định)
-  const p = await getPageText("group-tailor-made-tours", lang, dict);
+  // Chữ / ảnh sửa được trong CMS → Giao diện trang → Tour nhóm & thiết kế riêng (chưa sửa = nội dung mặc định).
+  // Dải "không rào cản": ô riêng của trang này để trống → chữ của khối chung (Toàn website → Khối du lịch không rào cản)
+  const access = await getPageText("access", lang, dict);
+  const p = await getPageText("group-tailor-made-tours", lang, withAccessCopy(dict, access));
   const includedIcons = [Users, Hotel, Car, Wrench, Stamp, MessagesSquare];
   const pillarIcons = [Wrench, Star, MapPin, MessagesSquare];
   const groupIcons = [UsersRound, Briefcase, GraduationCap, Handshake];
@@ -82,15 +85,8 @@ export default async function GroupTailorMadePage({ params }) {
         {/* Du lịch không rào cản: nhóm có khách đi xe lăn / khiếm thính / đi lại hạn chế → sắp xếp theo yêu cầu */}
         <AccessibleTravel
           lang={lang}
-          dict={{
-            ...dict,
-            access: {
-              ...dict.access,
-              title: p.accessTitle,
-              badgeLong: p.accessText,
-              cta: p.accessCta,
-            },
-          }}
+          dict={dict}
+          copy={{ ...access, title: p.accessTitle, bandText: p.accessText, cta: p.accessCta }}
           variant="band"
           className="mx-auto mt-8 max-w-5xl"
         />

@@ -21,7 +21,8 @@ import {
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, lp, tr } from "@/i18n/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";
-import { airportFrom, carRoutes, places, quoteRoutes, routeTitle } from "@/data/cars";
+import { carRoutes, quoteRoutes } from "@/data/cars";
+import { carPageData, fleetPhotos } from "@/data/car-gallery";
 import { getCatalog, getContactInfo, getReviews } from "@/lib/catalog";
 import { getPageText } from "@/lib/page-copy/server";
 import { Breadcrumbs, Container, Reveal, SectionHeading, Stars } from "@/components/ui";
@@ -47,41 +48,6 @@ export async function generateMetadata({ params }) {
   });
 }
 
-// Dải ảnh đội xe: ảnh HD (≥1600px, Pexels – miễn phí thương mại) thay cho ảnh thumbnail ≤600px bị mờ.
-const HD = "/images/cars";
-const fleetPhotos = () => ({
-  exterior: [
-    "sedan-v3a",
-    "suv-u1",
-    "minivan-1",
-    "luxury-v3a",
-    "limo-1",
-    "van16-1",
-    "coach29-u1",
-    "coach45-u1",
-    "ext-chauffeur-1",
-    "sedan-v3b",
-    "suv-u2",
-    "limo-v3b",
-    "van16-2",
-    "coach29-u2",
-    "coach45-u2",
-    "coach45-vn",
-    "ext-chauffeur-2",
-    "ext-saigon-street",
-  ].map((n) => `${HD}/${n}.webp`),
-  interior: [
-    "luxury-2",
-    "limo-2",
-    "int-limo-white",
-    "int-vclass",
-    "int-van-lounge",
-    "int-beige",
-    "int-leather",
-    "int-beige-2",
-  ].map((n) => `${HD}/${n}.webp`),
-});
-
 export default async function CarRentalPage({ params }) {
   const { fleet, carAreas } = await getCatalog();
   // 3 đánh giá đầu tiên được chọn hiện ở trang Thuê xe (CMS → Đánh giá khách)
@@ -101,37 +67,10 @@ export default async function CarRentalPage({ params }) {
   const { exterior, interior } = fleetPhotos();
   const half = Math.ceil(exterior.length / 2);
 
-  const fleetData = fleet.map((f) => ({
-    ...f,
-    name: { label: tr(f.name, lang) },
-    tagline: tr(f.tagline, lang),
-    description: tr(f.description, lang),
-    ideal: tr(f.ideal, lang),
-    from: airportFrom(f.priceKey),
-  }));
-  const areas = carAreas.map((a) => ({ key: a.key, name: tr(a.name, lang), airport: a.airport }));
-  const routes = carRoutes.map((r) => ({
-    ...r,
-    ...quoteRoutes.find((q) => q.slug === r.slug),
-    label: routeTitle(r.title, lang),
-  }));
-  const classes = fleet
-    .filter((f) => f.priceKey)
-    .map((f) => ({ key: f.priceKey, vehicle: f.key, label: tr(f.name, lang).split(" – ")[0] }));
-  const vehicles = fleet.map((f) => ({
-    key: f.key,
-    name: tr(f.name, lang),
-    seats: f.seats,
-    pax: f.pax,
-    luggage: f.luggage,
-    priceKey: f.priceKey,
-    image: f.images[0],
-  }));
-  const placeList = Object.entries(places).map(([key, v]) => ({
-    key,
-    group: v.group,
-    name: tr(v.name, lang),
-  }));
+  const { fleetData, areas, routes, classes, vehicles, placeList } = carPageData(
+    { fleet, carAreas },
+    lang,
+  );
   const trustIcons = [Plane, Clock, Languages, Ticket];
 
   const serviceIcons = [Plane, Map, Signpost, CalendarCheck, Users, Globe2];

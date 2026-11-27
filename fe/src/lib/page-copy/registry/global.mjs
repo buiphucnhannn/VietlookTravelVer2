@@ -1,5 +1,6 @@
 /**
- * Giao diện trang — nhóm "Toàn website": Đầu & chân trang (hiện trên MỌI trang), Trang không tìm thấy (404).
+ * Giao diện trang — nhóm "Toàn website": Đầu & chân trang (hiện trên MỌI trang), Trang không tìm thấy (404),
+ * Khối du lịch không rào cản (dùng chung: Trang chủ, Giới thiệu, Tour nhóm & thiết kế riêng).
  * Cách khai báo: xem hướng dẫn đầu file ../registry.mjs. Chép đúng kiểu + max + count sang
  * be/src/constants/page-copy/global.js (máy chủ kiểm tra dữ liệu).
  *
@@ -16,6 +17,14 @@
 const text = (label, def, max = 160, extra) => ({ type: "text", label, def, max, ...extra });
 const para = (label, def, max = 600, extra) => ({ type: "para", label, def, max, ...extra });
 const image = (label, def, crop, extra) => ({ type: "image", label, def, crop, ...extra });
+const list = (label, def, count, item, extra) => ({
+  type: "list",
+  label,
+  def,
+  count,
+  item,
+  ...extra,
+});
 
 const GROUP = "Toàn website";
 
@@ -70,6 +79,33 @@ export const GLOBAL_PAGES = {
       text: para("Lời nhắn", "notFound.text", 300),
       homeButton: text("Nút về trang chủ", "common.backHome", 40),
       toursButton: text("Nút xem tour", "nav.allTours", 40),
+    },
+  },
+
+  // Khối dùng chung (components/ui/AccessibleTravel.js): khối lớn ở Trang chủ + Giới thiệu, dải gọn ở trang Tour
+  // nhóm (trang đó vẫn sửa riêng được chữ của dải trong thẻ "Tour nhóm & thiết kế riêng"; để trống = chữ ở đây).
+  // Biểu tượng 3 thẻ (xe lăn, tai, bàn tay) cố định theo vị trí. Không có ô ảnh → `cover` làm ảnh thẻ CMS.
+  access: {
+    name: "Khối du lịch không rào cản (người khuyết tật)",
+    group: GROUP,
+    path: "/#accessible-travel",
+    summary:
+      "Khối giới thiệu tour phục vụ người khuyết tật (người đẩy xe lăn, khách khiếm thính) — hiện ở Trang chủ, Giới thiệu và Tour nhóm & thiết kế riêng.",
+    cover: "/images/tours/v2/hue-14612105.jpg",
+    fields: {
+      eyebrow: text("Dòng chữ nhỏ trên tiêu đề", "access.eyebrow", 80),
+      title: text("Tiêu đề", "access.title", 120),
+      text: para("Đoạn giới thiệu", "access.text", 400),
+      cta: text("Nút (mở trang Lên kế hoạch)", "access.cta", 50),
+      // optional: mặc định để trống → website không hiện dòng này (câu mời đã có ở đoạn giới thiệu + nút)
+      note: para("Dòng nhỏ dưới nút (để trống = không hiện)", "access.note", 200, {
+        optional: true,
+      }),
+      points: list("3 thẻ bên phải", "access.points", 3, {
+        title: text("Tiêu đề thẻ", null, 80),
+        text: para("Mô tả thẻ", null, 200),
+      }),
+      bandText: para("Mô tả trong dải gọn (trang Tour nhóm)", "access.badgeLong", 400),
     },
   },
 };

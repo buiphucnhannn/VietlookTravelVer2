@@ -11,7 +11,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Check, ImageOff, Pencil, Plus, X } from "lucide-react";
+import { Accessibility, ArrowUpRight, Check, ImageOff, Pencil, Plus, X } from "lucide-react";
+import { ADMIN_BASE } from "@/config/urls.mjs";
 import { cloudinaryVideo, parseVideo, videoThumb } from "@/lib/video";
 import { cn, foldSearch } from "@/lib/utils";
 import Link from "../Link";
@@ -665,6 +666,36 @@ export function AutoNote({ children, href, linkText, dark, className }) {
         </Link>
       )}
     </p>
+  );
+}
+
+/**
+ * Ghi chú tại vị trí khối "Du lịch không rào cản" trên bản xem trước Trang chủ / Giới thiệu: khối dùng chung
+ * nhiều trang → sửa ở Giao diện trang → Toàn website → Khối du lịch không rào cản (khoá "access").
+ */
+export function SharedAccessNote() {
+  return (
+    <Sec name="Du lịch không rào cản" className="bg-white pb-6 sm:pb-7">
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-1.5 rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4 text-center sm:p-5">
+        <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-600">
+          <Accessibility className="size-[18px]" />
+        </span>
+        <p className="text-[13px] font-semibold text-slate-700">
+          Khối “Du lịch không rào cản” hiện ở đây
+        </p>
+        <p className="text-[11.5px] leading-relaxed text-slate-500">
+          Khối này dùng chung cho Trang chủ, Giới thiệu và Tour nhóm & thiết kế riêng — sửa một lần
+          ở Giao diện trang → Toàn website → Khối du lịch không rào cản.
+        </p>
+        <Link
+          href={`${ADMIN_BASE}/pages?key=access`}
+          className="mt-1 inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-[11.5px] font-semibold text-brand-700 transition hover:bg-brand-100"
+        >
+          Sửa khối du lịch không rào cản
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      </div>
+    </Sec>
   );
 }
 

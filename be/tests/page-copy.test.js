@@ -91,6 +91,9 @@ describe("giao diện trang — khai báo ô", () => {
     for (const key of PAGE_COPY_KEYS) {
       for (const l of LANGS) {
         const defs = R.pageDefaults(PAGE_COPY[key], { dict: dicts[l], data: DATA }, l);
+        // ô `optional` (vd. dòng nhỏ dưới nút khối không rào cản) được phép để trống: trống = website không hiện
+        for (const [k, spec] of Object.entries(PAGE_COPY[key].fields))
+          if (spec.optional) delete defs[k];
         const empty = [];
         const visit = (v, path) => {
           if (typeof v === "string") return void (v.trim() || empty.push(path));
@@ -236,6 +239,29 @@ describe("giao diện trang — nội dung mặc định & bản đã sửa", ()
     // ảnh trang trí thẻ (trang không có ô ảnh) phải là ảnh có sẵn của website
     for (const key of PAGE_COPY_KEYS)
       if (PAGE_COPY[key].cover) assert.match(PAGE_COPY[key].cover, /^\/images\/[\w/.-]+$/, key);
+  });
+
+  it("khối không rào cản (dùng chung): chưa sửa → y hệt từ điển; dòng nhỏ dưới nút mặc định trống", () => {
+    const access = PAGE_COPY.access;
+    assert.equal(access.group, PAGE_COPY.global.group);
+    for (const l of LANGS) {
+      const p = R.resolvePage(access, {}, ctx(l), l);
+      const a = dicts[l].access;
+      assert.equal(p.title, a.title);
+      assert.equal(p.text, a.text);
+      assert.equal(p.cta, a.cta);
+      assert.equal(p.bandText, a.badgeLong);
+      assert.equal(p.note, "");
+      assert.deepEqual(p.points, a.points);
+    }
+    const p = R.resolvePage(
+      access,
+      { note: { vi: "Gọi hotline để được tư vấn" } },
+      ctx("vi"),
+      "vi",
+    );
+    assert.equal(p.note, "Gọi hotline để được tư vấn");
+    assert.equal(parse("access", { note: { vi: "x".repeat(201) } }).success, false);
   });
 
   it("CMS: điền sẵn mặc định rồi lưu lại không đổi gì → không lưu ô nào", () => {

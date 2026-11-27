@@ -2,94 +2,87 @@
 
 import { ArrowRight, BookOpen, Car, CheckCircle2, Map, Stamp, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Img, ListOf, Sec, Txt } from "../blocks";
+import { Container } from "@/components/ui";
+import { ListOf, Photo, Txt } from "../blocks";
 import BrushHeroPreview from "./BrushHeroPreview";
+import { SitePage, Zone } from "./site-frame";
 
 /**
- * Bản xem trước trang Dịch vụ (app/[lang]/services/page.js) — thu nhỏ, đúng thứ tự trang thật.
- * Ảnh nền đầu trang = ảnh của 3 dịch vụ đầu (đổi ảnh ở thẻ dịch vụ bên dưới).
- * Thứ tự, biểu tượng và trang đích của 5 dịch vụ giữ cố định.
+ * Bản xem trước trang Dịch vụ — dựng y như app/[lang]/services/page.js.
+ * Ảnh đầu trang = ảnh của 3 dịch vụ đầu (đổi ảnh ở từng thẻ dịch vụ bên dưới).
  */
 
-const ICONS = [Users, Map, Car, Stamp, BookOpen];
-const TARGETS = [
-  "Tour nhóm & thiết kế riêng",
-  "Gói tour",
-  "Thuê xe",
-  "Visa & Fast-track",
-  "Cẩm nang du lịch",
-];
+const icons = [Users, Map, Car, Stamp, BookOpen];
 
-export default function ServicesPreview() {
+export default function ServicesPreview({ lang }) {
   return (
-    <>
-      {/* ========== Đầu trang ========== */}
-      <BrushHeroPreview images="images" title="heroTitle" subtitle="heroSubtitle" pills={false}>
-        <p className="mt-4 rounded-full bg-black/35 px-3 py-1 text-[11px] text-white/80">
-          Ảnh nền là ảnh của 3 dịch vụ đầu — đổi ảnh ở từng thẻ dịch vụ bên dưới
-        </p>
-      </BrushHeroPreview>
+    <SitePage lang={lang} path="/services">
+      <BrushHeroPreview images="images" title="heroTitle" subtitle="heroSubtitle" pills={false} />
 
-      {/* ========== 5 dịch vụ ========== */}
-      <Sec name="5 dịch vụ chính" className="bg-white">
-        <div className="mb-6 flex justify-center text-center">
-          <Txt
-            f="intro"
-            className="text-[11px] font-bold tracking-[0.18em] text-brand-700 uppercase sm:text-xs"
-          />
-        </div>
-        <div className="space-y-8">
-          <ListOf f="items">
-            {(i) => {
-              const Icon = ICONS[i] ?? Users;
-              const flip = i % 2 === 1;
-              return (
-                <div key={i} className="grid items-center gap-5 lg:grid-cols-2 lg:gap-10">
-                  <div className={cn("relative", flip && "lg:order-2")}>
-                    <span className="pointer-events-none absolute top-2 left-3 z-10 font-hand text-4xl leading-none text-white/90 drop-shadow-lg">
-                      0{i + 1}
-                    </span>
-                    <Img f={`images.${i}`} aspect="aspect-[16/10]" label={`Ảnh dịch vụ ${i + 1}`} />
-                  </div>
-                  <div className="flex min-w-0 flex-col items-start">
-                    <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
-                      <Icon className="size-5" />
-                    </span>
-                    <Txt
-                      f={`items.${i}.title`}
-                      className="mt-3 text-xl leading-tight font-bold tracking-tight text-ink sm:text-2xl"
-                    />
-                    <Txt
-                      f={`items.${i}.text`}
-                      className="mt-2 text-[13px] leading-relaxed text-ink/75"
-                    />
-                    <ul className="mt-3 space-y-1.5">
-                      <ListOf f={`points${i}`}>
-                        {(j) => (
-                          <li
-                            key={j}
-                            className="flex items-start gap-2 text-xs font-medium text-ink"
-                          >
-                            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand-500" />
-                            <Txt f={`points${i}.${j}`} />
-                          </li>
+      <Zone name="5 dịch vụ chính">
+        <section className="py-14 lg:py-[4.5rem]">
+          <Container>
+            <p className="mb-10 text-center text-xs font-bold tracking-[0.18em] text-brand-700 uppercase sm:text-sm lg:mb-14">
+              <Txt f="intro" />
+            </p>
+
+            <div className="space-y-14 lg:space-y-20">
+              <ListOf f="items">
+                {(i) => {
+                  const Icon = icons[i] ?? Map;
+                  const flip = i % 2 === 1;
+                  return (
+                    <div key={i} className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
+                      <div
+                        className={cn(
+                          "group relative block aspect-[16/10] overflow-hidden rounded-3xl bg-slate-100 shadow-xl",
+                          flip && "lg:order-2",
                         )}
-                      </ListOf>
-                    </ul>
-                    <span className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-600 px-4 text-xs font-semibold text-white shadow-md">
-                      <Txt f={`items.${i}.cta`} dark />
-                      <ArrowRight className="size-3.5 shrink-0" />
-                    </span>
-                    <span className="mt-1.5 text-[10.5px] text-slate-400">
-                      Nút dẫn tới trang {TARGETS[i]}
-                    </span>
-                  </div>
-                </div>
-              );
-            }}
-          </ListOf>
-        </div>
-      </Sec>
-    </>
+                      >
+                        <Photo
+                          f={`images.${i}`}
+                          sizes="(min-width: 1024px) 50vw, 100vw"
+                          pill="bottom-4 right-4"
+                        />
+                        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-950/40 to-transparent" />
+                        <span className="pointer-events-none absolute top-5 left-5 font-hand text-6xl leading-none text-white/90 drop-shadow-lg">
+                          0{i + 1}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
+                          <Icon className="size-6" />
+                        </span>
+                        <h2 className="heading-lg mt-5 text-ink">
+                          <Txt f={`items.${i}.title`} />
+                        </h2>
+                        <p className="mt-4 text-lg leading-relaxed whitespace-pre-line text-ink/75">
+                          <Txt f={`items.${i}.text`} />
+                        </p>
+                        <ul className="mt-6 space-y-2.5">
+                          <ListOf f={`points${i}`}>
+                            {(j) => (
+                              <li key={j} className="flex items-start gap-3 font-medium text-ink">
+                                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-brand-500" />
+                                <Txt f={`points${i}.${j}`} />
+                              </li>
+                            )}
+                          </ListOf>
+                        </ul>
+                        <span className="mt-8 inline-flex h-12 items-center gap-2 rounded-md bg-brand-600 px-6 font-semibold text-white shadow-md">
+                          <Txt f={`items.${i}.cta`} dark />
+                          <ArrowRight className="size-4" />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }}
+              </ListOf>
+            </div>
+          </Container>
+        </section>
+      </Zone>
+    </SitePage>
   );
 }

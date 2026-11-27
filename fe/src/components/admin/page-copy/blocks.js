@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState } from "react";
+import Image from "next/image";
 import { ArrowUpRight, Crop, ImagePlus, RotateCcw, Upload } from "lucide-react";
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,20 @@ export function Shown({ f }) {
   return fld.value || fld.def;
 }
 
+/**
+ * Hàm đọc chữ / ảnh đang dùng (chỉ để hiện, không sửa) theo đường dẫn: plain("heroImages.1"), plain("heroEyebrow").
+ * Dùng khi truyền vào component của website cần chuỗi thật (link ảnh, chữ lặp lại ở đường dẫn trang…).
+ */
+export function usePlain() {
+  const ctx = useContext(PageCopyContext);
+  return (path) => {
+    const keys = keysOf(path);
+    const raw = getIn(ctx?.state, keys);
+    if (specAt(ctx?.entry, path)?.type === "image") return raw || getIn(ctx?.defs.en, keys) || "";
+    return raw?.[ctx?.lang] || getIn(ctx?.defs[ctx?.lang], keys) || "";
+  };
+}
+
 /** Số phần tử của 1 danh sách (theo khai báo) */
 export function useListCount(path) {
   const ctx = useContext(PageCopyContext);
@@ -125,8 +140,9 @@ function EditedMark({ onReset, label, className }) {
  * 1 ô chữ trên bản xem trước — trông y như chữ trên trang (kiểu chữ ở `className`), bấm vào là gõ.
  * `dark`: chữ nằm trên nền tối / ảnh. Đoạn văn (kiểu "para") tự cho xuống dòng.
  * Xoá trống ô → hiện mờ câu mặc định (lưu lại = dùng câu mặc định).
+ * `placeholder`: chữ mờ khi ô trống mà không có câu mặc định (ô tuỳ chọn, vd. "Bấm để thêm…").
  */
-export function Txt({ f, className, dark, label }) {
+export function Txt({ f, className, dark, label, placeholder }) {
   const fld = useCopyField(f);
   if (!fld.spec) return null;
   const name = label ?? fld.spec.label;
@@ -134,7 +150,7 @@ export function Txt({ f, className, dark, label }) {
     <span className="group/f relative inline-grid max-w-full">
       <InlineText
         value={fld.value}
-        placeholder={fld.def || "…"}
+        placeholder={fld.def || placeholder || "…"}
         onChange={fld.set}
         label={name}
         multiline={fld.spec.type === "para"}
@@ -236,7 +252,7 @@ export function ImagePill({ f, className, title, floating = true }) {
   return (
     <div
       className={cn(
-        "group/f z-20 flex items-center gap-0.5 rounded-full bg-white/95 p-0.5 pl-2.5 shadow-lg ring-1 ring-slate-900/10 backdrop-blur",
+        "group/f z-20 flex [zoom:var(--pz,1)] items-center gap-0.5 rounded-full bg-white/95 p-0.5 pl-2.5 shadow-lg ring-1 ring-slate-900/10 backdrop-blur",
         floating ? "absolute" : "relative",
         className,
       )}
@@ -312,6 +328,86 @@ export function BgPhoto({ f, sizes = "1200px", className, fade, pill = "top-3 ri
   );
 }
 
+/**
+ * Ảnh phủ kín khung cha (cha cần `relative`), đúng như ảnh trên website + thanh đổi ảnh ở góc `pill`.
+ * `className`: lớp của lớp ảnh (vd. "-z-10"), `imgClassName`: lớp của ảnh (vd. "object-[50%_70%]").
+ */
+export function Photo({
+  f,
+  sizes = "100vw",
+  className,
+  imgClassName,
+  pill = "top-3 right-3",
+  title,
+}) {
+  const fld = useCopyField(f);
+  return (
+    <>
+      <span className={cn("absolute inset-0", className)}>
+        <Pic src={fld.value || fld.def} sizes={sizes} className={imgClassName} />
+      </span>
+      {pill && <ImagePill f={f} className={pill} title={title} />}
+    </>
+  );
+}
+
+/**
+ * Thay next/image trong component của website (vd. BrushHero ImageComponent): hiện được cả ảnh vừa chọn chưa lưu
+ * (blob:) — next/image không vẽ được loại ảnh này.
+ */
+export function PreviewImage({
+  src,
+  alt = "",
+  className,
+  style,
+  preload,
+  fetchPriority,
+  priority,
+  ...rest
+}) {
+  if (!src) return null;
+  if (String(src).startsWith("blob:"))
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- ảnh tạm trên máy, chưa có trên CDN
+      <img
+        src={src}
+        alt={alt}
+        className={cn("absolute inset-0 size-full", className)}
+        style={style}
+      />
+    );
+  return <Image src={src} alt={alt} className={className} style={style} {...rest} />;
+}
+
+/**
+ * Hàng nút đổi ảnh cho dải 1–3 ảnh ghép của đầu trang (BrushHero): mỗi nút nằm giữa ảnh tương ứng; điện thoại chỉ
+ * hiện ảnh đầu (như website). Đặt trong khối `relative`.
+ */
+export function HeroImagePills({ f, count = 3, className = "bottom-1.5", extraClassName }) {
+  return (
+    <div
+      className={cn("pointer-events-none absolute inset-x-0 z-20 flex gap-[3px] px-2", className)}
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "flex flex-1 justify-center",
+            i > 0 && cn("hidden md:flex", extraClassName),
+          )}
+        >
+          <ImagePill
+            f={`${f}.${i}`}
+            title={count > 1 ? `Ảnh ${i + 1}` : undefined}
+            floating={false}
+            className="pointer-events-auto"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ---------- Bố cục ---------- */
 
 export { Sec };
@@ -320,9 +416,27 @@ export { Sec };
 export const TONES = {
   light: "bg-gradient-to-b from-white/92 via-white/78 to-white/60",
   mist: "bg-gradient-to-b from-[#f2f7fb]/92 via-[#f2f7fb]/80 to-[#f2f7fb]/65",
+  side: "bg-gradient-to-r from-[#f4f6f8]/95 via-[#f4f6f8]/85 to-[#f4f6f8]/35",
   night: "bg-gradient-to-r from-[#1c2630]/92 via-[#1c2630]/70 to-[#1c2630]/35",
   dark: "bg-gradient-to-r from-brand-950/90 via-brand-950/70 to-brand-950/30",
 };
+
+/**
+ * Ảnh nền khối y như components/ui/BgImage.js (ảnh + lớp màu `tone`) + thanh đổi ảnh ở góc `pill`.
+ * Đặt làm con đầu tiên của section có `relative isolate overflow-hidden`.
+ */
+export function BgEdit({ f, tone = "light", pill = "top-3 right-3", title }) {
+  const fld = useCopyField(f);
+  return (
+    <>
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <Pic src={fld.value || fld.def} sizes="100vw" />
+        <div className={cn("absolute inset-0", TONES[tone])} />
+      </div>
+      <ImagePill f={f} className={pill} title={title} />
+    </>
+  );
+}
 
 /** Lặp theo số phần tử của danh sách `f`: children(i) */
 export function ListOf({ f, children }) {

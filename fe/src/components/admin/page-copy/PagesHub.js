@@ -7,7 +7,7 @@ import { Compass, Luggage, Ship } from "lucide-react"; // nhóm Tour & du thuy�
 import { BookOpenText, MapPinned } from "lucide-react"; // nhóm Trang danh sách
 import { PartyPopper, Route, UsersRound } from "lucide-react"; // nhóm Tour nhóm & lên kế hoạch
 import { Handshake, LayoutGrid, Mail } from "lucide-react"; // nhóm Thông tin & đối tác
-import { PanelsTopLeft, SearchX } from "lucide-react"; // nhóm Toàn website
+import { Accessibility, PanelsTopLeft, SearchX } from "lucide-react"; // nhóm Toàn website
 import { Files } from "lucide-react"; // thẻ Chữ chung trên trang chi tiết
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ const ICONS = {
   services: LayoutGrid,
   global: PanelsTopLeft,
   "not-found": SearchX,
+  access: Accessibility,
   detail: Files,
 }; // biểu tượng trên thẻ (trang mới: mặc định LayoutTemplate)
 

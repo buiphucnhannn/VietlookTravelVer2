@@ -17,7 +17,9 @@ import {
 import { useMutation } from "./hooks";
 import { AutoTranslate, useAutoFill } from "./translate";
 import { SeoFields } from "./ArticleEditor";
-import { AboutBody, MiniHero, MiniSite, PolicyBody } from "./pages/canvas";
+import { MiniHero, MiniSite } from "./pages/canvas";
+import { AboutBody } from "./pages/about";
+import { PolicyBody } from "./pages/policy";
 import {
   Button,
   LangTabs,
@@ -331,22 +333,27 @@ function PageCanvas({ page, initial, all = [], defaults }) {
   };
   const goBack = leaveTo(BASE);
 
-  // Trang chính sách: menu 4 chính sách; chưa chọn ảnh đầu trang thì website mượn ảnh của chính sách khác
-  const policies = PAGES.filter((p) => p.key !== "about").map((p) => {
-    const other = all.find((x) => x.key === p.key);
-    const active = p.key === page.key;
-    const title = active ? d.title : other?.title;
-    const href = `${BASE}?key=${p.key}`;
-    return {
-      key: p.key,
-      href,
-      icon: p.icon,
-      active,
-      title: anyLang(title, lang) || p.label,
-      image: active ? "" : (other?.image ?? ""),
-      onClick: leaveTo(href),
-    };
-  });
+  // Trang chính sách: menu 4 chính sách (xếp theo thứ tự website dùng: theo mã trang A→Z); chưa chọn ảnh đầu
+  // trang thì website mượn ảnh của chính sách khác (chính sách đầu tiên trong menu có ảnh)
+  const policies = PAGES.filter((p) => p.key !== "about")
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((p) => {
+      const other = all.find((x) => x.key === p.key);
+      const active = p.key === page.key;
+      const title = active ? d.title : other?.title;
+      const href = `${BASE}?key=${p.key}`;
+      return {
+        key: p.key,
+        href,
+        icon: p.icon,
+        active,
+        title: anyLang(title, lang) || p.label,
+        image: active ? "" : (other?.image ?? ""),
+        // trang đang ẩn với khách thì menu chính sách trên website không có trang đó
+        hidden: !active && other?.isActive === false,
+        onClick: leaveTo(href),
+      };
+    });
 
   const discard = async () => {
     const ok = await confirm({
@@ -398,13 +405,15 @@ function PageCanvas({ page, initial, all = [], defaults }) {
 
       <ReadOnlyArea readOnly={!canEdit} notice={false}>
         <div className="mt-3">
-          <MiniSite name={page.label}>
+          <MiniSite name={page.label} lang={lang}>
             <MiniHero
               d={d}
               lang={lang}
               set={set}
               fallbackImage={
-                isAbout ? ABOUT_HERO_IMAGES[0] : (policies.find((p) => p.image)?.image ?? "")
+                isAbout
+                  ? ABOUT_HERO_IMAGES[0]
+                  : (policies.find((p) => p.image && !p.hidden)?.image ?? "")
               }
               extraImages={isAbout && !d.image ? ABOUT_HERO_IMAGES.slice(1) : []}
             />

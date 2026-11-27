@@ -1,284 +1,406 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, ChevronRight, FileCheck2, Info, Send, Ticket } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  Clock3,
+  FileCheck2,
+  Info,
+  PlaneLanding,
+  PlaneTakeoff,
+  Plus,
+  Send,
+} from "lucide-react";
 import { ADMIN_BASE } from "@/config/urls.mjs";
-import { visaProcesses } from "@/data/visa";
+import { tr } from "@/i18n/config";
+import { airportCodes, airports, visaProcesses } from "@/data/visa";
+import { Container, SectionHeading } from "@/components/ui";
+import VisaForm from "@/components/forms/VisaForm";
+import { PackageGrid } from "@/components/visa/PackageGroups";
 import { PROCESS_ICONS } from "@/components/visa/ProcessTabs";
 import { cn } from "@/lib/utils";
-import { Pic } from "../../home/shared";
-import {
-  CtaButton,
-  FaqList,
-  ImagePill,
-  ListOf,
-  ModuleNote,
-  Sec,
-  SectionHead,
-  TONES,
-  Txt,
-  BgPhoto,
-  Shown,
-  useCopyField,
-} from "../blocks";
+import { subgrid } from "@/lib/subgrid";
+import { BgEdit, ListOf, Txt, usePlain } from "../blocks";
+import BrushHeroPreview from "./BrushHeroPreview";
+import { Auto, Loading, SitePage, Zone, useCatalog, useDict } from "./site-frame";
+import { FaqItem } from "./faq";
 
 /**
- * Bản xem trước trang Visa & Fast-track (app/[lang]/visa-fast-track/page.js) — thu nhỏ, đúng thứ tự trang thật.
- * Gói fast-track & giá, bảng loại visa: dữ liệu ở mục Visa & fast-track → khung ghi chú + link.
+ * Bản xem trước trang Visa & Fast-track — dựng y như app/[lang]/visa-fast-track/page.js.
+ * Thẻ gói fast-track & giá, bảng loại visa, form đặt: đúng component + dữ liệu website (sửa ở mục Visa & fast-track).
+ * Tên nhóm gói, tab quy trình: bấm tên tab để chuyển tab và sửa chữ.
  */
 
-const TABS = [
-  { key: "arrival", tab: "tabArrival", steps: "stepsArrival" },
-  { key: "departure", tab: "tabDeparture", steps: "stepsDeparture" },
-  { key: "evisa", tab: "tabEvisa", steps: "stepsEvisa" },
-];
-const GROUPS = [
-  ["groupArrival", "groupArrivalSub"],
-  ["groupDeparture", "groupDepartureSub"],
-  ["groupAddons", "groupAddonsSub"],
-];
+const VISA = `${ADMIN_BASE}/visa`;
+const groupIcons = { arrival: PlaneLanding, departure: PlaneTakeoff, addons: Plus };
+const GROUPS = {
+  arrival: ["groupArrival", "groupArrivalSub"],
+  departure: ["groupDeparture", "groupDepartureSub"],
+  addons: ["groupAddons", "groupAddonsSub"],
+};
+const TABS = { arrival: "tabArrival", departure: "tabDeparture", evisa: "tabEvisa" };
+const STEPS = { arrival: "stepsArrival", departure: "stepsDeparture", evisa: "stepsEvisa" };
 
-/** 1 ô ảnh của dải 3 ảnh đầu trang (điện thoại chỉ hiện ảnh đầu, như trang thật) */
-function HeroTile({ i }) {
-  const fld = useCopyField(`heroImages.${i}`);
+/** Tab nhóm gói + lưới thẻ gói (PackageGroups của website, tên nhóm sửa được) */
+function Packages({ packages, airports: ap, labels }) {
+  const [group, setGroup] = useState("arrival");
   return (
-    <div className={cn("relative h-full flex-1", i > 0 && "hidden md:block")}>
-      <Pic src={fld.value || fld.def} sizes="480px" />
+    <div>
+      <div className="mx-auto flex max-w-3xl scrollbar-none overflow-x-auto rounded-full bg-cream-100 p-1.5 ring-1 ring-sand-300/70">
+        {Object.keys(packages).map((g) => {
+          const Icon = groupIcons[g];
+          const on = g === group;
+          return (
+            <div
+              key={g}
+              role="tab"
+              aria-selected={on}
+              onClick={() => setGroup(g)}
+              className={cn(
+                "flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-semibold whitespace-nowrap transition sm:text-[0.95rem]",
+                on ? "bg-forest-700 text-white shadow" : "text-ink/70 hover:text-forest-700",
+              )}
+            >
+              <Icon className="size-4" />
+              <Txt f={GROUPS[g][0]} dark={on} />
+              <span
+                className={cn(
+                  "rounded-full px-1.5 text-xs",
+                  on ? "bg-white/20" : "bg-sand-300/60 text-ink/70",
+                )}
+              >
+                {packages[g].length}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-center text-sm text-muted">
+        <Txt f={GROUPS[group][1]} />
+      </p>
+      <Auto
+        href={VISA}
+        label="Gói & giá theo sân bay · sửa ở mục Visa & fast-track"
+        at="top-1 right-0"
+      >
+        <PackageGrid key={group} list={packages[group]} airports={ap} labels={labels} />
+      </Auto>
     </div>
   );
 }
 
-function ProcessSteps() {
-  const [tab, setTab] = useState(TABS[0].key);
-  const cur = TABS.find((t) => t.key === tab);
+/** Quy trình 5 bước (ProcessTabs của website): bấm tên tab để chuyển tab, chữ từng bước sửa được */
+function Process() {
+  const [tab, setTab] = useState("arrival");
   return (
-    <>
-      <div className="mx-auto flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-sand-300/70">
-        {TABS.map((t) => (
-          <span
-            key={t.key}
+    <div>
+      <div className="mx-auto flex w-fit gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-sand-300/70">
+        {Object.keys(TABS).map((k) => (
+          <div
+            key={k}
             role="tab"
-            aria-selected={t.key === tab}
-            onClick={() => setTab(t.key)}
+            aria-selected={k === tab}
+            onClick={() => setTab(k)}
             className={cn(
-              "cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
-              t.key === tab ? "bg-clay-500 text-white shadow" : "text-ink/70 hover:text-clay-600",
+              "cursor-pointer rounded-full px-5 py-2 text-sm font-semibold transition",
+              k === tab ? "bg-clay-500 text-white shadow" : "text-ink/70 hover:text-clay-600",
             )}
           >
-            <Txt f={t.tab} dark={t.key === tab} />
-          </span>
+            <Txt f={TABS[k]} dark={k === tab} />
+          </div>
         ))}
       </div>
-      <p className="mt-2 text-center text-[11px] text-slate-500">
-        Bấm tên tab để xem và sửa các bước của tab đó.
-      </p>
-      <ol className="relative mt-5 grid gap-4 md:grid-cols-5 md:gap-3">
+
+      <ol key={tab} className="relative mt-10 grid animate-fade-up gap-6 md:grid-cols-5 md:gap-4">
         <span
           aria-hidden
-          className="absolute top-6 right-[10%] left-[10%] hidden border-t-2 border-dashed border-sand-300 md:block"
+          className="absolute top-7 right-[10%] left-[10%] hidden border-t-2 border-dashed border-sand-300 md:block"
         />
-        <ListOf f={cur.steps}>
+        <ListOf f={STEPS[tab]}>
           {(i) => {
             const Icon = PROCESS_ICONS[visaProcesses[tab]?.[i]?.icon] || Send;
             return (
               <li
-                key={`${tab}-${i}`}
-                className="relative flex gap-3 md:flex-col md:items-center md:text-center"
+                key={i}
+                className="relative flex gap-4 md:row-span-3 md:grid md:grid-rows-subgrid md:justify-items-center md:gap-y-0 md:text-center"
               >
-                <span className="relative grid size-12 shrink-0 place-items-center rounded-full bg-forest-700 text-white shadow-lg ring-4 ring-cream-50">
-                  <Icon className="size-5" />
-                  <span className="absolute -top-1 -right-1 grid size-5 place-items-center rounded-full bg-amber-brand text-[10px] font-bold text-ink">
+                <span className="relative grid size-14 shrink-0 place-items-center rounded-full bg-forest-700 text-white shadow-lg ring-4 ring-cream-50">
+                  <Icon className="size-6" />
+                  <span className="absolute -top-1.5 -right-1.5 grid size-6 place-items-center rounded-full bg-amber-brand text-xs font-bold text-ink">
                     {i + 1}
                   </span>
                 </span>
-                <div className="flex min-w-0 flex-col items-start md:mt-3 md:items-center">
-                  <Txt f={`${cur.steps}.${i}.title`} className="text-[13px] font-bold text-ink" />
-                  <Txt
-                    f={`${cur.steps}.${i}.text`}
-                    className="mt-1 text-[11.5px] leading-relaxed text-muted"
-                  />
+                <div className="md:contents">
+                  <h3 className="text-base font-bold text-ink md:mt-4">
+                    <Txt f={`${STEPS[tab]}.${i}.title`} />
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted">
+                    <Txt f={`${STEPS[tab]}.${i}.text`} />
+                  </p>
                 </div>
               </li>
             );
           }}
         </ListOf>
       </ol>
-    </>
+    </div>
   );
 }
 
-export default function VisaPreview() {
-  return (
-    <>
-      {/* ========== Đầu trang: dải 3 ảnh + tiêu đề nét cọ ========== */}
-      <Sec name="Đầu trang" dark className="bg-brand-950 text-white sm:pb-12">
-        <div className="absolute inset-0 -z-10 flex gap-[3px] bg-brand-950">
-          {[0, 1, 2].map((i) => (
-            <HeroTile key={i} i={i} />
-          ))}
-        </div>
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/50 via-black/25 to-black/50" />
-        {/* nút đổi ảnh: mỗi ảnh 1 thanh nút, đặt ở chân đúng ô ảnh đó */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-2.5 z-20 flex gap-[3px] px-2">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className={cn("relative flex flex-1 justify-center", i > 0 && "hidden md:flex")}
-            >
-              <ImagePill
-                f={`heroImages.${i}`}
-                title={`Ảnh ${i + 1}`}
-                floating={false}
-                className="pointer-events-auto"
-              />
-            </div>
-          ))}
-        </div>
-        <div className="flex min-h-[260px] flex-col items-center justify-center pb-10 text-center sm:min-h-[300px]">
-          <p className="mb-3 flex max-w-full items-center gap-1 text-[11px] text-white/75">
-            Vietlook <ChevronRight className="size-3 shrink-0" />{" "}
-            <span className="truncate text-white">
-              <Shown f="heroTitle" />
-            </span>
-          </p>
-          <Txt
-            f="heroTitle"
-            dark
-            className="brush text-2xl font-extrabold tracking-tight drop-shadow-md [--brush-color:var(--color-clay-600)] sm:text-[2.4rem]"
-          />
-          <Txt
-            f="heroIntro"
-            dark
-            className="mt-4 max-w-2xl text-[13px] font-semibold drop-shadow-md sm:text-[15px]"
-          />
-          <Txt
-            f="heroTagline"
-            dark
-            className="mt-2 text-sm font-bold text-amber-brand drop-shadow"
-          />
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <CtaButton f="ctaFast" variant="clay" className="rounded-md" />
-            <CtaButton f="ctaTypes" variant="outline" className="rounded-md border-white/70" />
-          </div>
-        </div>
-      </Sec>
+export default function VisaPreview({ lang }) {
+  const dict = useDict(lang);
+  const catalog = useCatalog();
+  const plain = usePlain();
+  const v = dict?.visa;
+  const c = dict && { ...dict.common, fullName: dict.tour.fullName, phone: dict.tour.phone };
+  const groups = {
+    arrival: plain("groupArrival"),
+    departure: plain("groupDeparture"),
+    addons: plain("groupAddons"),
+  };
+  const localize = (pkg) => ({ ...pkg, label: tr(pkg.name, lang), text: tr(pkg.desc, lang) });
+  const packages =
+    catalog &&
+    Object.fromEntries(
+      Object.entries(catalog.fastTrackPackages).map(([g, list]) => [g, list.map(localize)]),
+    );
+  const levels = catalog?.allPackages().map(localize);
+  const ap = airportCodes
+    .map((code) => airports.find((a) => a.code === code))
+    .map((a) => ({ ...a, label: tr(a.name, lang) }));
+  const ready = dict && catalog;
 
-      {/* ========== Gói fast-track ========== */}
-      <Sec name="Gói fast-track" className="bg-cream-50">
-        <SectionHead title="fastTitle" subtitle="fastSubtitle" />
-        <div className="mb-3 grid gap-2.5 sm:grid-cols-3">
-          {GROUPS.map(([name, sub]) => (
-            <div
-              key={name}
-              className="flex flex-col items-start rounded-xl bg-white p-3 ring-1 ring-sand-300/70"
-            >
-              <Txt f={name} className="text-[13px] font-bold text-forest-700" />
-              <Txt f={sub} className="mt-0.5 text-[11px] text-muted" />
-            </div>
-          ))}
-        </div>
-        <ModuleNote
-          icon={Ticket}
-          title="Các gói fast-track và giá theo 5 sân bay"
-          text="Tên nhóm phía trên sửa ở đây; từng gói, mô tả và giá hiện tự động."
-          href={`${ADMIN_BASE}/visa`}
-          linkText="Sửa gói & giá ở mục Visa & fast-track"
-        />
-        <div className="mt-3 flex flex-col items-center text-center">
-          <Txt f="dashNote" className="text-[11px] text-muted" />
-          <span className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted">
-            <Info className="size-3.5 shrink-0" />
-            <Txt f="priceNote" />
+  return (
+    <SitePage lang={lang} path="/visa-fast-track">
+      <BrushHeroPreview images="heroImages" title="heroTitle" subtitle="heroIntro">
+        <p className="mt-3 text-lg font-bold text-amber-brand drop-shadow">
+          <Txt f="heroTagline" dark />
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <span className="inline-flex h-12 items-center rounded-md bg-clay-500 px-6 font-semibold shadow-lg">
+            <Txt f="ctaFast" dark />
+          </span>
+          <span className="inline-flex h-12 items-center rounded-md border-2 border-white/70 px-6 font-semibold">
+            <Txt f="ctaTypes" dark />
           </span>
         </div>
-      </Sec>
+      </BrushHeroPreview>
 
-      {/* ========== Quy trình 5 bước + lưu ý ========== */}
-      <Sec name="Quy trình 5 bước">
-        <BgPhoto f="processImage" fade={TONES.light} />
-        <SectionHead title="processTitle" subtitle="processSubtitle" />
-        <ProcessSteps />
-        <div className="mx-auto mt-7 grid max-w-4xl gap-3 sm:grid-cols-2">
-          <ListOf f="notes">
-            {(i) => (
-              <div
-                key={i}
-                className="flex gap-2.5 rounded-2xl border border-amber-brand/40 bg-amber-brand/10 p-3.5"
-              >
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-clay-600" />
-                <p className="text-xs leading-relaxed text-ink">
-                  <span className="mr-1 font-bold text-clay-600">
-                    <Txt f="notesTitle" />:
-                  </span>
-                  <Txt f={`notes.${i}`} />
-                </p>
-              </div>
+      {/* 1. Gói fast-track theo 3 nhóm */}
+      <Zone name="Gói fast-track">
+        <section className="bg-cream-50 py-14 lg:py-[4.5rem]">
+          <Container>
+            <SectionHeading title={<Txt f="fastTitle" />} subtitle={<Txt f="fastSubtitle" />} />
+            {ready ? (
+              <Packages
+                packages={packages}
+                airports={ap}
+                labels={{
+                  groups,
+                  priceByAirport: v.priceByAirport,
+                  perPax: v.perPax,
+                  book: v.bookPackage,
+                  popular: v.popular,
+                  contactPrice: v.contactPrice,
+                  from: dict.common.from,
+                }}
+              />
+            ) : (
+              <Loading className="min-h-[640px]" />
             )}
-          </ListOf>
-        </div>
-      </Sec>
-
-      {/* ========== Thuật ngữ ========== */}
-      <Sec name="Thuật ngữ" className="bg-cream-100">
-        <SectionHead title="termsTitle" subtitle="termsSubtitle" />
-        <dl className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          <ListOf f="terms">
-            {(i) => (
-              <div
-                key={i}
-                className="flex flex-col items-start rounded-2xl bg-white p-3.5 ring-1 ring-sand-300/70"
-              >
-                <Txt f={`terms.${i}.term`} className="text-[13px] font-bold text-forest-700" />
-                <Txt
-                  f={`terms.${i}.meaning`}
-                  className="mt-1 text-[11.5px] leading-relaxed text-ink/75"
-                />
-              </div>
-            )}
-          </ListOf>
-        </dl>
-      </Sec>
-
-      {/* ========== Các loại visa ========== */}
-      <Sec name="Các loại visa" className="bg-white">
-        <SectionHead title="typesTitle" />
-        <ModuleNote
-          icon={FileCheck2}
-          title="Bảng loại visa: thời gian lưu trú, thời gian xử lý, phí"
-          href={`${ADMIN_BASE}/visa`}
-          linkText="Sửa loại visa ở mục Visa & fast-track"
-        />
-        <span className="mt-3 flex items-start gap-1.5 text-xs text-muted">
-          <Info className="mt-0.5 size-3.5 shrink-0" />
-          <Txt f="typesNote" />
-        </span>
-      </Sec>
-
-      {/* ========== Form đặt + câu hỏi ========== */}
-      <Sec name="Đặt dịch vụ & câu hỏi" className="bg-cream-50">
-        <BgPhoto f="formImage" fade={TONES.mist} />
-        <div className="grid items-start gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-sand-300/70 sm:p-5">
-            <Txt f="formTitle" className="text-lg font-bold tracking-tight text-ink sm:text-xl" />
-            <div className="mt-3 space-y-2">
-              {[0, 1, 2, 3].map((i) => (
-                <span
-                  key={i}
-                  className="block h-7 rounded-lg bg-slate-100 ring-1 ring-slate-200/70"
-                />
-              ))}
-              <span className="block h-8 rounded-lg bg-clay-500/80" />
-            </div>
-            <p className="mt-2 text-center text-[10px] text-slate-400">
-              Khung form giữ nguyên như trên website
+            <p className="mt-4 text-center text-xs text-muted">
+              <Txt f="dashNote" />
             </p>
-          </div>
-          <div className="flex flex-col items-start">
-            <Txt f="faqTitle" className="mb-3 text-base font-bold text-ink sm:text-lg" />
-            <FaqList f="faq" className="w-full" />
-          </div>
-        </div>
-      </Sec>
-    </>
+            <p className="mt-6 flex items-center justify-center gap-2 text-sm text-muted">
+              <Info className="size-4" /> <Txt f="priceNote" />
+            </p>
+          </Container>
+        </section>
+      </Zone>
+
+      {/* 2. Quy trình 5 bước + 3. Hai lưu ý */}
+      <Zone name="Quy trình & lưu ý">
+        <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
+          <BgEdit f="processImage" tone="light" />
+          <Container>
+            <SectionHeading
+              title={<Txt f="processTitle" />}
+              subtitle={<Txt f="processSubtitle" />}
+            />
+            <Process />
+            <div className="mx-auto mt-12 grid max-w-4xl gap-4 sm:grid-cols-2">
+              <ListOf f="notes">
+                {(i) => (
+                  <div
+                    key={i}
+                    className="flex gap-3 rounded-2xl border border-amber-brand/40 bg-amber-brand/10 p-5"
+                  >
+                    <AlertTriangle className="mt-0.5 size-5 shrink-0 text-clay-600" />
+                    <p className="text-sm leading-relaxed text-ink">
+                      <span className="mr-1 font-bold text-clay-600">
+                        <Txt f="notesTitle" />:
+                      </span>
+                      <Txt f={`notes.${i}`} />
+                    </p>
+                  </div>
+                )}
+              </ListOf>
+            </div>
+          </Container>
+        </section>
+      </Zone>
+
+      {/* 4. Thuật ngữ chuẩn EN / ZH */}
+      <Zone name="Thuật ngữ">
+        <section className="bg-cream-100 py-14 lg:py-[4.5rem]">
+          <Container>
+            <SectionHeading title={<Txt f="termsTitle" />} subtitle={<Txt f="termsSubtitle" />} />
+            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ListOf f="terms">
+                {(i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "rounded-2xl bg-white p-5 ring-1 ring-sand-300/70",
+                      subgrid(2, "sm"),
+                    )}
+                  >
+                    <dt className="font-bold text-forest-700">
+                      <Txt f={`terms.${i}.term`} />
+                    </dt>
+                    <dd className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink/75">
+                      <Txt f={`terms.${i}.meaning`} />
+                    </dd>
+                  </div>
+                )}
+              </ListOf>
+            </dl>
+          </Container>
+        </section>
+      </Zone>
+
+      {/* 5. Các loại visa */}
+      <Zone name="Các loại visa">
+        <section className="py-14 lg:py-[4.5rem]">
+          <Container>
+            <SectionHeading title={<Txt f="typesTitle" />} />
+            {ready ? (
+              <Auto
+                href={VISA}
+                label="Loại visa, thời hạn & phí · sửa ở mục Visa & fast-track"
+                at="-top-3 right-4"
+              >
+                <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-sand-300/70">
+                  <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)] gap-6 border-b border-sand-300/60 bg-cream-100 px-6 py-3.5 text-xs font-bold tracking-[0.12em] text-forest-700 uppercase md:grid">
+                    <span>{v.typeCol}</span>
+                    <span>{v.stay}</span>
+                    <span>{v.processing}</span>
+                    <span>{v.fee}</span>
+                  </div>
+                  {catalog.visaTypes.map((x) => {
+                    const [feeMain, feeSub] = tr(x.fee, lang).split(" · ");
+                    return (
+                      <div
+                        key={x.key}
+                        className="grid items-start gap-3 border-t border-sand-300/50 px-6 py-5 first:border-0 md:grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)] md:gap-6"
+                      >
+                        <div className="flex gap-3">
+                          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cream-100 text-forest-700">
+                            <FileCheck2 className="size-5" />
+                          </span>
+                          <div>
+                            <p className="font-bold text-ink">{tr(x.name, lang)}</p>
+                            <p className="mt-0.5 text-sm leading-relaxed text-muted">
+                              {tr(x.note, lang)}
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <span className="mb-1 block text-xs text-muted md:hidden">{v.stay}</span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-cream-100 px-3 py-1 text-sm font-medium text-forest-700">
+                            <CalendarDays className="size-3.5" /> {tr(x.stay, lang)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="mb-1 block text-xs text-muted md:hidden">
+                            {v.processing}
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-brand/15 px-3 py-1 text-sm font-medium text-clay-600">
+                            <Clock3 className="size-3.5 shrink-0" /> {tr(x.processing, lang)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="mb-1 block text-xs text-muted md:hidden">{v.fee}</span>
+                          <p className="font-bold text-ink">{feeMain}</p>
+                          {feeSub && <p className="text-sm text-muted">{feeSub}</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Auto>
+            ) : (
+              <Loading className="min-h-[420px]" />
+            )}
+            <p className="mt-4 flex items-start gap-2 text-sm text-muted">
+              <Info className="mt-0.5 size-4 shrink-0" /> <Txt f="typesNote" />
+            </p>
+          </Container>
+        </section>
+      </Zone>
+
+      {/* 6. Form đặt + FAQ */}
+      <Zone name="Form đặt & câu hỏi">
+        <section className="relative isolate overflow-clip bg-cream-50 py-14 lg:py-[4.5rem]">
+          <BgEdit f="formImage" tone="mist" />
+          <Container className="grid items-start gap-10 lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-sand-300/70 sm:p-8">
+              <h2 className="mb-6 text-3xl font-bold tracking-tight text-ink">
+                <Txt f="formTitle" />
+              </h2>
+              {ready ? (
+                <Auto label="Form đặt giữ nguyên như website" at="-top-3 right-0">
+                  <VisaForm
+                    lang={lang}
+                    t={v}
+                    c={c}
+                    airports={ap}
+                    levels={levels}
+                    groupLabels={groups}
+                  />
+                </Auto>
+              ) : (
+                <Loading className="min-h-[560px]" />
+              )}
+            </div>
+            <div>
+              <h2 className="mb-5 text-2xl font-bold text-ink">
+                <Txt f="faqTitle" />
+              </h2>
+              <div className="space-y-3">
+                <ListOf f="faq">
+                  {(i) => (
+                    <FaqItem
+                      key={i}
+                      f={`faq.${i}`}
+                      className="group rounded-2xl bg-white ring-1 ring-sand-300/70"
+                      summaryClassName="flex cursor-pointer list-none items-center justify-between gap-3 p-5 font-semibold text-ink"
+                      qClassName=""
+                      answerClassName="px-5 pb-5 whitespace-pre-line text-muted"
+                      after={
+                        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-cream-100 text-clay-600 transition group-open:rotate-45">
+                          +
+                        </span>
+                      }
+                    />
+                  )}
+                </ListOf>
+              </div>
+            </div>
+          </Container>
+        </section>
+      </Zone>
+    </SitePage>
   );
 }

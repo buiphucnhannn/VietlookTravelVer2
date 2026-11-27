@@ -25,32 +25,9 @@ import {
   useUi,
   useUnsavedGuard,
 } from "./ui";
-import MiniHero from "./home/MiniHero";
+import HomeSitePreview from "./home/SitePreview";
 import { HomeImagesContext } from "./home/ImageSlot";
 import { autoFeaturedTours, autoLongTours } from "@/lib/tour-picks";
-import {
-  AboutSection,
-  B2BSection,
-  CustomTripSection,
-  GuideSection,
-  MapSection,
-  MonthsSection,
-  PartnerStripSection,
-  PlannerSection,
-  ProjectsSection,
-  ReviewsSection,
-  ServicesSection,
-  StatsSection,
-  StepsSection,
-  TrustSection,
-  WhySection,
-} from "./home/CopySections";
-import {
-  DestinationTiles,
-  FeaturedToursSection,
-  LongToursSection,
-  ThemeTiles,
-} from "./home/Sections";
 import { CopyContext, EMPTY_SLIDE, L, validBannerVideo, validImage } from "./home/shared";
 import { usePendingImages } from "./pendingImages";
 import { usePendingVideos } from "./pendingVideos";
@@ -474,61 +451,24 @@ export default function HomeSettingsPage() {
               </div>
             </div>
 
-            <MiniHero
-              banner={data.banner}
+            <HomeSitePreview
               lang={lang}
+              data={data}
+              set={set}
               setBanner={setBanner}
-              sel={slideIndex}
-              setSel={setSlideIndex}
-              reviewStats={defs?.reviewStats}
+              slideIndex={slideIndex}
+              setSlideIndex={setSlideIndex}
+              tours={tours}
+              toursStatus={toursStatus}
+              themes={themes}
+              themesStatus={themesStatus}
+              destinations={destinations}
+              destinationsStatus={destinationsStatus}
+              autoFeatured={autoFeatured}
+              autoLong={autoLong}
+              autoStats={autoStats}
+              searchTours={searchTours}
             />
-            <TrustSection />
-            <ServicesSection />
-            <FeaturedToursSection
-              options={tours}
-              status={toursStatus}
-              value={data.featuredTours}
-              onChange={(featuredTours) => set({ featuredTours })}
-              auto={autoFeatured}
-              onSearch={searchTours}
-            />
-            <B2BSection />
-            <MapSection />
-            <DestinationTiles
-              options={destinations}
-              status={destinationsStatus}
-              value={data.featuredDestinations}
-              onChange={(featuredDestinations) => set({ featuredDestinations })}
-            />
-            <StatsSection
-              values={data.statValues}
-              onValues={(statValues) => set({ statValues })}
-              auto={autoStats}
-            />
-            <LongToursSection
-              options={tours}
-              status={toursStatus}
-              value={data.longTours}
-              onChange={(longTours) => set({ longTours })}
-              auto={autoLong}
-              onSearch={searchTours}
-            />
-            <StepsSection />
-            <ThemeTiles
-              options={themes}
-              status={themesStatus}
-              value={data.homeThemes}
-              onChange={(homeThemes) => set({ homeThemes })}
-            />
-            <CustomTripSection lang={lang} />
-            <WhySection />
-            <PartnerStripSection />
-            <ProjectsSection />
-            <ReviewsSection />
-            <GuideSection />
-            <MonthsSection />
-            <PlannerSection />
-            <AboutSection />
           </div>
         </ReadOnlyArea>
 

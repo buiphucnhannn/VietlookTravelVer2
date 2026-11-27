@@ -1,28 +1,44 @@
 "use client";
 
-import { BgPhoto, Sec, Txt } from "../blocks";
+import Button from "@/components/ui/Button";
+import { Container } from "@/components/ui";
+import { Photo, Txt } from "../blocks";
+import { SitePage, Zone } from "./site-frame";
 
 /**
- * Bản xem trước Trang không tìm thấy (app/[lang]/not-found.js) — khách thấy khi mở link sai / trang đã xoá.
- * Số "404" lớn giữ cố định. Trang 404 ngoài mọi ngôn ngữ (global-not-found.js) là trang tĩnh 3 thứ tiếng.
+ * Bản xem trước Trang không tìm thấy — dựng y như app/[lang]/not-found.js (khách thấy khi mở link sai / trang đã
+ * xoá), có đầu & chân trang như website. Số "404" lớn giữ cố định.
  */
-export default function NotFoundPreview() {
+export default function NotFoundPreview({ lang }) {
   return (
-    <Sec name="Toàn trang" dark className="bg-brand-950 text-white">
-      <BgPhoto f="image" fade="bg-brand-950/65" title="Ảnh nền" />
-      <div className="flex min-h-[22rem] flex-col items-center justify-center py-10 text-center sm:min-h-[26rem]">
-        <p className="text-7xl font-extrabold tracking-tighter sm:text-8xl">404</p>
-        <Txt f="title" dark className="mt-3 text-2xl font-bold sm:text-3xl" />
-        <Txt f="text" dark className="mt-3 max-w-md text-sm text-white/80 sm:text-base" />
-        <div className="mt-7 flex flex-wrap justify-center gap-3">
-          <span className="inline-flex h-11 items-center rounded-md bg-clay-500 px-6 text-[0.95rem] font-semibold text-white shadow-sm">
-            <Txt f="homeButton" dark />
-          </span>
-          <span className="inline-flex h-11 items-center rounded-md border-2 border-white/80 px-6 text-[0.95rem] font-semibold text-white">
-            <Txt f="toursButton" dark />
-          </span>
-        </div>
-      </div>
-    </Sec>
+    <SitePage lang={lang} path="/page-not-found">
+      <Zone name="Trang 404" dark at="left-3 bottom-3">
+        <section className="relative isolate overflow-hidden bg-brand-950 text-white">
+          <Photo
+            f="image"
+            className="-z-10 [&_img]:opacity-35"
+            pill="bottom-3 right-3"
+            title="Ảnh nền"
+          />
+          <Container className="flex min-h-[min(70vh,720px)] flex-col items-center justify-center pt-36 pb-24 text-center">
+            <p className="text-8xl font-extrabold tracking-tighter">404</p>
+            <h1 className="mt-3 text-3xl font-bold">
+              <Txt f="title" dark />
+            </h1>
+            <p className="mt-3 max-w-md whitespace-pre-line text-white/80">
+              <Txt f="text" dark />
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Button href="#" variant="cta">
+                <Txt f="homeButton" dark />
+              </Button>
+              <Button href="#" variant="outline-white">
+                <Txt f="toursButton" dark />
+              </Button>
+            </div>
+          </Container>
+        </section>
+      </Zone>
+    </SitePage>
   );
 }

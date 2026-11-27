@@ -279,6 +279,7 @@ const zh = {
     mapTitle: "越南 · 从北到南",
     mapSubtitle: "点击地点，查看线路。",
     mapFeatured: "精选线路",
+    mapHint: "点击地图上的圆点，查看各个目的地",
     heritageEyebrow: "数说 Vietlook",
     heritageTitle: "深耕越南17年 · 从北到南",
     heritageText: "每一次出行背后的真实数据。",
@@ -1014,7 +1015,7 @@ const zh = {
         text: "行程安排可服务残障旅客。",
       },
     ],
-    note: "预订时请告诉我们您的需求。",
+    note: "",
     cta: "告诉我们您的需求",
     badge: "专人推轮椅·服务听障旅客",
     badgeLong:

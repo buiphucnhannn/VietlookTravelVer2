@@ -359,18 +359,27 @@ export function HeaderStatic(props) {
   return <HeaderView {...props} pathname={null} />;
 }
 
-function HeaderView({ lang, nav, labels, contact, pathname }) {
+/**
+ * Bản xem trước trong CMS (Giao diện trang): header đúng như ở đầu trang `pathname` — không đổi nền khi khu quản trị
+ * cuộn (`frozen`). Website không dùng.
+ */
+export function HeaderPreview(props) {
+  return <HeaderView {...props} frozen />;
+}
+
+function HeaderView({ lang, nav, labels, contact, pathname, frozen }) {
   const [openKey, setOpenKey] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSection, setMobileSection] = useState(null);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
+    if (frozen) return;
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [frozen]);
   const closeTimer = useRef(null);
 
   // Đóng menu khi chuyển trang (cập nhật state ngay trong render theo khuyến nghị của React)

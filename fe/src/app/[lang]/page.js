@@ -147,6 +147,7 @@ export default async function HomePage({ params }) {
             lang={lang}
             labels={{
               featured: dict.home.mapFeatured,
+              hint: dict.home.mapHint,
               discover: dict.home.gridDiscover,
               tours: dict.home.gridTours,
               from: dict.common.from,

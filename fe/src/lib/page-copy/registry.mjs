@@ -26,6 +26,7 @@
  *       "/images/…" hoặc [ … ]   → giá trị cố định (ảnh có sẵn, mảng ảnh…)
  *     Danh sách: list(nhãn, nguồn, sốPhầnTử, ô) — ô là 1 kiểu (danh sách chữ / ảnh) hoặc object nhiều ô
  *     ({ title: text(…), text: para(…) }). Ô con lấy mặc định theo nguồn[i][tênÔ] (hoặc `from: "tênKhác"`).
+ *     Ô được phép trống (vd. dòng ghi chú phụ, trống = trang không hiện dòng đó): thêm `{ optional: true }`.
  *  2. Chép đúng các ô (kiểu + max + count) sang be/src/constants/page-copy.js (máy chủ kiểm tra dữ liệu).
  *     `npm test` trong be/ báo lỗi nếu 2 bên lệch nhau (tests/page-copy.test.js).
  *  3. Trang công khai: `const p = await getPageText("<khoá>", lang, dict)` (lib/page-copy/server.js) rồi dùng
@@ -47,7 +48,7 @@ import { PLANNING_PAGES } from "./registry/planning.mjs"; // Tour nhóm, Lên k�
 import { TOURS_PAGE_COPY } from "./registry/tours.mjs"; // Tất cả tour, du thuyền, Gói tour
 import { LISTING_PAGES } from "./registry/listing.mjs"; // Tất cả điểm đến, Cẩm nang du lịch
 import { DETAIL_PAGES } from "./registry/detail.mjs"; // Chữ chung trên trang chi tiết
-import { GLOBAL_PAGES } from "./registry/global.mjs"; // Đầu & chân trang, Trang 404
+import { GLOBAL_PAGES } from "./registry/global.mjs"; // Đầu & chân trang, Trang 404, Khối không rào cản
 
 /* ---------- Kiểu ô ---------- */
 

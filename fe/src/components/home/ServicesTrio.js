@@ -14,8 +14,14 @@ import { DEFAULT_HOME_IMAGES } from "./images";
  * Visa/Fast-track – nhân viên cầm biển "VIETLOOK TRAVEL – WELCOME" tại sân bay.
  * Ảnh đã cắt sẵn đúng khung 16:10 của thẻ và phóng to/làm nét (public/images/services/svc-*.webp).
  * - Cả thẻ là 1 liên kết lớn; nút hành động màu đỏ thương hiệu luôn hiển thị.
+ * - `imageSlot(key)`: chỉ bản xem trước trong CMS (nút đổi ảnh trên từng thẻ) — website không truyền.
  */
-export default function ServicesTrio({ lang, dict, images = DEFAULT_HOME_IMAGES.services }) {
+export default function ServicesTrio({
+  lang,
+  dict,
+  images = DEFAULT_HOME_IMAGES.services,
+  imageSlot,
+}) {
   const s = dict.home.services;
   // Ảnh: nhân viên thay được trong CMS → Trang chủ (images = homeImages(home.images).services)
   const items = [
@@ -78,6 +84,8 @@ export default function ServicesTrio({ lang, dict, images = DEFAULT_HOME_IMAGES.
                       </span>
                       0{i + 1}
                     </span>
+                    {/* CMS → Trang chủ: nút đổi ảnh phủ lên ảnh (chỉ bản xem trước truyền imageSlot) */}
+                    {imageSlot?.(it.key)}
                   </div>
                   <h3 className="px-6 pt-6 text-xl font-bold tracking-tight text-ink group-hover:text-sun-600 sm:text-[1.35rem]">
                     {data.title}

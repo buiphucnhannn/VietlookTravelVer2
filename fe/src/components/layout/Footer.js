@@ -232,8 +232,8 @@ export default function Footer({ lang, dict, policies, info = DEFAULT_CONTACT_VI
         </Container>
 
         <Container className="relative grid gap-8 pt-7 pb-20 sm:grid-cols-2 sm:pb-16 lg:grid-cols-4">
-          {columns.map((col) => (
-            <div key={col.title}>
+          {columns.map((col, i) => (
+            <div key={i}>
               <h3 className="relative mb-5 pb-2.5 text-base font-bold tracking-wide text-brand-700 uppercase after:absolute after:bottom-0 after:left-0 after:h-[3px] after:w-8 after:rounded-full after:bg-sun-500">
                 {col.title}
               </h3>

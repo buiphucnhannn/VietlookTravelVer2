@@ -7,7 +7,15 @@ import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { fillReviewStats, normalizeReviewStats } from "@/lib/review-stats";
-import { countEdited, fillPage, pageDefaults, stripPage } from "@/lib/page-copy/resolve.mjs";
+import {
+  countEdited,
+  fillPage,
+  pageDefaults,
+  resolvePage,
+  stripPage,
+} from "@/lib/page-copy/resolve.mjs";
+import { pageCopyOf } from "@/lib/page-copy/registry.mjs";
+import { ACCESS_LAYERED, withAccessCopy } from "@/lib/page-copy/access.mjs";
 import { loadDataSources } from "@/lib/page-copy/sources";
 import Link from "../Link";
 import { useMutation } from "../hooks";
@@ -35,22 +43,30 @@ const LANG_NAME = { en: "tiếng Anh", zh: "tiếng Trung", vi: "tiếng Việt"
 /**
  * Nội dung mặc định của trang theo 3 ngôn ngữ (đúng như website đang hiện khi chưa ai sửa):
  * từ điển giao diện (đã điền điểm & số lượt đánh giá đang dùng) + file dữ liệu + ảnh có sẵn.
+ * Trang Tour nhóm: ô dải "không rào cản" chưa sửa đi theo khối chung (khoá "access") — giống website.
  */
-async function loadDefaults(entry) {
-  const [en, zh, vi, site, data] = await Promise.all([
+async function loadDefaults(pageKey, entry) {
+  const layered = ACCESS_LAYERED.includes(pageKey);
+  const [en, zh, vi, site, data, accessDoc] = await Promise.all([
     import("@/i18n/dictionaries/en"),
     import("@/i18n/dictionaries/zh"),
     import("@/i18n/dictionaries/vi"),
     api("/public/site").catch(() => null),
     loadDataSources(entry),
+    layered ? api("/settings/page-copy/access").catch(() => null) : null,
   ]);
   const stats = normalizeReviewStats(site?.data?.reviewStats);
   const dicts = { en: en.default, zh: zh.default, vi: vi.default };
   return Object.fromEntries(
-    Object.entries(dicts).map(([l, d]) => [
-      l,
-      pageDefaults(entry, { dict: fillReviewStats(d, stats, l), data }, l),
-    ]),
+    Object.entries(dicts).map(([l, d]) => {
+      let dict = fillReviewStats(d, stats, l);
+      if (layered)
+        dict = withAccessCopy(
+          dict,
+          resolvePage(pageCopyOf("access"), accessDoc?.data?.data, { dict }, l),
+        );
+      return [l, pageDefaults(entry, { dict, data }, l)];
+    }),
   );
 }
 
@@ -60,7 +76,7 @@ export default function PageCopyEditor({ pageKey, entry }) {
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
     let alive = true;
-    Promise.all([api(`/settings/page-copy/${pageKey}`), loadDefaults(entry)])
+    Promise.all([api(`/settings/page-copy/${pageKey}`), loadDefaults(pageKey, entry)])
       .then(([r, defs]) => alive && setState({ loading: false, doc: r.data ?? {}, defs }))
       .catch((err) => alive && setState({ loading: false, error: errorMessage(err) }));
     return () => {
@@ -275,7 +291,7 @@ function Editor({ pageKey, entry, doc, defs }) {
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-500">
             {canEdit
-              ? "Bản xem trước theo đúng thứ tự trên website. Bấm vào chữ để sửa, dùng nút trên ảnh để đổi ảnh, rồi bấm Lưu."
+              ? "Bản xem trước giống hệt trang trên website (thu nhỏ vừa khung). Bấm vào chữ để sửa, dùng nút trên ảnh để đổi ảnh, rồi bấm Lưu. Phần có nhãn “Tự động” lấy từ mục khác — bấm nhãn để sang mục đó sửa."
               : "Bạn đang ở chế độ chỉ xem."}
             {updatedAt && ` Lưu lần cuối ${fmtDateTime(updatedAt)}.`}
           </p>
@@ -339,12 +355,13 @@ function Editor({ pageKey, entry, doc, defs }) {
             {dirty ? (
               <Badge tone="amber">Chưa lưu</Badge>
             ) : (
-              <span className="flex items-center gap-1.5 text-slate-500">
+              <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-slate-500">
                 <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
                 Đã lưu mọi thay đổi
               </span>
             )}
-            <span className="truncate text-slate-400">
+            {/* khung hẹp (vd. 1024px có thanh menu): bỏ dòng phụ, giữ "Đã lưu" trên 1 dòng */}
+            <span className="truncate text-slate-400 max-xl:hidden">
               {edited ? `· Đã chỉnh sửa ${edited} mục` : "· Đang dùng nội dung mặc định"}
             </span>
           </div>

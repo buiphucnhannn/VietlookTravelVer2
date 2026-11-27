@@ -302,6 +302,7 @@ const vi = {
     mapTitle: "Việt Nam, từ Bắc vào Nam",
     mapSubtitle: "Chạm vào một địa điểm để xem tour.",
     mapFeatured: "Tour nổi bật",
+    mapHint: "Bấm vào chấm trên bản đồ để xem từng điểm đến",
     heritageEyebrow: "Vietlook qua những con số",
     heritageTitle: "17 năm hoạt động, từ Bắc vào Nam",
     heritageText: "Những con số thật phía sau mỗi chuyến đi chúng tôi tổ chức.",
@@ -1226,7 +1227,7 @@ const vi = {
         text: "Tour được sắp xếp để phục vụ người khuyết tật.",
       },
     ],
-    note: "Hãy cho chúng tôi biết nhu cầu khi đặt tour.",
+    note: "",
     cta: "Cho chúng tôi biết nhu cầu",
     badge: "Có người đẩy xe lăn, phục vụ khách khiếm thính",
     badgeLong:

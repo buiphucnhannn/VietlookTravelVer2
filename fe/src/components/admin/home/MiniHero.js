@@ -9,17 +9,14 @@ import {
   HelpCircle,
   ImageIcon,
   ImagePlus,
-  MapPin,
   Monitor,
   Plus,
-  Search,
   Smartphone,
-  Star,
   Trash2,
   Upload,
 } from "lucide-react";
 import { errorMessage, isAbort } from "@/lib/api";
-import { REVIEW_STATS_FALLBACK, formatScore } from "@/lib/review-stats";
+
 import {
   canonicalVideo,
   cloudinaryVideo,
@@ -63,18 +60,11 @@ import {
 } from "./shared";
 
 /**
- * Banner thu nhỏ: chữ sửa ngay trên ảnh nền; bên dưới là dải slide (kéo để đổi thứ tự) và
- * phần video / ảnh của slide đang chọn.
+ * Thanh sửa banner (ngay dưới banner của bản xem trước — banner dựng bằng đúng component website, chữ sửa ngay trên
+ * banner): mô tả ngắn cho điện thoại, dải slide (kéo để đổi thứ tự) và phần video / ảnh của slide đang chọn.
  * `sel` = vị trí slide đang chọn (cha giữ để có thể nhảy tới slide cần sửa khi lưu).
  */
-export default function MiniHero({
-  banner,
-  lang,
-  setBanner,
-  sel,
-  setSel,
-  reviewStats = REVIEW_STATS_FALLBACK,
-}) {
+export default function MiniHero({ banner, lang, setBanner, sel, setSel }) {
   const { confirm } = useUi();
   const slides = banner.slides;
   const cur = Math.min(sel, slides.length - 1);
@@ -122,99 +112,9 @@ export default function MiniHero({
   };
 
   return (
-    <section>
-      {/* ----- Banner ----- */}
-      <div className="relative isolate flex min-h-[460px] items-center justify-center overflow-hidden bg-gradient-to-br from-brand-950 via-brand-800 to-brand-600 text-white sm:min-h-[540px]">
-        <Pic src={slideBackground(slide)} sizes="1280px" className="-z-10" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/35 via-black/20 to-black/55" />
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.3),transparent_65%)]" />
-
-        <div className="flex w-full flex-col items-center px-5 pt-10 pb-16 text-center sm:px-10">
-          <InlineText
-            {...loc("eyebrow", "Dòng chữ nhỏ")}
-            label="Dòng chữ nhỏ phía trên tiêu đề"
-            className="text-[0.62rem] font-bold tracking-[0.2em] text-amber-brand uppercase sm:text-xs sm:tracking-[0.35em]"
-          />
-          <InlineText
-            {...loc("titleTop", "Tiêu đề dòng 1")}
-            label="Tiêu đề dòng 1"
-            className="mt-3 text-2xl leading-none font-extrabold tracking-[-0.04em] [text-shadow:0_4px_12px_rgba(0,0,0,.35)] sm:text-4xl"
-          />
-          <InlineText
-            {...loc("titleMain", "Tiêu đề dòng 2")}
-            label="Tiêu đề dòng 2 (chữ lớn)"
-            className="mt-2 text-[2.9rem] leading-[0.95] font-extrabold tracking-[-0.06em] [text-shadow:0_6px_18px_rgba(0,0,0,.4)] sm:text-[5.25rem]"
-          />
-          <InlineText
-            {...loc("description", "Mô tả ngắn gọn về công ty, hiện dưới tiêu đề")}
-            label="Mô tả dưới tiêu đề"
-            multiline
-            className="mt-4 max-w-xl text-[0.8rem] leading-snug text-white/90 sm:text-[0.95rem] sm:leading-normal"
-          />
-
-          {/* Ô tìm kiếm + huy hiệu đánh giá của trang thật — chỉ để minh hoạ */}
-          <div
-            aria-hidden
-            className="pointer-events-none mt-6 flex w-full max-w-md items-center gap-2 rounded-xl bg-white/95 p-1.5 text-left text-[0.7rem] text-slate-400 shadow-xl select-none"
-          >
-            <span className="flex flex-1 items-center gap-1.5 px-2">
-              <Search className="size-3.5 text-brand-700" /> Tìm tour…
-            </span>
-            <span className="hidden flex-1 items-center gap-1.5 border-l border-slate-200 px-2 sm:flex">
-              <MapPin className="size-3.5 text-brand-700" /> Điểm đến
-            </span>
-            <span className="grid h-7 place-items-center rounded-lg bg-sun-500 px-3 font-semibold text-white">
-              Tìm
-            </span>
-          </div>
-          <div
-            aria-hidden
-            className="pointer-events-none mt-4 flex items-center gap-6 text-[0.7rem] font-semibold text-white/90 select-none [text-shadow:0_1px_6px_rgba(0,0,0,.6)]"
-          >
-            <span className="flex items-center gap-1.5">
-              Google <Star className="size-3 fill-amber-brand text-amber-brand" />
-              {formatScore(reviewStats.google.rating)}
-            </span>
-            <span className="flex items-center gap-1.5">
-              Tripadvisor <Star className="size-3 fill-[#34e0a1] text-[#34e0a1]" />
-              {formatScore(reviewStats.tripadvisor.rating)}
-            </span>
-          </div>
-        </div>
-
-        {/* Chú thích của slide đang chọn */}
-        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 px-5 pb-3.5 text-center">
-          {slide ? (
-            <InlineText
-              value={slide.caption[lang] ?? ""}
-              placeholder={
-                anyLang({ ...slide.caption, [lang]: "" }) || "Chú thích ảnh, ví dụ: Vịnh Hạ Long"
-              }
-              onChange={(v) => setSlide({ caption: { ...slide.caption, [lang]: v } })}
-              label={`Chú thích của slide ${cur + 1}`}
-              className="text-xs font-semibold tracking-wide text-white/90 [text-shadow:0_1px_6px_rgba(0,0,0,.6)] sm:text-[0.8rem]"
-            />
-          ) : (
-            <p className="text-xs text-white/75">
-              Chưa có slide nào — trang chủ đang dùng video mặc định.
-            </p>
-          )}
-          {slides.length > 1 && (
-            <div className="flex gap-1.5" aria-hidden>
-              {slides.map((_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "h-1 rounded-full transition-all",
-                    i === cur ? "w-5 bg-white" : "w-1.5 bg-white/45",
-                  )}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
+    // Nằm ngay dưới banner của bản xem trước (banner dựng bằng đúng component website — chữ sửa ngay trên banner).
+    // Bù lại độ thu nhỏ của khung xem trước để các nút giữ cỡ thật.
+    <section className="relative z-20 [zoom:var(--pz,1)] font-sans text-slate-900">
       {/* ----- Mô tả ngắn cho điện thoại ----- */}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 bg-brand-950 px-4 py-3 text-white sm:px-6">
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tracking-wide text-amber-brand uppercase">
@@ -257,6 +157,11 @@ export default function MiniHero({
           </button>
         )}
         <span className="ml-auto shrink-0 pl-2 text-right text-[11px] leading-relaxed text-white/55">
+          {!slides.length && (
+            <span className="block text-white/75">
+              Chưa có slide — banner đang dùng video có sẵn của website.
+            </span>
+          )}
           {slides.length}/{MAX_SLIDES} slide
           {slides.length > 1 && <span className="block">Kéo thả để sắp xếp</span>}
         </span>
@@ -273,6 +178,20 @@ export default function MiniHero({
                 được.
               </span>
             </p>
+            <label className="flex min-w-0 flex-1 basis-64 items-center gap-2 text-xs text-slate-500">
+              <span className="shrink-0 font-semibold text-slate-700">Chú thích:</span>
+              <InlineText
+                value={slide.caption[lang] ?? ""}
+                placeholder={
+                  anyLang({ ...slide.caption, [lang]: "" }) ||
+                  "Ví dụ: Vịnh Hạ Long (hiện ở chân banner)"
+                }
+                onChange={(v) => setSlide({ caption: { ...slide.caption, [lang]: v } })}
+                label={`Chú thích của slide ${cur + 1}`}
+                light
+                className="min-w-0 text-sm text-slate-800"
+              />
+            </label>
             <Button variant="danger" size="sm" icon={Trash2} onClick={removeSlide}>
               Xoá slide
             </Button>

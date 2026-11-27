@@ -58,8 +58,9 @@ export function WhyUs({ dict }) {
  * không còn; nền tươi sáng: biển Nha Trang xanh ngọc phủ kem),
  * 2 khung ảnh viền cọ đổi ảnh luân phiên + 2 huy hiệu số liệu; bên phải thông điệp B2B rõ ràng:
  * đối tượng (agencies, OTA, MICE), giá net, báo giá 15–30 phút (giờ hành chính).
+ * `frameSlot(group)`: chỉ bản xem trước trong CMS (nút đổi ảnh trên 2 khung) — website không truyền.
  */
-export function B2BBlock({ lang, dict, images = DEFAULT_HOME_IMAGES }) {
+export function B2BBlock({ lang, dict, images = DEFAULT_HOME_IMAGES, frameSlot }) {
   const t = dict.home;
   const northImages = images.b2bNorth;
   const centralSouthImages = images.b2bSouth;
@@ -99,6 +100,15 @@ export function B2BBlock({ lang, dict, images = DEFAULT_HOME_IMAGES }) {
             startDelay={2400}
             className="right-0 bottom-0 h-[60%] w-[64%] animate-float"
           />
+          {/* CMS → Trang chủ: nút đổi ảnh của 2 khung (chỉ bản xem trước truyền frameSlot) */}
+          {frameSlot && (
+            <>
+              <div className="absolute top-0 left-0 h-[66%] w-[70%]">{frameSlot("b2bNorth")}</div>
+              <div className="absolute right-0 bottom-0 h-[60%] w-[64%]">
+                {frameSlot("b2bSouth")}
+              </div>
+            </>
+          )}
           {/* Huy hiệu: thời gian báo giá */}
           <div className="absolute bottom-[8%] left-[4%] flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-ink shadow-xl">
             <Clock4 className="size-8 text-sun-500" />

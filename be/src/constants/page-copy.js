@@ -16,7 +16,7 @@ import { PLANNING_SCHEMA } from "./page-copy/planning.js"; // Tour nhóm, Lên k
 import { TOURS_SCHEMA } from "./page-copy/tours.js"; // Tất cả tour, du thuyền, Gói tour
 import { LISTING_SCHEMA } from "./page-copy/listing.js"; // Tất cả điểm đến, Cẩm nang du lịch
 import { DETAIL_SCHEMA } from "./page-copy/detail.js"; // Chữ chung trên trang chi tiết
-import { GLOBAL_SCHEMA } from "./page-copy/global.js"; // Đầu & chân trang, Trang 404
+import { GLOBAL_SCHEMA } from "./page-copy/global.js"; // Đầu & chân trang, Trang 404, Khối không rào cản
 
 const text = (max) => ({ type: "text", max });
 const para = (max) => ({ type: "para", max });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Clock, MapPin } from "lucide-react";
@@ -9,27 +9,92 @@ import { VN_PATH, VN_VIEWBOX, archipelagos, vnProject } from "@/data/vietnam-map
 
 const W = 520;
 const H = 640;
-// Vị trí nhãn quanh ghim để không đè nhau (l = trái, r = phải; dy = lệch dọc px)
-const side = {
-  sapa: ["l", 0],
-  "ha-giang": ["l", -4],
-  "cao-bang": ["r", -4],
-  hanoi: ["r", -12],
-  "halong-bay": ["r", 4],
-  "ninh-binh": ["r", 8],
-  "moc-chau": ["l", 6],
-  "quang-binh": ["r", 0],
-  hue: ["l", 0],
-  "da-nang": ["r", -6],
-  "hoi-an": ["r", 10],
-  "nha-trang": ["r", 0],
-  dalat: ["l", 0],
-  "mui-ne": ["r", 4],
-  "ho-chi-minh-city": ["l", -6],
-  "vung-tau": ["r", 10],
-  "mekong-delta": ["l", 10],
-  "phu-quoc": ["l", 0],
+// Bản đồ hiện tối đa 460px → 1 đơn vị viewBox ≈ 0,885px (nhãn có cỡ chữ cố định theo px)
+const PX = 460 / W;
+
+/**
+ * Điểm đến CHÍNH luôn ghi tên trên bản đồ; điểm khác chỉ là chấm — rê chuột / bấm / đang chọn mới hiện tên
+ * (bản đồ nhỏ, ghi hết ~35 tên thì chồng chéo khó đọc). Thứ tự = ưu tiên chỗ đặt nhãn.
+ */
+const MAJOR = [
+  "hanoi",
+  "halong-bay",
+  "sapa",
+  "ha-giang",
+  "ninh-binh",
+  "cao-bang",
+  "hue",
+  "hoi-an",
+  "da-nang",
+  "ho-chi-minh-city",
+  "mekong-delta",
+  "phu-quoc",
+  "nha-trang",
+  "dalat",
+  "quang-binh",
+  "quy-nhon",
+  "con-dao",
+];
+// Phía ưu tiên của nhãn (l = trái, r = phải) — miền Bắc / bờ biển miền Trung ghi ra biển cho thoáng
+const PREFER = {
+  sapa: "l",
+  "ha-giang": "l",
+  "moc-chau": "l",
+  "son-la": "l",
+  "dien-bien": "l",
+  hue: "l",
+  dalat: "l",
+  "ho-chi-minh-city": "l",
+  "mekong-delta": "l",
+  "phu-quoc": "l",
 };
+
+/** Bề rộng / cao ước lượng của nhãn (đơn vị viewBox): chữ Hán rộng gấp đôi chữ Latin */
+function labelBox(name) {
+  const px = [...String(name)].reduce((w, ch) => w + (/[㐀-鿿]/.test(ch) ? 11 : 6.3), 0);
+  return { w: (px + 18) / PX, h: 21 / PX };
+}
+
+const overlap = (a, b) =>
+  Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+  Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+/**
+ * Đặt nhãn các điểm chính, tránh đè nhau: thử 6 chỗ quanh ghim (phải / trái, ngang / lệch lên / lệch xuống),
+ * chọn chỗ ít chồng lấn nhất với nhãn đã đặt + các ghim + mép bản đồ. Trả { slug: { side, dy } } (dy theo px).
+ */
+function layoutLabels(items) {
+  const pins = items.map((d) => {
+    const [x, y] = vnProject(...d.at);
+    return { x: x - 6, y: y - 6, w: 12, h: 12, slug: d.slug };
+  });
+  const placed = [];
+  const out = {};
+  const order = [...items]
+    .filter((d) => MAJOR.includes(d.slug))
+    .sort((a, b) => MAJOR.indexOf(a.slug) - MAJOR.indexOf(b.slug));
+  for (const d of order) {
+    const [x, y] = vnProject(...d.at);
+    const { w, h } = labelBox(d.name);
+    const pref = PREFER[d.slug] ?? "r";
+    let best = null;
+    for (const side of [pref, pref === "l" ? "r" : "l"]) {
+      for (const dyu of [0, -15, 15, -26, 26]) {
+        const bx = side === "r" ? x + 9 : x - 9 - w;
+        const box = { x: bx, y: y - h / 2 + dyu, w, h };
+        let cost = (side === pref ? 0 : 40) + Math.abs(dyu) * 1.5;
+        for (const p of placed) cost += overlap(box, p) * 4;
+        for (const p of pins) if (p.slug !== d.slug) cost += overlap(box, p) * 3;
+        if (box.x < 0) cost += -box.x * h * 3;
+        if (box.x + w > W) cost += (box.x + w - W) * h * 3;
+        if (!best || cost < best.cost) best = { cost, box, side, dy: dyu * PX };
+      }
+    }
+    placed.push(best.box);
+    out[d.slug] = { side: best.side, dy: Math.round(best.dy) };
+  }
+  return out;
+}
 
 /**
  * Bản đồ Việt Nam Bắc → Nam (tài liệu mục 4 + tham khảo lotuscharmtravel.com):
@@ -40,6 +105,8 @@ export default function VietnamMap({ items, labels, lang }) {
   const [active, setActive] = useState(items[0]?.slug);
   const [auto, setAuto] = useState(true);
   const cur = items.find((d) => d.slug === active) || items[0];
+  // Chỗ đặt nhãn các điểm chính (tính 1 lần, giống nhau ở máy chủ và trình duyệt)
+  const layout = useMemo(() => layoutLabels(items), [items]);
 
   useEffect(() => {
     if (!auto) return;
@@ -100,7 +167,11 @@ export default function VietnamMap({ items, labels, lang }) {
           return (
             <span
               key={a.name.en}
-              className="absolute -translate-x-1/2 translate-y-3 text-center text-[0.62rem] leading-tight font-medium text-forest-700/80 italic sm:text-[0.7rem]"
+              className={cn(
+                "absolute w-24 translate-y-3 text-center text-[0.62rem] leading-tight font-medium text-balance text-forest-700/80 italic sm:w-28 sm:text-[0.7rem]",
+                // sát mép phải (Trường Sa) → lệch vào trong để không bị cắt trên điện thoại
+                x / W > 0.8 ? "-translate-x-[78%]" : "-translate-x-1/2",
+              )}
               style={{ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%` }}
             >
               {a.name[lang] || a.name.en}
@@ -108,11 +179,19 @@ export default function VietnamMap({ items, labels, lang }) {
           );
         })}
 
+        {labels.hint && (
+          <p className="absolute inset-x-0 -bottom-7 text-center text-xs text-muted">
+            {labels.hint}
+          </p>
+        )}
+
         {/* Ghim + nhãn */}
         {items.map((d) => {
           const [x, y] = vnProject(...d.at);
           const on = d.slug === cur.slug;
-          const [s, dy] = side[d.slug] || ["r", 0];
+          const major = layout[d.slug];
+          const s = major?.side ?? PREFER[d.slug] ?? (x > W * 0.72 ? "l" : "r");
+          const dy = major?.dy ?? 0;
           return (
             <button
               key={d.slug}
@@ -120,13 +199,20 @@ export default function VietnamMap({ items, labels, lang }) {
               onClick={() => pick(d.slug)}
               aria-pressed={on}
               aria-label={d.name}
-              className="group absolute z-10 -translate-x-1/2 -translate-y-1/2"
+              title={major ? undefined : d.name}
+              className={cn(
+                "group absolute -translate-x-1/2 -translate-y-1/2 p-1.5 hover:z-30 focus-visible:z-30",
+                on ? "z-30" : major ? "z-20" : "z-10",
+              )}
               style={{ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%` }}
             >
               <span
                 className={cn(
-                  "relative block size-3 rounded-full ring-2 ring-white transition",
-                  on ? "scale-125 bg-amber-brand" : "bg-cream-50 group-hover:bg-amber-brand",
+                  "relative block rounded-full ring-white transition",
+                  major ? "size-3 ring-2" : "size-2.5 ring-[1.5px]",
+                  on
+                    ? "scale-125 bg-amber-brand"
+                    : "bg-cream-50 group-hover:scale-125 group-hover:bg-amber-brand",
                 )}
               >
                 {on && (
@@ -135,8 +221,15 @@ export default function VietnamMap({ items, labels, lang }) {
               </span>
               <span
                 className={cn(
-                  "absolute top-1/2 hidden rounded-full px-2 py-0.5 text-[0.68rem] font-semibold whitespace-nowrap shadow-sm transition sm:block",
-                  s === "l" ? "right-full mr-1.5" : "left-full ml-1.5",
+                  "pointer-events-none absolute top-1/2 hidden rounded-full px-2 py-0.5 text-[0.68rem] font-semibold whitespace-nowrap shadow-sm transition",
+                  // điểm chính: luôn ghi tên (từ sm); điểm khác: chỉ khi rê chuột / đang chọn
+                  // điện thoại: chỉ ghi tên điểm đang chọn (bản đồ nhỏ, ghi hết sẽ chồng chéo)
+                  on
+                    ? "block"
+                    : major
+                      ? "sm:block"
+                      : "sm:group-hover:block sm:group-focus-visible:block",
+                  s === "l" ? "right-full mr-0.5" : "left-full ml-0.5",
                   on
                     ? "bg-forest-900 text-white"
                     : "bg-white/95 text-ink group-hover:bg-forest-700 group-hover:text-white",

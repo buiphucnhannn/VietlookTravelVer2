@@ -1,6 +1,7 @@
 import { Accessibility, ArrowRight, Ear, HandHeart } from "lucide-react";
 import { lp } from "@/i18n/config";
 import { cn } from "@/lib/utils";
+import { getPageText } from "@/lib/page-copy/server";
 import Button from "./Button";
 import Container from "./Container";
 import Reveal from "./Reveal";
@@ -9,12 +10,20 @@ const ICONS = [Accessibility, Ear, HandHeart];
 
 /**
  * "Du lịch không rào cản" — khách đi xe lăn (có nhân viên đẩy xe), khách khiếm thính, khách đi lại hạn chế.
- * Câu chữ trung thực: "theo yêu cầu", "chúng tôi sắp xếp…" (dict.access), không hứa hẹn y tế.
+ * Chữ sửa được: CMS → Giao diện trang → Toàn website → Khối du lịch không rào cản (khoá "access");
+ * chưa sửa = câu mặc định dict.access. Biểu tượng cố định theo vị trí.
  * - variant "section" (mặc định): khối riêng — trang chủ, trang Giới thiệu
- * - variant "band": dải gọn 1 dòng — trang Tour nhóm & thiết kế riêng
+ * - variant "band": dải gọn 1 dòng — trang Tour nhóm & thiết kế riêng (trang đó truyền `copy` đã ghép ô riêng)
+ * `copy`: chữ đã tính sẵn (cùng hình dạng getPageText("access")) — không truyền thì tự lấy.
  */
-export default function AccessibleTravel({ lang, dict, variant = "section", className }) {
-  const a = dict.access;
+export default async function AccessibleTravel({
+  lang,
+  dict,
+  variant = "section",
+  className,
+  copy,
+}) {
+  const a = copy ?? (await getPageText("access", lang, dict));
   const planHref = `${lp(lang)}/plan-your-trip`;
 
   if (variant === "band") {
@@ -37,7 +46,9 @@ export default function AccessibleTravel({ lang, dict, variant = "section", clas
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-bold text-ink">{a.title}</p>
-          <p className="mt-0.5 text-sm leading-relaxed text-ink/75">{a.badgeLong}</p>
+          <p className="mt-0.5 text-sm leading-relaxed whitespace-pre-line text-ink/75">
+            {a.bandText}
+          </p>
         </div>
         <a
           href={planHref}
@@ -67,11 +78,18 @@ export default function AccessibleTravel({ lang, dict, variant = "section", clas
               <h2 className="mt-2 text-3xl font-bold tracking-tight text-balance text-ink sm:text-4xl">
                 {a.title}
               </h2>
-              <p className="mt-4 text-lg leading-relaxed text-ink/80">{a.text}</p>
+              <p className="mt-4 text-lg leading-relaxed whitespace-pre-line text-ink/80">
+                {a.text}
+              </p>
               <Button href={planHref} variant="primary" className="mt-7">
                 {a.cta}
               </Button>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">{a.note}</p>
+              {/* Dòng nhỏ dưới nút: tuỳ chọn — để trống thì không hiện */}
+              {a.note && (
+                <p className="mt-3 max-w-md text-sm leading-relaxed whitespace-pre-line text-muted">
+                  {a.note}
+                </p>
+              )}
             </div>
             <ul className="grid gap-4">
               {a.points.map((p, i) => {
@@ -79,7 +97,7 @@ export default function AccessibleTravel({ lang, dict, variant = "section", clas
                 return (
                   <Reveal
                     as="li"
-                    key={p.title}
+                    key={i}
                     delay={i * 80}
                     className="flex items-start gap-4 rounded-2xl bg-white/90 p-5 shadow-sm ring-1 ring-border"
                   >
@@ -88,7 +106,9 @@ export default function AccessibleTravel({ lang, dict, variant = "section", clas
                     </span>
                     <div className="min-w-0">
                       <h3 className="text-lg font-semibold tracking-tight text-ink">{p.title}</h3>
-                      <p className="mt-1 leading-relaxed text-muted">{p.text}</p>
+                      <p className="mt-1 leading-relaxed whitespace-pre-line text-muted">
+                        {p.text}
+                      </p>
                     </div>
                   </Reveal>
                 );

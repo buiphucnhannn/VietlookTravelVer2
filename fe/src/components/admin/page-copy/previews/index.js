@@ -13,6 +13,7 @@ const load = (fn) =>
 export const PREVIEWS = {
   global: load(() => import("./GlobalPreview")),
   "not-found": load(() => import("./NotFoundPreview")),
+  access: load(() => import("./AccessPreview")),
   "car-rental": load(() => import("./CarRentalPreview")),
   "visa-fast-track": load(() => import("./VisaPreview")),
   "group-tailor-made-tours": load(() => import("./GroupToursPreview")),
