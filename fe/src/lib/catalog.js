@@ -160,7 +160,7 @@ async function loadPageCopy(key) {
 export const getSmallGroup = cache(async () => (await loadSite()).smallGroup ?? null);
 
 /**
- * Điểm & số lượt đánh giá công ty (CMS → Cài đặt → Điểm & số lượt đánh giá) — { tripadvisor, google }:
+ * Điểm & số lượt đánh giá công ty (CMS → Đánh giá → Điểm & số lượt đánh giá) — { tripadvisor, google }:
  * { rating, count, url }. Thẻ "settings": CMS lưu / máy chủ tự cập nhật xong → website làm mới ngay.
  * Backend lỗi → số dự phòng trong lib/review-stats.js (website không bao giờ hỏng vì thiếu số này).
  */
@@ -175,8 +175,17 @@ export const getReviewStats = cache(async () => {
 /** Mã đo lường Google nhập trong CMS (Cài đặt) — { gtmId, ga4Id, adsId } */
 export const getTracking = cache(async () => (await loadSite()).tracking ?? {});
 
+/** Trang chủ → "Hiển thị trên Google" nhập trong CMS ({ en, zh, vi } × { title, description }) — null nếu chưa sửa */
+export const getHomeSeo = cache(async () => {
+  try {
+    return (await loadHome()).seo ?? null;
+  } catch {
+    return null;
+  }
+});
+
 /**
- * Thông tin liên hệ công ty (CMS → Cài đặt → Thông tin liên hệ): điện thoại, email, địa chỉ, mạng xã hội…
+ * Thông tin liên hệ công ty (CMS → Thông tin liên hệ): điện thoại, email, địa chỉ, mạng xã hội…
  * cùng dạng siteConfig (contact / messaging / social / maps / legal) — xem lib/contact.mjs.
  * Thẻ "settings": CMS lưu xong → website làm mới ngay. Backend lỗi → đúng giá trị mặc định (siteConfig).
  */

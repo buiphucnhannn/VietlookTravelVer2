@@ -2,10 +2,10 @@ import BgImage from "@/components/ui/BgImage";
 import { AlertTriangle, CalendarDays, Clock3, FileCheck2, Info } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, tr } from "@/i18n/config";
-import { JsonLd, pageMetadata } from "@/lib/seo";
+import { JsonLd, pageMetadata, seoField } from "@/lib/seo";
 import { airportCodes, airports, visaProcesses } from "@/data/visa";
 import { getCatalog } from "@/lib/catalog";
-import { getPageText } from "@/lib/page-copy/server";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import VisaForm from "@/components/forms/VisaForm";
@@ -18,11 +18,12 @@ export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = await getPageText("visa-fast-track", lang, dict);
+  const seo = await getPageSeo("visa-fast-track"); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: "/visa-fast-track",
-    title: p.heroTitle,
-    description: p.heroIntro,
+    title: seoField(seo, lang, "title") || p.heroTitle,
+    description: seoField(seo, lang, "description") || p.heroIntro,
     image: p.heroImages[0],
   });
 }
@@ -39,6 +40,7 @@ export default async function VisaPage({ params }) {
   const v = dict.visa;
   // Chữ / ảnh sửa được trong CMS → Giao diện trang → Visa & Fast-track (chưa sửa = nội dung mặc định)
   const p = await getPageText("visa-fast-track", lang, dict);
+  const hidden = p.hidden ?? {}; // khối đã tắt trong CMS (Hiện / Ẩn trên website) → không hiện
   const groups = { arrival: p.groupArrival, departure: p.groupDeparture, addons: p.groupAddons };
   const groupSub = {
     arrival: p.groupArrivalSub,
@@ -133,52 +135,59 @@ export default async function VisaPage({ params }) {
       </section>
 
       {/* 2. Quy trình 5 bước: nhập cảnh / xuất cảnh / e-visa */}
-      <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
-        <BgImage src={p.processImage} tone="light" />
-        <Container>
-          <SectionHeading title={p.processTitle} subtitle={p.processSubtitle} />
-          <ProcessTabs processes={processes} tabs={tabs} />
+      {!hidden.process && (
+        <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
+          <BgImage src={p.processImage} tone="light" />
+          <Container>
+            <SectionHeading title={p.processTitle} subtitle={p.processSubtitle} />
+            <ProcessTabs processes={processes} tabs={tabs} />
 
-          {/* 3. Hai lưu ý bắt buộc */}
-          <div className="mx-auto mt-12 grid max-w-4xl gap-4 sm:grid-cols-2">
-            {p.notes.map((n, i) => (
-              <Reveal
-                key={i}
-                delay={i * 90}
-                className="flex gap-3 rounded-2xl border border-amber-brand/40 bg-amber-brand/10 p-5"
-              >
-                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-clay-600" />
-                <p className="text-sm leading-relaxed text-ink">
-                  <span className="mr-1 font-bold text-clay-600">{p.notesTitle}:</span>
-                  {n}
-                </p>
-              </Reveal>
-            ))}
-          </div>
-        </Container>
-      </section>
+            {/* 3. Hai lưu ý bắt buộc */}
+            <div className="mx-auto mt-12 grid max-w-4xl gap-4 sm:grid-cols-2">
+              {p.notes.map((n, i) => (
+                <Reveal
+                  key={i}
+                  delay={i * 90}
+                  className="flex gap-3 rounded-2xl border border-amber-brand/40 bg-amber-brand/10 p-5"
+                >
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-clay-600" />
+                  <p className="text-sm leading-relaxed text-ink">
+                    <span className="mr-1 font-bold text-clay-600">{p.notesTitle}:</span>
+                    {n}
+                  </p>
+                </Reveal>
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* 4. Thuật ngữ chuẩn EN / ZH */}
-      <section className="bg-cream-100 py-14 lg:py-[4.5rem]">
-        <Container>
-          <SectionHeading title={p.termsTitle} subtitle={p.termsSubtitle} />
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {p.terms.map((x, i) => (
-              <Reveal
-                as="div"
-                key={i}
-                delay={(i % 4) * 70}
-                className={cn("rounded-2xl bg-white p-5 ring-1 ring-sand-300/70", subgrid(2, "sm"))}
-              >
-                <dt className="font-bold text-forest-700">{x.term}</dt>
-                <dd className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink/75">
-                  {x.meaning}
-                </dd>
-              </Reveal>
-            ))}
-          </dl>
-        </Container>
-      </section>
+      {!hidden.terms && (
+        <section className="bg-cream-100 py-14 lg:py-[4.5rem]">
+          <Container>
+            <SectionHeading title={p.termsTitle} subtitle={p.termsSubtitle} />
+            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {p.terms.map((x, i) => (
+                <Reveal
+                  as="div"
+                  key={i}
+                  delay={(i % 4) * 70}
+                  className={cn(
+                    "rounded-2xl bg-white p-5 ring-1 ring-sand-300/70",
+                    subgrid(2, "sm"),
+                  )}
+                >
+                  <dt className="font-bold text-forest-700">{x.term}</dt>
+                  <dd className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink/75">
+                    {x.meaning}
+                  </dd>
+                </Reveal>
+              ))}
+            </dl>
+          </Container>
+        </section>
+      )}
 
       {/* 5. Các loại visa */}
       <section id="visa" className="scroll-mt-32 py-14 lg:py-[4.5rem]">

@@ -109,7 +109,8 @@ const sourcesOf = (vid, small) => (small ? (vid.srcMobile ?? []) : [vid.src]).fi
  * - Slide YouTube (CMS): máy tính phát iframe YouTube tự phát / tắt tiếng / lặp, chỉ nạp khi tới lượt,
  *   chuyển slide theo thời gian (maxMs). Điện thoại hiện ảnh của slide (không nạp iframe YouTube).
  */
-export default function HeroVideos({ videos, maxMs = 14000 }) {
+// `off`: chỉ hiện ảnh poster, không tải / phát video (bản xem trước trong CMS)
+export default function HeroVideos({ videos, maxMs = 14000, off }) {
   const rootRef = useRef(null);
   const small = useSyncExternalStore(subscribeMq, getMq, () => null);
   const ready = useAfterLoad();
@@ -125,7 +126,7 @@ export default function HeroVideos({ videos, maxMs = 14000 }) {
   const started = useRef(-1); // slide đã được phát từ đầu ở lượt hiện tại (để không tua lại khi phát tiếp)
   const n = videos.length;
   const next = (i + 1) % n;
-  const on = ready && small !== null && !failed;
+  const on = ready && small !== null && !failed && !off;
   const kindOf = (vid) =>
     !small && vid.yt ? "yt" : sourcesOf(vid, small).length ? "video" : "image";
 
@@ -210,10 +211,10 @@ export default function HeroVideos({ videos, maxMs = 14000 }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i, n, maxMs, small, videos, on, onScreen]);
 
-  // Ra khỏi màn hình / ẩn tab → dừng mọi video (quay lại thì effect trên phát tiếp)
+  // Ra khỏi màn hình / ẩn tab / tắt video (off) → dừng mọi video (quay lại thì effect trên phát tiếp)
   useEffect(() => {
-    if (!onScreen) refs.current.forEach((v) => v?.pause());
-  }, [onScreen]);
+    if (!onScreen || off) refs.current.forEach((v) => v?.pause());
+  }, [onScreen, off]);
 
   // Clip cũ đã mờ hẳn sau lớp clip mới → dừng cho nhẹ máy
   useEffect(() => {

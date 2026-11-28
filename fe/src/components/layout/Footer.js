@@ -20,8 +20,9 @@ import Logo from "./Logo";
 import { CookieSettingsLink } from "./ConsentBanner";
 
 /**
- * info: thông tin liên hệ (CMS → Cài đặt → Thông tin liên hệ, lib/catalog getContactInfo)
+ * info: thông tin liên hệ (CMS → Thông tin liên hệ, lib/catalog getContactInfo)
  * copy: chữ & ảnh đầu / chân trang (CMS → Giao diện trang → Đầu & chân trang) — thiếu → chữ từ điển như cũ
+ *   (chỉ trình sửa CMS: copy.ctaImageEdit / copy.ctaPhotoEdit — lớp đổi ảnh đặt ngay trên 2 ảnh của dải CTA)
  */
 export default function Footer({ lang, dict, policies, info = DEFAULT_CONTACT_VIEW, copy }) {
   const g = copy ?? {};
@@ -98,7 +99,7 @@ export default function Footer({ lang, dict, policies, info = DEFAULT_CONTACT_VI
               {
                 icon: TripAdvisorIcon,
                 label: "Tripadvisor",
-                sub: dict.common.ratingText, // điểm & số lượt: CMS → Cài đặt (i18n/dictionaries.js)
+                sub: dict.common.ratingText, // điểm & số lượt: CMS → Đánh giá (i18n/dictionaries.js)
                 href: dict.reviewStats?.tripadvisor.url ?? social.tripadvisor,
               },
               {
@@ -145,6 +146,7 @@ export default function Footer({ lang, dict, policies, info = DEFAULT_CONTACT_VI
       {/* Dải CTA */}
       <div className="relative isolate overflow-hidden bg-[#2b3640] text-white">
         <BgImage src={g.ctaImage || "/images/tours/v2/hanoi-33946371.jpg"} tone="night" />
+        {g.ctaImageEdit}
         <Container className="grid items-center gap-8 py-12 md:grid-cols-[auto_1fr_auto]">
           <div className="relative hidden h-28 w-44 md:block">
             <Image
@@ -154,6 +156,7 @@ export default function Footer({ lang, dict, policies, info = DEFAULT_CONTACT_VI
               sizes="176px"
               className="rotate-[-4deg] rounded-xl object-cover shadow-2xl ring-4 ring-white"
             />
+            {g.ctaPhotoEdit}
           </div>
           <div>
             <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{f.ctaTitle}</h2>

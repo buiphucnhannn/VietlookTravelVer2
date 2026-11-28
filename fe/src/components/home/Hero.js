@@ -86,7 +86,8 @@ const text = (banner, key, lang, fallback) =>
  * Banner chính: video nền luân phiên, vừa đúng 1 màn hình (header trong suốt phủ lên trên).
  * Cỡ chữ co theo chiều cao màn hình để nội dung luôn nằm gọn trong khung đầu tiên.
  */
-export default function Hero({ lang, dict, banner, regions, destinations }) {
+// `videoOff`: chỉ hiện ảnh nền, không phát video (bản xem trước trong CMS) — website không truyền.
+export default function Hero({ lang, dict, banner, regions, destinations, videoOff }) {
   const t = dict.home;
   const destinationsByRegion = (slug) => destinations.filter((d) => d.region === slug);
   const slides = (banner?.slides ?? []).filter((s) => s.video || s.poster || s.posterMobile);
@@ -98,7 +99,7 @@ export default function Hero({ lang, dict, banner, regions, destinations }) {
     description: text(banner, "description", lang, t.heroText),
     descriptionShort: text(banner, "descriptionShort", lang, t.heroTextShort),
   };
-  // Điểm & số lượt đánh giá: CMS → Cài đặt (dict.reviewStats — i18n/dictionaries.js)
+  // Điểm & số lượt đánh giá: CMS → Đánh giá (dict.reviewStats — i18n/dictionaries.js)
   const { google, tripadvisor } = dict.reviewStats;
   const ratings = [
     {
@@ -123,7 +124,7 @@ export default function Hero({ lang, dict, banner, regions, destinations }) {
     // Banner luôn VỪA ĐÚNG 1 MÀN HÌNH (điện thoại & máy tính): mọi khoảng cách/cỡ chữ co giãn theo
     // chiều cao màn hình (svh), nội dung căn giữa phần còn lại dưới header trong suốt.
     <section className="relative isolate flex h-[100svh] max-h-[1100px] min-h-[560px] overflow-hidden text-white">
-      <HeroVideos videos={videos} />
+      <HeroVideos videos={videos} off={videoOff} />
       {/* Lớp phủ nhẹ – chỉ đủ để chữ trắng dễ đọc, giữ video tươi sáng */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/45" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.28),transparent_65%)]" />

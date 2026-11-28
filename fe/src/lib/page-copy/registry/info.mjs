@@ -5,7 +5,7 @@
  *
  * Không sửa ở đây (cố ý):
  *   - Số điện thoại, email, WeChat, địa chỉ, giờ mở cửa, bản đồ (trang Liên hệ): thông tin chung của website
- *     (CMS → Cài đặt → Thông tin liên hệ) — dùng ở chân trang, nút chat… nên chỉ hiện để xem.
+ *     (CMS → Thông tin liên hệ) — dùng ở chân trang, nút chat… nên chỉ hiện để xem.
  *   - Chủ đề trong form liên hệ: email & CMS dịch chủ đề theo đúng câu gốc → sửa sẽ làm mất bản dịch.
  *   - Khối "Dự án đã phục vụ" (trang Đối tác): dùng chung với trang chủ → sửa ở CMS → Trang chủ.
  * File này KHÔNG import gì (dữ liệu thuần) để backend test đọc được trực tiếp.
@@ -41,6 +41,7 @@ export const INFO_PAGES = {
     name: "Liên hệ",
     group: GROUP,
     path: "/contact",
+    seo: true,
     summary: "Đầu trang, form gửi tin nhắn, lời mời liên hệ trực tiếp, văn phòng & bản đồ.",
     thumb: "heroImages.0",
     fields: {
@@ -78,6 +79,7 @@ export const INFO_PAGES = {
     name: "Đối tác B2B",
     group: GROUP,
     path: "/partners",
+    seo: true,
     summary: "Đầu trang, lời giới thiệu, 8 ưu đãi cho đối tác, ảnh ghép và form hợp tác.",
     thumb: "heroImages.0",
     fields: {
@@ -129,6 +131,7 @@ export const INFO_PAGES = {
     name: "Dịch vụ",
     group: GROUP,
     path: "/services",
+    seo: true,
     summary: "Đầu trang và 5 thẻ dịch vụ chính: ảnh, tên, mô tả, điểm nổi bật, chữ trên nút.",
     thumb: "images.0",
     fields: {

@@ -1,5 +1,5 @@
 /**
- * Thông tin liên hệ công ty (CMS → Cài đặt → Thông tin liên hệ) — dùng ở thanh trên cùng, đầu trang, chân trang,
+ * Thông tin liên hệ công ty (CMS → Thông tin liên hệ) — dùng ở thanh trên cùng, đầu trang, chân trang,
  * trang Liên hệ, nút chat nổi, ô liên hệ trang tour / thuê xe, JSON-LD…
  *
  * Mặc định = đúng giá trị đang có ở constants/site.js (siteConfig) → backend lỗi / chưa ai sửa thì website hiện

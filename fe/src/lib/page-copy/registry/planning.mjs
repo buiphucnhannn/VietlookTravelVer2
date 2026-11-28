@@ -27,6 +27,7 @@ export const PLANNING_PAGES = {
     name: "Tour nhóm & thiết kế riêng",
     group: GROUP,
     path: "/group-tailor-made-tours",
+    seo: true,
     summary:
       "Đầu trang, giới thiệu, dải du lịch không rào cản, luôn bao gồm, loại nhóm, cách làm việc, câu hỏi thường gặp.",
     thumb: "heroImage",
@@ -111,6 +112,7 @@ export const PLANNING_PAGES = {
     name: "Lên kế hoạch chuyến đi",
     group: GROUP,
     path: "/plan-your-trip",
+    seo: true,
     summary:
       "Ảnh nền, tiêu đề, giới thiệu, các điểm cam kết bên cạnh form và ghi chú thời gian trả lời.",
     thumb: "heroImage",

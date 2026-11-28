@@ -101,9 +101,10 @@ function layoutLabels(items) {
  * ghim mọi điểm đến; bấm ghim → thẻ bên phải (mô tả + 2 tour nổi bật + Discover now).
  * Tự chuyển ghim mỗi 5 giây cho tới khi khách tương tác. Luôn ghi Hoàng Sa, Trường Sa (Việt Nam).
  */
-export default function VietnamMap({ items, labels, lang }) {
+// `autoPlay={false}`: không tự chuyển ghim (bản xem trước trong CMS) — website để mặc định.
+export default function VietnamMap({ items, labels, lang, autoPlay = true }) {
   const [active, setActive] = useState(items[0]?.slug);
-  const [auto, setAuto] = useState(true);
+  const [auto, setAuto] = useState(autoPlay);
   const cur = items.find((d) => d.slug === active) || items[0];
   // Chỗ đặt nhãn các điểm chính (tính 1 lần, giống nhau ở máy chủ và trình duyệt)
   const layout = useMemo(() => layoutLabels(items), [items]);

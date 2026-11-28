@@ -32,6 +32,7 @@ export const LISTING_PAGES = {
     name: "Tất cả điểm đến",
     group: GROUP,
     path: "/destinations",
+    seo: true,
     summary:
       "Đầu trang (3 ảnh nền, tiêu đề, giới thiệu) và lời giới thiệu từng miền Bắc – Trung – Nam.",
     thumb: "heroImages.0",
@@ -65,6 +66,7 @@ export const LISTING_PAGES = {
     name: "Cẩm nang du lịch",
     group: GROUP,
     path: "/travel-guide",
+    seo: true,
     summary:
       "Tiêu đề, giới thiệu đầu trang và chữ trên thanh lọc / tìm kiếm / nút xem thêm bài viết.",
     // ảnh nền đầu trang = ảnh bài viết (không sửa ở đây) → thẻ trong CMS dùng ảnh chia sẻ

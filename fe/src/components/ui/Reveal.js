@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useStillMotion } from "./motion";
 
 // Kích hoạt ngay khi mép phần tử vừa lộ khỏi đáy màn hình (cách đáy ~40px) → cảm giác "nhạy".
 const ROOT_MARGIN = "0px 0px -40px 0px";
@@ -23,12 +24,13 @@ export default function Reveal({
   ...props
 }) {
   const ref = useRef(null);
-  const [shown, setShown] = useState(false);
+  const still = useStillMotion(); // bản xem trước trong CMS: hiện ngay, không chờ cuộn tới
+  const [shown, setShown] = useState(still);
   const [instant, setInstant] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || still) return;
     const start = performance.now();
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -42,7 +44,7 @@ export default function Reveal({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [still]);
 
   const stagger = instant ? 0 : Math.min(Math.round(delay * STAGGER_SCALE), STAGGER_MAX);
 

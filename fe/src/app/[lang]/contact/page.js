@@ -2,8 +2,8 @@ import { ChevronRight, Clock, Mail, MapPin, Phone } from "lucide-react";
 import BgImage from "@/components/ui/BgImage";
 import { getDictionary } from "@/i18n/dictionaries";
 import { href, tr } from "@/i18n/config";
-import { pageMetadata } from "@/lib/seo";
-import { getPageText } from "@/lib/page-copy/server";
+import { pageMetadata, seoField } from "@/lib/seo";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 import { getContactInfo } from "@/lib/catalog";
 import { phoneDigits } from "@/lib/contact.mjs";
 import { Fragment } from "react";
@@ -24,17 +24,19 @@ export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = await getPageText("contact", lang, dict);
+  const seo = await getPageSeo("contact"); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: "/contact",
-    title: p.heroTitle,
+    title: seoField(seo, lang, "title") || p.heroTitle,
     // Phụ đề hero ngắn → thêm thông tin liên hệ cho kết quả tìm kiếm
     description:
-      lang === "zh"
+      seoField(seo, lang, "description") ||
+      (lang === "zh"
         ? `${p.heroSubtitle}河内办公室，热线、WhatsApp、微信、LINE与Zalo全天候联系 Vietlook Travel。`
         : lang === "vi"
           ? `${p.heroSubtitle} Liên hệ Vietlook Travel tại Hà Nội qua hotline, WhatsApp, WeChat, LINE, Zalo hoặc email.`
-          : `${p.heroSubtitle} Contact Vietlook Travel in Hanoi by hotline, WhatsApp, WeChat, LINE, Zalo or email.`,
+          : `${p.heroSubtitle} Contact Vietlook Travel in Hanoi by hotline, WhatsApp, WeChat, LINE, Zalo or email.`),
   });
 }
 
@@ -43,7 +45,7 @@ export default async function ContactPage({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   // Chữ / ảnh sửa được trong CMS → Giao diện trang → Liên hệ (chưa sửa = nội dung mặc định).
-  // Số điện thoại, email, WeChat, địa chỉ, bản đồ: CMS → Cài đặt → Thông tin liên hệ (dùng chung toàn website).
+  // Số điện thoại, email, WeChat, địa chỉ, bản đồ: CMS → Thông tin liên hệ (dùng chung toàn website).
   const p = await getPageText("contact", lang, dict);
   const t = {
     ...dict.contact,

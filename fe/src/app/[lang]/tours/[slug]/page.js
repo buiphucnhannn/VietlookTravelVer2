@@ -342,13 +342,13 @@ async function TourPageContent({ params }) {
   const dict = await getDictionary(lang);
   const t = dict.tour;
   const c = dict.common;
-  // Điểm Tripadvisor của công ty: CMS → Cài đặt → Điểm & số lượt đánh giá (lib/review-stats.js)
+  // Điểm Tripadvisor của công ty: CMS → Đánh giá → Điểm & số lượt đánh giá (lib/review-stats.js)
   const ta = dict.reviewStats.tripadvisor;
   const tx = tourText(tour, lang);
   // 9Pay bật trong CMS → sau khi gửi đơn có bước "Thanh toán"; tắt → đặt tour như cũ
   const paymentConfig = await getPaymentConfig();
   const smallGroup = await getSmallGroup();
-  const info = await getContactInfo(); // CMS → Cài đặt → Thông tin liên hệ
+  const info = await getContactInfo(); // CMS → Thông tin liên hệ
   // Chữ chung sửa được trong CMS → Giao diện trang → Chữ chung trên trang chi tiết (chưa sửa = từ điển)
   const p = await getPageText("detail", lang, dict);
   const title = tx.title;

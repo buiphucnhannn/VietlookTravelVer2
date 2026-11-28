@@ -13,7 +13,7 @@ const icons = {
 
 /**
  * Dải uy tín dưới hero (như localvietnam.com): đánh giá Tripadvisor/Google + điểm mạnh.
- * `stats` = dict.reviewStats (CMS → Cài đặt → Điểm & số lượt đánh giá).
+ * `stats` = dict.reviewStats (CMS → Đánh giá → Điểm & số lượt đánh giá).
  */
 export default function TrustStrip({ items, stats = REVIEW_STATS_FALLBACK }) {
   return (

@@ -104,6 +104,21 @@ export function pageDefaults(entry, ctx, lang) {
   );
 }
 
+/* ---------- Khối bật / tắt trên website ---------- */
+
+/**
+ * Cờ ẩn khối đã lưu (`data.hidden`) → chỉ các khối đang tắt, đúng khoá trang cho phép (entry.hideable —
+ * lib/hidden-blocks.mjs): { faq: true, … }. Trang không có khối tắt được → {}.
+ */
+export const hiddenOf = (entry, data) =>
+  Object.fromEntries(
+    (entry?.hideable ?? []).filter((k) => data?.hidden?.[k] === true).map((k) => [k, true]),
+  );
+
+/** Thêm `hidden` vào kết quả khi trang có khối tắt được (trang khác giữ nguyên hình dạng như cũ) */
+const withHidden = (entry, data, out) =>
+  entry?.hideable ? { ...out, hidden: hiddenOf(entry, data) } : out;
+
 /* ---------- Website: bản đã sửa đè lên mặc định ---------- */
 
 function overlay(spec, node, def, lang) {
@@ -130,8 +145,12 @@ function overlay(spec, node, def, lang) {
 export function resolvePage(entry, data, ctx, lang) {
   const defs = pageDefaults(entry, ctx, lang);
   const d = isObj(data) ? data : {};
-  return Object.fromEntries(
-    Object.entries(entry.fields).map(([k, spec]) => [k, overlay(spec, d[k], defs[k], lang)]),
+  return withHidden(
+    entry,
+    d,
+    Object.fromEntries(
+      Object.entries(entry.fields).map(([k, spec]) => [k, overlay(spec, d[k], defs[k], lang)]),
+    ),
   );
 }
 
@@ -183,12 +202,16 @@ const perField = (entry, defsByLang, data, leaf) =>
  * (nhân viên thấy đúng chữ đang hiện trên website). `defsByLang`: { en, zh, vi } = pageDefaults từng ngôn ngữ.
  */
 export const fillPage = (entry, data, defsByLang) =>
-  perField(entry, defsByLang, isObj(data) ? data : {}, (spec, defs, node) =>
-    spec.type === "image"
-      ? filled(node)
-        ? node.trim()
-        : str(defs.en)
-      : Object.fromEntries(LANGS.map((l) => [l, filled(node?.[l]) ? node[l] : str(defs[l])])),
+  withHidden(
+    entry,
+    data,
+    perField(entry, defsByLang, isObj(data) ? data : {}, (spec, defs, node) =>
+      spec.type === "image"
+        ? filled(node)
+          ? node.trim()
+          : str(defs.en)
+        : Object.fromEntries(LANGS.map((l) => [l, filled(node?.[l]) ? node[l] : str(defs[l])])),
+    ),
   );
 
 const cleanText = (v, multiline) => {
@@ -241,6 +264,9 @@ export function stripPage(entry, state, defsByLang) {
     const v = compact(spec, raw[k]);
     if (v !== undefined) out[k] = v;
   }
+  // khối đang tắt trên website (không tắt khối nào → không gửi)
+  const hidden = hiddenOf(entry, state);
+  if (Object.keys(hidden).length) out.hidden = hidden;
   return out;
 }
 
@@ -261,7 +287,7 @@ export function countEdited(entry, data) {
       n++;
   };
   Object.entries(entry.fields).forEach(([k, spec]) => visit(spec, data[k]));
-  return n;
+  return n + Object.keys(hiddenOf(entry, data)).length; // mỗi khối đang tắt tính 1
 }
 
 /** Khai báo của ô theo đường dẫn ("faq.2.q" → ô q của danh sách faq) — CMS dùng để lấy nhãn, độ dài tối đa */

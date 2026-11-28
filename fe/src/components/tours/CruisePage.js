@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { Ship } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, seoField } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui";
 import { AdviceBox, BannerHero } from "@/components/ui/PageHero";
 import TourListing from "@/components/tours/TourListing";
 import { href, lp } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
-import { getPageText } from "@/lib/page-copy/server";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 
 /**
  * Các trang du thuyền (mục 4.2.1 của khách), mỗi loại một đường dẫn riêng để Google lập chỉ mục:
@@ -41,11 +41,12 @@ export async function cruiseMetadata(kind, params) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = await getPageText(CRUISE_PAGES[kind].copyKey, lang, dict);
+  const seo = await getPageSeo(CRUISE_PAGES[kind].copyKey); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: CRUISE_PAGES[kind].path,
-    title: p.heroTitle,
-    description: p.heroIntro,
+    title: seoField(seo, lang, "title") || p.heroTitle,
+    description: seoField(seo, lang, "description") || p.heroIntro,
     image: p.heroImages[0],
   });
 }

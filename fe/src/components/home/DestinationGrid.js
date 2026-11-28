@@ -11,7 +11,8 @@ import { Container, Reveal, SectionHeading } from "@/components/ui";
  * nút "Discover now". Dưới cùng: dải "N điểm đến khác" (avatar tròn, Bắc → Nam) + View all.
  * `featured`: 6 ô đã chuẩn hoá (toGridItem); `others`: các điểm đến còn lại (lấy avatar).
  */
-export default function DestinationGrid({ lang, dict, featured, others }) {
+// Chỉ bản xem trước trong CMS (website không truyền): `itemSlot(d, i)` lớp sửa phủ lên từng ô, `after` ô thêm.
+export default function DestinationGrid({ lang, dict, featured, others, itemSlot, after }) {
   const t = dict.home;
   const shown = others.slice(0, 6);
   const more = Math.max(0, others.length - shown.length);
@@ -67,8 +68,10 @@ export default function DestinationGrid({ lang, dict, featured, others }) {
                   {t.gridDiscover} <ArrowRight className="size-4" />
                 </Link>
               </div>
+              {itemSlot?.(d, i)}
             </Reveal>
           ))}
+          {after}
         </div>
         {/* Dải cuối: "N+ Other locations" – rộng hết lưới, nằm dưới cùng */}
         <Reveal

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useStillMotion } from "./motion";
 
 /**
  * Số chạy từ 0 → value khi cuộn tới (1 lần). Server render sẵn giá trị cuối (tốt cho SEO,
@@ -9,10 +10,11 @@ import { useEffect, useRef, useState } from "react";
 export default function CountUp({ value, decimals = 0, duration = 1200, className }) {
   const ref = useRef(null);
   const [shown, setShown] = useState(value);
+  const still = useStillMotion(); // bản xem trước trong CMS: hiện ngay số cuối
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || still) return;
     let raf;
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -35,11 +37,11 @@ export default function CountUp({ value, decimals = 0, duration = 1200, classNam
       io.disconnect();
       cancelAnimationFrame(raf);
     };
-  }, [value, duration]);
+  }, [value, duration, still]);
 
   return (
     <span ref={ref} className={className}>
-      {shown.toFixed(decimals)}
+      {(still ? value : shown).toFixed(decimals)}
     </span>
   );
 }

@@ -37,7 +37,7 @@ export default async function ThankYouPage({ params }) {
   const dict = await getDictionary(lang);
   // Chữ sửa được trong CMS → Giao diện trang → Trang cảm ơn (chưa sửa = nội dung mặc định)
   const t = await getPageText("thank-you", lang, dict);
-  const { messaging } = await getContactInfo(); // CMS → Cài đặt → Thông tin liên hệ
+  const { messaging } = await getContactInfo(); // CMS → Thông tin liên hệ
   return (
     <section className="flex min-h-[calc(100svh-4rem)] items-center bg-cream-50 py-8 lg:min-h-[calc(100svh-6.75rem)] short:py-4">
       <Container className="max-w-3xl text-center">

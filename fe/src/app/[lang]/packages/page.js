@@ -4,22 +4,23 @@ import { ArrowRight, Star, Headphones, MapPin, Smartphone, Languages, Wrench } f
 import { getDictionary } from "@/i18n/dictionaries";
 import { fill, href, lp } from "@/i18n/config";
 import { cn } from "@/lib/utils";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, seoField } from "@/lib/seo";
 import { Container, Reveal } from "@/components/ui";
 import { AdviceBox, BrushHero } from "@/components/ui/PageHero";
 import { getCatalog } from "@/lib/catalog";
-import { getPageText } from "@/lib/page-copy/server";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 import PackageRow from "@/components/tours/PackageRow";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const pc = await getPageText("packages", lang, dict);
+  const seo = await getPageSeo("packages"); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: "/packages",
-    title: pc.heroTitle,
-    description: pc.heroIntro,
+    title: seoField(seo, lang, "title") || pc.heroTitle,
+    description: seoField(seo, lang, "description") || pc.heroIntro,
   });
 }
 

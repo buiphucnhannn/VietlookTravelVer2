@@ -4,6 +4,7 @@ import { Children, useCallback, useEffect, useLayoutEffect, useRef, useState } f
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useA11y } from "@/components/layout/A11y";
+import { useStillMotion } from "./motion";
 
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -25,6 +26,7 @@ export default function Carousel({
   label = "carousel",
 }) {
   const a11y = useA11y();
+  const still = useStillMotion(); // bản xem trước trong CMS: không tự lướt
   const items = Children.toArray(children);
   const n = items.length;
   const loop = n > 1;
@@ -179,10 +181,10 @@ export default function Carousel({
   }, [normalize, syncPage]);
 
   useEffect(() => {
-    if (!autoplay || paused || dragging || n < 2) return;
+    if (!autoplay || still || paused || dragging || n < 2) return;
     const id = setInterval(() => go(1), autoplay);
     return () => clearInterval(id);
-  }, [autoplay, paused, dragging, go, n]);
+  }, [autoplay, still, paused, dragging, go, n]);
 
   // ---- Kéo bằng chuột ----
   const onPointerDown = (e) => {

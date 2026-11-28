@@ -2,13 +2,13 @@ import Image from "next/image";
 import BgImage from "@/components/ui/BgImage";
 import { Bus, Clock, FileSignature, Flag, Gift, Headset, Percent, Stamp } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, seoField } from "@/lib/seo";
 import { Container, Reveal, SectionHeading } from "@/components/ui";
 import { BannerHero } from "@/components/ui/PageHero";
 import ContactForm from "@/components/forms/ContactForm";
 import { href } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
-import { getPageText } from "@/lib/page-copy/server";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 import { withHomeCopy } from "@/components/home/copy";
 import { ProjectCases } from "@/components/home/PartnersBlock";
 
@@ -16,11 +16,12 @@ export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = await getPageText("partners", lang, dict);
+  const seo = await getPageSeo("partners"); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: "/partners",
-    title: p.heroTitle,
-    description: p.intro,
+    title: seoField(seo, lang, "title") || p.heroTitle,
+    description: seoField(seo, lang, "description") || p.intro,
   });
 }
 
@@ -33,6 +34,7 @@ export default async function PartnersPage({ params }) {
   const dict = await getDictionary(lang);
   // Chữ / ảnh sửa được trong CMS → Giao diện trang → Đối tác B2B (chưa sửa = nội dung mặc định)
   const p = await getPageText("partners", lang, dict);
+  const hidden = p.hidden ?? {}; // khối đã tắt trong CMS (Hiện / Ẩn trên website) → không hiện
   // Dự án đã phục vụ: dùng chung câu chữ với trang chủ (sửa trong CMS → Trang chủ → Dự án)
   const { home } = await getCatalog();
   const homeCopy = withHomeCopy(dict.home, home.copy, lang);
@@ -58,45 +60,49 @@ export default async function PartnersPage({ params }) {
         </p>
       </Container>
 
-      <section
-        id="offers"
-        className="relative isolate scroll-mt-28 overflow-hidden py-14 lg:py-[4.5rem]"
-      >
-        <BgImage src={p.offersImage} tone="light" />
-        <Container>
-          <SectionHeading title={p.offerTitle} />
-          {/* Subgrid: icon · tiêu đề · mô tả thẳng hàng giữa các thẻ cùng hàng (tiêu đề 2 dòng không đẩy lệch mô tả) */}
-          <div className="rail grid gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
-            {p.offers.map((o, i) => {
-              const Icon = icons[i];
-              return (
-                <Reveal
-                  key={i}
-                  delay={(i % 4) * 80}
-                  className="row-span-3 grid grid-rows-subgrid content-start gap-y-3 rounded-3xl bg-surface p-6"
-                >
-                  <span className="grid size-12 place-items-center rounded-xl bg-brand-600 text-white">
-                    <Icon className="size-5" />
-                  </span>
-                  <h3 className="mt-1 text-xl leading-snug font-bold text-ink">{o.title}</h3>
-                  <p className="whitespace-pre-line text-muted">{o.text}</p>
-                </Reveal>
-              );
-            })}
-          </div>
-        </Container>
-      </section>
+      {!hidden.offers && (
+        <section
+          id="offers"
+          className="relative isolate scroll-mt-28 overflow-hidden py-14 lg:py-[4.5rem]"
+        >
+          <BgImage src={p.offersImage} tone="light" />
+          <Container>
+            <SectionHeading title={p.offerTitle} />
+            {/* Subgrid: icon · tiêu đề · mô tả thẳng hàng giữa các thẻ cùng hàng (tiêu đề 2 dòng không đẩy lệch mô tả) */}
+            <div className="rail grid gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+              {p.offers.map((o, i) => {
+                const Icon = icons[i];
+                return (
+                  <Reveal
+                    key={i}
+                    delay={(i % 4) * 80}
+                    className="row-span-3 grid grid-rows-subgrid content-start gap-y-3 rounded-3xl bg-surface p-6"
+                  >
+                    <span className="grid size-12 place-items-center rounded-xl bg-brand-600 text-white">
+                      <Icon className="size-5" />
+                    </span>
+                    <h3 className="mt-1 text-xl leading-snug font-bold text-ink">{o.title}</h3>
+                    <p className="whitespace-pre-line text-muted">{o.text}</p>
+                  </Reveal>
+                );
+              })}
+            </div>
+          </Container>
+        </section>
+      )}
 
-      <section id="projects" className="scroll-mt-28 bg-white py-14 lg:py-[4.5rem]">
-        <Container>
-          <SectionHeading
-            eyebrow={homeCopy.partnersEyebrow}
-            title={homeCopy.projectsTitle}
-            subtitle={homeCopy.partnersSubtitle}
-          />
-          <ProjectCases projects={homeCopy.projects} />
-        </Container>
-      </section>
+      {!hidden.projects && (
+        <section id="projects" className="scroll-mt-28 bg-white py-14 lg:py-[4.5rem]">
+          <Container>
+            <SectionHeading
+              eyebrow={homeCopy.partnersEyebrow}
+              title={homeCopy.projectsTitle}
+              subtitle={homeCopy.partnersSubtitle}
+            />
+            <ProjectCases projects={homeCopy.projects} />
+          </Container>
+        </section>
+      )}
 
       <section id="partner-form" className="scroll-mt-28 bg-brand-950 py-14 lg:py-[4.5rem]">
         <Container className="grid gap-10 lg:grid-cols-2">

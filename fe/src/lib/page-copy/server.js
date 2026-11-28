@@ -24,3 +24,11 @@ export async function getPageText(key, lang, dict) {
   const [data, sources] = await Promise.all([getPageCopy(key), loadDataSources(entry)]);
   return resolvePage(entry, data, { dict, data: sources }, lang);
 }
+
+/**
+ * "Hiển thị trên Google" đã lưu trong CMS cho 1 trang ({ en, zh, vi } × { title, description }) — null khi chưa
+ * sửa. Dùng trong generateMetadata: `seoField(await getPageSeo(key), lang, "title") || <tiêu đề mặc định>`.
+ */
+export async function getPageSeo(key) {
+  return (await getPageCopy(key))?.seo ?? null;
+}

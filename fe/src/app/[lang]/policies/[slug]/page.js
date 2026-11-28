@@ -51,7 +51,7 @@ async function PolicyPageContent({ params }) {
   if (!policy) notFound();
   const dict = await getDictionary(lang);
   const t = dict.policy;
-  const info = await getContactInfo(); // CMS → Cài đặt → Thông tin liên hệ
+  const info = await getContactInfo(); // CMS → Thông tin liên hệ
 
   // Gắn id cho các đề mục <h2> để làm mục lục "On this page" ở cột phải
   const toc = [];

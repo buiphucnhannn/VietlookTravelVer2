@@ -63,7 +63,7 @@ export default async function LangLayout({ children, params }) {
   const catalog = await getCatalog();
   const nav = buildNavigation(lang, dict, catalog);
   const tracking = await getTracking();
-  // Thông tin liên hệ: CMS → Cài đặt → Thông tin liên hệ · chữ đầu & chân trang: CMS → Giao diện trang → Đầu & chân trang
+  // Thông tin liên hệ: CMS → Thông tin liên hệ · chữ đầu & chân trang: CMS → Giao diện trang → Đầu & chân trang
   const [info, g] = await Promise.all([getContactInfo(), getPageText("global", lang, dict)]);
   const headerLabels = {
     ...dict.topbar,

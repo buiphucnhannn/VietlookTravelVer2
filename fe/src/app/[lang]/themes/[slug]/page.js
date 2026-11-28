@@ -5,7 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { fill, href, locales, lp, tr } from "@/i18n/config";
-import { pageMetadata, notFoundMetadata } from "@/lib/seo";
+import { pageMetadata, notFoundMetadata, seoField } from "@/lib/seo";
 import { Container } from "@/components/ui";
 import { AdviceBox, BannerHero } from "@/components/ui/PageHero";
 import { Star } from "lucide-react";
@@ -41,8 +41,11 @@ export async function generateMetadata({ params }) {
   return pageMetadata({
     lang,
     path: `/themes/${slug}`,
-    title: fill(p.themeSamples, { name: inSentence(tr(theme.name, lang), lang) }),
-    description: tr(theme.intro, lang),
+    // Tiêu đề / mô tả Google nhập trong CMS (Chủ đề → Hiển thị trên Google) được ưu tiên; trống = tự tạo
+    title:
+      seoField(theme.seo, lang, "title") ||
+      fill(p.themeSamples, { name: inSentence(tr(theme.name, lang), lang) }),
+    description: seoField(theme.seo, lang, "description") || tr(theme.intro, lang),
     image: theme.banner || theme.image,
   });
 }

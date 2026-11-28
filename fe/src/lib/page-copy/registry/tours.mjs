@@ -37,6 +37,7 @@ const cruise = (name, path, images, title, intro, summary) => ({
   name,
   group: "Tour & du thuyền",
   path,
+  seo: true,
   summary,
   thumb: "heroImages.0",
   fields: {
@@ -78,6 +79,7 @@ export const TOURS_PAGE_COPY = {
     name: "Tất cả tour",
     group: "Tour & du thuyền",
     path: "/tours",
+    seo: true,
     summary: "Đầu trang (3 ảnh, tiêu đề, giới thiệu) và hộp tư vấn dưới danh sách tour.",
     thumb: "heroImages.0",
     fields: {
@@ -135,6 +137,7 @@ export const TOURS_PAGE_COPY = {
     name: "Gói tour 1–3 tuần",
     group: "Tour & du thuyền",
     path: "/packages",
+    seo: true,
     summary:
       "Đầu trang + ảnh ghép, 6 lý do chọn, lời giới thiệu và hộp thiết kế riêng của gói 1 / 2 / 3 tuần.",
     thumb: "heroImages.0",

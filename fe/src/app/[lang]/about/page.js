@@ -58,6 +58,8 @@ export default async function AboutPage({ params }) {
     ctaLabel: own("ctaLabel") || dict.nav.contact,
   };
   const valueIcons = [Rocket, HeartHandshake, Sparkles];
+  // Khối đã tắt trong CMS (công tắc “Hiện / Ẩn trên website”) → bỏ hẳn khỏi trang
+  const hidden = about.hidden ?? {};
   const collage = ABOUT_COLLAGE.map((src, i) => about.collage?.[i] || src);
   // "Vì sao chọn Vietlook": tối đa 6 lý do (mỗi lý do một biểu tượng); chưa nhập → dùng bộ của trang chủ
   const reasons = (about.reasons ?? [])
@@ -133,98 +135,107 @@ export default async function AboutPage({ params }) {
         </Container>
       </section>
 
-      <section className="relative isolate overflow-hidden bg-brand-950 py-14 text-white lg:py-[4.5rem]">
-        <BgImage src="/images/tours/hd/hanoi7.jpg" tone="dark" />
-        <Container className="grid gap-6 md:grid-cols-2">
-          {[
-            {
-              icon: Eye,
-              title: a.visionTitle,
-              text: tr(about.vision, lang),
-            },
-            {
-              icon: Compass,
-              title: a.missionTitle,
-              text: tr(about.mission, lang),
-            },
-          ].map((x, i) => (
-            <div
-              key={i}
-              className={cn("rounded-3xl bg-white/5 p-8 ring-1 ring-white/10", subgrid(3, "md"))}
-            >
-              <x.icon className="size-9 text-amber-brand" />
-              <h3 className="mt-4 text-2xl font-bold">{x.title}</h3>
-              <p className="mt-2 text-lg text-white/80">{x.text}</p>
-            </div>
-          ))}
-        </Container>
-        <Container className="mt-14">
-          <h2 className="text-center text-3xl font-bold">{a.valuesTitle}</h2>
-          <div className="rail mt-10 grid gap-6 md:grid-cols-3">
-            {(about.values ?? []).map((v, i) => {
-              const Icon = valueIcons[i % valueIcons.length];
-              return (
-                <Reveal
-                  key={i}
-                  delay={i * 90}
-                  className={cn("rounded-3xl bg-white p-7 text-ink", subgrid(3, "md"))}
-                >
-                  <span className="grid size-12 place-items-center rounded-xl bg-sun-500 text-white">
-                    <Icon className="size-6" />
-                  </span>
-                  <h3 className="mt-4 text-xl font-bold">{tr(v.title, lang)}</h3>
-                  <p className="mt-2 text-muted">{tr(v.text, lang)}</p>
-                </Reveal>
-              );
-            })}
-          </div>
-          <div className="mt-10 flex flex-wrap justify-center gap-3">
-            {tr(about.people, lang).map((p) => (
-              <span key={p} className="rounded-full border border-white/25 px-5 py-2 font-semibold">
-                {p}
-              </span>
+      {!hidden.values && (
+        <section className="relative isolate overflow-hidden bg-brand-950 py-14 text-white lg:py-[4.5rem]">
+          <BgImage src="/images/tours/hd/hanoi7.jpg" tone="dark" />
+          <Container className="grid gap-6 md:grid-cols-2">
+            {[
+              {
+                icon: Eye,
+                title: a.visionTitle,
+                text: tr(about.vision, lang),
+              },
+              {
+                icon: Compass,
+                title: a.missionTitle,
+                text: tr(about.mission, lang),
+              },
+            ].map((x, i) => (
+              <div
+                key={i}
+                className={cn("rounded-3xl bg-white/5 p-8 ring-1 ring-white/10", subgrid(3, "md"))}
+              >
+                <x.icon className="size-9 text-amber-brand" />
+                <h3 className="mt-4 text-2xl font-bold">{x.title}</h3>
+                <p className="mt-2 text-lg text-white/80">{x.text}</p>
+              </div>
             ))}
-          </div>
-        </Container>
-      </section>
-
-      <div id="why">
-        <WhyUs dict={whyDict} />
-      </div>
-      <AccessibleTravel lang={lang} dict={dict} />
-
-      <section className="relative isolate overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
-        <BgImage src="/images/tours/v2/hanoi-32123175.jpg" tone="mist" />
-        <Container className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="overflow-hidden rounded-3xl shadow-xl">
-            {/* Video CMS (YouTube / Google Drive); trống → video giới thiệu có sẵn */}
-            <VideoEmbed
-              url={about.video}
-              fallbackId={siteConfig.youtubeIds[0]}
-              title="Discovering The Timeless Beauty With Vietlook Travel"
-            />
-          </div>
-          <div>
-            <SectionHeading title={a.numbersTitle} align="left" />
-            <dl className="grid grid-cols-2 gap-4">
-              {stats.map((s, i) => (
-                <div
-                  key={i}
-                  className="flex flex-col-reverse rounded-2xl bg-white p-5 ring-1 ring-border"
+          </Container>
+          <Container className="mt-14">
+            <h2 className="text-center text-3xl font-bold">{a.valuesTitle}</h2>
+            <div className="rail mt-10 grid gap-6 md:grid-cols-3">
+              {(about.values ?? []).map((v, i) => {
+                const Icon = valueIcons[i % valueIcons.length];
+                return (
+                  <Reveal
+                    key={i}
+                    delay={i * 90}
+                    className={cn("rounded-3xl bg-white p-7 text-ink", subgrid(3, "md"))}
+                  >
+                    <span className="grid size-12 place-items-center rounded-xl bg-sun-500 text-white">
+                      <Icon className="size-6" />
+                    </span>
+                    <h3 className="mt-4 text-xl font-bold">{tr(v.title, lang)}</h3>
+                    <p className="mt-2 text-muted">{tr(v.text, lang)}</p>
+                  </Reveal>
+                );
+              })}
+            </div>
+            <div className="mt-10 flex flex-wrap justify-center gap-3">
+              {tr(about.people, lang).map((p) => (
+                <span
+                  key={p}
+                  className="rounded-full border border-white/25 px-5 py-2 font-semibold"
                 >
-                  <dt className="text-sm text-muted">{s.label}</dt>
-                  <dd className="text-3xl font-extrabold text-brand-600">{s.value}</dd>
-                </div>
+                  {p}
+                </span>
               ))}
-            </dl>
-            <Button href={`${lp(lang)}/contact`} variant="cta" className="mt-8">
-              {a.ctaLabel}
-            </Button>
-          </div>
-        </Container>
-      </section>
+            </div>
+          </Container>
+        </section>
+      )}
 
-      <Reviews lang={lang} dict={dict} reviews={reviews} bg="white" />
+      {!hidden.why && (
+        <div id="why">
+          <WhyUs dict={whyDict} />
+        </div>
+      )}
+      {!hidden.access && <AccessibleTravel lang={lang} dict={dict} />}
+
+      {!hidden.numbers && (
+        <section className="relative isolate overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
+          <BgImage src="/images/tours/v2/hanoi-32123175.jpg" tone="mist" />
+          <Container className="grid items-center gap-10 lg:grid-cols-2">
+            <div className="overflow-hidden rounded-3xl shadow-xl">
+              {/* Video CMS (YouTube / Google Drive); trống → video giới thiệu có sẵn */}
+              <VideoEmbed
+                url={about.video}
+                fallbackId={siteConfig.youtubeIds[0]}
+                title="Discovering The Timeless Beauty With Vietlook Travel"
+              />
+            </div>
+            <div>
+              <SectionHeading title={a.numbersTitle} align="left" />
+              <dl className="grid grid-cols-2 gap-4">
+                {stats.map((s, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col-reverse rounded-2xl bg-white p-5 ring-1 ring-border"
+                  >
+                    <dt className="text-sm text-muted">{s.label}</dt>
+                    <dd className="text-3xl font-extrabold text-brand-600">{s.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <Button href={`${lp(lang)}/contact`} variant="cta" className="mt-8">
+                {a.ctaLabel}
+              </Button>
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {!hidden.reviews && <Reviews lang={lang} dict={dict} reviews={reviews} bg="white" />}
     </>
   );
 }

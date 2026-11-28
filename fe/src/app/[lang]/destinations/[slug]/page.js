@@ -3,7 +3,7 @@ import PageSkeleton from "@/components/ui/PageSkeleton";
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { fill, href, locales, lp, tr } from "@/i18n/config";
-import { pageMetadata, notFoundMetadata } from "@/lib/seo";
+import { pageMetadata, notFoundMetadata, seoField } from "@/lib/seo";
 import { Container, SectionHeading } from "@/components/ui";
 import { AdviceBox, BlobHero } from "@/components/ui/PageHero";
 import TourListing from "@/components/tours/TourListing";
@@ -40,14 +40,16 @@ export async function generateMetadata({ params }) {
   return pageMetadata({
     lang,
     path: `/destinations/${slug}`,
-    title: fill(p.destBestTours, { name }),
+    // Tiêu đề / mô tả Google nhập trong CMS (Điểm đến → Hiển thị trên Google) được ưu tiên; trống = tự tạo
+    title: seoField(r.item.seo, lang, "title") || fill(p.destBestTours, { name }),
     // Mô tả ngắn → thêm câu ngữ cảnh để đủ ý cho kết quả tìm kiếm
     description:
-      lang === "zh"
+      seoField(r.item.seo, lang, "description") ||
+      (lang === "zh"
         ? `${tr(r.item.intro, lang)}${name}私人线路与定制行程，由本地地接社 Vietlook Travel 安排。`
         : lang === "vi"
           ? `${tr(r.item.intro, lang)} Tour riêng ${name} và hành trình thiết kế theo yêu cầu do công ty lữ hành địa phương Vietlook Travel tổ chức.`
-          : `${tr(r.item.intro, lang)} Private ${name} tours and tailor-made trips by local operator Vietlook Travel.`,
+          : `${tr(r.item.intro, lang)} Private ${name} tours and tailor-made trips by local operator Vietlook Travel.`),
     image: r.item.hero || r.item.image,
   });
 }

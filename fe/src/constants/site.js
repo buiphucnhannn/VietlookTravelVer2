@@ -70,7 +70,7 @@ export const siteConfig = {
       },
       hotline2: "WhatsApp · LINE",
     },
-    // Email liên hệ HIỂN THỊ cho khách. Hộp thư nhận thông báo đơn/form cài riêng trong CMS (Cài đặt → Thông báo).
+    // Email liên hệ HIỂN THỊ cho khách. Hộp thư nhận thông báo đơn/form cài riêng trong CMS (Cài đặt → Email thông báo).
     email: "info@vietlooktravel.com",
     address: {
       en: "01 Lien Ke 20, Van Khe Urban Area, Ha Dong, Hanoi 12113, Vietnam",
@@ -93,7 +93,7 @@ export const siteConfig = {
   // Video giới thiệu chính chủ (chỉ dùng để phát video, không phải link mạng xã hội)
   youtubeIds: ["-Si4zYv7gKs"],
   // Điểm & số lượt đánh giá Tripadvisor / Google: KHÔNG để cứng ở đây — máy chủ tự cập nhật mỗi ngày
-  // (xem CMS → Cài đặt → "Điểm & số lượt đánh giá"). Xem lib/review-stats.js.
+  // (xem CMS → Đánh giá → "Điểm & số lượt đánh giá"). Xem lib/review-stats.js.
   messaging: {
     whatsapp: "https://wa.me/84983393588",
     whatsapp2: "https://wa.me/84983393488",

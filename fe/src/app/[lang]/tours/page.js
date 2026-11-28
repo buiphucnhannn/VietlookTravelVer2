@@ -1,21 +1,22 @@
 import { getDictionary } from "@/i18n/dictionaries";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, seoField } from "@/lib/seo";
 import { Container } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
 import TourListing from "@/components/tours/TourListing";
 import { href, lp } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
-import { getPageText } from "@/lib/page-copy/server";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = await getPageText("tours", lang, dict);
+  const seo = await getPageSeo("tours"); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: "/tours",
-    title: p.heroTitle,
-    description: p.heroIntro,
+    title: seoField(seo, lang, "title") || p.heroTitle,
+    description: seoField(seo, lang, "description") || p.heroIntro,
   });
 }
 

@@ -44,6 +44,24 @@ input::-webkit-contacts-auto-fill-button {
   }
 }
 
+/* Bản xem trước trang website trong trình sửa (gắn class "site-preview" vào khung bao):
+   tắt hiệu ứng chuyển động / trượt / hiện dần của website — đỡ giật, đỡ lag, dễ sửa chữ và ảnh.
+   Phần giao diện sửa (data-edit-ui: viền ô sửa, nút đổi ảnh, thanh danh sách) vẫn giữ hiệu ứng nhẹ. */
+.site-preview *,
+.site-preview *::before,
+.site-preview *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+.site-preview [data-edit-ui],
+.site-preview [data-edit-ui] * {
+  transition-duration: 150ms !important;
+}
+
 /* CSS của khu quản trị (CMS) + trang đăng nhập. Website dùng site.css (nhẹ hơn, không kèm lớp của CMS). */
 
 /* ===== CMS: nội dung trong trình soạn thảo (RichText) ===== */

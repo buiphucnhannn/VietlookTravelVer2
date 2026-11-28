@@ -13,7 +13,8 @@ import { EXCLUSIVE_THEME } from "@/constants/themes";
  *   máy tính 4 cột: [Độc quyền 2×2][1][2] / [Độc quyền][3][4] / [5][6][7 — rộng 2]
  *   tablet / điện thoại 2 cột: [Độc quyền — rộng 2] rồi từng cặp, thẻ lẻ cuối rộng 2
  */
-export default function ThemesMasonry({ lang, dict, themes }) {
+// `itemSlot(theme, i)`: chỉ bản xem trước trong CMS (lớp sửa phủ lên từng thẻ) — website không truyền.
+export default function ThemesMasonry({ lang, dict, themes, itemSlot }) {
   const t = dict.home;
   const featured = themes.find((x) => x.slug === EXCLUSIVE_THEME);
   const rest = themes.filter((x) => x !== featured);
@@ -47,6 +48,50 @@ export default function ThemesMasonry({ lang, dict, themes }) {
           {ordered.map((theme, i) => {
             const big = theme === featured;
             const last = !big && i === ordered.length - 1;
+            const card = (
+              <Link
+                href={`${lp(lang)}/themes/${theme.slug}`}
+                className={cn(
+                  "group relative block size-full overflow-hidden rounded-md",
+                  big && "ring-2 ring-amber-brand ring-offset-2 ring-offset-[#141210]",
+                )}
+              >
+                <Image
+                  src={theme.image}
+                  alt=""
+                  fill
+                  sizes={big ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1024px) 25vw, 50vw"}
+                  className="object-cover transition-transform duration-[1200ms] group-hover:scale-110"
+                />
+                <span
+                  className={cn(
+                    "absolute inset-0 transition-colors duration-500",
+                    big
+                      ? "bg-gradient-to-t from-black/70 via-black/25 to-black/10 group-hover:bg-black/30"
+                      : "bg-black/15 group-hover:bg-black/40",
+                  )}
+                />
+                {big ? (
+                  <span className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center [text-shadow:0_2px_10px_rgba(0,0,0,.75)]">
+                    <span className="mb-3 grid size-10 place-items-center rounded-full bg-amber-brand text-ink shadow-lg">
+                      <Star className="size-5 fill-current" aria-hidden />
+                    </span>
+                    <span className="text-2xl leading-tight font-bold uppercase sm:text-3xl lg:text-4xl">
+                      {tr(theme.name, lang)}
+                    </span>
+                    {tr(theme.tagline, lang) && (
+                      <span className="mt-2 max-w-sm text-sm text-white/90 sm:text-base">
+                        {tr(theme.tagline, lang)}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="absolute inset-0 grid place-items-center px-3 text-center text-lg leading-tight font-semibold uppercase [text-shadow:0_2px_8px_rgba(0,0,0,.7)] sm:text-xl">
+                    {tr(theme.name, lang)}
+                  </span>
+                )}
+              </Link>
+            );
             return (
               <Reveal
                 key={theme.slug}
@@ -57,50 +102,14 @@ export default function ThemesMasonry({ lang, dict, themes }) {
                   last && (smMissing || lgMissing) && lastSpan,
                 )}
               >
-                <Link
-                  href={`${lp(lang)}/themes/${theme.slug}`}
-                  className={cn(
-                    "group relative block size-full overflow-hidden rounded-md",
-                    big && "ring-2 ring-amber-brand ring-offset-2 ring-offset-[#141210]",
-                  )}
-                >
-                  <Image
-                    src={theme.image}
-                    alt=""
-                    fill
-                    sizes={
-                      big ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1024px) 25vw, 50vw"
-                    }
-                    className="object-cover transition-transform duration-[1200ms] group-hover:scale-110"
-                  />
-                  <span
-                    className={cn(
-                      "absolute inset-0 transition-colors duration-500",
-                      big
-                        ? "bg-gradient-to-t from-black/70 via-black/25 to-black/10 group-hover:bg-black/30"
-                        : "bg-black/15 group-hover:bg-black/40",
-                    )}
-                  />
-                  {big ? (
-                    <span className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center [text-shadow:0_2px_10px_rgba(0,0,0,.75)]">
-                      <span className="mb-3 grid size-10 place-items-center rounded-full bg-amber-brand text-ink shadow-lg">
-                        <Star className="size-5 fill-current" aria-hidden />
-                      </span>
-                      <span className="text-2xl leading-tight font-bold uppercase sm:text-3xl lg:text-4xl">
-                        {tr(theme.name, lang)}
-                      </span>
-                      {tr(theme.tagline, lang) && (
-                        <span className="mt-2 max-w-sm text-sm text-white/90 sm:text-base">
-                          {tr(theme.tagline, lang)}
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="absolute inset-0 grid place-items-center px-3 text-center text-lg leading-tight font-semibold uppercase [text-shadow:0_2px_8px_rgba(0,0,0,.7)] sm:text-xl">
-                      {tr(theme.name, lang)}
-                    </span>
-                  )}
-                </Link>
+                {itemSlot ? (
+                  <div className="relative size-full rounded-md">
+                    {card}
+                    {itemSlot(theme, i)}
+                  </div>
+                ) : (
+                  card
+                )}
               </Reveal>
             );
           })}

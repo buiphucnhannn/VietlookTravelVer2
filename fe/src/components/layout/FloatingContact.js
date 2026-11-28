@@ -123,7 +123,7 @@ export default function FloatingContact({ labels, contact, messaging }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // LINE (CMS → Cài đặt → Thông tin liên hệ): LINE ID nếu có + các số tích kênh LINE
+  // LINE (CMS → Thông tin liên hệ): LINE ID nếu có + các số tích kênh LINE
   const lineValues = [
     messaging.lineId,
     ...(messaging.linePhones ?? [contact.hotline, contact.hotline2]),

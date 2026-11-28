@@ -17,6 +17,8 @@
  *  CÁCH THÊM 1 TRANG MỚI (vd. "group-tailor-made-tours")
  * --------------------------------------------------------------------------------------------
  *  1. Khai báo trang trong PAGE_COPY bên dưới: name (tên tiếng Việt) / group (nhóm thẻ trong CMS, vd. "Trang dịch vụ")
+ *     / seo: true (trang có đường dẫn riêng → sửa được "Hiển thị trên Google", lưu ở data.seo; thêm khoá vào
+ *     PAGE_COPY_SEO_KEYS bên máy chủ)
  *     / path / thumb (đường dẫn ô ảnh làm ảnh thẻ; trang không có ô ảnh: `cover` = ảnh có sẵn cố định) / summary + `fields`.
  *     Mỗi ô: text(nhãn, nguồnMặcĐịnh, maxKýTự) · para(…) · image(nhãn, ảnhMặcĐịnh, khungCắt) · list(…).
  *     Nguồn mặc định (`def`):
@@ -49,6 +51,7 @@ import { TOURS_PAGE_COPY } from "./registry/tours.mjs"; // Tất cả tour, du t
 import { LISTING_PAGES } from "./registry/listing.mjs"; // Tất cả điểm đến, Cẩm nang du lịch
 import { DETAIL_PAGES } from "./registry/detail.mjs"; // Chữ chung trên trang chi tiết
 import { GLOBAL_PAGES } from "./registry/global.mjs"; // Đầu & chân trang, Trang 404, Khối không rào cản
+import { PAGE_COPY_BLOCKS } from "../hidden-blocks.mjs"; // khối bật / tắt được trên website
 
 /* ---------- Kiểu ô ---------- */
 
@@ -78,6 +81,7 @@ export const PAGE_COPY = {
     name: "Thuê xe",
     group: "Trang dịch vụ",
     path: "/car-rental",
+    seo: true,
     summary: "Đầu trang, điểm mạnh, dịch vụ, giá đã bao gồm, cách đặt xe, câu hỏi thường gặp.",
     thumb: "heroImage",
     fields: {
@@ -156,6 +160,7 @@ export const PAGE_COPY = {
     name: "Visa & Fast-track",
     group: "Trang dịch vụ",
     path: "/visa-fast-track",
+    seo: true,
     summary: "Đầu trang, gói fast-track, quy trình 5 bước, lưu ý, thuật ngữ, câu hỏi thường gặp.",
     thumb: "heroImages.0",
     fields: {
@@ -244,3 +249,7 @@ export const PAGE_COPY = {
 export const PAGE_COPY_KEYS = Object.keys(PAGE_COPY);
 
 export const pageCopyOf = (key) => (Object.hasOwn(PAGE_COPY, key) ? PAGE_COPY[key] : null);
+
+// Khối bật / tắt được trên website của từng trang (lib/hidden-blocks.mjs): entry.hideable = [khoá khối…]
+for (const [key, blocks] of Object.entries(PAGE_COPY_BLOCKS))
+  if (Object.hasOwn(PAGE_COPY, key)) PAGE_COPY[key].hideable = Object.keys(blocks);

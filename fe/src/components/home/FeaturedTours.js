@@ -9,11 +9,13 @@ import { lp } from "@/i18n/config";
  * Khối "Tour nổi bật" trang chủ (CMS → Trang chủ → Tour nổi bật; chưa chọn → tour đánh dấu "nổi bật").
  * Khác hẳn khối tour dài ngày bên dưới: thẻ vòm dọc 4:5 có mô tả ngắn, xếp thành dải trượt
  * (4 thẻ desktop · 2 tablet · 1 thẻ + mép thẻ kế bên trên mobile). Không có tour nào → ẩn cả khối.
+ * Chỉ bản xem trước trong CMS (website không truyền): `staticGrid` — bày mọi thẻ thành lưới tĩnh;
+ * `itemSlot(card, i)` — lớp sửa phủ lên từng thẻ; `after` — ô thêm cuối lưới.
  */
-export default function FeaturedTours({ lang, dict, cards, labels }) {
-  if (!cards.length) return null;
+export default function FeaturedTours({ lang, dict, cards, labels, staticGrid, itemSlot, after }) {
+  if (!cards.length && !after) return null;
   const t = dict.home;
-  const few = cards.length <= 4; // ít thẻ → lưới tĩnh, không cần dải trượt
+  const few = staticGrid || cards.length <= 4; // ít thẻ → lưới tĩnh, không cần dải trượt
 
   return (
     <section className="bg-white py-14 lg:py-[4.5rem]" id="featured-tours">
@@ -26,9 +28,24 @@ export default function FeaturedTours({ lang, dict, cards, labels }) {
 
         {few ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-            {cards.map((card) => (
-              <TourCard key={card.slug} lang={lang} card={card} labels={labels} />
-            ))}
+            {cards.map((card, i) =>
+              itemSlot ? (
+                // bản xem trước CMS: thẻ giống dải trượt trên web (không canh hàng chung) + lớp sửa phủ lên
+                <div key={card.slug} className="relative h-full">
+                  <TourCard
+                    lang={lang}
+                    card={card}
+                    labels={labels}
+                    alignAt={false}
+                    className="h-full"
+                  />
+                  {itemSlot(card, i)}
+                </div>
+              ) : (
+                <TourCard key={card.slug} lang={lang} card={card} labels={labels} />
+              ),
+            )}
+            {after}
           </div>
         ) : (
           <Carousel itemClassName="basis-[82%] sm:basis-1/2 lg:basis-1/4" label={t.featuredTitle}>

@@ -2,9 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BookOpen, Car, CheckCircle2, Map, Stamp, Users } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, seoField } from "@/lib/seo";
 import { href } from "@/i18n/config";
-import { getPageText } from "@/lib/page-copy/server";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 import { cn } from "@/lib/utils";
 import { Container, Reveal } from "@/components/ui";
 import { BrushHero } from "@/components/ui/PageHero";
@@ -23,11 +23,12 @@ export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = await getPageText("services", lang, dict);
+  const seo = await getPageSeo("services"); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: "/services",
-    title: p.heroTitle,
-    description: p.heroSubtitle,
+    title: seoField(seo, lang, "title") || p.heroTitle,
+    description: seoField(seo, lang, "description") || p.heroSubtitle,
   });
 }
 

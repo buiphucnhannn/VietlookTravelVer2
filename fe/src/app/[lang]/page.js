@@ -1,8 +1,8 @@
 import { getDictionary } from "@/i18n/dictionaries";
 import { lp, tr } from "@/i18n/config";
 import { cardLabels } from "@/lib/labels";
-import { pageMetadata } from "@/lib/seo";
-import { getCatalog, getReviews } from "@/lib/catalog";
+import { pageMetadata, seoField } from "@/lib/seo";
+import { getCatalog, getHomeSeo, getReviews } from "@/lib/catalog";
 import { Container, SectionHeading } from "@/components/ui";
 import TrustStrip from "@/components/home/TrustStrip";
 import Hero from "@/components/home/Hero";
@@ -32,10 +32,12 @@ import { DEFAULT_GRID, pairOf } from "@/data/destination-grid";
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
+  // CMS → Trang chủ → Hiển thị trên Google (ô trống = câu mặc định của website)
+  const seo = await getHomeSeo();
   return pageMetadata({
     lang,
-    title: { absolute: dict.meta.title },
-    description: dict.meta.description,
+    title: { absolute: seoField(seo, lang, "title") || dict.meta.title },
+    description: seoField(seo, lang, "description") || dict.meta.description,
   });
 }
 
@@ -68,6 +70,8 @@ export default async function HomePage({ params }) {
   const labels = cardLabels(dict);
   // Ảnh các khối: ảnh nhân viên thay trong CMS → Trang chủ, ô trống → ảnh có sẵn
   const images = homeImages(home.images);
+  // Khối đã tắt trong CMS → Trang chủ (công tắc “Hiện / Ẩn trên website”): bỏ hẳn khỏi trang, không để khoảng trống
+  const hidden = home.hidden ?? {};
 
   // Bản đồ Bắc → Nam: mọi điểm đến có toạ độ + 2 tour nổi bật
   const mapItems = destinations
@@ -131,56 +135,70 @@ export default async function HomePage({ params }) {
         regions={regions}
         destinations={destinations}
       />
-      <TrustStrip items={dict.home.trust} stats={dict.reviewStats} />
-      <ServicesTrio lang={lang} dict={dict} images={images.services} />
-      <FeaturedTours lang={lang} dict={dict} labels={labels} cards={featured} />
-      <B2BBlock lang={lang} dict={dict} images={images} />
-      <section className="bg-cream-100 py-14 lg:py-[4.5rem]" id="map">
-        <Container>
-          <SectionHeading
-            eyebrow={dict.home.mapEyebrow}
-            title={dict.home.mapTitle}
-            subtitle={dict.home.mapSubtitle}
-          />
-          <VietnamMap
-            items={mapItems}
-            lang={lang}
-            labels={{
-              featured: dict.home.mapFeatured,
-              hint: dict.home.mapHint,
-              discover: dict.home.gridDiscover,
-              tours: dict.home.gridTours,
-              from: dict.common.from,
-            }}
-          />
-        </Container>
-      </section>
-      <DestinationGrid lang={lang} dict={dict} featured={gridFeatured} others={gridOthers} />
-      <DrumStats lang={lang} dict={dict} />
-      <LongTours
-        lang={lang}
-        t={{
-          longToursTitle: dict.home.longToursTitle,
-          longToursSubtitle: dict.home.longToursSubtitle,
-          weekTabs: dict.home.weekTabs,
-          longToursCta: dict.home.longToursCta,
-        }}
-        labels={labels}
-        cards={longTours({ shown: featured.map((c) => c.slug) }).map((t) => toCard(t, lang))}
-      />
-      <BookingSteps dict={dict} />
-      <ThemesMasonry lang={lang} dict={dict} themes={homeThemes()} />
-      <CustomTrip lang={lang} dict={dict} starImages={images.star} starLabels={home.starLabels} />
+      {!hidden.trust && <TrustStrip items={dict.home.trust} stats={dict.reviewStats} />}
+      {!hidden.services && <ServicesTrio lang={lang} dict={dict} images={images.services} />}
+      {!hidden.featured && (
+        <FeaturedTours lang={lang} dict={dict} labels={labels} cards={featured} />
+      )}
+      {!hidden.b2b && <B2BBlock lang={lang} dict={dict} images={images} />}
+      {!hidden.map && (
+        <section className="bg-cream-100 py-14 lg:py-[4.5rem]" id="map">
+          <Container>
+            <SectionHeading
+              eyebrow={dict.home.mapEyebrow}
+              title={dict.home.mapTitle}
+              subtitle={dict.home.mapSubtitle}
+            />
+            <VietnamMap
+              items={mapItems}
+              lang={lang}
+              labels={{
+                featured: dict.home.mapFeatured,
+                hint: dict.home.mapHint,
+                discover: dict.home.gridDiscover,
+                tours: dict.home.gridTours,
+                from: dict.common.from,
+              }}
+            />
+          </Container>
+        </section>
+      )}
+      {!hidden.destinations && (
+        <DestinationGrid lang={lang} dict={dict} featured={gridFeatured} others={gridOthers} />
+      )}
+      {!hidden.stats && <DrumStats lang={lang} dict={dict} />}
+      {!hidden.long && (
+        <LongTours
+          lang={lang}
+          t={{
+            longToursTitle: dict.home.longToursTitle,
+            longToursSubtitle: dict.home.longToursSubtitle,
+            weekTabs: dict.home.weekTabs,
+            longToursCta: dict.home.longToursCta,
+          }}
+          labels={labels}
+          cards={longTours({ shown: featured.map((c) => c.slug) }).map((t) => toCard(t, lang))}
+        />
+      )}
+      {!hidden.steps && <BookingSteps dict={dict} />}
+      {!hidden.themes && <ThemesMasonry lang={lang} dict={dict} themes={homeThemes()} />}
+      {!hidden.custom && (
+        <CustomTrip lang={lang} dict={dict} starImages={images.star} starLabels={home.starLabels} />
+      )}
 
-      <WhyUs dict={dict} />
+      {!hidden.why && <WhyUs dict={dict} />}
       {/* Du lịch không rào cản: xe lăn (có người đẩy), khiếm thính, đi lại hạn chế — theo yêu cầu */}
-      <AccessibleTravel lang={lang} dict={dict} />
-      <PartnerStrip title={dict.home.partnerStrip} />
-      <PartnersBlock lang={lang} dict={dict} />
-      <Reviews lang={lang} dict={dict} reviews={reviews} />
-      <GuideAndMonths lang={lang} dict={dict} posts={latestPosts} months={monthPosts()} />
-      <PlannerBlock lang={lang} dict={dict} destinationOptions={plannerOptions(lang)} />
-      <AboutBlob lang={lang} dict={dict} image={images.about} />
+      {!hidden.access && <AccessibleTravel lang={lang} dict={dict} />}
+      {!hidden.partnerLogos && <PartnerStrip title={dict.home.partnerStrip} />}
+      {!hidden.projects && <PartnersBlock lang={lang} dict={dict} />}
+      {!hidden.reviews && <Reviews lang={lang} dict={dict} reviews={reviews} />}
+      {!hidden.guide && (
+        <GuideAndMonths lang={lang} dict={dict} posts={latestPosts} months={monthPosts()} />
+      )}
+      {!hidden.planner && (
+        <PlannerBlock lang={lang} dict={dict} destinationOptions={plannerOptions(lang)} />
+      )}
+      {!hidden.about && <AboutBlob lang={lang} dict={dict} image={images.about} />}
     </>
   );
 }

@@ -48,14 +48,17 @@ Turnstile → Hostnames phải có tên miền website. Đặt secret mà thiế
 
 `RESEND_API_KEY`, `MAIL_FROM` (địa chỉ trên tên miền công ty đã xác minh, có SPF/DKIM/DMARC — xem `be/README.md`).
 Không đặt thì đơn vẫn lưu CMS, chỉ không gửi email.
+Người nhận thư báo đơn mới **chỉ** cài trong CMS → Cài đặt → **Email thông báo** (không còn biến `NOTIFY_EMAIL` — nếu
+server cũ còn dòng này thì xoá đi, hệ thống bỏ qua). Danh sách trống → đơn vẫn lưu CMS nhưng không ai nhận thư báo;
+trang Cài đặt và Tổng quan hiện cảnh báo cho admin.
 
 ### 1.6. Điểm & số lượt đánh giá Tripadvisor / Google (tự cập nhật qua Apify)
 
 Điểm và số lượt đánh giá của công ty (đầu trang, trang chủ, chân trang, trang tour…) do **máy chủ tự cập nhật mỗi ngày**
 ~06:00 giờ VN (`REVIEW_SYNC_HOUR_VN`) qua dịch vụ **Apify** (<https://apify.com>), và thêm 1 lần ngay sau khi backend khởi động
-nếu lần cập nhật cuối đã quá 24 giờ. CMS → **Cài đặt → "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)"** chỉ để **xem**:
+nếu lần cập nhật cuối đã quá 24 giờ. CMS → **Đánh giá → "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)"** chỉ để **xem**:
 số đang dùng, kết quả lần chạy gần nhất từng nền tảng, lần tự cập nhật tiếp theo, hạn mức Apify tháng này và nút
-**"Cập nhật ngay"** (chỉ admin; chạy nền ~1 phút; chờ 5 phút giữa 2 lần bấm). Không có ô nhập khoá / nhập số trong CMS.
+**"Cập nhật ngay"** (admin hoặc nhân viên có quyền sửa Đánh giá; chạy nền ~1 phút; chờ 5 phút giữa 2 lần bấm). Không có ô nhập khoá / nhập số trong CMS.
 
 **Lấy mã Apify (miễn phí, không cần thẻ):**
 
@@ -224,7 +227,7 @@ lên Google Search Console. Bản chạy thử trên tên miền tạm luôn b�
 - [ ] Gửi từng form (đặt tour, thiết kế tour, xe, visa, liên hệ, đối tác) → thấy trong CMS + email tới đúng người nhận
 - [ ] Mở `<ADMIN_LOGIN_PATH>` → đăng nhập → vào `/admin`; upload ảnh lên Cloudinary được
 - [ ] Cửa sổ ẩn danh (chưa đăng nhập): `/login`, `/admin`, `/admin/tours` → trang 404
-- [ ] CMS → Cài đặt → "Điểm & số lượt đánh giá": hiện hạn mức Apify; bấm "Cập nhật ngay" → ~1 phút sau báo kết quả từng nền tảng
+- [ ] CMS → Đánh giá → "Điểm & số lượt đánh giá": hiện hạn mức Apify; bấm "Cập nhật ngay" → ~1 phút sau báo kết quả từng nền tảng
 - [ ] Cookie `__Host-vl_at`, `__Secure-vl_rt`, `__Host-vl_session` (HttpOnly, Secure, SameSite=Strict)
 
 ## 5. Checklist bàn giao
@@ -233,7 +236,8 @@ lên Google Search Console. Bản chạy thử trên tên miền tạm luôn b�
 - [ ] `ADMIN_LOGIN_PATH` đã đặt trên Vercel (giá trị ngẫu nhiên mới, không dùng lại giá trị lúc chạy thử) → Redeploy;
       gửi link `https://<tên-miền><ADMIN_LOGIN_PATH>` **riêng** cho khách (gặp trực tiếp / tin nhắn riêng), dặn lưu
       bookmark và không chia sẻ; hướng dẫn cách đổi link (mục 3.1)
-- [ ] CMS → Cài đặt → Email nhận thông báo = email của **khách**
+- [ ] CMS → Cài đặt → Email thông báo = email của **khách** (bắt buộc — không có email dự phòng trên server)
+- [ ] CMS → Thông tin liên hệ: điện thoại, email, địa chỉ, mạng xã hội đúng của **khách**
 - [ ] CMS → Cài đặt → Thanh toán 9Pay: admin nhập 3 mã thật **trực tiếp trên CMS / server** (không gửi qua Zalo / email);
       đăng ký Return URL `https://<tên-miền>/api/v1/payments/return`, IPN URL `https://<tên-miền>/api/v1/payments/ipn`;
       thanh toán thật 1 đơn thành công

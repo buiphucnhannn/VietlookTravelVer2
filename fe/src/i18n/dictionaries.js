@@ -13,7 +13,7 @@ const dictionaries = {
 
 /**
  * Bộ chữ giao diện theo ngôn ngữ. Các ô {taLabel} {taCount} {gScore}… (điểm & số lượt đánh giá Tripadvisor /
- * Google) được điền sẵn từ CMS → Cài đặt (lib/review-stats.js); `dict.reviewStats` = số liệu gốc
+ * Google) được điền sẵn từ CMS → Đánh giá (lib/review-stats.js); `dict.reviewStats` = số liệu gốc
  * { tripadvisor, google } cho các khối cần số / link (huy hiệu banner, số sao, chân trang…).
  * Mỗi request chỉ dựng 1 lần cho mỗi ngôn ngữ.
  */

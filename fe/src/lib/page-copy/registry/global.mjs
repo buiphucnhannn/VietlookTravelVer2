@@ -6,7 +6,7 @@
  *
  * Không sửa ở đây (cố ý):
  *   - Số điện thoại, email, WeChat, LINE, địa chỉ, link Facebook / Tripadvisor / Google Maps, tên công ty,
- *     mã số doanh nghiệp, giấy phép: CMS → Cài đặt → Thông tin liên hệ (dùng chung cả website + email).
+ *     mã số doanh nghiệp, giấy phép: CMS → Thông tin liên hệ (dùng chung cả website + email).
  *   - Tên các mục menu & link chân trang: là cấu trúc điều hướng (cùng chữ với tiêu đề trang, đường dẫn,
  *     menu điện thoại, sơ đồ trang) — đổi riêng ở đây dễ lệch tên giữa menu và trang → giữ cố định.
  *   - Trang 404 toàn cục (đường dẫn không thuộc ngôn ngữ nào, app/global-not-found.js): trang tĩnh 3 thứ tiếng,

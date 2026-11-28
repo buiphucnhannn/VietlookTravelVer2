@@ -101,12 +101,15 @@ export const STAR_DEFAULT_NAMES = Array.from(
 
 /**
  * `labels`: tên địa điểm nhân viên đặt cho từng cánh (home.starLabels, { en, zh, vi }) — trống = tên có sẵn.
+ * `petalSlot(slot, { center, sliver })`: chỉ bản xem trước trong CMS — lớp sửa ảnh / tên nằm trong từng cánh
+ * (cánh không còn là liên kết, không hiện nhãn tên khi rê chuột). Website không truyền.
  */
 export default function RibbonStar({
   lang,
   className,
   images = DEFAULT_HOME_IMAGES.star,
   labels = [],
+  petalSlot,
 }) {
   return (
     <div
@@ -130,12 +133,13 @@ export default function RibbonStar({
         const [left, top, width, height] = p.box;
         const name = tr(labels?.[p.slot], lang) || tr(p.name, lang);
         const center = visibleCenter(p.clip);
+        const Petal = petalSlot ? "div" : Link;
         return (
-          <Link
+          <Petal
             key={i}
-            href={`${lp(lang)}/destinations/${p.slug}`}
-            aria-label={name}
-            tabIndex={p.sliver ? -1 : undefined}
+            href={petalSlot ? undefined : `${lp(lang)}/destinations/${p.slug}`}
+            aria-label={petalSlot ? undefined : name}
+            tabIndex={p.sliver && !petalSlot ? -1 : undefined}
             className="group absolute block"
             style={{
               left: `${left}%`,
@@ -154,7 +158,8 @@ export default function RibbonStar({
               sizes={`(min-width: 640px) ${Math.ceil(width * 5.94)}px, ${Math.ceil(width * 0.93)}vw`}
               className="object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:brightness-110 group-hover:saturate-125"
             />
-            {!p.sliver && (
+            {petalSlot?.(p.slot, { center, sliver: !!p.sliver })}
+            {!p.sliver && !petalSlot && (
               <span
                 className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                 style={{ left: `${center[0]}%`, top: `${center[1]}%` }}
@@ -164,7 +169,7 @@ export default function RibbonStar({
                 </span>
               </span>
             )}
-          </Link>
+          </Petal>
         );
       })}
 

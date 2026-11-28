@@ -1,22 +1,24 @@
 import Image from "next/image";
 import { CheckCircle2, Clock } from "lucide-react";
 import { getDictionary } from "@/i18n/dictionaries";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, seoField } from "@/lib/seo";
 import { Breadcrumbs, Container } from "@/components/ui";
 import TripPlannerForm from "@/components/forms/TripPlannerForm";
 import { href } from "@/i18n/config";
 import { getCatalog } from "@/lib/catalog";
-import { getPageText } from "@/lib/page-copy/server";
+import { getPageSeo, getPageText } from "@/lib/page-copy/server";
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
   const p = await getPageText("plan-your-trip", lang, dict);
+  const seo = await getPageSeo("plan-your-trip"); // CMS → Giao diện trang → Hiển thị trên Google
   return pageMetadata({
     lang,
     path: "/plan-your-trip",
-    title: p.title,
-    description: `${p.subtitle} ${p.points.slice(0, 3).join(" · ")}`,
+    title: seoField(seo, lang, "title") || p.title,
+    description:
+      seoField(seo, lang, "description") || `${p.subtitle} ${p.points.slice(0, 3).join(" · ")}`,
     image: p.heroImage,
   });
 }

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui";
 import TourCard from "@/components/tours/TourCard";
 import { lp } from "@/i18n/config";
+import { subgrid } from "@/lib/subgrid";
 
 // Nhóm theo tuần – giống bộ lọc gói tour của Link 3 (khung bố cục chính)
 const groups = {
@@ -21,7 +22,8 @@ const groups = {
  * thẻ khung vòm nền kem, kèm bộ lọc theo số tuần như Link 3.
  */
 // `t`: chỉ các câu chữ khối này dùng (không truyền cả từ điển xuống trình duyệt — trang chủ nặng thêm ~50 KB)
-export default function LongTours({ lang, t, cards, labels }) {
+// Chỉ bản xem trước trong CMS: `itemSlot(card, i)` lớp sửa phủ lên từng thẻ, `after` ô thêm cuối lưới.
+export default function LongTours({ lang, t, cards, labels, itemSlot, after }) {
   const [tab, setTab] = useState("all");
   const list = cards.filter(groups[tab]).slice(0, 8);
 
@@ -64,9 +66,25 @@ export default function LongTours({ lang, t, cards, labels }) {
           key={tab}
           className="grid animate-fade-up grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4 lg:gap-6"
         >
-          {list.map((card) => (
-            <TourCard key={card.slug} lang={lang} card={card} labels={labels} compact alignAt="" />
-          ))}
+          {list.map((card, i) =>
+            itemSlot ? (
+              // lớp bọc cũng chia hàng như thẻ (subgrid) → các thẻ vẫn thẳng hàng như trên web
+              <div key={card.slug} className={cn("relative", subgrid(4))}>
+                <TourCard lang={lang} card={card} labels={labels} compact alignAt="" />
+                {itemSlot(card, i)}
+              </div>
+            ) : (
+              <TourCard
+                key={card.slug}
+                lang={lang}
+                card={card}
+                labels={labels}
+                compact
+                alignAt=""
+              />
+            ),
+          )}
+          {after}
         </div>
 
         <div className="mt-10 text-center">
