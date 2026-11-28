@@ -60,6 +60,11 @@ before(() => {
     ...upd.$set,
   }));
   stub(enquiryRepository, "deleteById", async () => ({}));
+  // xoá đơn = chuyển vào Thùng rác
+  stub(enquiryRepository, "softDeleteById", async (id) => ({
+    ...enquiries[String(id)],
+    deletedAt: new Date(),
+  }));
   stub(enquiryRepository, "addNote", async (id) => enquiries[String(id)]);
   stub(enquiryRepository, "paginate", async (filter) => {
     lastEnquiryFilter = filter;
@@ -140,6 +145,25 @@ describe("phân quyền — hàm tính quyền", () => {
       permissions: { bookings: "full" },
     });
     assert.equal(c.success, true);
+  });
+
+  it("Thông tin liên hệ: Không / Xem / Sửa (không có xoá); tài khoản cũ & quyền đã lưu thiếu mục → không truy cập", () => {
+    for (const level of ["none", "view", "edit"])
+      assert.equal(updateUserSchema.safeParse({ permissions: { contact: level } }).success, true);
+    assert.equal(updateUserSchema.safeParse({ permissions: { contact: "full" } }).success, false);
+    assert.equal(LEGACY_EDITOR_PERMISSIONS.contact, "none");
+    assert.equal(effectivePermissions(users[ID.legacy]).contact, "none");
+    assert.equal(effectivePermissions(users[ID.staff]).contact, "none");
+    assert.equal(normalizePermissions({ contact: "full" }).contact, "edit");
+    assert.equal(effectivePermissions({ role: "admin" }).contact, "edit");
+    assert.equal(
+      can({ role: "editor", permissions: { contact: "view" } }, "contact", "edit"),
+      false,
+    );
+    assert.equal(
+      can({ role: "editor", permissions: { contact: "edit" } }, "contact", "edit"),
+      true,
+    );
   });
 });
 

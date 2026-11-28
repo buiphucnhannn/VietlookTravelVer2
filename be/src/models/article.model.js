@@ -1,5 +1,6 @@
 import { Schema, model } from "mongoose";
 import { localizedString, seoSchema, toJSONOptions } from "./shared.schema.js";
+import { softDeletePlugin } from "./soft-delete.plugin.js";
 
 /** Bài viết cẩm nang. body = HTML đã lọc (sanitize) theo từng ngôn ngữ. */
 const articleSchema = new Schema(
@@ -25,6 +26,8 @@ const articleSchema = new Schema(
   { timestamps: true, toJSON: toJSONOptions() },
 );
 
+// Thùng rác: deletedAt + mọi truy vấn đọc tự bỏ mục đã xoá (xem soft-delete.plugin.js)
+articleSchema.plugin(softDeletePlugin);
 articleSchema.index({ isActive: 1, publishedAt: -1 });
 
 export const Article = model("Article", articleSchema);

@@ -112,7 +112,7 @@ const remainingUsd = (e) => {
   return Math.max(0, Math.round((total - paid) * 100) / 100);
 };
 
-/** company: thông tin công ty từ CMS → Cài đặt → Thông tin liên hệ (payment.service truyền vào); thiếu → mặc định */
+/** company: thông tin công ty từ CMS → Thông tin liên hệ (payment.service truyền vào); thiếu → mặc định */
 export function paymentCustomerEmail(e, attempt, company = COMPANY) {
   const lang = pickLang(e.lang);
   const t = T[lang];

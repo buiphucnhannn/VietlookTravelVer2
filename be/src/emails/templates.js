@@ -172,7 +172,7 @@ const CUSTOMER = {
 
 export function customerEmail(e, lookups = {}) {
   const lang = pickLang(e.lang);
-  // Thông tin công ty: CMS → Cài đặt → Thông tin liên hệ (enquiry.service truyền vào); thiếu → mặc định
+  // Thông tin công ty: CMS → Thông tin liên hệ (enquiry.service truyền vào); thiếu → mặc định
   const co = lookups.company ?? COMPANY;
   const t = CUSTOMER[lang];
   const type = TYPE_LABEL[lang][e.type] ? e.type : "contact";

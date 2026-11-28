@@ -113,3 +113,25 @@ export const PAGE_COPY_SCHEMA = Object.freeze({
 });
 
 export const PAGE_COPY_KEYS = Object.keys(PAGE_COPY_SCHEMA);
+
+/**
+ * Trang có đường dẫn riêng → sửa được "Hiển thị trên Google" (tiêu đề + mô tả, lưu ở data.seo).
+ * Khớp với các trang `seo: true` trong fe/src/lib/page-copy/registry*.mjs (tests/page-copy.test.js kiểm tra).
+ * Không gồm: khối dùng chung (đầu & chân trang, chữ trang chi tiết, khối không rào cản), trang 404, trang cảm ơn.
+ */
+export const PAGE_COPY_SEO_KEYS = Object.freeze([
+  "car-rental",
+  "visa-fast-track",
+  "contact",
+  "partners",
+  "services",
+  "group-tailor-made-tours",
+  "plan-your-trip",
+  "tours",
+  "halong-bay-cruises",
+  "halong-bay-overnight-cruises",
+  "day-cruises",
+  "packages",
+  "destinations",
+  "travel-guide",
+]);

@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "emails:preview": "node --env-file-if-exists=.env scripts/preview-emails.js",
     "media:cleanup": "node --env-file-if-exists=.env src/scripts/media-cleanup.js",
+    "trash:purge": "node --env-file-if-exists=.env src/scripts/trash-purge.js",
     "images:upload": "node --env-file-if-exists=.env scripts/upload-site-images.js",
     "seed": "node --env-file-if-exists=.env src/scripts/seed-content.js",
     "reviews:seed": "node --env-file-if-exists=.env src/scripts/seed-reviews.js",

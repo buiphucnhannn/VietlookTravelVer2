@@ -19,7 +19,8 @@ const notFound = () => ApiError.notFound("Không tìm thấy đơn / yêu cầu"
  */
 export const requireEnquiryAccess = (level) => async (req, _res, next) => {
   const id = req.validated?.params?.id ?? req.params.id;
-  const doc = await enquiryRepository.findById(id, { select: "type" });
+  // kể cả đơn trong Thùng rác (khôi phục / xoá hẳn) — các thao tác khác tự báo "không tìm thấy" ở service
+  const doc = await enquiryRepository.findById(id, { select: "type", withDeleted: true });
   if (!doc) return next(notFound());
   const module = enquiryModule(doc.type);
   if (!can(req.user, module, "view")) return next(notFound());

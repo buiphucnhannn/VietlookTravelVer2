@@ -6,6 +6,7 @@ import { logger } from "./config/logger.js";
 import { ensureFirstAdmin } from "./services/admin-bootstrap.service.js";
 import { scheduleDailySweep } from "./services/media-cleanup.service.js";
 import { scheduleDailyReviewSync } from "./services/review-stats.service.js";
+import { scheduleDailyTrashPurge } from "./services/trash.service.js";
 
 /** Điểm khởi động: kết nối dịch vụ ngoài → mở cổng → tắt êm khi nhận tín hiệu dừng. */
 async function bootstrap() {
@@ -30,6 +31,8 @@ async function bootstrap() {
   await ensureFirstAdmin(); // tạo tài khoản admin đầu tiên từ .env nếu chưa có
   // dọn ảnh không dùng ~03:00 giờ VN mỗi ngày (bật mặc định ở production)
   if (env.cloudinary.enabled && env.cloudinary.dailyCleanup) scheduleDailySweep();
+  // Thùng rác: xoá hẳn tour / bài viết / đơn đã xoá quá 30 ngày (~03:30 giờ VN mỗi ngày)
+  scheduleDailyTrashPurge();
   // điểm & số lượt đánh giá Tripadvisor / Google ~06:00 giờ VN (chưa có khoá API → bỏ qua, dùng số nhập tay)
   if (env.reviews.daily) scheduleDailyReviewSync();
 

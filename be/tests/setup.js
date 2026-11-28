@@ -12,7 +12,6 @@ process.env.CLOUDINARY_CLOUD_NAME = "vltest"; // video nền chép từ Drive: c
 // KHÔNG BAO GIỜ gửi email thật / gọi Cloudinary / dùng DB thật dù máy dev có .env đầy đủ.
 process.env.MONGODB_URI = "mongodb://127.0.0.1:1/vietlook-test";
 process.env.RESEND_API_KEY = "";
-process.env.NOTIFY_EMAIL = "ops@example.com";
 process.env.MAIL_REDIRECT_TO = ""; // test chuyển hướng email truyền địa chỉ trực tiếp vào applyRedirect
 process.env.CLOUDINARY_API_KEY = "";
 process.env.CLOUDINARY_API_SECRET = "";

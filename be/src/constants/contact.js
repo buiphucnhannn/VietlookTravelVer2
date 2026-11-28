@@ -1,5 +1,5 @@
 /**
- * Thông tin liên hệ của công ty (CMS → Cài đặt → Thông tin liên hệ) — lưu ở settings, khoá "contact".
+ * Thông tin liên hệ của công ty (CMS → Thông tin liên hệ) — lưu ở settings, khoá "contact".
  *
  * Mặc định = đúng các giá trị đang viết cứng ở fe/src/constants/site.js (siteConfig) → chưa ai sửa thì
  * website & email hiện y như cũ. Bản sao phía website: fe/src/lib/contact.mjs (giữ đúng mặc định + cách chuẩn hoá

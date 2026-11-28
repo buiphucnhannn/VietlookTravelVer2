@@ -60,8 +60,9 @@ export function quotaView(provider, info, cost) {
 /** Câu báo khi không đủ lượt cho thao tác bấm tay */
 export const quotaBlockedText = (provider, q) =>
   q?.left === 0
-    ? `Đã dùng hết hạn mức ${provider.name} tháng này — số trên website giữ nguyên, cập nhật tự động tạm dừng đến khi sang chu kỳ mới`
-    : `Hạn mức ${provider.name} còn ít — đang giữ lại cho cập nhật tự động hằng ngày, thử lại khi sang chu kỳ mới`;
+    ? "Đã dùng hết hạn mức tháng này — số trên website giữ nguyên, cập nhật tự động tạm dừng đến khi sang chu kỳ mới"
+    : "Hạn mức còn ít — đang giữ lại cho cập nhật tự động hằng ngày, thử lại khi sang chu kỳ mới";
 
 /** Chưa cấu hình nhà cung cấp trên máy chủ */
-export const notConfiguredText = (provider) => `Chưa cài mã ${provider.name} trên máy chủ`;
+export const notConfiguredText = () =>
+  "Chưa bật kết nối dịch vụ lấy đánh giá — nhờ bộ phận kỹ thuật bật";

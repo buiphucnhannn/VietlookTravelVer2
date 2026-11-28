@@ -52,7 +52,9 @@ import {
  *   GET    /:id        chi tiết                              xem
  *   PUT    /:id        lưu (toàn bộ form)                    sửa
  *   PATCH  /:id/visibility  ẩn / hiện                        sửa
- *   DELETE /:id        xoá                                   toàn quyền
+ *   DELETE /:id        xoá (tour / bài viết: vào Thùng rác)   toàn quyền
+ *   DELETE /:id?hard=1 xoá hẳn mục trong Thùng rác            toàn quyền
+ *   POST   /:id/restore  khôi phục từ Thùng rác                toàn quyền
  */
 function crud(service, schema, type, module, options) {
   const c = createContentController(service, type, options);
@@ -76,7 +78,9 @@ function crud(service, schema, type, module, options) {
     validate({ params: idParam, body: visibilitySchema }),
     c.visibility,
   );
+  // Loại có Thùng rác (tour, bài viết): DELETE = chuyển vào Thùng rác, DELETE ?hard=1 = xoá hẳn, POST /restore = khôi phục
   r.delete("/:id", full, validate({ params: idParam }), c.remove);
+  if (service.softDelete) r.post("/:id/restore", full, validate({ params: idParam }), c.restore);
   return r;
 }
 

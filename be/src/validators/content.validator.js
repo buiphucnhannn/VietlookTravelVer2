@@ -14,6 +14,8 @@ import {
 import { env } from "../config/env.js";
 import { canonicalVideo, cloudinaryVideo, cloudinaryVideoUrl, parseVideo } from "../utils/video.js";
 import { email, objectId, pageQuery, searchQuery, slug } from "./common.validator.js";
+import { ABOUT_HIDEABLE, HOME_HIDEABLE } from "../constants/hidden-blocks.js";
+import { hiddenBlocks } from "./hidden-blocks.validator.js";
 
 /* ---------- Kiểu dùng chung ---------- */
 
@@ -105,6 +107,8 @@ const mediaList = (max = 40) => z.array(media).max(max).default([]);
 const money = z.coerce.number().min(0).max(1_000_000).nullable().default(null);
 const seoLang = z.object({ title: str(200), description: str(500) }).default({});
 const seo = z.object({ en: seoLang, zh: seoLang, vi: seoLang }).default({});
+/** Trình sửa trang gửi kèm lúc bản đang sửa được lưu (services/revision.service.js → assertFresh) */
+const baseUpdatedAt = z.string().max(40).optional();
 const order = z.coerce.number().int().min(0).max(100_000).default(0);
 const isActive = z.boolean().default(true);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày dạng YYYY-MM-DD");
@@ -128,6 +132,7 @@ export const contentListQuery = pageQuery.extend({
   featured: z.enum(["featured", "long"]).optional(),
   source: z.enum(REVIEW_SOURCES).optional(), // đánh giá khách: lọc theo nguồn
   sort: z.enum(["newest", "oldest", "name", "rank", "order", "price"]).optional(),
+  trash: z.enum(["1"]).optional(), // Thùng rác (tour, bài viết)
 });
 
 /* ---------- Điểm đến / chủ đề ---------- */
@@ -141,6 +146,7 @@ export const destinationSchema = z.object({
   image: media.default(""),
   hero: media.default(""),
   keywords: list(80, 60),
+  seo,
   order,
   isActive,
 });
@@ -152,6 +158,7 @@ export const themeSchema = z.object({
   intro: loc(1500),
   image: media.default(""),
   banner: media.default(""),
+  seo,
   order,
   isActive,
 });
@@ -451,11 +458,13 @@ export const pageSchema = z.object({
         .default([]),
       video: aboutVideo.default(""), // video YouTube / Google Drive cạnh khối số liệu
       ctaLabel: loc(40),
+      hidden: hiddenBlocks(ABOUT_HIDEABLE), // khối đang tắt trên website: { values: true, … }
     })
     .partial()
     .default({}),
   seo,
   isActive,
+  baseUpdatedAt, // lúc bản đang sửa được lưu — có người lưu sau đó → 409 (chống ghi đè)
 });
 
 /* Độ dài tối đa của câu chữ trang chủ theo loại */
@@ -586,6 +595,8 @@ export const homeSettingsSchema = z.object({
   statValues: z.array(str(12)).max(6).default([]),
   // Tên địa điểm hiện khi rê chuột lên 6 cánh ngôi sao (khối "Thiết kế tour") — trống = tên có sẵn
   starLabels: z.array(loc(60)).max(6).default([]),
+  // Khối đang tắt trên website: { reviews: true, … } — không gửi = giữ nguyên như lần lưu trước
+  hidden: hiddenBlocks(HOME_HIDEABLE).optional(),
   // Ảnh các khối trang chủ do nhân viên thay — ô trống ("") = website dùng ảnh có sẵn
   images: z
     .object({
@@ -602,6 +613,9 @@ export const homeSettingsSchema = z.object({
       about: media.default(""), // ảnh khối "Về chúng tôi"
     })
     .default({}),
+  // Hiển thị trên Google (tiêu đề + mô tả trang chủ theo ngôn ngữ) — không gửi = giữ như lần lưu trước
+  seo: z.object({ en: seoLang, zh: seoLang, vi: seoLang }).optional(),
+  baseUpdatedAt, // lúc bản đang sửa được lưu — có người lưu sau đó → 409 (chống ghi đè)
 });
 
 export const notificationSettingsSchema = z.object({
@@ -690,6 +704,7 @@ export const enquiryListQuery = pageQuery.extend({
   status: z.enum(ENQUIRY_STATUS).optional(),
   paymentStatus: z.enum(PAYMENT_STATUS).optional(),
   emailFailed: z.enum(["1"]).optional(),
+  trash: z.enum(["1"]).optional(), // Thùng rác
 });
 
 export const enquiryUpdateSchema = z

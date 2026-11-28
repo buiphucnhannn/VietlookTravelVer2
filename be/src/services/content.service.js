@@ -1,3 +1,5 @@
+import { deletedSlug, originalSlug } from "../models/soft-delete.plugin.js";
+import { trusted } from "../repositories/base.repository.js";
 import { ApiError } from "../utils/ApiError.js";
 import { afterSave as cleanupMedia } from "./media-cleanup.service.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
@@ -23,7 +25,8 @@ const SORTS = {
  *   filters(query)            điều kiện lọc riêng của trang danh sách
  * idField "_id": loại không có đường dẫn / mã riêng (vd. đánh giá khách) → không kiểm tra trùng, không tìm theo mã.
  * Tuỳ chọn: sorts (ghi đè cách sắp xếp mặc định, vd. bài viết "Mới nhất" theo ngày đăng), listSelect (chỉ lấy các trường cần cho trang danh sách — nhẹ hơn),
- *   trackOldSlugs (loại có slug cũ để chuyển hướng 301: tour, bài viết).
+ *   trackOldSlugs (loại có slug cũ để chuyển hướng 301: tour, bài viết),
+ *   softDelete (xoá = chuyển vào Thùng rác, giữ 30 ngày, khôi phục được — model phải có softDeletePlugin).
  */
 export function createContentService({
   repo,
@@ -34,6 +37,7 @@ export function createContentService({
   sorts = {},
   listSelect,
   trackOldSlugs = false,
+  softDelete = false,
   prepare = (d) => d,
   beforeCreate,
   afterUpdate,
@@ -65,11 +69,15 @@ export function createContentService({
 
   return {
     label,
+    softDelete,
     getOr404,
 
     async list(query = {}) {
       const page = getPagination(query, { defaultLimit: 50, maxLimit: 200 });
       const filter = { ...(filters?.(query) ?? {}) };
+      // Thùng rác: chỉ mục đã xoá, mới xoá trước (mặc định mọi truy vấn đọc đã bỏ mục đã xoá)
+      const trash = softDelete && query.trash === "1";
+      if (trash) filter.deletedAt = trusted({ $ne: null });
       if (query.status) filter.isActive = query.status === "active";
       // không phân biệt dấu / hoa thường / khoảng trắng: "ha noi" = "hà nội" = "hanoi"
       const rx = searchRegex(query.q);
@@ -79,12 +87,20 @@ export function createContentService({
           ...searchFields.map((f) => ({ [f]: rx })),
         ];
       const sortKey = query.sort ?? defaultSort;
-      const sort = sorts[sortKey] ?? SORTS[sortKey] ?? SORTS[defaultSort];
+      const sort = trash
+        ? { deletedAt: -1, _id: -1 }
+        : (sorts[sortKey] ?? SORTS[sortKey] ?? SORTS[defaultSort]);
+      const select =
+        trash && listSelect
+          ? typeof listSelect === "string"
+            ? `${listSelect} deletedAt`
+            : { ...listSelect, deletedAt: 1 }
+          : listSelect;
       const { items, total } = await repo.paginate(filter, {
         ...page,
         sort,
-        select: listSelect,
-        ...(sortKey === "name" && { collation: { locale: "vi" } }), // A → Z đúng thứ tự tiếng Việt
+        select,
+        ...(!trash && sortKey === "name" && { collation: { locale: "vi" } }), // A → Z đúng thứ tự tiếng Việt
       });
       return { items, meta: buildPageMeta(page, total) };
     },
@@ -114,12 +130,63 @@ export function createContentService({
       return repo.updateById(id, { $set: { isActive } });
     },
 
+    /**
+     * Xoá. softDelete → chuyển vào Thùng rác: slug gắn hậu tố "--deleted-<thời điểm>" để đường dẫn được
+     * dùng lại ngay cho mục mới; ảnh GIỮ NGUYÊN (chỉ dọn khi xoá hẳn). Trả bản ghi lúc trước khi xoá (để ghi nhật ký).
+     */
     async remove(id) {
       const doc = await getOr404(id);
       await beforeRemove?.(doc);
-      await repo.deleteById(id);
-      cleanupMedia(doc, null);
+      if (!softDelete) {
+        await repo.deleteById(id);
+        cleanupMedia(doc, null);
+        return doc;
+      }
+      const renamed = idField === "slug" && doc.slug ? { slug: deletedSlug(doc.slug) } : {};
+      if (!(await repo.softDeleteById(id, renamed)))
+        throw ApiError.notFound(`Không tìm thấy ${label}`);
       return doc;
+    },
+
+    /**
+     * Khôi phục từ Thùng rác. Đường dẫn cũ còn trống → lấy lại đúng đường dẫn cũ; đã có mục khác dùng
+     * → thêm "-2", "-3"… Trả bản ghi + slugChanged / originalSlug để CMS báo cho người dùng.
+     */
+    async restore(id) {
+      const doc = await repo.findDeletedById(id);
+      if (!doc) throw ApiError.notFound(`Không tìm thấy ${label} trong Thùng rác`);
+      const set = {};
+      const wanted = originalSlug(doc.slug);
+      if (idField === "slug" && doc.slug) {
+        let slug = wanted;
+        for (let n = 2; await repo.findByIdent(slug, { select: "_id" }); n++) {
+          if (n > 50)
+            throw ApiError.conflict(
+              `Đường dẫn "${wanted}" đang được dùng — hãy đổi đường dẫn của ${label} kia trước`,
+            );
+          slug = `${wanted}-${n}`.slice(0, 120);
+        }
+        set.slug = slug;
+      }
+      const next = await repo.restoreById(id, set);
+      if (!next) throw ApiError.notFound(`Không tìm thấy ${label} trong Thùng rác`);
+      await releaseOldSlug(next);
+      return set.slug && set.slug !== wanted
+        ? { ...next, slugChanged: true, originalSlug: wanted }
+        : next;
+    },
+
+    /** Xoá hẳn 1 mục ĐANG TRONG Thùng rác (không khôi phục được nữa) → dọn ảnh nền */
+    async purge(id) {
+      const doc = await repo.findDeletedById(id);
+      if (!doc) {
+        if (await repo.exists({ _id: id }))
+          throw ApiError.conflict(`Hãy xoá ${label} vào Thùng rác trước khi xoá hẳn`);
+        throw ApiError.notFound(`Không tìm thấy ${label} trong Thùng rác`);
+      }
+      await repo.purgeByIds([doc._id]);
+      cleanupMedia(doc, null);
+      return { ...doc, slug: originalSlug(doc.slug) };
     },
 
     async reorder(items) {

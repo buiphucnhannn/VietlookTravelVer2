@@ -1,6 +1,7 @@
 import { Schema, model } from "mongoose";
 import { ENQUIRY_STATUS, ENQUIRY_TYPE_VALUES, PAYMENT_STATUS } from "../constants/content.js";
 import { toJSONOptions } from "./shared.schema.js";
+import { softDeletePlugin } from "./soft-delete.plugin.js";
 
 /**
  * Đơn đặt tour + yêu cầu từ mọi form (thiết kế tour, báo giá xe, visa / fast-track, liên hệ, đối tác).
@@ -106,6 +107,8 @@ const enquirySchema = new Schema(
   { timestamps: true, minimize: false, toJSON: toJSONOptions(["ip", "userAgent"]) },
 );
 
+// Thùng rác: deletedAt + mọi truy vấn đọc tự bỏ mục đã xoá (xem soft-delete.plugin.js)
+enquirySchema.plugin(softDeletePlugin);
 enquirySchema.index({ createdAt: -1 });
 enquirySchema.index({ type: 1, status: 1, createdAt: -1 });
 // Tab "Yêu cầu từ form" lọc theo trạng thái (không theo 1 loại cố định), mới nhất trước

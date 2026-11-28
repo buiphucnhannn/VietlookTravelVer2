@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { includeDeleted } from "../models/soft-delete.plugin.js";
 
 /**
  * Repository = lớp DUY NHẤT nói chuyện với MongoDB (Mongoose).
@@ -25,8 +26,10 @@ export class BaseRepository {
     return this.model.create(data);
   }
 
-  findById(id, { select, lean = true } = {}) {
-    return this.model.findById(id).select(select).lean(lean);
+  /** withDeleted: đọc cả mục trong Thùng rác (model có softDeletePlugin) */
+  findById(id, { select, lean = true, withDeleted = false } = {}) {
+    const q = this.model.findById(id);
+    return (withDeleted ? includeDeleted(q) : q).select(select).lean(lean);
   }
 
   findOne(filter, { select, lean = true } = {}) {
@@ -61,6 +64,58 @@ export class BaseRepository {
 
   exists(filter) {
     return this.model.exists(filter);
+  }
+
+  /* ----- Thùng rác (chỉ model có softDeletePlugin: tour, bài viết, đơn / yêu cầu) ----- */
+
+  /** 1 mục đang nằm trong Thùng rác */
+  findDeletedById(id, { select } = {}) {
+    return this.model
+      .findOne({ _id: id, deletedAt: trusted({ $ne: null }) })
+      .select(select)
+      .lean();
+  }
+
+  /** Chuyển vào Thùng rác (chỉ khi chưa xoá) — `set` = trường đổi kèm (vd. slug đã gắn hậu tố) */
+  softDeleteById(id, set = {}) {
+    return this.model
+      .findOneAndUpdate(
+        { _id: id, deletedAt: null },
+        { $set: { ...set, deletedAt: new Date() } },
+        { returnDocument: "after" },
+      )
+      .lean();
+  }
+
+  /** Lấy lại từ Thùng rác */
+  restoreById(id, set = {}) {
+    return this.model
+      .findOneAndUpdate(
+        { _id: id, deletedAt: trusted({ $ne: null }) },
+        { $set: { ...set, deletedAt: null } },
+        { returnDocument: "after" },
+      )
+      .lean();
+  }
+
+  /** Các mục đã nằm trong Thùng rác từ trước `date` (để xoá hẳn) */
+  findDeletedBefore(date, { select } = {}) {
+    return this.model
+      .find({ deletedAt: trusted({ $lt: date }) })
+      .select(select)
+      .lean();
+  }
+
+  /**
+   * Xoá hẳn nhiều mục — CHỈ những mục đang trong Thùng rác (không bao giờ đụng mục đang dùng / vừa khôi phục).
+   * `before`: chỉ mục đã vào Thùng rác trước thời điểm này (tự xoá sau 30 ngày).
+   */
+  purgeByIds(ids, { before } = {}) {
+    if (!ids.length) return Promise.resolve({ deletedCount: 0 });
+    return this.model.deleteMany({
+      _id: trusted({ $in: ids }),
+      deletedAt: trusted(before ? { $lt: before } : { $ne: null }),
+    });
   }
 
   count(filter = {}) {

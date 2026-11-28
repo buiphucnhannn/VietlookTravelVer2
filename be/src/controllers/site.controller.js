@@ -3,7 +3,10 @@ import { enquiryModule, viewableKinds } from "../middlewares/enquiry-access.midd
 import { auditService } from "../services/audit.service.js";
 import { authService } from "../services/auth.service.js";
 import { enquiryService } from "../services/enquiry.service.js";
-import { pageCopyService, pageService } from "../services/modules.service.js";
+import { pageContent, pageCopyService, pageService } from "../services/modules.service.js";
+import { revisionService } from "../services/revision.service.js";
+import { PAGE_KEYS } from "../constants/content.js";
+import { PAGE_COPY_KEYS } from "../constants/page-copy.js";
 import { publicService } from "../services/public.service.js";
 import { reviewStatsService } from "../services/review-stats.service.js";
 import { settingsService } from "../services/settings.service.js";
@@ -66,7 +69,7 @@ export const publicController = {
     ok(res, {
       tracking: await settingsService.getTracking(),
       smallGroup: await settingsService.getSmallGroup(),
-      // Thông tin liên hệ công ty (CMS → Cài đặt → Thông tin liên hệ) — website dùng cho đầu / chân trang, nút chat…
+      // Thông tin liên hệ công ty (CMS → Thông tin liên hệ) — website dùng cho đầu / chân trang, nút chat…
       contact: await settingsService.getContact(),
       reviewStats: await reviewStatsService.publicStats(),
     }),
@@ -154,21 +157,35 @@ export const enquiryController = {
     ok(res, status);
   },
 
+  /** Xoá = vào Thùng rác; ?hard=1 = xoá hẳn đơn đang trong Thùng rác */
   async remove(req, res) {
-    const doc = await enquiryService.remove(req.validated.params.id);
-    auditService.record(req, "enquiry.delete", {
+    const hard = req.query?.hard === "1";
+    const id = req.validated.params.id;
+    const doc = hard ? await enquiryService.purge(id) : await enquiryService.remove(id);
+    auditService.record(req, hard ? "enquiry.purge" : "enquiry.delete", {
+      target: { type: "enquiry", id: doc.code },
+      meta: { ...enquiryInfo(doc), ...(!hard && { trash: true }) },
+    });
+    noContent(res);
+  },
+
+  async restore(req, res) {
+    const doc = await enquiryService.restore(req.validated.params.id);
+    auditService.record(req, "enquiry.restore", {
       target: { type: "enquiry", id: doc.code },
       meta: enquiryInfo(doc),
     });
-    noContent(res);
+    ok(res, doc);
   },
 };
 
 /** Trang chủ, trang nội dung, cài đặt (CMS) */
 export const settingsController = {
-  getHome: async (_req, res) => ok(res, await settingsService.getHome()),
+  // CMS: kèm updatedAt (trình sửa gửi lại khi lưu → chống ghi đè; trang danh sách hiện "Cập nhật …")
+  getHome: async (_req, res) => ok(res, await settingsService.getHomeAdmin()),
   async saveHome(req, res) {
-    const data = await settingsService.saveHome(req.validated.body, req.user);
+    const { baseUpdatedAt, ...body } = req.validated.body;
+    const data = await settingsService.saveHome(body, req.user, { baseUpdatedAt });
     auditService.record(req, "settings.home");
     ok(res, data);
   },
@@ -177,7 +194,8 @@ export const settingsController = {
   page: async (req, res) => ok(res, await pageService.get(req.validated.params.key)),
   async savePage(req, res) {
     const { key } = req.validated.params;
-    const data = await pageService.save(key, req.validated.body);
+    const { baseUpdatedAt, ...body } = req.validated.body;
+    const data = await pageService.save(key, body, { actor: req.user, baseUpdatedAt });
     auditService.record(req, "page.update", { target: { type: "page", id: key } });
     ok(res, data);
   },
@@ -187,8 +205,34 @@ export const settingsController = {
   pageCopy: async (req, res) => ok(res, await pageCopyService.get(req.params.key)),
   async savePageCopy(req, res) {
     const { key } = req.params;
-    const data = await pageCopyService.save(key, req.validated.body);
+    const { baseUpdatedAt, ...body } = req.validated.body;
+    const data = await pageCopyService.save(key, body, { actor: req.user, baseUpdatedAt });
     auditService.record(req, "page.update", { target: { type: "page", id: key } });
+    ok(res, data);
+  },
+
+  /* Lịch sử phiên bản (Trang chủ · Giao diện trang · Giới thiệu / chính sách) — quyền theo trang ở route */
+  revisions: async (req, res) => ok(res, await revisionService.list(req.params.key)),
+  revision: async (req, res) =>
+    ok(res, await revisionService.get(req.params.key, req.validated.params.id)),
+  /** "Dùng lại bản này": bản hiện tại được cất vào lịch sử trước, rồi lưu lại bản cũ (như 1 lần lưu) */
+  async restoreRevision(req, res) {
+    const { key } = req.params;
+    const rev = await revisionService.get(key, req.validated.params.id);
+    const opts = { actor: req.user, reason: "restore" };
+    let data;
+    if (key === "home") {
+      const lists = { featuredTours: [], longTours: [], homeThemes: [], featuredDestinations: [] };
+      data = await settingsService.saveHome({ ...lists, ...rev.data }, req.user, opts);
+    } else if (PAGE_KEYS.includes(key))
+      data = await pageService.save(key, pageContent(rev.data), opts);
+    else if (PAGE_COPY_KEYS.includes(key))
+      data = await pageCopyService.save(key, { data: rev.data }, opts);
+    else throw ApiError.notFound("Không tìm thấy trang");
+    auditService.record(req, "settings.revision_restore", {
+      target: key === "home" ? {} : { type: "page", id: key },
+      meta: { key, at: rev.savedAt ?? rev.createdAt, ...(key === "home" && { name: "Trang chủ" }) },
+    });
     ok(res, data);
   },
 

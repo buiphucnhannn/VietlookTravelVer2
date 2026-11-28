@@ -20,6 +20,7 @@ import { cleanHtml } from "../utils/sanitize.js";
 import { createContentService } from "./content.service.js";
 import { afterSave as cleanupMedia } from "./media-cleanup.service.js";
 import { settingsService } from "./settings.service.js";
+import { actorName, assertFresh, revisionService } from "./revision.service.js";
 
 const LANGS = ["en", "zh", "vi"];
 const mapLangs = (obj, fn) => Object.fromEntries(LANGS.map((l) => [l, fn(obj?.[l] ?? "", l)]));
@@ -74,6 +75,7 @@ export const tourService = createContentService({
   sorts: { name: { "content.vi.title": 1, "content.en.title": 1, _id: 1 } },
   prepare: prepareTour,
   trackOldSlugs: true,
+  softDelete: true, // xoá → Thùng rác 30 ngày, khôi phục được
   // tour nổi bật / dài ngày ở trang chủ lưu theo đường dẫn → đổi đường dẫn / xoá tour thì cập nhật theo
   afterUpdate: (next, prev) => settingsService.renameHomeRef("tour", prev.slug, next.slug),
   beforeRemove: (doc) => settingsService.renameHomeRef("tour", doc.slug, null),
@@ -107,7 +109,7 @@ export const destinationService = createContentService({
     const n = await tourRepository.countUsing("destinations", doc.slug);
     if (n)
       throw ApiError.conflict(
-        `Điểm đến đang gắn với ${n} tour — hãy ẩn điểm đến hoặc bỏ gắn khỏi các tour trước khi xoá`,
+        `Điểm đến này đang gắn với ${n} tour (kể cả tour trong Thùng rác) — hãy ẩn điểm đến, hoặc bỏ gắn khỏi các tour (tour trong Thùng rác: xoá hẳn) trước khi xoá`,
       );
     await settingsService.renameHomeRef("destination", doc.slug, null);
   },
@@ -152,6 +154,7 @@ export const articleService = createContentService({
   },
   prepare: prepareArticle,
   trackOldSlugs: true,
+  softDelete: true,
   // Danh sách bài viết trong CMS: KHÔNG gửi nội dung HTML (nặng) của 3 ngôn ngữ — chỉ cần biết ngôn ngữ nào
   // đã có nội dung (body.{lang} = true / false) để báo "Thiếu bản …"
   listSelect: {
@@ -266,17 +269,38 @@ export const pageService = {
     return page;
   },
 
-  async save(key, data) {
+  /**
+   * Lưu trang; bản cũ được cất vào lịch sử phiên bản.
+   * @param {{ actor?: object, baseUpdatedAt?: string, reason?: "save" | "restore" }} [opts]
+   *   baseUpdatedAt: lúc bản đang sửa được lưu — có người lưu sau đó → 409 CONTENT_CONFLICT
+   */
+  async save(key, data, { actor, baseUpdatedAt, reason = "save" } = {}) {
     const prev = await pageRepository.findByIdent(key);
-    const next = await pageRepository.upsertByIdent(key, {
-      ...data,
+    assertFresh(prev, baseUpdatedAt);
+    const doc = { ...data, key, body: mapLangs(data.body, (h) => cleanHtml(h)) };
+    delete doc.baseUpdatedAt;
+    await revisionService.snapshot(
       key,
-      body: mapLangs(data.body, (h) => cleanHtml(h)),
-    });
+      prev && { data: pageContent(prev), savedAt: prev.updatedAt, savedBy: prev.updatedBy },
+      pageContent(doc),
+      { actor, reason },
+    );
+    const next = await pageRepository.upsertByIdent(key, { ...doc, updatedBy: actorName(actor) });
     cleanupMedia(prev, next); // ảnh bị thay / bỏ → dọn nền
     return next;
   },
 };
+
+/** Phần nội dung của trang giới thiệu / chính sách (cất vào lịch sử, khôi phục lại đúng dạng gửi lên khi lưu) */
+export const pageContent = (p) => ({
+  title: p.title ?? {},
+  subtitle: p.subtitle ?? {},
+  body: p.body ?? {},
+  image: p.image ?? "",
+  data: p.data ?? {},
+  seo: p.seo ?? {},
+  isActive: p.isActive !== false,
+});
 
 /* ---------- Giao diện các trang công khai (CMS → Giao diện trang) ---------- */
 
@@ -309,6 +333,18 @@ export function compactPageCopy(data, fields = {}) {
   return out;
 }
 
+/** { en, zh, vi } × { title, description } — bỏ ngôn ngữ trống; trống hết → null */
+export function compactSeo(seo) {
+  if (!isObj(seo)) return null;
+  const out = {};
+  for (const l of LANGS) {
+    const title = String(seo[l]?.title ?? "").trim();
+    const description = String(seo[l]?.description ?? "").trim();
+    if (title || description) out[l] = { title, description };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export const pageCopyService = {
   /** Mọi trang đã từng lưu: [{ key, data, updatedAt }] (trang chưa lưu không có trong danh sách) */
   async list() {
@@ -330,10 +366,32 @@ export const pageCopyService = {
     return doc && doc.isActive !== false ? (doc.data ?? {}) : {};
   },
 
-  async save(key, input) {
+  /**
+   * Lưu 1 trang; bản cũ được cất vào lịch sử phiên bản.
+   * @param {{ actor?: object, baseUpdatedAt?: string, reason?: "save" | "restore" }} [opts]
+   *   baseUpdatedAt: lúc bản đang sửa được lưu — có người lưu sau đó → 409 CONTENT_CONFLICT
+   */
+  async save(key, input, { actor, baseUpdatedAt, reason = "save" } = {}) {
     const prev = await pageRepository.findByIdent(key);
+    assertFresh(prev, baseUpdatedAt);
     const data = compactPageCopy(input.data, PAGE_COPY_SCHEMA[key]);
-    const next = await pageRepository.upsertByIdent(key, { key, data, isActive: true });
+    // khối đang tắt trên website (đã lọc khoá ở validator) — không có khối nào tắt thì không lưu
+    if (Object.keys(input.data?.hidden ?? {}).length) data.hidden = input.data.hidden;
+    // Hiển thị trên Google (chỉ trang có đường dẫn riêng — validator đã lọc) — trống hết thì không lưu
+    const seo = compactSeo(input.data?.seo);
+    if (seo) data.seo = seo;
+    await revisionService.snapshot(
+      key,
+      prev && { data: prev.data ?? {}, savedAt: prev.updatedAt, savedBy: prev.updatedBy },
+      data,
+      { actor, reason },
+    );
+    const next = await pageRepository.upsertByIdent(key, {
+      key,
+      data,
+      isActive: true,
+      updatedBy: actorName(actor),
+    });
     cleanupMedia(prev, next); // ảnh bị thay / về ảnh mặc định → dọn nền
     return { key, data: next.data ?? {}, updatedAt: next.updatedAt ?? null };
   },

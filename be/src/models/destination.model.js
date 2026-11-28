@@ -1,6 +1,6 @@
 import { Schema, model } from "mongoose";
 import { REGION_VALUES } from "../constants/content.js";
-import { localizedString, publishable, toJSONOptions } from "./shared.schema.js";
+import { localizedString, publishable, seoSchema, toJSONOptions } from "./shared.schema.js";
 
 /** Điểm đến — thuộc 1 trong 3 miền cố định Bắc / Trung / Nam. */
 const destinationSchema = new Schema(
@@ -13,6 +13,7 @@ const destinationSchema = new Schema(
     image: { type: String, default: "" }, // ảnh thẻ
     hero: { type: String, default: "" }, // ảnh banner trang điểm đến
     keywords: { type: [String], default: [] }, // từ khoá tự gán tour vào điểm đến khi chuyển dữ liệu
+    seo: { type: seoSchema(), default: () => ({}) }, // tiêu đề / mô tả hiện trên Google (trống = tự tạo)
     ...publishable,
   },
   { timestamps: true, toJSON: toJSONOptions() },

@@ -20,6 +20,7 @@ const pageSchema = new Schema(
     data: { type: Schema.Types.Mixed, default: {} },
     seo: { type: seoSchema(), default: () => ({}) },
     isActive: { type: Boolean, default: true },
+    updatedBy: { type: String, default: "" }, // tên người lưu gần nhất (báo khi có người khác vừa lưu)
   },
   { timestamps: true, minimize: false, toJSON: toJSONOptions() },
 );

@@ -20,8 +20,8 @@ import { signAccessToken } from "../src/services/token.service.js";
 import { contactSettingsSchema } from "../src/validators/contact.validator.js";
 
 /**
- * CMS → Cài đặt → Thông tin liên hệ: mặc định khớp website (siteConfig), kiểm tra dữ liệu, email dùng đúng
- * thông tin đã lưu, phân quyền (chỉ admin) + nhật ký — không cần MongoDB thật (thay repository).
+ * CMS → Thông tin liên hệ: mặc định khớp website (siteConfig), kiểm tra dữ liệu, email dùng đúng
+ * thông tin đã lưu, phân quyền (admin + nhân viên có quyền "Thông tin liên hệ") + nhật ký — không cần MongoDB thật (thay repository).
  */
 
 const FE = new URL("../../fe/src/", import.meta.url);
@@ -211,7 +211,21 @@ describe("thông tin liên hệ — đường dẫn, phân quyền, nhật ký",
     saved.push([obj, name, obj[name]]);
     obj[name] = fn;
   };
-  const ID = { admin: "64b7f0c2a1b2c3d4e5f6f001", staff: "64b7f0c2a1b2c3d4e5f6f002" };
+  const ID = {
+    admin: "64b7f0c2a1b2c3d4e5f6f001",
+    staff: "64b7f0c2a1b2c3d4e5f6f002",
+    viewer: "64b7f0c2a1b2c3d4e5f6f003",
+    editor: "64b7f0c2a1b2c3d4e5f6f004",
+    legacy: "64b7f0c2a1b2c3d4e5f6f005",
+  };
+  const staff = (id, username, permissions) => ({
+    _id: id,
+    username,
+    role: "editor",
+    isActive: true,
+    tokenVersion: 0,
+    ...(permissions && { permissions }),
+  });
   const users = {
     [ID.admin]: { _id: ID.admin, username: "boss", role: "admin", isActive: true, tokenVersion: 0 },
     [ID.staff]: {
@@ -222,6 +236,10 @@ describe("thông tin liên hệ — đường dẫn, phân quyền, nhật ký",
       tokenVersion: 0,
       permissions: { pages: "full", home: "full" },
     },
+    [ID.viewer]: staff(ID.viewer, "viewer", { contact: "view" }),
+    [ID.editor]: staff(ID.editor, "contacted", { contact: "edit" }),
+    // tài khoản nhân viên cũ (chưa từng phân quyền chi tiết) → quyền cũ, KHÔNG có Thông tin liên hệ
+    [ID.legacy]: staff(ID.legacy, "old"),
   };
   const store = {};
   const audits = [];
@@ -241,9 +259,20 @@ describe("thông tin liên hệ — đường dẫn, phân quyền, nhật ký",
     return body === undefined ? r : r.send(body);
   };
 
-  it("nhân viên (kể cả toàn quyền Giao diện trang) không xem / sửa được → 403", async () => {
-    assert.equal((await call(ID.staff, "get", "/settings/contact")).status, 403);
-    assert.equal((await call(ID.staff, "put", "/settings/contact", valid())).status, 403);
+  it("nhân viên không có quyền Thông tin liên hệ (kể cả toàn quyền Giao diện trang, tài khoản cũ) → 403", async () => {
+    for (const id of [ID.staff, ID.legacy]) {
+      assert.equal((await call(id, "get", "/settings/contact")).status, 403);
+      assert.equal((await call(id, "put", "/settings/contact", valid())).status, 403);
+    }
+    assert.equal(store.contact, undefined);
+  });
+
+  it("quyền Xem: đọc được, không lưu được (403)", async () => {
+    const r = await call(ID.viewer, "get", "/settings/contact");
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body.data, plain(CONTACT_DEFAULTS));
+    assert.equal((await call(ID.viewer, "put", "/settings/contact", valid())).status, 403);
+    assert.equal(store.contact, undefined);
   });
 
   it("admin: chưa lưu → mặc định; dữ liệu sai → 422; lưu được + ghi nhật ký; website đọc được", async () => {
@@ -280,5 +309,18 @@ describe("thông tin liên hệ — đường dẫn, phân quyền, nhật ký",
     // email dùng bản vừa lưu
     const { settingsService } = await import("../src/services/settings.service.js");
     assert.equal((await settingsService.emailCompany()).whatsapp, "https://wa.me/84912345678");
+  });
+
+  it("quyền Sửa: lưu được (ghi nhật ký settings.contact như admin)", async () => {
+    const before = audits.length;
+    const res = await call(ID.editor, "put", "/settings/contact", {
+      ...valid(),
+      email: "staff@example.com",
+    });
+    assert.equal(res.status, 200);
+    assert.equal(store.contact.email, "staff@example.com");
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(audits.slice(before).some((a) => a.action === "settings.contact"));
+    assert.equal((await call(ID.editor, "get", "/settings/contact")).status, 200);
   });
 });

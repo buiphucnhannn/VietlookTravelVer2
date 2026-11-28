@@ -11,6 +11,18 @@ import { searchRegex } from "../utils/search.js";
 const refKey = (t) => `${t?.type}:${t?.id}`;
 const canLookup = (t) => AUDIT_TARGET_TYPES.includes(t?.type) && Boolean(t?.id);
 
+/**
+ * Mẫu mã thao tác → RegExp khớp trọn mã. `*` = phần bất kỳ:
+ *   "auth.*" (mọi việc đăng nhập), "*.delete" (mọi việc xoá), "*_delete", "user.create" (đúng 1 mã).
+ * Chỉ nhận ký tự [a-z_.*] (validator cũng chặn) → không thể chèn biểu thức lạ.
+ */
+export function actionPatternRegex(patterns = []) {
+  const list = patterns.filter((p) => /^[a-z_.*]{1,60}$/.test(p));
+  if (!list.length) return null;
+  const body = list.map((p) => p.replaceAll(".", "\\.").replaceAll("*", "[a-z_.]*")).join("|");
+  return new RegExp(`^(?:${body})$`);
+}
+
 /** Tên dễ đọc của nội dung để ghi kèm nhật ký: `meta: { name: auditName(doc) }` */
 export const auditName = contentName;
 
@@ -93,10 +105,23 @@ export const auditService = {
     (req.log ?? logger).warn({ event, ip: req.ip, path: req.path, ...data }, `[${event}]`);
   },
 
+  /**
+   * Danh sách nhật ký. Lọc theo mã thao tác:
+   *   action   đúng 1 mã
+   *   match    các mẫu (xem actionPatternRegex) — khớp ít nhất 1 mẫu, vd. ["*.create"]
+   *   exclude  các mẫu cần bỏ, vd. ["auth.*"] (ẩn đăng nhập / đăng xuất)
+   */
   async list(query) {
     const page = getPagination(query, { defaultLimit: 50, maxLimit: 200 });
     const filter = {};
-    if (query.action) filter.action = query.action;
+    const and = [];
+    if (query.action) and.push({ action: query.action });
+    const include = actionPatternRegex(query.match);
+    if (include) and.push({ action: trusted({ $regex: include }) });
+    const exclude = actionPatternRegex(query.exclude);
+    if (exclude) and.push({ action: trusted({ $not: exclude }) });
+    if (and.length === 1) Object.assign(filter, and[0]);
+    else if (and.length) filter.$and = and;
     if (query.actor) filter.actor = query.actor;
     if (query.q || query.actions?.length) {
       const or = [];

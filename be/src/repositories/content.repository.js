@@ -8,6 +8,7 @@ import { Setting } from "../models/setting.model.js";
 import { Author, Category } from "../models/taxonomy.model.js";
 import { Theme } from "../models/theme.model.js";
 import { Tour } from "../models/tour.model.js";
+import { includeDeleted } from "../models/soft-delete.plugin.js";
 import { BaseRepository, trusted } from "./base.repository.js";
 
 /**
@@ -118,9 +119,12 @@ class TourRepository extends ContentRepository {
     ]);
   }
 
-  /** Tour đang bán dùng điểm đến / chủ đề này (chặn xoá điểm đến đang được dùng) */
+  /**
+   * Số tour gắn điểm đến / chủ đề này — KỂ CẢ tour trong Thùng rác (chặn xoá điểm đến đang được dùng:
+   * tour khôi phục từ Thùng rác không được trỏ tới điểm đến đã mất)
+   */
   countUsing(field, value) {
-    return this.model.countDocuments({ [field]: value });
+    return includeDeleted(this.model.countDocuments({ [field]: value }));
   }
 
   /** Đổi slug điểm đến / chủ đề trong mọi tour (khi CMS đổi slug) */
@@ -189,8 +193,9 @@ class EnquiryRepository extends BaseRepository {
 
   /* ----- Thanh toán online (9Pay) ----- */
 
+  // kể cả đơn trong Thùng rác: khách đã trả tiền thì 9Pay vẫn phải ghi nhận được (khôi phục ra là thấy)
   findByInvoice(invoiceNo) {
-    return this.model.findOne({ "payments.invoiceNo": invoiceNo }).lean();
+    return includeDeleted(this.model.findOne({ "payments.invoiceNo": invoiceNo })).lean();
   }
 
   pushPayment(id, payment) {
@@ -257,6 +262,14 @@ class SettingRepository extends BaseRepository {
 
   async get(key) {
     return (await this.model.findOne({ key }).lean())?.value ?? null;
+  }
+
+  /** Giá trị + lúc lưu + người lưu: { value, updatedAt, updatedBy } — chưa có → null */
+  async getEntry(key) {
+    const doc = await this.model.findOne({ key }).select("value updatedAt updatedBy").lean();
+    return doc
+      ? { value: doc.value ?? null, updatedAt: doc.updatedAt, updatedBy: doc.updatedBy }
+      : null;
   }
 
   set(key, value, updatedBy = "") {

@@ -3,7 +3,7 @@ import { PHONE_PURPOSES, normalizePhone, phoneDigits } from "../constants/contac
 import { email, plainText } from "./common.validator.js";
 
 /**
- * CMS → Cài đặt → Thông tin liên hệ. Dữ liệu này hiện trên MỌI trang website + email gửi khách → kiểm tra chặt:
+ * CMS → Thông tin liên hệ. Dữ liệu này hiện trên MỌI trang website + email gửi khách → kiểm tra chặt:
  * số điện thoại chuẩn hoá (+84 98 339 3588), link chỉ https, email đúng dạng, các ô chính bắt buộc.
  */
 
@@ -95,7 +95,7 @@ export const contactSettingsSchema = z
     // Khung bản đồ nhúng vào trang Liên hệ: chỉ nhận bản đồ của Google
     mapsEmbed: httpsUrl("Link bản đồ nhúng", ["google.com", "google.com.vn"]).refine(
       (u) => /output=embed|\/maps\/embed/.test(u),
-      { message: "Link bản đồ nhúng: dùng link “Nhúng bản đồ” của Google Maps (có output=embed)" },
+      { message: "Link bản đồ nhúng chưa đúng — dùng link “Nhúng bản đồ” của Google Maps" },
     ),
   })
   .strip()

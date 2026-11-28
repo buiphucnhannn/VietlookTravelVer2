@@ -9,6 +9,7 @@ import {
   fastTrackRepository,
   tourRepository,
 } from "../repositories/content.repository.js";
+import { trusted } from "../repositories/base.repository.js";
 import { ApiError } from "../utils/ApiError.js";
 import { formMessage } from "../utils/form-messages.js";
 import { buildPageMeta, getPagination } from "../utils/pagination.js";
@@ -84,7 +85,7 @@ export async function emailLookups(e) {
 async function deliver(enquiry, { paymentOnline = false } = {}) {
   const settings = await settingsService.getNotifications();
   const recipients = await settingsService.recipients();
-  // company: thông tin liên hệ công ty (CMS → Cài đặt → Thông tin liên hệ) — chân thư, nút WhatsApp, số gọi
+  // company: thông tin liên hệ công ty (CMS → Thông tin liên hệ) — chân thư, nút WhatsApp, số gọi
   const lookups = {
     ...(await emailLookups(enquiry)),
     paymentOnline,
@@ -233,6 +234,9 @@ export const enquiryService = {
   async list(query, kinds = ["bookings", "requests"]) {
     const page = getPagination(query, { defaultLimit: 30, maxLimit: 100 });
     const filter = {};
+    // Thùng rác: chỉ đơn đã xoá (mặc định mọi truy vấn đọc đã bỏ đơn đã xoá)
+    const trash = query.trash === "1";
+    if (trash) filter.deletedAt = trusted({ $ne: null });
     const kind = query.kind ?? (kinds.length === 1 ? kinds[0] : undefined);
     if (kind === "bookings") filter.type = "booking";
     if (kind === "requests") filter.$nor = [{ type: "booking" }];
@@ -257,7 +261,7 @@ export const enquiryService = {
     }
     const { items, total } = await enquiryRepository.paginate(filter, {
       ...page,
-      sort: { createdAt: -1 },
+      sort: trash ? { deletedAt: -1, _id: -1 } : { createdAt: -1 },
       select: "-ip -userAgent",
     });
     return { items, meta: buildPageMeta(page, total) };
@@ -300,9 +304,29 @@ export const enquiryService = {
     return { status: await deliver(e, { paymentOnline: Boolean(payment) }), enquiry: e };
   },
 
+  /** Xoá = chuyển vào Thùng rác (giữ 30 ngày, khôi phục được) */
   async remove(id) {
     const e = await this.get(id);
-    await enquiryRepository.deleteById(id);
+    if (!(await enquiryRepository.softDeleteById(id)))
+      throw ApiError.notFound("Không tìm thấy đơn / yêu cầu");
+    return e;
+  },
+
+  async restore(id) {
+    const e = await enquiryRepository.restoreById(id);
+    if (!e) throw ApiError.notFound("Không tìm thấy đơn / yêu cầu trong Thùng rác");
+    return enquiryRepository.findById(id, { select: "-ip -userAgent" });
+  },
+
+  /** Xoá hẳn 1 đơn đang trong Thùng rác */
+  async purge(id) {
+    const e = await enquiryRepository.findDeletedById(id, { select: "-ip -userAgent" });
+    if (!e) {
+      if (await enquiryRepository.exists({ _id: id }))
+        throw ApiError.conflict("Hãy xoá đơn vào Thùng rác trước khi xoá hẳn");
+      throw ApiError.notFound("Không tìm thấy đơn / yêu cầu trong Thùng rác");
+    }
+    await enquiryRepository.purgeByIds([e._id]);
     return e;
   },
 

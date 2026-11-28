@@ -125,8 +125,7 @@ export const reviewImportService = {
   /** Kiểm tra trước khi chạy: đã cấu hình + đủ hạn mức (giữ phần cho cập nhật tự động) */
   async checkPreview({ source, fetchImpl = fetch } = {}) {
     const provider = reviewProvider();
-    if (!usable(provider))
-      throw ApiError.badRequest(`${notConfiguredText(provider)} nên chưa lấy được đánh giá`);
+    if (!usable(provider)) throw ApiError.badRequest(notConfiguredText(provider));
     const list = IMPORT_SOURCES.filter((s) => !source || source === s);
     if (provider.quota) {
       const q = quotaView(provider, await provider.quota({ fetchImpl }), provider.reviewCost(list));

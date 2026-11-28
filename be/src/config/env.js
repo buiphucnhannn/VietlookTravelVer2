@@ -102,8 +102,6 @@ const schema = z
     // Email thông báo (Resend — gửi qua HTTPS). Trống RESEND_API_KEY → không gửi, đơn vẫn lưu trong CMS.
     RESEND_API_KEY: z.string().trim().default(""),
     MAIL_FROM: z.string().trim().default("Vietlook Travel <onboarding@resend.dev>"),
-    // Email nhận thông báo mặc định khi CMS chưa cài (Cài đặt → Email nhận thông báo)
-    NOTIFY_EMAIL: z.string().trim().toLowerCase().default(""),
     // CHỈ dùng khi phát triển / thử nghiệm: có giá trị → MỌI email (cho công ty lẫn cho khách) chỉ gửi tới địa chỉ này
     // (người nhận thật ghi trong tiêu đề + dải cảnh báo đầu email). Production: để trống.
     MAIL_REDIRECT_TO: z
@@ -272,7 +270,6 @@ export const env = Object.freeze({
   mail: {
     resendKey: e.RESEND_API_KEY,
     from: e.MAIL_FROM,
-    notifyFallback: e.NOTIFY_EMAIL,
     redirectTo: e.MAIL_REDIRECT_TO,
     enabled: Boolean(e.RESEND_API_KEY),
   },

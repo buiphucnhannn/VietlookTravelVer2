@@ -11,11 +11,13 @@ import { ROLES } from "./roles.js";
  *   full  Toàn quyền (thêm cả xoá)
  *
  * Mục không có gì để xoá chỉ có tới mức "edit": Trang chủ, Giao diện trang (chỉ sửa chữ / ảnh / ẩn hiện, không xoá
- * được trang). Nhật ký thao tác chỉ có "view". Quyền đã lưu cao hơn mức tối đa của mục (vd. "full" lưu trước đây cho
+ * được trang), Thông tin liên hệ (1 bản duy nhất: điện thoại, email, địa chỉ, mạng xã hội, giờ làm việc — chỉ xem /
+ * sửa). Nhật ký thao tác chỉ có "view". Quyền đã lưu cao hơn mức tối đa của mục (vd. "full" lưu trước đây cho
  * Giao diện trang) tự hiểu thành mức cao nhất của mục đó (clampLevel) — không cần sửa dữ liệu cũ.
  *
- * Cài đặt (liên hệ công ty, email thông báo, 9Pay, phụ thu nhóm nhỏ, mã đo lường) + Tài khoản quản trị KHÔNG cấp
- * được — luôn chỉ admin.
+ * Thông tin liên hệ (contact) trước đây chỉ admin → nay cấp riêng; quyền đã lưu không có mục này = "none" (tài khoản
+ * cũ không tự được thêm quyền).
+ * Cài đặt (email thông báo, 9Pay, phụ thu nhóm nhỏ, mã đo lường) + Tài khoản quản trị KHÔNG cấp được — luôn chỉ admin.
  * Đồng bộ danh sách mục với fe/src/components/admin/permissions.js.
  */
 export const LEVELS = Object.freeze(["none", "view", "edit", "full"]);
@@ -24,7 +26,7 @@ const RANK = Object.freeze({ none: 0, view: 1, edit: 2, full: 3 });
 /** Mục chỉ sửa được, không có thao tác xoá → không có mức "Toàn quyền" */
 const NO_DELETE = Object.freeze(["none", "view", "edit"]);
 
-/** Mục → các mức được phép (Trang chủ / Giao diện trang tới "sửa"; Nhật ký thao tác chỉ xem) */
+/** Mục → các mức được phép (Trang chủ / Giao diện trang / Thông tin liên hệ tới "sửa"; Nhật ký thao tác chỉ xem) */
 export const MODULES = Object.freeze({
   bookings: LEVELS,
   requests: LEVELS,
@@ -38,6 +40,7 @@ export const MODULES = Object.freeze({
   taxonomy: LEVELS,
   pages: NO_DELETE,
   reviews: LEVELS,
+  contact: NO_DELETE,
   audit: Object.freeze(["none", "view"]),
 });
 export const MODULE_KEYS = Object.freeze(Object.keys(MODULES));
@@ -70,6 +73,7 @@ export const MODULE_LABELS = Object.freeze({
   taxonomy: "Chuyên mục & tác giả",
   pages: "Giao diện trang",
   reviews: "Đánh giá",
+  contact: "Thông tin liên hệ",
   audit: "Nhật ký thao tác",
 });
 export const LEVEL_LABELS = Object.freeze({
@@ -105,6 +109,7 @@ export const LEGACY_EDITOR_PERMISSIONS = Object.freeze({
   ...fill("full"),
   bookings: "edit",
   requests: "edit",
+  contact: "none", // trước đây chỉ admin → không tự cấp cho tài khoản cũ
   audit: "none",
 });
 export const ADMIN_PERMISSIONS = Object.freeze(fill("full"));

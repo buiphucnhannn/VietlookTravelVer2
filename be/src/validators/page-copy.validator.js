@@ -1,7 +1,9 @@
 import { z } from "zod";
-import { PAGE_COPY_SCHEMA } from "../constants/page-copy.js";
+import { PAGE_COPY_SCHEMA, PAGE_COPY_SEO_KEYS } from "../constants/page-copy.js";
 import { plainText } from "./common.validator.js";
 import { media } from "./content.validator.js";
+import { PAGE_COPY_HIDEABLE } from "../constants/hidden-blocks.js";
+import { hiddenBlocks } from "./hidden-blocks.validator.js";
 
 /**
  * Kiểm tra dữ liệu "Giao diện trang" theo khai báo của từng trang (constants/page-copy.js).
@@ -51,16 +53,32 @@ export function fieldSchema(spec) {
   }
 }
 
+/** Hiển thị trên Google: { en, zh, vi } × { title, description } (chữ thuần, 1 dòng) */
+const seoLang = z
+  .object({ title: line(200).default(""), description: line(500).default("") })
+  .default({});
+export const pageSeoSchema = z.object({ en: seoLang, zh: seoLang, vi: seoLang });
+
+/** Lúc bản đang sửa được lưu (trình sửa gửi kèm) — có người lưu sau đó → 409, xem services/revision.service.js */
+export const baseUpdatedAt = z.string().max(40).optional();
+
 /** Zod cho dữ liệu cả trang: mọi ô đều không bắt buộc (không gửi = dùng mặc định) */
 export function pageCopySchema(key) {
   const fields = PAGE_COPY_SCHEMA[key];
   if (!fields) return null;
+  // khối tắt được trên website (constants/hidden-blocks.js) → cờ { <khối>: true }
+  const hideable = Object.hasOwn(PAGE_COPY_HIDEABLE, key) ? PAGE_COPY_HIDEABLE[key] : null;
   return z.object({
     data: z
-      .object(
-        Object.fromEntries(Object.entries(fields).map(([k, s]) => [k, fieldSchema(s).optional()])),
-      )
+      .object({
+        ...Object.fromEntries(
+          Object.entries(fields).map(([k, s]) => [k, fieldSchema(s).optional()]),
+        ),
+        ...(hideable ? { hidden: hiddenBlocks(hideable).optional() } : {}),
+        ...(PAGE_COPY_SEO_KEYS.includes(key) ? { seo: pageSeoSchema.optional() } : {}),
+      })
       .default({}),
+    baseUpdatedAt,
   });
 }
 

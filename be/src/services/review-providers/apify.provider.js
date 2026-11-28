@@ -133,8 +133,8 @@ export function apifyErrorText(
 ) {
   const s = err?.status;
   const t = `${err?.apifyType ?? ""} ${err?.apifyMessage ?? ""}`.toLowerCase();
-  if (err?.code === "NO_KEY") return "Chưa cài mã Apify trên máy chủ";
-  if (err?.code === "EMPTY") return `Apify không trả về số của công ty, ${retryHint}`;
+  if (err?.code === "NO_KEY") return "Chưa bật kết nối dịch vụ lấy đánh giá";
+  if (err?.code === "EMPTY") return `Dịch vụ không trả về số của công ty, ${retryHint}`;
   if (err?.code === "EMPTY_REVIEWS") return `Không nhận được đánh giá nào, ${retryHint}`;
   if (err?.code === "NO_TEXT")
     return "Các đánh giá mới nhất chỉ chấm sao, không có lời khách để hiện trên website";
@@ -142,20 +142,22 @@ export function apifyErrorText(
     return `Dịch vụ chạy quá lâu nên đã dừng, ${retryHint}`;
   if (err?.code === "RUN_ABORTED") return `Lần chạy bị dừng giữa chừng, ${retryHint}`;
   if (err?.code === "RUN_FAILED" && /usage|credit|limit|charge/i.test(err?.apifyMessage ?? ""))
-    return `Đã chạm hạn mức chi phí của Apify — ${quotaHint}`;
+    return `Đã dùng hết hạn mức tháng này — ${quotaHint}`;
   if (err?.code === "RUN_FAILED")
     return `Trang đánh giá tạm thời không đọc được (dịch vụ gặp lỗi), ${retryHint}`;
-  if (err?.code === "BAD_RESPONSE") return `Apify trả về dữ liệu không đúng, ${retryHint}`;
+  if (err?.code === "BAD_RESPONSE") return `Dịch vụ trả về dữ liệu không đúng, ${retryHint}`;
   if (err?.name === "TimeoutError" || err?.name === "AbortError" || s === 408)
-    return `Apify chạy quá lâu chưa xong, ${retryHint}`;
-  if (s === 401) return "Mã Apify trên máy chủ không đúng — kiểm tra lại APIFY_TOKEN";
-  if (s === 429) return `Apify đang bận (gọi quá nhiều lần), ${retryHint}`;
+    return `Dịch vụ chạy quá lâu chưa xong, ${retryHint}`;
+  if (s === 401)
+    return "Kết nối dịch vụ lấy đánh giá không đúng — nhờ bộ phận kỹ thuật kiểm tra kết nối";
+  if (s === 429) return `Dịch vụ đang bận, ${retryHint}`;
   if (s === 402 || /usage|credit|insufficient|payment|hard limit|monthly/.test(t))
-    return `Đã dùng hết hạn mức Apify tháng này — ${quotaHint}`;
-  if (s === 403) return "Mã Apify không được phép chạy công cụ này — kiểm tra quyền của mã";
-  if (s === 404) return "Không tìm thấy công cụ lấy số trên Apify";
-  if (err?.name === "FetchError") return `Không kết nối được Apify, ${retryHint}`;
-  return `Không lấy được dữ liệu (${s ? `lỗi ${s}` : "lỗi Apify"}), ${retryHint}`;
+    return `Đã dùng hết hạn mức tháng này — ${quotaHint}`;
+  if (s === 403)
+    return "Kết nối dịch vụ lấy đánh giá chưa đủ quyền — nhờ bộ phận kỹ thuật kiểm tra kết nối";
+  if (s === 404) return "Dịch vụ lấy đánh giá đã thay đổi — nhờ bộ phận kỹ thuật kiểm tra kết nối";
+  if (err?.name === "FetchError") return `Không kết nối được dịch vụ lấy đánh giá, ${retryHint}`;
+  return `Không lấy được dữ liệu (${s ? `lỗi ${s}` : "lỗi dịch vụ"}), ${retryHint}`;
 }
 
 /** Mã lỗi ngắn để ghi log (không bao giờ có mã / URL) */
@@ -208,7 +210,7 @@ export async function usageLimits(fetchImpl = fetch, { now = Date.now() } = {}) 
     value = {
       error:
         err?.status === 401
-          ? "Mã Apify trên máy chủ không đúng — kiểm tra lại APIFY_TOKEN"
+          ? "Kết nối dịch vụ lấy đánh giá không đúng — nhờ bộ phận kỹ thuật kiểm tra kết nối"
           : "Chưa xem được hạn mức còn lại, thử lại sau",
     };
   }

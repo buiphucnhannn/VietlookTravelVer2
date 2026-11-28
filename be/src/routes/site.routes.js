@@ -13,7 +13,7 @@ import {
 import { requireCaptcha } from "../middlewares/captcha.middleware.js";
 import { limiter, publicFormLimiter } from "../middlewares/rate-limit.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
-import { idParam, slug } from "../validators/common.validator.js";
+import { idParam, objectId, slug } from "../validators/common.validator.js";
 import {
   enquiryListQuery,
   enquiryUpdateSchema,
@@ -31,6 +31,7 @@ import { lookupCodeParam, publicEnquirySchema } from "../validators/enquiry.vali
 import { contactSettingsSchema } from "../validators/contact.validator.js";
 import { PAGE_COPY_VALIDATORS } from "../validators/page-copy.validator.js";
 import { PAGE_COPY_KEYS } from "../constants/page-copy.js";
+import { PAGE_KEYS } from "../constants/content.js";
 import { ApiError } from "../utils/ApiError.js";
 import { formLang, formMessage, localizeFormDetails } from "../utils/form-messages.js";
 import { z } from "zod";
@@ -184,6 +185,40 @@ settingsRoutes.put(
   validatePageCopy,
   settingsController.savePageCopy,
 );
+// Lịch sử phiên bản: Trang chủ (quyền "home") · Giới thiệu / chính sách / Giao diện trang (quyền "pages").
+// Xem danh sách / 1 bản = xem; "Dùng lại bản này" = sửa. Khoá lạ → 404.
+const revisionAccess = (level) => (req, res, next) => {
+  const { key } = req.params;
+  const module =
+    key === "home"
+      ? "home"
+      : PAGE_KEYS.includes(key) || PAGE_COPY_KEYS.includes(key)
+        ? "pages"
+        : null;
+  if (!module) return next(ApiError.notFound("Không tìm thấy trang"));
+  return requirePermission(module, level)(req, res, next);
+};
+const revisionId = validate({ params: z.object({ key: z.string().max(60), id: objectId }) });
+settingsRoutes.get(
+  "/revisions/:key",
+  requireStaff,
+  revisionAccess("view"),
+  settingsController.revisions,
+);
+settingsRoutes.get(
+  "/revisions/:key/:id",
+  requireStaff,
+  revisionAccess("view"),
+  revisionId,
+  settingsController.revision,
+);
+settingsRoutes.post(
+  "/revisions/:key/:id/restore",
+  requireStaff,
+  revisionAccess("edit"),
+  revisionId,
+  settingsController.restoreRevision,
+);
 settingsRoutes.get("/notifications", requireAdmin, settingsController.getNotifications);
 settingsRoutes.put(
   "/notifications",
@@ -198,11 +233,18 @@ settingsRoutes.put(
   validate({ body: trackingSettingsSchema }),
   settingsController.saveTracking,
 );
-// Thông tin liên hệ công ty (điện thoại, email, địa chỉ, mạng xã hội…): chỉ admin
-settingsRoutes.get("/contact", requireAdmin, settingsController.getContact);
+// Thông tin liên hệ công ty (điện thoại, email, địa chỉ, mạng xã hội…): theo quyền "Thông tin liên hệ" (contact) —
+// xem = xem, lưu = sửa; admin luôn được. Website đọc qua GET /public/site, không qua đây.
+settingsRoutes.get(
+  "/contact",
+  requireStaff,
+  requirePermission("contact", "view"),
+  settingsController.getContact,
+);
 settingsRoutes.put(
   "/contact",
-  requireAdmin,
+  requireStaff,
+  requirePermission("contact", "edit"),
   validate({ body: contactSettingsSchema }),
   settingsController.saveContact,
 );

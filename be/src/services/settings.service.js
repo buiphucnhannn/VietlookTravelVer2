@@ -11,6 +11,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { decryptSecret, encryptSecret, maskSecret } from "../utils/crypto.js";
 import { SMALL_GROUP_DEFAULT } from "../utils/pricing.js";
 import { CONTACT_KEY, emailCompany, mergeContact } from "../constants/contact.js";
+import { actorName, assertFresh, revisionService } from "./revision.service.js";
 
 const KEYS = {
   home: "home",
@@ -34,6 +35,8 @@ const EMPTY_HOME = {
   statValues: [],
   images: {},
   starLabels: [],
+  hidden: {}, // khối đang tắt trên website: { reviews: true, … }
+  seo: {}, // tiêu đề + mô tả trên Google theo ngôn ngữ (trống = câu mặc định của website)
 };
 
 /**
@@ -73,22 +76,48 @@ export const settingsService = {
     return { ...EMPTY_HOME, ...((await settingRepository.get(KEYS.home)) ?? {}) };
   },
 
-  async saveHome(input, actor) {
+  /** CMS: như getHome + lúc lưu gần nhất (updatedAt) — trình sửa gửi lại khi lưu để chống ghi đè */
+  async getHomeAdmin() {
+    const entry = await settingRepository.getEntry(KEYS.home);
+    return { ...EMPTY_HOME, ...(entry?.value ?? {}), updatedAt: entry?.updatedAt ?? null };
+  },
+
+  /**
+   * Lưu trang chủ; bản cũ được cất vào lịch sử phiên bản (khôi phục được).
+   * @param {{ baseUpdatedAt?: string, reason?: "save" | "restore" }} [opts] baseUpdatedAt: lúc bản đang sửa
+   *   được lưu — có người lưu sau đó → 409 CONTENT_CONFLICT, không ghi gì
+   */
+  async saveHome(input, actor, { baseUpdatedAt, reason = "save" } = {}) {
     const [featuredTours, longTours, homeThemes, featuredDestinations] = await Promise.all([
       existingSlugs(tourRepository, input.featuredTours),
       existingSlugs(tourRepository, input.longTours),
       existingSlugs(themeRepository, input.homeThemes),
       existingSlugs(destinationRepository, input.featuredDestinations),
     ]);
+    const entry = await settingRepository.getEntry(KEYS.home);
+    assertFresh(entry, baseUpdatedAt);
+    const before = entry?.value ?? null;
     const data = { ...input, featuredTours, longTours, homeThemes, featuredDestinations };
-    const before = await settingRepository.get(KEYS.home);
-    await settingRepository.set(KEYS.home, data, actor?.username);
-    // Video nền đã chép từ Drive mà banner không còn dùng → xoá khỏi Cloudinary (chạy nền, chỉ thư mục banner)
+    delete data.baseUpdatedAt;
+    // không gửi cờ ẩn khối → giữ nguyên như lần lưu trước (khối đang tắt không tự bật lại)
+    if (data.hidden === undefined) data.hidden = before?.hidden ?? {};
+    // không gửi phần "Hiển thị trên Google" → giữ nguyên như lần lưu trước
+    if (data.seo === undefined) data.seo = before?.seo ?? {};
+    await revisionService.snapshot(
+      KEYS.home,
+      before && { data: before, savedAt: entry.updatedAt, savedBy: entry.updatedBy },
+      data,
+      { actor, reason },
+    );
+    await settingRepository.set(KEYS.home, data, actorName(actor));
+    // Video nền đã chép từ Drive mà banner không còn dùng (kể cả trong lịch sử phiên bản) → xoá khỏi Cloudinary
+    // (chạy nền, chỉ thư mục banner)
     const slideVideos = (home) =>
       (home?.banner?.slides ?? []).flatMap((s) => [s.video, s.videoMobile]);
-    uploadService.deleteBannerVideos(slideVideos(before), { keep: slideVideos(data) });
+    const kept = [...slideVideos(data), ...(await revisionService.homeVideos())].filter(Boolean);
+    uploadService.deleteBannerVideos(slideVideos(before), { keep: kept });
     cleanupMedia(before, data); // ảnh slide bị thay / bỏ → dọn nền nếu không còn chỗ nào dùng
-    return this.getHome();
+    return this.getHomeAdmin();
   },
 
   /**
@@ -117,14 +146,16 @@ export const settingsService = {
       replyTo: v.replyTo ?? "",
       sendCustomerConfirmation: v.sendCustomerConfirmation ?? true,
       mailConfigured: env.mail.enabled, // máy chủ đã có RESEND_API_KEY chưa
-      fallback: env.mail.notifyFallback,
     };
   },
 
-  /** Người nhận thực tế: cài trong CMS → nếu trống dùng NOTIFY_EMAIL của máy chủ */
+  /**
+   * Người nhận thư báo đơn mới: CHỈ lấy từ CMS (Cài đặt → Email thông báo). Trống → không gửi thư cho công ty
+   * (mailService bỏ qua, đơn đánh dấu "chưa gửi email") nhưng đơn vẫn lưu đủ trong CMS; Cài đặt + Tổng quan cảnh báo.
+   */
   async recipients() {
-    const { recipients, fallback } = await this.getNotifications();
-    return recipients.length ? recipients : fallback ? [fallback] : [];
+    const { recipients } = await this.getNotifications();
+    return recipients;
   },
 
   async saveNotifications(data, actor) {

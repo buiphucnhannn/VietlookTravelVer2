@@ -1,6 +1,7 @@
 import { Schema, model } from "mongoose";
 import { DAY_SUPPORT, REGION_VALUES, TOUR_LABELS } from "../constants/content.js";
 import { publishable, seoSchema, toJSONOptions } from "./shared.schema.js";
+import { softDeletePlugin } from "./soft-delete.plugin.js";
 
 /**
  * Tour. Nội dung chữ tách theo từng ngôn ngữ trong `content.{en,zh,vi}` → CMS có 3 tab ngôn ngữ,
@@ -132,6 +133,8 @@ const tourSchema = new Schema(
   { timestamps: true, toJSON: toJSONOptions() },
 );
 
+// Thùng rác: deletedAt + mọi truy vấn đọc tự bỏ mục đã xoá (xem soft-delete.plugin.js)
+tourSchema.plugin(softDeletePlugin);
 tourSchema.index({ isActive: 1, rank: 1 });
 
 export const Tour = model("Tour", tourSchema);

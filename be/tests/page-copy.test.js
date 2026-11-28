@@ -4,7 +4,11 @@ import { after, before, describe, it } from "node:test";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import { PAGE_KEYS } from "../src/constants/content.js";
-import { PAGE_COPY_KEYS, PAGE_COPY_SCHEMA } from "../src/constants/page-copy.js";
+import {
+  PAGE_COPY_KEYS,
+  PAGE_COPY_SCHEMA,
+  PAGE_COPY_SEO_KEYS,
+} from "../src/constants/page-copy.js";
 import { auditLogRepository } from "../src/repositories/audit-log.repository.js";
 import { pageRepository } from "../src/repositories/content.repository.js";
 import { userRepository } from "../src/repositories/user.repository.js";
@@ -67,6 +71,15 @@ describe("giao diện trang — khai báo ô", () => {
       );
       assert.deepEqual(fe, PAGE_COPY_SCHEMA[key], `trang ${key} lệch khai báo`);
     }
+  });
+
+  it("trang sửa được “Hiển thị trên Google”: website (seo: true) và máy chủ khớp nhau", () => {
+    const fe = PAGE_COPY_KEYS.filter((k) => PAGE_COPY[k].seo === true).sort();
+    assert.deepEqual(fe, [...PAGE_COPY_SEO_KEYS].sort());
+    for (const k of PAGE_COPY_SEO_KEYS) assert.ok(PAGE_COPY_KEYS.includes(k), k);
+    // khối dùng chung / trang không lập chỉ mục không có phần Google
+    for (const k of ["global", "detail", "access", "not-found", "thank-you"])
+      assert.equal(PAGE_COPY_SEO_KEYS.includes(k), false, k);
   });
 
   it("khoá trang không trùng trang giới thiệu / chính sách; đủ tên, đường dẫn, nhãn tiếng Việt", () => {

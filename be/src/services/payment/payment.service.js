@@ -325,7 +325,7 @@ export const paymentService = {
       ]);
       if (!changed) return { ...base, outcome: "success", changed: false };
 
-      const fresh = await enquiryRepository.findById(e._id);
+      const fresh = await enquiryRepository.findById(e._id, { withDeleted: true });
       const total = Number(fresh.estimate?.total) || 0;
       const nextStatus = paidUsd(fresh) + 0.01 >= total ? "paid" : "deposit";
       const doc = await enquiryRepository.setPaymentStatus(e._id, nextStatus);

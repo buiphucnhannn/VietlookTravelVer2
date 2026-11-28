@@ -4,6 +4,8 @@ import { confirmSavedMedia } from "../services/media-cleanup.service.js";
 import auditLogRoutes from "./audit-log.routes.js";
 import authRoutes from "./auth.routes.js";
 import contentRoutes from "./content.routes.js";
+import enquiryTrashRoutes from "./enquiry-trash.routes.js";
+import overviewRoutes from "./overview.routes.js";
 import paymentRoutes from "./payment.routes.js";
 import { enquiryRoutes, publicRoutes, settingsRoutes } from "./site.routes.js";
 import translateRoutes from "./translate.routes.js";
@@ -30,7 +32,7 @@ router.get("/health", healthController.check);
 router.use(confirmSavedMedia);
 router.use("/public", publicRoutes);
 router.use("/auth", noStore, authRoutes);
-router.use("/enquiries", noStore, enquiryRoutes);
+router.use("/enquiries", noStore, enquiryTrashRoutes, enquiryRoutes);
 router.use("/payments", noStore, paymentRoutes);
 router.use("/admin", noStore, contentRoutes);
 router.use("/settings", noStore, settingsRoutes);
@@ -38,5 +40,6 @@ router.use("/users", noStore, userRoutes);
 router.use("/uploads", noStore, uploadRoutes);
 router.use("/translate", noStore, translateRoutes);
 router.use("/audit-logs", noStore, auditLogRoutes);
+router.use("/overview", noStore, overviewRoutes); // số liệu trang Tổng quan (CMS)
 
 export default router;

@@ -8,7 +8,7 @@ import { CONTACT_DEFAULTS, emailCompany } from "../constants/contact.js";
 
 /**
  * Thông tin doanh nghiệp MẶC ĐỊNH trong email — giống fe/src/constants/site.js (siteConfig).
- * Bản thật lấy từ CMS → Cài đặt → Thông tin liên hệ (settingsService.emailCompany()) rồi truyền vào mẫu email
+ * Bản thật lấy từ CMS → Thông tin liên hệ (settingsService.emailCompany()) rồi truyền vào mẫu email
  * (lookups.company / tham số company); COMPANY chỉ dùng khi nơi gọi không truyền (VD test, xem trước).
  */
 export const COMPANY = Object.freeze(emailCompany(CONTACT_DEFAULTS));

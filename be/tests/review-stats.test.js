@@ -234,10 +234,16 @@ describe("điểm đánh giá — tự cập nhật qua Apify (fetch giả)", ()
     const f = fakeFetch([]);
     const r = await reviewStatsService.sync({ fetchImpl: f, notify: () => true });
     assert.equal(r.changed, false);
-    assert.equal(r.lastSync.message, "Chưa cài mã Apify trên máy chủ");
+    assert.equal(
+      r.lastSync.message,
+      "Chưa bật kết nối dịch vụ lấy đánh giá — nhờ bộ phận kỹ thuật bật",
+    );
     assert.equal(f.calls.length, 0);
     assert.equal(store.reviewStats, undefined);
-    await assert.rejects(reviewStatsService.manualSync({ fetchImpl: f }), /Chưa cài mã Apify/);
+    await assert.rejects(
+      reviewStatsService.manualSync({ fetchImpl: f }),
+      /Chưa bật kết nối dịch vụ lấy đánh giá/,
+    );
   });
 
   it("thành công: đúng actor + input tiết kiệm, mã ở header, cập nhật 2 nguồn, báo website", async () => {
@@ -308,7 +314,10 @@ describe("điểm đánh giá — tự cập nhật qua Apify (fetch giả)", ()
     });
     assert.equal(r1.lastSync.ok, false);
     assert.match(r1.lastSync.sources.tripadvisor.message, /giảm bất thường.*giữ số cũ/);
-    assert.match(r1.lastSync.sources.google.message, /Mã Apify.*không đúng.*giữ số cũ/);
+    assert.match(
+      r1.lastSync.sources.google.message,
+      /Kết nối dịch vụ lấy đánh giá không đúng.*giữ số cũ/,
+    );
 
     const r2 = await reviewStatsService.sync({
       fetchImpl: fakeFetch([
@@ -318,10 +327,10 @@ describe("điểm đánh giá — tự cập nhật qua Apify (fetch giả)", ()
       notify: () => true,
     });
     assert.match(r2.lastSync.sources.tripadvisor.message, /điểm nhận về không hợp lệ/);
-    assert.match(r2.lastSync.sources.google.message, /hết hạn mức Apify/);
+    assert.match(r2.lastSync.sources.google.message, /hết hạn mức tháng này/);
 
     const r3 = await reviewStatsService.sync({ fetchImpl: fakeFetch([]), notify: () => true });
-    assert.match(r3.lastSync.sources.google.message, /Không kết nối được Apify/);
+    assert.match(r3.lastSync.sources.google.message, /Không kết nối được dịch vụ lấy đánh giá/);
     const r4 = await reviewStatsService.sync({
       fetchImpl: fakeFetch([
         [TA_ACT, () => json([])],
@@ -372,7 +381,7 @@ describe("điểm đánh giá — tự cập nhật qua Apify (fetch giả)", ()
     const empty = fakeFetch([["/users/me/limits", LIMITS(5, 5)]]);
     await assert.rejects(
       reviewStatsService.manualSync({ fetchImpl: empty, notify: () => true }),
-      /hết hạn mức Apify tháng này/,
+      /hết hạn mức tháng này/,
     );
     assert.equal(empty.calls.filter((c) => c.url.includes("/acts/")).length, 0);
   });
@@ -650,7 +659,7 @@ describe("lấy đánh giá qua Apify — chạy không đồng bộ (fetch gi�
     assert.equal(s2.status, "done");
     assert.match(
       s2.result.errors.tripadvisor,
-      /hết hạn mức Apify tháng này — thử lại khi sang chu kỳ mới/,
+      /hết hạn mức tháng này — thử lại khi sang chu kỳ mới/,
     );
     assert.deepEqual(s2.result.counts, { tripadvisor: 0, google: 3 });
     assert.equal(s2.result.items.length, 3);
@@ -681,7 +690,7 @@ describe("lấy đánh giá qua Apify — chạy không đồng bộ (fetch gi�
     const s = await start(f);
     assert.equal(s.status, "done");
     assert.match(s.result.errors.google, /bận/);
-    assert.match(s.result.errors.tripadvisor, /Không tìm thấy công cụ/);
+    assert.match(s.result.errors.tripadvisor, /Dịch vụ lấy đánh giá đã thay đổi/);
     assert.deepEqual(s.result.items, []);
   });
 
@@ -731,11 +740,11 @@ describe("lấy đánh giá qua Apify — chạy không đồng bộ (fetch gi�
     assert.ok(!poor.calls.some((c) => c.url.includes("/runs?")));
     _resetLimitsCache();
     const none = apify({ used: 5 });
-    await assert.rejects(start(none), /Đã dùng hết hạn mức Apify tháng này/);
+    await assert.rejects(start(none), /Đã dùng hết hạn mức tháng này/);
     assert.equal((await status(none)).status, "idle");
 
     env.reviews.apifyToken = "";
-    await assert.rejects(start(apify()), /Chưa cài mã Apify/);
+    await assert.rejects(start(apify()), /Chưa bật kết nối dịch vụ lấy đánh giá/);
     assert.deepEqual(await reviewImportService.sources(), {
       tripadvisor: false,
       google: false,
@@ -849,7 +858,7 @@ describe("điểm đánh giá — quyền truy cập API", () => {
       .set("Cookie", cookie(admin))
       .set("X-Requested-With", "fetch");
     assert.equal(sync.status, 400);
-    assert.match(sync.body.error.message, /Chưa cài mã Apify/);
+    assert.match(sync.body.error.message, /Chưa bật kết nối dịch vụ lấy đánh giá/);
     // lấy đánh giá: nhân viên có quyền Đánh giá xem được máy chủ đã cấu hình chưa (true / false)
     const src = await request(app)
       .get("/api/v1/admin/reviews/import/sources")
@@ -875,7 +884,7 @@ describe("điểm đánh giá — quyền truy cập API", () => {
       editor.permissions = { reviews: "edit" };
       const start = await hit("post", "/api/v1/admin/reviews/import/preview");
       assert.equal(start.status, 400);
-      assert.match(start.body.error.message, /Apify/);
+      assert.match(start.body.error.message, /Chưa bật kết nối dịch vụ lấy đánh giá/);
     } finally {
       editor.permissions = { reviews: "full" };
     }

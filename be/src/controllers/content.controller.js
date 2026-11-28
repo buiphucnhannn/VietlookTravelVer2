@@ -50,13 +50,26 @@ export function createContentController(service, type, { name = auditName } = {}
       ok(res, doc);
     },
 
+    /** Xoá: loại có Thùng rác → chuyển vào Thùng rác; ?hard=1 → xoá hẳn mục đang trong Thùng rác */
     async remove(req, res) {
-      const doc = await service.remove(req.validated.params.id);
-      auditService.record(req, `${type}.delete`, {
+      const hard = Boolean(service.softDelete) && req.query?.hard === "1";
+      const id = req.validated.params.id;
+      const doc = hard ? await service.purge(id) : await service.remove(id);
+      auditService.record(req, `${type}.${hard ? "purge" : "delete"}`, {
+        target: target(doc),
+        meta: { ...info(doc), ...(service.softDelete && !hard && { trash: true }) },
+      });
+      noContent(res);
+    },
+
+    /** Khôi phục từ Thùng rác */
+    async restore(req, res) {
+      const doc = await service.restore(req.validated.params.id);
+      auditService.record(req, `${type}.restore`, {
         target: target(doc),
         meta: info(doc),
       });
-      noContent(res);
+      ok(res, doc);
     },
 
     async reorder(req, res) {
