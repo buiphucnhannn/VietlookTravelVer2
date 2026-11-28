@@ -19,6 +19,8 @@ import {
   PageHeader,
   Pagination,
   SearchBox,
+  Select,
+  Toggle,
   fmtDateTime,
 } from "./ui";
 
@@ -59,6 +61,8 @@ const CONTENT_VERBS = {
   hide: "Ẩn",
   delete: "Xoá",
   reorder: "Sắp xếp lại thứ tự",
+  restore: "Khôi phục", // từ Thùng rác
+  purge: "Xoá hẳn", // xoá vĩnh viễn khỏi Thùng rác
 };
 
 const ROLE_LABELS = { admin: "Quản trị viên", editor: "Nhân viên" };
@@ -95,6 +99,9 @@ const FIXED = {
   "enquiry.delete": "Xoá đơn",
   "enquiry.resend_email": "Gửi lại email của đơn",
   "enquiry.payment": "Khách thanh toán online qua 9Pay",
+  "enquiry.restore": "Khôi phục đơn từ Thùng rác",
+  "enquiry.purge": "Xoá hẳn đơn khỏi Thùng rác",
+  "trash.purge": "Tự xoá hẳn mục quá 30 ngày trong Thùng rác",
   "media.upload": "Tải ảnh lên",
   "media.from_url": "Thêm ảnh từ link",
   "media.delete": "Xoá ảnh",
@@ -103,6 +110,7 @@ const FIXED = {
   "media.discard": "Bỏ ảnh / video chưa lưu",
   "page.update": "Sửa nội dung trang",
   "settings.home": "Sửa trang chủ",
+  "settings.revision_restore": "Khôi phục phiên bản",
   "settings.notifications": "Sửa email nhận thông báo",
   "settings.test_email": "Gửi email thử",
   "settings.payment": "Sửa cài đặt thanh toán 9Pay",
@@ -145,6 +153,9 @@ const BADGES = {
   "enquiry.resend_email": ["Gửi email", "amber"],
   "enquiry.payment": ["Thanh toán", "green"],
   "enquiry.delete": ["Xoá", "red"],
+  "enquiry.restore": ["Khôi phục", "green"],
+  "enquiry.purge": ["Xoá hẳn", "red"],
+  "trash.purge": ["Thùng rác", "gray"],
   "media.upload": ["Ảnh", "blue"],
   "media.from_url": ["Ảnh", "blue"],
   "media.drive_video": ["Video", "blue"],
@@ -152,6 +163,7 @@ const BADGES = {
   "media.cleanup": ["Dọn ảnh", "gray"],
   "media.discard": ["Dọn ảnh", "gray"],
   "page.update": ["Sửa", "blue"],
+  "settings.revision_restore": ["Khôi phục", "green"],
   "review.fetch": ["Lấy đánh giá", "blue"],
   "settings.review_sync": ["Điểm đánh giá", "blue"],
   "user.create": ["Tài khoản", "violet"],
@@ -168,6 +180,8 @@ const VERB_TONES = {
   hide: "gray",
   delete: "red",
   reorder: "blue",
+  restore: "green",
+  purge: "red",
 };
 export function actionBadge(action = "") {
   if (BADGES[action]) return BADGES[action];
@@ -200,7 +214,7 @@ export function describeLog(x) {
   const [type, verb] = action.split(".");
   const m = x.meta ?? {};
   const id = x.target?.id ?? "";
-  const gone = Boolean(x.targetGone) && verb !== "delete";
+  const gone = Boolean(x.targetGone) && verb !== "delete" && verb !== "purge";
   const goneNote = gone ? " (đã xoá)" : "";
   const plain = (before) => ({ before });
 
@@ -213,7 +227,16 @@ export function describeLog(x) {
         after: "",
       };
     const lead = verb === "create" ? `Thêm ${c.noun} mới` : `${CONTENT_VERBS[verb]} ${c.noun}`;
-    const tail = verb === "show" ? " trên website" : verb === "hide" ? " khỏi website" : "";
+    const tail =
+      verb === "show"
+        ? " trên website"
+        : verb === "hide"
+          ? " khỏi website"
+          : verb === "delete" && m.trash
+            ? " (chuyển vào Thùng rác)"
+            : verb === "restore"
+              ? " từ Thùng rác"
+              : "";
     if (!x.targetName)
       return plain(
         `${CONTENT_VERBS[verb]} một ${c.noun}${verb === "create" ? " mới" : ""}${gone ? " (nay đã xoá)" : ""}${tail}`,
@@ -222,7 +245,7 @@ export function describeLog(x) {
       before: `${lead} `,
       name: quoted(x.targetName),
       after: `${goneNote}${tail}`,
-      href: gone || verb === "delete" ? "" : c.href ? c.href(id) : c.list,
+      href: gone || verb === "delete" || verb === "purge" ? "" : c.href ? c.href(id) : c.list,
       module: c.module,
     };
   }
@@ -252,7 +275,9 @@ export function describeLog(x) {
     if (verb === "note") return link("Thêm ghi chú vào");
     if (verb === "note_delete") return link("Xoá ghi chú của");
     if (verb === "resend_email") return link("Gửi lại email cho");
-    if (verb === "delete") return link("Xoá");
+    if (verb === "delete") return link("Xoá", m.trash ? " (chuyển vào Thùng rác)" : "");
+    if (verb === "restore") return link("Khôi phục", " từ Thùng rác");
+    if (verb === "purge") return link("Xoá hẳn");
     if (verb === "create") return link("Khách gửi");
     if (verb === "payment") {
       const amount = m.amount ? `${Number(m.amount).toLocaleString("vi-VN")} ₫` : "";
@@ -324,6 +349,12 @@ export function describeLog(x) {
       return plain("Thêm video từ Google Drive");
     case "media.delete":
       return plain("Xoá một ảnh khỏi kho ảnh");
+    case "trash.purge":
+      return plain(
+        m.count
+          ? `Tự xoá hẳn ${m.count} mục đã nằm trong Thùng rác quá ${m.days ?? 30} ngày`
+          : "Tự xoá hẳn mục quá hạn trong Thùng rác",
+      );
     case "media.cleanup":
       return plain(m.count ? `Tự dọn ${m.count} ảnh không còn dùng` : "Tự dọn ảnh không còn dùng");
     case "media.discard":
@@ -374,8 +405,8 @@ export function describeLog(x) {
         before: "Sửa ",
         name: "thông tin liên hệ công ty",
         after: m.phones ? ` — ${m.phones} số điện thoại${m.email ? `, ${m.email}` : ""}` : "",
-        href: "/settings#contact",
-        module: "admin",
+        href: "/contact",
+        module: "contact",
       };
     case "settings.tracking":
       return {
@@ -389,7 +420,7 @@ export function describeLog(x) {
       return {
         before: "Sửa ",
         name: "điểm & số lượt đánh giá Tripadvisor / Google",
-        after: m.keyChanged?.length ? " — có đổi khoá API" : "", // dòng cũ; nay ghi riêng "settings.secret"
+        after: m.keyChanged?.length ? " — có đổi khoá kết nối" : "", // dòng cũ; nay ghi riêng "settings.secret"
         href: "/settings",
         module: "admin",
       };
@@ -513,7 +544,7 @@ function detailRows(x) {
     add("Google", m.google && `${m.google} đánh giá${m.googleAuto ? " (tự động)" : ""}`);
     if (m.keyChanged?.length)
       add(
-        "Đổi khoá API",
+        "Đổi khoá kết nối",
         m.keyChanged.map((k) => (k === "google" ? "Google" : "Tripadvisor")).join(", "),
       );
   }
@@ -558,6 +589,7 @@ const FILTER_GROUPS = [
     label: "Trang & ảnh",
     actions: [
       "page.update",
+      "settings.revision_restore",
       "media.upload",
       "media.from_url",
       "media.drive_video",
@@ -612,6 +644,52 @@ function matchActions(text) {
     ).includes(q),
   );
 }
+
+/**
+ * Lọc theo loại thao tác — mẫu mã thao tác gửi lên backend (`*` = phần bất kỳ, xem be audit.service.js)
+ */
+const KIND_FILTERS = [
+  { key: "", label: "Tất cả" },
+  { key: "auth", label: "Đăng nhập & đăng xuất", match: ["auth.*"] },
+  {
+    key: "create",
+    label: "Thêm mới",
+    match: ["*.create", "media.upload", "media.from_url", "media.drive_video"],
+  },
+  {
+    key: "update",
+    label: "Sửa",
+    match: [
+      "*.update",
+      "*.show",
+      "*.hide",
+      "*.reorder",
+      "*.permissions",
+      "*.password_reset",
+      "*.unlock",
+      "enquiry.note",
+      "enquiry.payment",
+      "enquiry.resend_email",
+      "review.fetch",
+    ],
+  },
+  {
+    key: "delete",
+    label: "Xoá & khôi phục",
+    match: [
+      "*.delete",
+      "*_delete",
+      "*.restore",
+      "*.purge",
+      "trash.*",
+      "media.discard",
+      "media.cleanup",
+    ],
+  },
+  { key: "settings", label: "Cài đặt", match: ["settings.*"] },
+];
+// Ẩn đăng nhập thường ngày; vẫn hiện cảnh báo bảo mật (sai mật khẩu, tạm khoá, đổi mật khẩu…)
+const HIDE_AUTH = "auth.login";
 
 /** Khoảng thời gian nhanh */
 const vnDay = (offsetDays = 0) =>
@@ -670,7 +748,7 @@ const networkLabel = (ip = "") =>
   !ip
     ? ""
     : /^(::1|127\.|::ffff:127\.)/.test(ip)
-      ? "Mạng nội bộ (máy chủ)"
+      ? "Mạng nội bộ của hệ thống"
       : ip.replace(/^::ffff:/, "");
 
 const explainOf = (x, id) =>
@@ -775,6 +853,8 @@ export default function AuditLogPage() {
     actor: "",
     q: "",
     actions: "",
+    match: "",
+    exclude: HIDE_AUTH, // mặc định ẩn đăng nhập / đăng xuất
     from: "",
     limit: 25,
   });
@@ -794,7 +874,19 @@ export default function AuditLogPage() {
     setPeriod(p.key);
     setQuery({ from: p.from ? p.from() : "" });
   };
-  const filtering = Boolean(text.trim() || period || list.query.actor);
+  // Loại thao tác + "Ẩn đăng nhập" (chọn "Đăng nhập & đăng xuất" thì không ẩn nữa)
+  const [kind, setKind] = useState("");
+  const [hideAuth, setHideAuth] = useState(true);
+  const applyKind = (k, hide) => {
+    setKind(k);
+    setHideAuth(hide);
+    const f = KIND_FILTERS.find((x) => x.key === k);
+    setQuery({
+      match: f?.match?.join(",") ?? "",
+      exclude: hide && k !== "auth" ? HIDE_AUTH : "",
+    });
+  };
+  const filtering = Boolean(text.trim() || period || list.query.actor || kind);
 
   const actorCell = (x, id) =>
     id ? (
@@ -862,6 +954,28 @@ export default function AuditLogPage() {
                 </button>
               ))}
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <label className="flex min-w-0 items-center gap-2.5 text-[13px] font-semibold text-slate-600">
+              <span className="whitespace-nowrap">Loại thao tác</span>
+              <Select
+                value={kind}
+                onChange={(e) => applyKind(e.target.value, hideAuth)}
+                className="h-10 w-56 max-w-full py-0 text-sm"
+              >
+                {KIND_FILTERS.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <Toggle
+              checked={hideAuth && kind !== "auth"}
+              disabled={kind === "auth"}
+              onChange={(v) => applyKind(kind, v)}
+              label="Ẩn đăng nhập"
+            />
           </div>
           <div className="flex min-h-6 flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-slate-500">
             {list.query.actor && (

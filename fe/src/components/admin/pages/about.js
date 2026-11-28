@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import Image from "next/image";
 import {
   Accessibility,
@@ -12,7 +12,6 @@ import {
   Handshake,
   Headphones,
   HeartHandshake,
-  ImagePlus,
   Languages,
   Layers,
   MapPinned,
@@ -30,8 +29,9 @@ import Container from "@/components/ui/Container";
 import Button from "@/components/ui/Button";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import Reviews from "@/components/home/Reviews";
-import { Sortable } from "../Sortable";
-import { Button as AdminButton, ImageField, Modal, VideoField, VideoHelp } from "../ui";
+import { DragHandle, Sortable } from "../Sortable";
+import { Button as AdminButton, Modal, VideoField, VideoHelp } from "../ui";
+import { ImageSpot } from "../page-copy/image-edit";
 import {
   AddButton,
   AutoChip,
@@ -43,6 +43,8 @@ import {
   otherList,
 } from "./canvas";
 import { usePublicData } from "./live";
+import { ABOUT_BLOCKS } from "@/lib/hidden-blocks.mjs";
+import { BlockSwitch, DIM_TRANSITION, HIDDEN_DIM } from "../block-visibility";
 
 /* =========================================================================
  * Trang Giới thiệu — y như website (app/[lang]/about/page.js), cùng thứ tự khối:
@@ -67,36 +69,109 @@ const ACCESS_ICONS = [Accessibility, Ear, HandHeart];
 /** Khoảng cách trên/dưới mỗi khối — giống website */
 const SECTION = "py-14 lg:py-[4.5rem]";
 
+/**
+ * Mỗi khối chỉ vẽ lại khi chính các ô của nó đổi (gõ ở khối này không vẽ lại các khối khác) — `keys`: các ô
+ * trong `data` mà khối dùng.
+ */
+const only = (Section, keys) =>
+  memo(
+    Section,
+    (a, b) =>
+      a.lang === b.lang && a.setData === b.setData && keys.every((k) => a.data[k] === b.data[k]),
+  );
+
+/** Ô chữ 3 ngôn ngữ của `data[key]` (props cho LocText) */
+const locOf = (data, lang, setData) => (key) => ({
+  lang,
+  value: data[key],
+  onChange: (v) => setData({ [key]: v }),
+});
+
 export function AboutBody({ data, lang, setData }) {
   const live = usePublicData(lang);
-  const loc = (key) => ({
-    lang,
-    value: data[key],
-    onChange: (v) => setData({ [key]: v }),
-  });
-  const props = { data, lang, setData, loc };
+  const props = { data, lang, setData };
   return (
     <>
-      <StorySection {...props} />
-      <ValuesSection {...props} />
-      <WhySection {...props} />
-      <AccessSection live={live} lang={lang} />
-      <NumbersSection {...props} />
-      <ReviewsSection live={live} lang={lang} />
+      <StoryBlock {...props} />
+      <Hideable k="values" data={data} setData={setData}>
+        <ValuesBlock {...props} />
+      </Hideable>
+      <Hideable k="why" data={data} setData={setData}>
+        <WhyBlock {...props} />
+      </Hideable>
+      <Hideable k="access" data={data} setData={setData}>
+        <AccessSection live={live} lang={lang} />
+      </Hideable>
+      <Hideable k="numbers" data={data} setData={setData}>
+        <NumbersBlock {...props} />
+      </Hideable>
+      <Hideable k="reviews" data={data} setData={setData}>
+        <ReviewsSection live={live} lang={lang} />
+      </Hideable>
     </>
+  );
+}
+
+/**
+ * Khối bật / tắt được trên website (`data.hidden`, lib/hidden-blocks.mjs): công tắc "Hiện / Ẩn trên website" giữa
+ * mép trên khối (hiện khi rê chuột vào khối); khối đang ẩn hiện mờ, vẫn sửa được. Đầu trang + câu chuyện không tắt được.
+ */
+function Hideable({ k, data, setData, children }) {
+  const hidden = data.hidden?.[k] === true;
+  const onChange = (on) => {
+    const next = { ...data.hidden };
+    if (on) next[k] = true;
+    else delete next[k];
+    // không tắt khối nào → bỏ hẳn cờ (bật lại hết = như chưa sửa, không báo "Chưa lưu")
+    setData({ hidden: Object.keys(next).length ? next : undefined });
+  };
+  return (
+    <div className="group/sec relative" data-jump-hidden={hidden || undefined}>
+      <div className={cn(DIM_TRANSITION, hidden && HIDDEN_DIM)}>{children}</div>
+      <BlockSwitch group="sec" name={ABOUT_BLOCKS[k]} hidden={hidden} onChange={onChange} />
+    </div>
   );
 }
 
 /* ----- Câu chuyện + 4 ảnh ----- */
 
-function StorySection({ data, lang, setData, loc }) {
+const StoryBlock = only(StorySection, [
+  "story",
+  "storyEyebrow",
+  "storyTitle",
+  "languages",
+  "collage",
+]);
+const ValuesBlock = only(ValuesSection, [
+  "vision",
+  "mission",
+  "visionTitle",
+  "missionTitle",
+  "valuesTitle",
+  "values",
+  "people",
+]);
+const WhyBlock = only(WhySection, ["whyTitle", "whySubtitle", "reasons"]);
+const NumbersBlock = only(NumbersSection, ["numbersTitle", "stats", "video", "ctaLabel"]);
+
+/**
+ * Cụm nút kéo / xoá của đoạn văn & lý do (khối chữ không có viền thẻ): màn hình rộng → cụm DỌC nằm ngoài mép phải
+ * (trong khoảng trống giữa các cột) để không đè lên chữ; điện thoại → phía trên, góc phải.
+ */
+const SIDE_TOOLS = "-top-8 right-0 sm:top-0 sm:-right-0.5 sm:translate-x-full sm:flex-col";
+
+function StorySection({ data, lang, setData }) {
+  const loc = locOf(data, lang, setData);
+  // hàm ổn định → ô ảnh ghép / thẻ ngôn ngữ không vẽ lại khi gõ đoạn văn
+  const setLanguages = useCallback((languages) => setData({ languages }), [setData]);
+  const setCollage = useCallback((collage) => setData({ collage }), [setData]);
   const [focusAt, setFocusAt] = useState(-1);
   const story = rowsOf(data.story, lang);
   const setStory = (next) => setData({ story: { ...data.story, [lang]: next } });
   const english = otherList(data.story, lang);
 
   return (
-    <section className={SECTION}>
+    <section data-jump="Câu chuyện" className={SECTION}>
       <Container className="grid gap-12 lg:grid-cols-2">
         <div className="min-w-0 self-center">
           <LocText
@@ -116,7 +191,8 @@ function StorySection({ data, lang, setData, loc }) {
           <Sortable
             items={story}
             onReorder={setStory}
-            className="mt-6 space-y-4 text-base leading-relaxed text-ink/80 sm:text-justify sm:text-lg sm:hyphens-auto"
+            // điện thoại: cụm nút kéo / xoá nằm TRÊN mỗi đoạn → giãn khoảng cách để cụm nút không sát dòng của đoạn trước
+            className="mt-6 space-y-10 text-base leading-relaxed text-ink/80 sm:space-y-4 sm:text-justify sm:text-lg sm:hyphens-auto"
           >
             {(p, i, drag) => (
               <div
@@ -129,7 +205,7 @@ function StorySection({ data, lang, setData, loc }) {
                   drag={drag}
                   name={`đoạn ${i + 1}`}
                   onRemove={() => setStory(story.filter((_, k) => k !== i))}
-                  className="-top-5 right-0"
+                  className={SIDE_TOOLS}
                 />
                 <InlineText
                   label={`Đoạn ${i + 1}`}
@@ -151,15 +227,16 @@ function StorySection({ data, lang, setData, loc }) {
             Thêm đoạn
           </AddButton>
 
+          {/* mt-10: cụm nút nổi phía trên mỗi thẻ ngôn ngữ không chạm nút "Thêm đoạn" */}
           <div
-            className="mt-6 flex flex-wrap items-center gap-2"
+            className="mt-10 flex flex-wrap items-center gap-2"
             title="Ngôn ngữ của hướng dẫn viên — hiện giống nhau ở cả ba bản EN, 中文, VI"
           >
             <Languages className="size-5 text-brand-600" />
             <InlineChips
               name="Ngôn ngữ hướng dẫn viên"
               value={data.languages}
-              onChange={(languages) => setData({ languages })}
+              onChange={setLanguages}
               addLabel="Thêm ngôn ngữ"
               newHint="VD: English"
               chipClass="rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700"
@@ -167,34 +244,36 @@ function StorySection({ data, lang, setData, loc }) {
           </div>
         </div>
 
-        <Collage value={data.collage} onChange={(collage) => setData({ collage })} />
+        <Collage value={data.collage} onChange={setCollage} />
       </Container>
     </section>
   );
 }
 
-/** Lưới 2×2 ảnh cạnh câu chuyện (cao bằng khối chữ bên cạnh): bấm để đổi ảnh, giữ và kéo để đổi chỗ */
-function Collage({ value, onChange }) {
-  const [editing, setEditing] = useState(-1);
+/**
+ * Lưới 2×2 ảnh cạnh câu chuyện (cao bằng khối chữ bên cạnh): bấm vào ảnh là đổi ảnh (cùng kiểu đổi ảnh với mọi
+ * trang); rê chuột → nút "Kéo đổi chỗ" ở góc ảnh.
+ */
+const Collage = memo(function Collage({ value, onChange }) {
+  const setAt = (i, src) => onChange(value.map((x, k) => (k === i ? src || ABOUT_COLLAGE[k] : x)));
   return (
-    <>
-      <Sortable
-        items={value}
-        onReorder={onChange}
-        layout="grid"
-        className="grid h-[420px] grid-cols-2 grid-rows-2 gap-4 sm:h-[560px] lg:h-full"
-      >
-        {(src, i, drag) => (
-          <button
-            type="button"
-            {...drag.handle}
-            onClick={() => setEditing(i)}
-            aria-label={`Ảnh ${i + 1}: bấm để đổi ảnh, giữ và kéo để đổi chỗ`}
-            className={cn(
-              "group absolute inset-0 overflow-hidden rounded-3xl bg-slate-200 shadow-lg ring-brand-400 transition focus-visible:ring-4 focus-visible:outline-none",
-              drag.dragging && "ring-4",
-            )}
-          >
+    <Sortable
+      items={value}
+      onReorder={onChange}
+      layout="grid"
+      className="grid h-[420px] grid-cols-2 grid-rows-2 gap-4 sm:h-[560px] lg:h-full"
+    >
+      {(src, i, drag) => (
+        <div
+          className={cn(
+            "absolute inset-0 overflow-hidden rounded-3xl bg-slate-200 shadow-lg",
+            drag.dragging && "ring-4 ring-blue-400",
+          )}
+        >
+          {String(src).startsWith("blob:") ? (
+            // eslint-disable-next-line @next/next/no-img-element -- ảnh tạm trên máy, chưa có trên CDN
+            <img src={src} alt="" className="absolute inset-0 size-full object-cover" />
+          ) : (
             <Image
               src={src}
               alt=""
@@ -202,40 +281,26 @@ function Collage({ value, onChange }) {
               sizes="(min-width: 1024px) 25vw, 50vw"
               className="object-cover"
             />
-            <span className="absolute right-3 bottom-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-white/95 px-3 text-xs font-semibold text-slate-800 opacity-0 shadow-md transition group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100">
-              <ImagePlus className="size-3.5" />
-              Đổi ảnh
-            </span>
-          </button>
-        )}
-      </Sortable>
-
-      <Modal
-        open={editing >= 0}
-        onClose={() => setEditing(-1)}
-        size="sm"
-        icon={ImagePlus}
-        title={`Ảnh ${editing + 1} cạnh câu chuyện`}
-        description="Nên chọn ảnh rõ nét. Bỏ ảnh thì website dùng lại ảnh có sẵn."
-        footer={<AdminButton onClick={() => setEditing(-1)}>Xong</AdminButton>}
-      >
-        <div className="flex justify-center">
-          {editing >= 0 && (
-            <ImageField
-              value={value[editing]}
-              onChange={(image) =>
-                onChange(value.map((x, k) => (k === editing ? image || ABOUT_COLLAGE[k] : x)))
-              }
-              folder="pages"
-              aspect="aspect-square"
-              crop={{ width: 1000 }}
-            />
           )}
+          <ImageSpot
+            value={src}
+            onChange={(v) => setAt(i, v)}
+            crop={{ width: 1000 }}
+            label={`Ảnh ${i + 1}`}
+            edited={src !== ABOUT_COLLAGE[i]}
+            onReset={() => setAt(i, ABOUT_COLLAGE[i])}
+            tools={
+              <DragHandle
+                {...drag.handle}
+                className="pointer-events-auto size-7 rounded-full bg-white/95 text-slate-700 shadow-md ring-1 ring-slate-900/10 hover:bg-white"
+              />
+            }
+          />
         </div>
-      </Modal>
-    </>
+      )}
+    </Sortable>
   );
-}
+});
 
 /* ----- Tầm nhìn – sứ mệnh – giá trị cốt lõi – phẩm chất ----- */
 
@@ -245,7 +310,8 @@ const SUBGRID3 = "md:grid md:grid-cols-1 md:grid-rows-subgrid md:gap-y-0 md:row-
 const WRAP_SUBGRID3 =
   "md:[&>*]:grid md:[&>*]:grid-cols-1 md:[&>*]:grid-rows-subgrid md:[&>*]:gap-y-0 md:[&>*]:row-span-3";
 
-function ValuesSection({ data, lang, setData, loc }) {
+function ValuesSection({ data, lang, setData }) {
+  const loc = locOf(data, lang, setData);
   const [focusAt, setFocusAt] = useState(-1);
   const values = data.values;
   const setValues = (next) => setData({ values: next });
@@ -254,7 +320,10 @@ function ValuesSection({ data, lang, setData, loc }) {
   const people = rowsOf(data.people, lang);
 
   return (
-    <section className={cn(SECTION, "relative isolate overflow-hidden bg-brand-950 text-white")}>
+    <section
+      data-jump="Tầm nhìn & giá trị"
+      className={cn(SECTION, "relative isolate overflow-hidden bg-brand-950 text-white")}
+    >
       <BgImage src="/images/tours/hd/hanoi7.jpg" tone="dark" />
       <Container className="grid gap-6 md:grid-cols-2">
         {[
@@ -377,7 +446,8 @@ function ValuesSection({ data, lang, setData, loc }) {
 
 /* ----- Vì sao chọn Vietlook (giống components/home/WhyAndB2B.js → WhyUs) ----- */
 
-function WhySection({ data, lang, setData, loc }) {
+function WhySection({ data, lang, setData }) {
+  const loc = locOf(data, lang, setData);
   const [focusAt, setFocusAt] = useState(-1);
   const reasons = data.reasons;
   const setReasons = (next) => setData({ reasons: next });
@@ -385,7 +455,10 @@ function WhySection({ data, lang, setData, loc }) {
     setReasons(reasons.map((x, k) => (k === i ? { ...x, [field]: v } : x)));
 
   return (
-    <section className={cn(SECTION, "relative isolate overflow-hidden")}>
+    <section
+      data-jump="Vì sao chọn Vietlook"
+      className={cn(SECTION, "relative isolate overflow-hidden")}
+    >
       <BgImage src="/images/tours/v2/sapa-6872795.jpg" tone="light" />
       <Container>
         <Heading
@@ -426,7 +499,7 @@ function WhySection({ data, lang, setData, loc }) {
                   drag={drag}
                   name={`lý do ${i + 1}`}
                   onRemove={() => setReasons(reasons.filter((_, k) => k !== i))}
-                  className="right-0"
+                  className={SIDE_TOOLS}
                 />
                 <span className="row-span-2 grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-forest-700 to-forest-700 text-white shadow-lg shadow-forest-700/25">
                   <Icon className="size-6" />
@@ -495,7 +568,10 @@ function Heading({ title, subtitle, align = "center" }) {
 export function AccessSection({ live, lang }) {
   const a = live?.access;
   return (
-    <section className="relative scroll-mt-28 py-14 lg:py-[4.5rem]">
+    <section
+      data-jump="Du lịch không rào cản"
+      className="group/auto relative scroll-mt-28 py-14 lg:py-[4.5rem]"
+    >
       <Container className="relative">
         <AutoChip
           href={`${ADMIN_BASE}/pages?key=access`}
@@ -577,7 +653,8 @@ function Skeleton({ rows = 3, dark }) {
 
 /* ----- Video + những con số + nút liên hệ ----- */
 
-function NumbersSection({ data, lang, setData, loc }) {
+function NumbersSection({ data, lang, setData }) {
+  const loc = locOf(data, lang, setData);
   const [videoOpen, setVideoOpen] = useState(false);
   const [focusAt, setFocusAt] = useState(-1);
   const stats = data.stats;
@@ -586,23 +663,32 @@ function NumbersSection({ data, lang, setData, loc }) {
     setStats(stats.map((x, k) => (k === i ? { ...x, [field]: v } : x)));
 
   return (
-    <section className={cn(SECTION, "relative isolate overflow-hidden bg-surface")}>
+    <section
+      data-jump="Con số"
+      className={cn(SECTION, "relative isolate overflow-hidden bg-surface")}
+    >
       <BgImage src="/images/tours/v2/hanoi-32123175.jpg" tone="mist" />
       <Container className="grid items-center gap-10 lg:grid-cols-2">
-        {/* Video: y như website (bấm nút phát để xem thử) */}
-        <div className="relative overflow-hidden rounded-3xl shadow-xl">
+        {/* Video: y như website — chỉ hiện ảnh bìa (bấm nút phát giữa ảnh để xem thử); rê chuột → nhãn đổi video */}
+        <div className="group/video relative overflow-hidden rounded-3xl shadow-xl">
           <VideoEmbed
             url={data.video}
             fallbackId={siteConfig.youtubeIds[0]}
             title="Discovering The Timeless Beauty With Vietlook Travel"
           />
+          <span
+            data-edit-ui
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10 hidden rounded-[inherit] ring-2 ring-blue-500 ring-inset group-hover/video:block"
+          />
           <button
             type="button"
+            data-edit-ui
             onClick={() => setVideoOpen(true)}
-            className="absolute top-3 left-3 z-10 inline-flex h-9 items-center gap-1.5 rounded-full bg-white/95 px-3.5 text-xs font-semibold text-slate-800 shadow-md transition hover:bg-white"
+            className="invisible absolute top-2 left-2 z-20 inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[11px] leading-none font-semibold text-white shadow-lg group-hover/video:visible hover:bg-blue-700 [@media(hover:none)]:visible"
           >
-            <Film className="size-4" />
-            Đổi video
+            <Film className="size-3" />
+            Bấm để đổi video
           </button>
         </div>
 
@@ -711,7 +797,7 @@ function NumbersSection({ data, lang, setData, loc }) {
 function ReviewsSection({ live, lang }) {
   if (!live)
     return (
-      <section className={cn(SECTION, "bg-forest-900")}>
+      <section data-jump="Đánh giá của khách" className={cn(SECTION, "bg-forest-900")}>
         <Container>
           <Skeleton rows={2} dark />
         </Container>
@@ -719,7 +805,7 @@ function ReviewsSection({ live, lang }) {
     );
   const reviews = live.reviewsOn("about");
   return (
-    <div className="relative">
+    <div data-jump="Đánh giá của khách" className="group/auto relative">
       <AutoChip dark href={`${ADMIN_BASE}/reviews`}>
         Tự động — sửa ở mục Đánh giá
       </AutoChip>

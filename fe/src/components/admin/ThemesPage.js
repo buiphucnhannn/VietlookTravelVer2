@@ -40,6 +40,8 @@ import {
 import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { slugSource, useAutoFill } from "./translate";
+import { SeoFields, normalizeSeo, seoEmpty } from "./SeoFields";
+import TipNotice from "./TipNotice";
 
 const PATH = "/admin/themes";
 // chủ đề thay đổi → menu, trang chủ, trang chủ đề, bộ lọc tour đều đổi
@@ -50,6 +52,14 @@ const PAGE_SIZE = 8; // 2 hàng × 4 cột
 
 const L = () => ({ en: "", zh: "", vi: "" });
 
+/** Tiêu đề Google website tự tạo khi để trống (giống mẫu câu mặc định của trang chủ đề) — chỉ để xem trước */
+const AUTO_TITLE = {
+  en: (n) => `Samples of ${n.replace(/\s+tours?$/i, "")} tours`,
+  vi: (n) => `Tour ${n.replace(/^tour\s+/i, "")} tiêu biểu`,
+  zh: (n) => `${n.replace(/线路$/, "")}线路精选`,
+};
+const autoTitle = (name, lang) => (name ? AUTO_TITLE[lang](name) : "");
+
 const EMPTY = {
   slug: "",
   name: L(),
@@ -57,6 +67,7 @@ const EMPTY = {
   intro: L(),
   image: "",
   banner: "",
+  seo: seoEmpty(),
   order: 0,
   isActive: true,
 };
@@ -68,6 +79,7 @@ const toPayload = (d) => ({
   intro: d.intro,
   image: d.image,
   banner: d.banner,
+  seo: normalizeSeo(d.seo, { trim: true }),
   order: Number(d.order) || 0,
   isActive: d.isActive,
 });
@@ -94,7 +106,7 @@ export default function ThemesPage() {
     <>
       <PageHeader
         title="Chủ đề tour"
-        description={`Tối đa 8 chủ đề (VD: Gia đình, Ẩm thực, Mạo hiểm). Hiện trên menu, trang chủ, bộ lọc tour và trang chủ đề.${canEdit ? " Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất kỳ." : ""}`}
+        description="Tối đa 8 chủ đề (VD: Gia đình, Ẩm thực), hiện trên menu, trang chủ, bộ lọc tour và trang chủ đề."
         actions={
           <>
             <Badge tone={full ? "amber" : "blue"} className="px-3 py-1 text-xs">
@@ -113,6 +125,13 @@ export default function ThemesPage() {
         <Notice tone="warn" className="mb-4">
           Đã đủ {MAX} chủ đề. Muốn thêm chủ đề mới, hãy xoá bớt hoặc sửa lại một chủ đề cũ.
         </Notice>
+      )}
+
+      {canEdit && (
+        <TipNotice id="sort-themes" className="mb-4">
+          Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất
+          kỳ.
+        </TipNotice>
       )}
 
       <Card bodyClassName="p-4 sm:p-5">
@@ -192,7 +211,12 @@ export default function ThemesPage() {
 function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
   const editVerb = useEditVerb();
   const isNew = !initial.id;
-  const [d, setD] = useState({ ...EMPTY, ...(isNew && { order: nextOrder }), ...initial });
+  const [d, setD] = useState({
+    ...EMPTY,
+    ...(isNew && { order: nextOrder }),
+    ...initial,
+    seo: normalizeSeo(initial.seo),
+  });
   const [lang, setLang] = useState(DEFAULT_LANG);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const { run, busy } = useMutation(TAGS);
@@ -321,6 +345,20 @@ function ThemeEditor({ initial, nextOrder, onClose, onSaved }) {
                 hint="Tắt để tạm ẩn chủ đề này khỏi website."
               />
             </div>
+          </FormSection>
+
+          <FormSection title="Hiển thị trên Google">
+            <p className="-mt-2 text-xs leading-5 text-slate-500">
+              Để trống thì website tự tạo từ tên và đoạn giới thiệu của chủ đề.
+            </p>
+            <SeoFields
+              value={d.seo}
+              onChange={(seo) => set({ seo })}
+              lang={lang}
+              fallbackTitle={autoTitle(anyLang(d.name, lang), lang)}
+              fallbackDescription={anyLang(d.intro, lang)}
+              path={`themes/${d.slug || "…"}`}
+            />
           </FormSection>
         </div>
       </div>

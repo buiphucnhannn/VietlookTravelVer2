@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "@/components/admin/Link";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, ExternalLink, Save, Search } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { ADMIN_BASE } from "@/config/urls.mjs";
 import { siteConfig } from "@/constants/site";
 import {
@@ -15,14 +12,12 @@ import {
   ABOUT_VISION_TITLE,
 } from "@/data/about";
 import { useMutation } from "./hooks";
-import { AutoTranslate, useAutoFill } from "./translate";
-import { SeoFields } from "./ArticleEditor";
+import { useAutoFill } from "./translate";
+import { SeoCard } from "./SeoFields";
 import { MiniHero, MiniSite } from "./pages/canvas";
 import { AboutBody } from "./pages/about";
 import { PolicyBody } from "./pages/policy";
 import {
-  Button,
-  LangTabs,
   LoadingBlock,
   Notice,
   PageHeader,
@@ -30,7 +25,6 @@ import {
   Toggle,
   anyLang,
   filledOf,
-  fmtDateTime,
   useUi,
   useUnsavedGuard,
 } from "./ui";
@@ -40,8 +34,24 @@ import { pageCopyOf } from "@/lib/page-copy/registry.mjs";
 import { CONTENT_PAGES } from "./pages/list";
 import PageCopyEditor from "./page-copy/PageCopyEditor";
 import PagesHub from "./page-copy/PagesHub";
+import {
+  BackLink,
+  EditorHeader,
+  HistoryButton,
+  LangTools,
+  QuickHelp,
+  RELOAD,
+  SaveBar,
+  ViewLiveLink,
+  useConflictSave,
+  useSaveShortcut,
+} from "./page-copy/chrome";
+import HistoryDrawer, { diffParts } from "./page-copy/HistoryDrawer";
+import JumpMenu from "./page-copy/JumpMenu";
 
 const TAGS = ["pages"];
+const ABOUT_HERO_IMAGES_REST = ABOUT_HERO_IMAGES.slice(1);
+const NO_IMAGES = [];
 const BASE = `${ADMIN_BASE}/pages`;
 
 const PAGES = CONTENT_PAGES;
@@ -205,6 +215,7 @@ export default function ContentPagesPage() {
 function PageEditor({ page }) {
   const isAbout = page.key === "about";
   const [state, setState] = useState({ loading: true, error: "", doc: null });
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -224,7 +235,12 @@ function PageEditor({ page }) {
     return () => {
       alive = false;
     };
-  }, [page.key, isAbout]);
+  }, [page.key, isAbout, nonce]);
+  // "Tải lại bản mới" (có người khác vừa lưu): tải lại từ máy chủ, dựng lại trình sửa
+  const reload = useCallback(() => {
+    setState({ loading: true, error: "", doc: null });
+    setNonce((n) => n + 1);
+  }, []);
 
   if (state.loading) return <LoadingBlock text="Đang tải nội dung…" />;
   if (!state.doc)
@@ -234,43 +250,58 @@ function PageEditor({ page }) {
         <Notice tone="error">{state.error}</Notice>
       </>
     );
-  return <PageCanvas page={page} initial={state.doc} all={state.all} defaults={state.defaults} />;
-}
-
-function BackLink({ onClick }) {
   return (
-    <Link
-      href={BASE}
-      onClick={onClick}
-      className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-brand-700"
-    >
-      <ArrowLeft className="size-3.5" />
-      Giao diện trang
-    </Link>
+    <PageCanvas
+      key={nonce}
+      page={page}
+      initial={state.doc}
+      all={state.all}
+      defaults={state.defaults}
+      onReload={reload}
+    />
   );
 }
 
-function PageCanvas({ page, initial, all = [], defaults }) {
+/** Các phần của trang để báo bản cũ trong Lịch sử khác bản đang lưu ở đâu */
+const PAGE_PARTS = [
+  ["Tiêu đề trang", (x) => x.title],
+  ["Dòng giới thiệu", (x) => x.subtitle],
+  ["Ảnh đầu trang", (x) => x.image],
+  ["Nội dung", (x) => x.body],
+  ["Các khối của trang", (x) => x.data],
+  ["Hiển thị trên Google", (x) => x.seo],
+  ["Hiện / ẩn trên website", (x) => x.isActive],
+];
+
+function PageCanvas({ page, initial, all = [], defaults, onReload }) {
   const isAbout = page.key === "about";
   const router = useRouter();
   const { toast, confirm } = useUi();
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [lang, setLang] = useState(DEFAULT_LANG);
-  const [seoOpen, setSeoOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
   const images = usePendingImages(d);
+  const guarded = useConflictSave();
   const set = useCallback((patch) => setD((x) => ({ ...x, ...patch })), []);
   const setData = useCallback(
     (patch) => setD((x) => ({ ...x, data: { ...x.data, ...patch } })),
     [],
   );
 
+  // so sánh "Chưa lưu" chạy sau phím vừa gõ (không làm chậm lúc gõ)
+  const settled = useDeferredValue(d);
+  const savedJson = useMemo(() => JSON.stringify(toPayload(saved, isAbout)), [saved, isAbout]);
   const dirty = useMemo(
-    () => JSON.stringify(toPayload(d, isAbout)) !== JSON.stringify(toPayload(saved, isAbout)),
-    [d, saved, isAbout],
+    () => JSON.stringify(toPayload(settled, isAbout)) !== savedJson,
+    [settled, savedJson, isAbout],
   );
+  const dirtyRef = useRef(dirty);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
   useUnsavedGuard(dirty);
   const { canEdit } = usePermission("pages"); // chỉ xem → bản xem trước chỉ đọc, không có nút Lưu
 
@@ -287,73 +318,93 @@ function PageCanvas({ page, initial, all = [], defaults }) {
     const { value: v, failed } = await autoFill.fill(base, { lang });
     if (v !== d) setD(v);
     const url = `/settings/pages/${page.key}`;
-    const r = await run(
-      () => api(url, { method: "PUT", body: toPayload(v, isAbout) }),
-      `Đã lưu trang ${page.label}`,
-    );
+    const put = (x, at) =>
+      api(url, {
+        method: "PUT",
+        body: { ...toPayload(x, isAbout), ...(at && { baseUpdatedAt: at }) },
+      });
+    const r = await run(() => guarded((at) => put(v, at), saved.updatedAt));
+    if (r === RELOAD) return onReload();
     if (!r?.data) return;
+    toast(`Đã lưu trang ${page.label}`);
     const next = fromDoc(r.data, isAbout, defaults);
     setSaved(next);
     setD(next);
     if (failed)
       autoFill.offerRetry(async (t) => {
-        const r2 = await api(url, { method: "PUT", body: toPayload(t, isAbout) });
+        const r2 = await put(t, next.updatedAt);
         const again = fromDoc(r2.data, isAbout, defaults);
         setSaved(again);
         setD(again);
       });
-  }, [d, isAbout, defaults, page, run, toast, canEdit, autoFill, lang, images]);
+  }, [
+    d,
+    saved.updatedAt,
+    isAbout,
+    defaults,
+    page,
+    run,
+    guarded,
+    onReload,
+    toast,
+    canEdit,
+    autoFill,
+    lang,
+    images,
+  ]);
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        save();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [save]);
+  useSaveShortcut(save, canEdit);
 
   /** Rời sang trang khác trong mục này: còn thay đổi chưa lưu thì hỏi lại */
-  const leaveTo = (to) => async (e) => {
-    if (!dirty) return;
-    e.preventDefault();
-    const ok = await confirm({
-      title: "Rời trang khi chưa lưu?",
-      message: "Nội dung bạn đang soạn chưa được lưu và sẽ mất nếu rời trang này.",
-      confirmText: "Rời trang",
-      cancelText: "Ở lại",
-      danger: true,
-    });
-    if (ok) {
-      setD(saved);
-      router.push(to);
-    }
-  };
+  const savedRef = useRef(saved);
+  useEffect(() => {
+    savedRef.current = saved;
+  }, [saved]);
+  const leaveTo = useCallback(
+    (to) => async (e) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      const ok = await confirm({
+        title: "Rời trang khi chưa lưu?",
+        message: "Nội dung bạn đang soạn chưa được lưu và sẽ mất nếu rời trang này.",
+        confirmText: "Rời trang",
+        cancelText: "Ở lại",
+        danger: true,
+      });
+      if (ok) {
+        setD(savedRef.current);
+        router.push(to);
+      }
+    },
+    [confirm, router],
+  );
   const goBack = leaveTo(BASE);
 
   // Trang chính sách: menu 4 chính sách (xếp theo thứ tự website dùng: theo mã trang A→Z); chưa chọn ảnh đầu
   // trang thì website mượn ảnh của chính sách khác (chính sách đầu tiên trong menu có ảnh)
-  const policies = PAGES.filter((p) => p.key !== "about")
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .map((p) => {
-      const other = all.find((x) => x.key === p.key);
-      const active = p.key === page.key;
-      const title = active ? d.title : other?.title;
-      const href = `${BASE}?key=${p.key}`;
-      return {
-        key: p.key,
-        href,
-        icon: p.icon,
-        active,
-        title: anyLang(title, lang) || p.label,
-        image: active ? "" : (other?.image ?? ""),
-        // trang đang ẩn với khách thì menu chính sách trên website không có trang đó
-        hidden: !active && other?.isActive === false,
-        onClick: leaveTo(href),
-      };
-    });
+  const policies = useMemo(
+    () =>
+      PAGES.filter((p) => p.key !== "about")
+        .sort((a, b) => a.key.localeCompare(b.key))
+        .map((p) => {
+          const other = all.find((x) => x.key === p.key);
+          const active = p.key === page.key;
+          const title = active ? d.title : other?.title;
+          const href = `${BASE}?key=${p.key}`;
+          return {
+            key: p.key,
+            href,
+            icon: p.icon,
+            active,
+            title: anyLang(title, lang) || p.label,
+            image: active ? "" : (other?.image ?? ""),
+            // trang đang ẩn với khách thì menu chính sách trên website không có trang đó
+            hidden: !active && other?.isActive === false,
+            onClick: leaveTo(href),
+          };
+        }),
+    [all, page.key, d.title, lang, leaveTo],
+  );
 
   const discard = async () => {
     const ok = await confirm({
@@ -366,48 +417,80 @@ function PageCanvas({ page, initial, all = [], defaults }) {
     if (ok) setD(saved);
   };
 
+  // Lịch sử: bản cũ khác bản đang lưu ở phần nào; dùng lại bản cũ → nạp vào trình sửa
+  const describe = useCallback(
+    (rev) =>
+      diffParts(
+        PAGE_PARTS,
+        toPayload(fromDoc(rev, isAbout, defaults), isAbout),
+        toPayload(saved, isAbout),
+      ),
+    [saved, isAbout, defaults],
+  );
+  const onRestored = useCallback(
+    (doc) => {
+      const next = fromDoc(doc, isAbout, defaults);
+      setSaved(next);
+      setD(next);
+    },
+    [isAbout, defaults],
+  );
+
   const viewUrl = `${lang === "en" ? "" : `/${lang}`}${page.url}`;
+  const langTools = (
+    <LangTools
+      lang={lang}
+      onLang={setLang}
+      filled={filledOf(d.title)}
+      canEdit={canEdit}
+      value={d}
+      onTranslate={setD}
+    />
+  );
 
   return (
     <div className="w-full">
-      <BackLink onClick={goBack} />
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">
-        {page.label}
-      </h1>
-      <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
-        {canEdit ? "Bấm vào dòng chữ bất kỳ bên dưới để sửa." : "Bạn đang ở chế độ chỉ xem."}
-        {saved.updatedAt && ` Lưu lần cuối ${fmtDateTime(saved.updatedAt)}.`}
-      </p>
-
-      {/* Thanh chọn ngôn ngữ + bật/tắt hiển thị: khi cuộn nổi cách mép trên 12px (điện thoại: dưới thanh tiêu đề
-          64px + 8px), bo tròn đủ 4 góc, nền trắng đặc + viền mảnh + bóng nhẹ → như 1 thanh công cụ nổi, không dính sát mép */}
-      <div className="sticky z-30 -mx-3 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl bg-white/95 px-4 py-2.5 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/80 backdrop-blur max-lg:top-[4.5rem] lg:top-3">
-        <Toggle
-          checked={d.isActive}
-          onChange={(isActive) => set({ isActive })}
-          disabled={!canEdit}
-          label="Hiện trên website"
-          hint={d.isActive ? "Khách xem được trang này" : "Trang đang ẩn với khách"}
-        />
-        {/* Dịch tự động nằm ngay bên trái các tab ngôn ngữ, cùng hàng, cùng chiều cao */}
-        <div className="flex max-w-full items-center gap-2">
-          {canEdit && (
-            <AutoTranslate
-              lang={lang}
-              value={d}
-              onChange={setD}
-              className="h-9 rounded-full px-3 sm:px-3.5"
-            />
-          )}
-          <LangTabs value={lang} onChange={setLang} filled={filledOf(d.title)} />
-        </div>
-      </div>
+      <EditorHeader
+        title={page.label}
+        readOnly={!canEdit}
+        intro="Bản xem trước giống trang trên website. Bấm vào chữ để sửa, bấm vào ảnh để đổi ảnh, rồi bấm Lưu. Phần có biểu tượng ⚡ lấy từ mục khác — rê chuột để xem sửa ở đâu."
+        updatedAt={saved.updatedAt}
+        onBack={goBack}
+        actions={
+          <>
+            {/* Bật / tắt hiển thị: thẻ nhỏ cạnh nút xem trang thật (cùng hàng tiêu đề, như Giao diện trang) */}
+            <div className="flex h-11 items-center rounded-xl bg-white px-3 ring-1 ring-slate-200">
+              <Toggle
+                checked={d.isActive}
+                onChange={(isActive) => set({ isActive })}
+                disabled={!canEdit}
+                label="Hiện trên website"
+                hint={d.isActive ? "Khách xem được trang này" : "Trang đang ẩn với khách"}
+              />
+            </div>
+            <ViewLiveLink href={viewUrl} dirty={dirty} className="h-11" />
+          </>
+        }
+      />
 
       <ReadOnlyArea readOnly={!canEdit} notice={false}>
-        <div className="mt-3">
-          <MiniSite name={page.label} lang={lang}>
+        <MiniSite
+          name={page.label}
+          lang={lang}
+          tools={
+            <>
+              <JumpMenu />
+              <HistoryButton onClick={() => setHistoryOpen(true)} active={historyOpen} />
+              <QuickHelp />
+              {!canEdit && langTools}
+            </>
+          }
+        >
+          <div data-jump="Đầu trang">
             <MiniHero
-              d={d}
+              title={d.title}
+              subtitle={d.subtitle}
+              image={d.image}
               lang={lang}
               set={set}
               fallbackImage={
@@ -415,108 +498,52 @@ function PageCanvas({ page, initial, all = [], defaults }) {
                   ? ABOUT_HERO_IMAGES[0]
                   : (policies.find((p) => p.image && !p.hidden)?.image ?? "")
               }
-              extraImages={isAbout && !d.image ? ABOUT_HERO_IMAGES.slice(1) : []}
+              extraImages={isAbout && !d.image ? ABOUT_HERO_IMAGES_REST : NO_IMAGES}
             />
-            {isAbout ? (
-              <AboutBody data={d.data} lang={lang} setData={setData} />
-            ) : (
-              <PolicyBody d={d} lang={lang} set={set} menu={policies} />
-            )}
-          </MiniSite>
-        </div>
+          </div>
+          {isAbout ? (
+            <AboutBody data={d.data} lang={lang} setData={setData} />
+          ) : (
+            <PolicyBody body={d.body} lang={lang} set={set} menu={policies} />
+          )}
+        </MiniSite>
 
         {/* Hiển thị trên Google: thu gọn sẵn */}
-        <section className="mt-6 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/80">
-          <button
-            type="button"
-            aria-expanded={seoOpen}
-            onClick={() => setSeoOpen((v) => !v)}
-            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50 sm:px-5"
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
-              <Search className="size-[18px]" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-bold text-slate-900">
-                Hiển thị trên Google
-              </span>
-              <span className="block text-xs leading-relaxed text-slate-500">
-                Tiêu đề và mô tả khách nhìn thấy khi tìm ra trang này. Không bắt buộc.
-              </span>
-            </span>
-            <ChevronDown
-              className={cn("size-5 shrink-0 text-slate-400 transition", seoOpen && "rotate-180")}
-            />
-          </button>
-          {seoOpen && (
-            <div className="border-t border-slate-100 p-4 sm:p-5">
-              <SeoFields
-                value={d.seo}
-                onChange={(seo) => set({ seo })}
-                lang={lang}
-                fallbackTitle={anyLang(d.title, lang)}
-                fallbackDescription={anyLang(d.subtitle, lang)}
-                path={page.url.slice(1)}
-              />
-            </div>
-          )}
-        </section>
+        <SeoCard
+          value={d.seo}
+          onChange={(seo) => set({ seo })}
+          lang={lang}
+          fallbackTitle={anyLang(d.title, lang)}
+          fallbackDescription={anyLang(d.subtitle, lang)}
+          path={page.url.slice(1)}
+        />
       </ReadOnlyArea>
 
-      {/* Thanh lưu */}
-      <div className="sticky bottom-0 z-30 mt-6 -mb-2 pb-2">
-        <div className="flex items-center justify-between gap-2 rounded-2xl bg-white/95 px-3 py-2.5 shadow-[0_-4px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200 backdrop-blur sm:gap-3 sm:px-5 sm:py-3">
-          <p
-            className={cn(
-              "flex min-w-0 items-center gap-2 text-sm",
-              dirty ? "font-semibold text-amber-700" : "text-slate-500",
-            )}
-          >
-            <span
-              className={cn(
-                "size-2 shrink-0 rounded-full",
-                dirty ? "bg-amber-500" : "bg-emerald-500",
-              )}
-            />
-            <span className="truncate">{dirty ? "Chưa lưu" : "Đã lưu"}</span>
-          </p>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <a
-              href={viewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Xem trên website"
-              title={dirty ? "Website đang hiện bản đã lưu gần nhất" : undefined}
-              className="inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              <ExternalLink className="size-4" />
-              <span className="hidden sm:inline">Xem trên website</span>
-            </a>
-            {dirty && canEdit && (
-              <Button variant="ghost" className="px-3" onClick={discard}>
-                <span>
-                  Bỏ<span className="hidden sm:inline"> thay đổi</span>
-                </span>
-              </Button>
-            )}
-            {canEdit && (
-              <Button
-                icon={Save}
-                className="px-4 sm:px-5"
-                onClick={save}
-                loading={busy || autoFill.busy || images.busy}
-                disabled={!dirty}
-              >
-                {images.label || (
-                  <span>
-                    Lưu<span className="hidden sm:inline"> thay đổi</span>
-                  </span>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Thanh lưu: cùng kiểu với Giao diện trang */}
+      {canEdit && (
+        <SaveBar
+          tools={langTools}
+          dirty={dirty}
+          note={d.isActive ? "· Trang đang hiện trên website" : "· Trang đang ẩn với khách"}
+          onDiscard={discard}
+          onSave={save}
+          busy={busy}
+          saving={busy || autoFill.busy || images.busy}
+          saveLabel={images.label}
+        />
+      )}
+
+      <HistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        contentKey={page.key}
+        title={page.label}
+        describe={describe}
+        onRestored={onRestored}
+        dirty={dirty}
+        canRestore={canEdit}
+        tags={TAGS}
+      />
     </div>
   );
 }

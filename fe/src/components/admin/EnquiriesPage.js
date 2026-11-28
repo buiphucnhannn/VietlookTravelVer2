@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CalendarCheck,
+  Check,
+  ChevronDown,
   Copy,
   Globe,
   Inbox,
@@ -24,6 +27,7 @@ import { priceLineVi } from "@/lib/pricing-labels";
 import { TODO_EVENT, toastError, useAdminList, useMutation, useOptions } from "./hooks";
 import { regions } from "@/data/regions";
 import { usePermission } from "./permissions";
+import { TrashActions, TrashTabs, trashNote, useTrash } from "./catalogShared";
 import { LANG_LABELS, PAYMENT_STATUSES, STATUSES, detailRows, sitePageName } from "./labels";
 import { carRoutes, places as carPlaces, routeTitle } from "@/data/cars";
 import { airports as visaAirports } from "@/data/visa";
@@ -48,8 +52,8 @@ import {
 } from "./ui";
 
 const PATH = "/enquiries";
-const MAIL_OFF_TEXT =
-  "Tính năng gửi email chưa được bật. Liên hệ đơn vị phát triển website để bật.";
+const AUTO_REFRESH_MS = 60_000; // tự tải lại danh sách khi tab đang mở
+const MAIL_OFF_TEXT = "Tính năng gửi email chưa được bật. Liên hệ bộ phận kỹ thuật để bật.";
 
 /* =========================================================================
  * Nhãn dùng chung (Dashboard cũng dùng)
@@ -154,12 +158,25 @@ export default function EnquiriesPage({ kind = "bookings" }) {
     status: "",
     type: "",
     paymentStatus: "",
+    trash: "",
     limit: 20,
   });
+  const inTrash = list.query.trash === "1";
+  const noun = isBookings ? "đơn" : "yêu cầu";
   const [stats, setStats] = useState(null);
   // Quyền ở mục này (Đơn đặt tour / Yêu cầu từ form): xem / sửa (trạng thái, ghi chú, email) / xoá
   const perm = usePermission(kind);
   const [openId, setOpenId] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false); // đang mở menu đổi trạng thái → tạm dừng tự tải lại
+  const { run: runStatus, busy: statusBusy } = useMutation([]);
+  const trash = useTrash({
+    path: PATH,
+    tags: [],
+    noun,
+    nameOf: (e) => e.code,
+    onChange: list.reload,
+    removeMessage: `${noun === "đơn" ? "Đơn" : "Yêu cầu"} sẽ được chuyển vào Thùng rác (khách không bị ảnh hưởng).`,
+  });
 
   // Số lượng theo trạng thái — tải lại mỗi khi có thao tác (useMutation phát TODO_EVENT)
   const loadStats = useCallback(() => {
@@ -191,7 +208,59 @@ export default function EnquiriesPage({ kind = "bookings" }) {
   const total = stats ? Object.values(stats).reduce((a, b) => a + b, 0) : null;
   const q = list.query;
 
-  const onChanged = (doc) => list.setItems((xs) => xs.map((x) => (x.id === doc.id ? doc : x)));
+  const onChanged = useCallback(
+    (doc) => list.setItems((xs) => xs.map((x) => (x.id === doc.id ? doc : x))),
+    [list.setItems], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  /** Đổi trạng thái ngay trên dòng — kèm "Hoàn tác" (bấm nhầm thì trả lại trạng thái cũ) */
+  const changeStatus = async (e, status, undo = false) => {
+    const prev = e.status;
+    const r = await runStatus(
+      () => api(`${PATH}/${e.id}`, { method: "PATCH", body: { status } }),
+      null,
+      { retry: () => changeStatus(e, status, undo) },
+    );
+    if (!r?.data) return;
+    onChanged(r.data);
+    const msg = `${e.code}: ${undo ? "đã trả lại" : "đã chuyển sang"} "${statusOf(status).label}"`;
+    if (undo) toast(msg);
+    else
+      toast(msg, {
+        duration: 8000,
+        action: { label: "Hoàn tác", onClick: () => changeStatus(r.data, prev, true) },
+      });
+  };
+
+  // Tự tải lại mỗi 60 giây khi tab đang hiện — dừng khi tab ẩn, đang mở chi tiết / menu / đang đổi trạng thái.
+  // Có đơn mới (tổng số tăng) → báo nhẹ.
+  const totalRef = useRef(null);
+  useEffect(() => {
+    totalRef.current = list.meta?.total ?? null;
+  }, [list.meta]);
+  const { reload } = list;
+  const paused = Boolean(openId) || menuOpen || statusBusy || trash.busy;
+  useEffect(() => {
+    if (paused) return;
+    let last = Date.now();
+    const tick = async () => {
+      if (document.hidden || Date.now() - last < AUTO_REFRESH_MS - 1000) return;
+      last = Date.now();
+      const before = totalRef.current;
+      loadStats();
+      const r = await reload();
+      const added = r?.ok && before != null ? (r.meta?.total ?? 0) - before : 0;
+      if (added > 0 && !inTrash)
+        toast.info(`Có ${added} ${noun} mới`, { title: "Danh sách vừa tự cập nhật" });
+    };
+    const timer = setInterval(tick, AUTO_REFRESH_MS);
+    const onVisible = () => !document.hidden && tick(); // quay lại tab sau hơn 60 giây → tải ngay
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [paused, reload, loadStats, inTrash, noun, toast]);
 
   return (
     <>
@@ -222,27 +291,41 @@ export default function EnquiriesPage({ kind = "bookings" }) {
       />
 
       <Card bodyClassName="p-0">
-        {/* Trạng thái */}
-        <div className="[scrollbar-width:none] overflow-x-auto border-b border-slate-100 px-4 py-4">
-          <div className="mx-auto flex w-max gap-2">
-            <StatusChip
-              active={!q.status}
-              onClick={() => list.setQuery({ status: "" })}
-              label="Tất cả"
-              count={total}
+        {perm.canDelete && (
+          <div className={cn("px-4 pt-4 sm:px-5", inTrash && "border-b border-slate-100 pb-4")}>
+            <TrashTabs
+              trash={inTrash}
+              onChange={(on) =>
+                list.setQuery({ trash: on ? "1" : "", status: "", type: "", paymentStatus: "" })
+              }
+              countUrl={`${PATH}?trash=1&limit=1&kind=${kind}`}
+              activeLabel={isBookings ? "Đơn đang có" : "Yêu cầu đang có"}
             />
-            {STATUSES.map((s) => (
-              <StatusChip
-                key={s.value}
-                active={q.status === s.value}
-                onClick={() => list.setQuery({ status: s.value })}
-                label={s.label}
-                count={stats ? (stats[s.value] ?? 0) : null}
-                hot={s.value === "new"}
-              />
-            ))}
           </div>
-        </div>
+        )}
+        {/* Trạng thái */}
+        {!inTrash && (
+          <div className="[scrollbar-width:none] overflow-x-auto border-b border-slate-100 px-4 py-4">
+            <div className="mx-auto flex w-max gap-2">
+              <StatusChip
+                active={!q.status}
+                onClick={() => list.setQuery({ status: "" })}
+                label="Tất cả"
+                count={total}
+              />
+              {STATUSES.map((s) => (
+                <StatusChip
+                  key={s.value}
+                  active={q.status === s.value}
+                  onClick={() => list.setQuery({ status: s.value })}
+                  label={s.label}
+                  count={stats ? (stats[s.value] ?? 0) : null}
+                  hot={s.value === "new"}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Bộ lọc */}
         <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:px-5">
@@ -254,7 +337,7 @@ export default function EnquiriesPage({ kind = "bookings" }) {
             }
             className="w-full"
           />
-          {isBookings ? (
+          {inTrash ? null : isBookings ? (
             <Select
               value={q.paymentStatus}
               onChange={(e) => list.setQuery({ paymentStatus: e.target.value })}
@@ -293,9 +376,51 @@ export default function EnquiriesPage({ kind = "bookings" }) {
         ) : !list.items.length ? (
           <EmptyState
             icon={isBookings ? CalendarCheck : Inbox}
-            title={isBookings ? "Chưa có đơn đặt tour" : "Chưa có yêu cầu"}
-            text="Không có mục nào khớp bộ lọc hiện tại."
+            title={
+              inTrash ? "Thùng rác trống" : isBookings ? "Chưa có đơn đặt tour" : "Chưa có yêu cầu"
+            }
+            text={
+              inTrash
+                ? `${isBookings ? "Đơn" : "Yêu cầu"} bị xoá sẽ nằm ở đây 30 ngày, khôi phục được bất cứ lúc nào.`
+                : "Không có mục nào khớp bộ lọc hiện tại."
+            }
           />
+        ) : inTrash ? (
+          <BusyArea busy={list.loading}>
+            <ul className="divide-y divide-slate-100">
+              {list.items.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 sm:px-5"
+                >
+                  <div className="min-w-0 flex-1 basis-56">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-slate-700">
+                        {e.code}
+                      </span>
+                      {!isBookings && <TypeBadge type={e.type} />}
+                      <StatusBadge status={e.status} />
+                    </p>
+                    <p className="mt-1 truncate font-semibold text-slate-800">
+                      {e.name}
+                      {isBookings && e.tour?.title && (
+                        <span className="font-normal text-slate-500"> · {e.tour.title}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Gửi {fmtDateTime(e.createdAt)} · {trashNote(e.deletedAt)}
+                    </p>
+                  </div>
+                  <TrashActions
+                    busy={trash.busy}
+                    onRestore={() => trash.restore(e)}
+                    onPurge={() => trash.purge(e)}
+                    className="max-sm:w-full max-sm:justify-end"
+                  />
+                </li>
+              ))}
+            </ul>
+          </BusyArea>
         ) : (
           <BusyArea busy={list.loading}>
             {/* Máy tính: bảng */}
@@ -374,7 +499,16 @@ export default function EnquiriesPage({ kind = "bookings" }) {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex flex-col items-center gap-1">
-                          <StatusBadge status={e.status} />
+                          {perm.canEdit ? (
+                            <StatusMenu
+                              value={e.status}
+                              disabled={statusBusy}
+                              onPick={(st) => changeStatus(e, st)}
+                              onOpenChange={setMenuOpen}
+                            />
+                          ) : (
+                            <StatusBadge status={e.status} />
+                          )}
                           {isBookings && <PaymentBadge value={e.paymentStatus} />}
                         </div>
                       </td>
@@ -391,11 +525,19 @@ export default function EnquiriesPage({ kind = "bookings" }) {
             <ul className="divide-y divide-slate-100 md:hidden">
               {list.items.map((e) => (
                 <li key={e.id}>
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setOpenId(e.id)}
+                    onKeyDown={(ev) => {
+                      if (ev.target !== ev.currentTarget) return;
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        setOpenId(e.id);
+                      }
+                    }}
                     className={cn(
-                      "block w-full px-4 py-3.5 text-left active:bg-slate-50",
+                      "block w-full cursor-pointer px-4 py-3.5 text-left active:bg-slate-50",
                       e.status === "new" && "bg-sun-50/30",
                     )}
                   >
@@ -433,12 +575,21 @@ export default function EnquiriesPage({ kind = "bookings" }) {
                         {[fmtDay(e.departureDate), paxText(e)].filter(Boolean).join(" · ")}
                       </span>
                     )}
-                    <span className="mt-2 flex flex-wrap gap-1.5">
+                    <span className="mt-2 flex flex-wrap items-center gap-1.5">
                       {!isBookings && <TypeBadge type={e.type} />}
-                      <StatusBadge status={e.status} />
+                      {perm.canEdit ? (
+                        <StatusMenu
+                          value={e.status}
+                          disabled={statusBusy}
+                          onPick={(st) => changeStatus(e, st)}
+                          onOpenChange={setMenuOpen}
+                        />
+                      ) : (
+                        <StatusBadge status={e.status} />
+                      )}
                       {isBookings && <PaymentBadge value={e.paymentStatus} />}
                     </span>
-                  </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -459,12 +610,119 @@ export default function EnquiriesPage({ kind = "bookings" }) {
           canDelete={perm.canDelete}
           onClose={close}
           onChanged={onChanged}
-          onDeleted={() => {
-            close();
-            list.reload();
+          onDelete={async (item) => {
+            if (await trash.remove(item)) close();
           }}
         />
       )}
+    </>
+  );
+}
+
+/**
+ * Nhãn trạng thái bấm được → menu chọn trạng thái mới. Menu gắn vào <body> (vị trí cố định theo nút)
+ * để không bị khung cuộn ngang của bảng cắt mất. Đóng khi bấm ra ngoài, Esc, cuộn trang.
+ */
+function StatusMenu({ value, onPick, disabled, onOpenChange }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btn = useRef(null);
+  const menu = useRef(null);
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
+  useLayoutEffect(() => {
+    if (!open || !btn.current) return;
+    const r = btn.current.getBoundingClientRect();
+    const width = 184;
+    const left = Math.min(
+      Math.max(8, r.left + r.width / 2 - width / 2),
+      window.innerWidth - width - 8,
+    );
+    const below = window.innerHeight - r.bottom > 250;
+    setPos({
+      left,
+      width,
+      ...(below ? { top: r.bottom + 6 } : { bottom: window.innerHeight - r.top + 6 }),
+    });
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const onDown = (ev) => {
+      if (!menu.current?.contains(ev.target) && !btn.current?.contains(ev.target)) close();
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") {
+        close();
+        btn.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+  return (
+    <>
+      <button
+        ref={btn}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Đổi trạng thái"
+        onClick={(ev) => {
+          ev.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        onKeyDown={(ev) => ev.stopPropagation()}
+        className="inline-flex items-center gap-0.5 rounded-full pr-1 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:outline-none disabled:opacity-60"
+      >
+        <StatusBadge status={value} />
+        <ChevronDown className="size-3.5 text-slate-400" />
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={menu}
+            role="menu"
+            onClick={(ev) => ev.stopPropagation()}
+            style={pos}
+            className="fixed z-[70] rounded-xl bg-white p-1 text-left shadow-[0_16px_40px_-12px_rgba(10,37,60,0.35)] ring-1 ring-slate-200"
+          >
+            <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold text-slate-400">
+              Đổi trạng thái
+            </p>
+            {STATUSES.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={s.value === value}
+                onClick={() => {
+                  setOpen(false);
+                  if (s.value !== value) onPick(s.value);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50",
+                  s.value === value && "font-semibold text-brand-700",
+                )}
+              >
+                {s.label}
+                {s.value === value && <Check className="size-4" />}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -504,7 +762,7 @@ function StatusChip({ active, onClick, label, count, hot }) {
  * Chi tiết đơn / yêu cầu
  * ========================================================================= */
 
-function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }) {
+function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDelete }) {
   const { toast, confirm } = useUi();
   const { run, busy } = useMutation([]);
   const [item, setItem] = useState(null);
@@ -620,17 +878,8 @@ function EnquiryDetail({ id, canEdit, canDelete, onClose, onChanged, onDeleted }
     }
   };
 
-  const remove = async () => {
-    const ok = await confirm({
-      title: "Xoá vĩnh viễn?",
-      message: `${item.code} của ${item.name} sẽ bị xoá và không khôi phục được. Nếu chỉ muốn bỏ qua, hãy đổi trạng thái sang "Huỷ".`,
-      confirmText: "Xoá",
-      danger: true,
-    });
-    if (!ok) return;
-    if (await run(() => api(`${PATH}/${id}`, { method: "DELETE" }), `Đã xoá ${item.code}`))
-      onDeleted();
-  };
+  // Xoá → Thùng rác 30 ngày (hỏi lại + "Hoàn tác" do trang danh sách lo)
+  const remove = () => onDelete(item);
 
   const isBooking = item?.type === "booking";
   const details = detailRows(item?.details, {

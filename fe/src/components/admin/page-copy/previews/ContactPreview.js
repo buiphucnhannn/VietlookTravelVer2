@@ -22,7 +22,7 @@ import { Auto, Loading, SitePage, FormStates, Zone, useDict, useSiteInfo } from 
 
 /**
  * Bản xem trước trang Liên hệ — dựng y như app/[lang]/contact/page.js.
- * Số điện thoại, email, WeChat, địa chỉ, bản đồ: chỉ xem (CMS → Cài đặt → Thông tin liên hệ).
+ * Số điện thoại, email, WeChat, địa chỉ, bản đồ: chỉ xem (CMS → Thông tin liên hệ).
  */
 
 const SETTINGS = `${ADMIN_BASE}${CONTACT_SETTINGS_HREF}`;
@@ -121,7 +121,7 @@ export default function ContactPreview({ lang }) {
                 </p>
                 <Auto
                   href={SETTINGS}
-                  label="Số điện thoại & kênh chat · sửa ở Cài đặt"
+                  label="Số điện thoại & kênh chat · sửa ở Thông tin liên hệ"
                   at="-top-3 right-0"
                   className="space-y-3"
                 >
@@ -170,7 +170,7 @@ export default function ContactPreview({ lang }) {
               </h2>
               <Auto
                 href={SETTINGS}
-                label="Tên công ty, địa chỉ, điện thoại · sửa ở Cài đặt"
+                label="Tên công ty, địa chỉ, điện thoại · sửa ở Thông tin liên hệ"
                 at="-top-4 right-0"
                 className="space-y-5"
               >
@@ -207,7 +207,7 @@ export default function ContactPreview({ lang }) {
             </div>
             <Auto
               href={SETTINGS}
-              label="Bản đồ · sửa ở Cài đặt"
+              label="Bản đồ · sửa ở Thông tin liên hệ"
               at="top-3 right-3"
               className="overflow-hidden rounded-3xl shadow-lg ring-1 ring-border"
             >

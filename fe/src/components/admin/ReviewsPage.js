@@ -46,6 +46,7 @@ import {
 import VisibilityToggle from "./VisibilityToggle";
 import ReviewImportDialog, { IMPORT_NAMES, IMPORT_PATH, importTitle } from "./ReviewImportDialog";
 import ReviewStatsCard from "./ReviewStatsCard";
+import TipNotice from "./TipNotice";
 import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { useAutoFill } from "./translate";
@@ -62,7 +63,7 @@ const TAGS = ["reviews"];
 const PAGE_SIZE = 10;
 const MAX_TEXT = 5000;
 const HINT =
-  "Chép nguyên văn đánh giá từ TripAdvisor/Google, ghi đúng tên người viết và dán link bài gốc.";
+  "Chép nguyên văn đánh giá từ Tripadvisor / Google, ghi đúng tên người viết và dán link bài gốc.";
 
 export const REVIEW_SOURCES = [
   { value: "tripadvisor", label: "Tripadvisor", tone: "green" },
@@ -209,7 +210,7 @@ export default function ReviewsPage() {
     <>
       <PageHeader
         title="Đánh giá"
-        description={`Đánh giá thật của khách, hiện ở trang chủ, trang giới thiệu, trang tour đoàn và trang thuê xe. Thứ tự trong danh sách là thứ tự trên website.${canEdit ? " Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh." : ""}`}
+        description="Đánh giá thật của khách, hiện ở trang chủ, Giới thiệu, Tour đoàn và Thuê xe — theo đúng thứ tự trong danh sách."
         actions={
           canEdit && (
             <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
@@ -225,6 +226,18 @@ export default function ReviewsPage() {
           )
         }
       />
+
+      {/* Điểm Tripadvisor / Google công ty (chỉ có ở trang này): ai xem được Đánh giá đều thấy;
+          nút "Cập nhật ngay" chỉ hiện với quyền sửa */}
+      <div className="mb-6">
+        <ReviewStatsCard />
+      </div>
+
+      {canEdit && (
+        <TipNotice id="sort-reviews" className="mb-4">
+          Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh.
+        </TipNotice>
+      )}
 
       <Card
         title="Danh sách đánh giá"
@@ -315,12 +328,6 @@ export default function ReviewsPage() {
         )}
         <Pagination meta={paged.meta} onPage={paged.setPage} unit="đánh giá" />
       </Card>
-
-      {/* Điểm Tripadvisor / Google (cũng có ở Cài đặt cho quản trị viên): nhân viên có quyền Đánh giá xem được;
-          nút "Cập nhật ngay" chỉ hiện với quyền sửa */}
-      <div className="mt-6">
-        <ReviewStatsCard />
-      </div>
 
       {importing && (
         <ReviewImportDialog

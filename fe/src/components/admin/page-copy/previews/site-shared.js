@@ -6,7 +6,7 @@ import { DEFAULT_CONTACT_VIEW, contactView } from "@/lib/contact.mjs";
 
 /**
  * Dữ liệu chỉ-xem cho bản xem trước "Giao diện trang":
- *   useContactInfo() — thông tin liên hệ đang hiện trên website (CMS → Cài đặt → Thông tin liên hệ)
+ *   useContactInfo() — thông tin liên hệ đang hiện trên website (CMS → Thông tin liên hệ)
  *   useSiteDict(lang) — từ điển giao diện website (tên menu, chữ cố định) theo ngôn ngữ đang sửa
  */
 
@@ -45,5 +45,5 @@ export function useSiteDict(lang) {
   return dict;
 }
 
-/** Link sang Cài đặt → Thông tin liên hệ */
-export const CONTACT_SETTINGS_HREF = "/settings#contact";
+/** Link sang trang CMS Thông tin liên hệ */
+export const CONTACT_SETTINGS_HREF = "/contact";

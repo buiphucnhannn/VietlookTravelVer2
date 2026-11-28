@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowUpRight, ImagePlus, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Plus, Trash2, X, Zap } from "lucide-react";
 import Link from "@/components/admin/Link";
 import { cn } from "@/lib/utils";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import Container from "@/components/ui/Container";
+import { StillMotion } from "@/components/ui/motion";
 import { DragHandle, Sortable } from "../Sortable";
-import { Button, ImageField, Modal } from "../ui";
+import { InlineText as SharedInlineText } from "../home/shared";
+import { EditorFrame, PREVIEW_CSS } from "../page-copy/chrome";
+import { ImageSpot } from "../page-copy/image-edit";
 
 /* =========================================================================
  * Bản xem trước trang Giới thiệu / chính sách: dựng y như trang thật trên website (cùng thứ tự khối,
@@ -35,10 +38,11 @@ export const otherList = (list, lang) =>
     .sort((a, b) => b.length - a.length)[0] ?? [];
 
 /**
- * Dòng chữ sửa tại chỗ: trong suốt, tự cao theo nội dung, viền nét đứt khi rê chuột / đang gõ.
- * Kiểu chữ lấy từ className của khung ngoài (giống hệt chữ trên website). Khung có lề trong để viền không
- * dính chữ, lề âm bên ngoài bù lại → chữ nằm đúng chỗ như trên website.
- * `fit`: ô chỉ rộng vừa bằng chữ (dùng cho tiêu đề trên nét cọ, chữ trên nút).
+ * Dòng chữ sửa tại chỗ — dùng ĐÚNG ô sửa chữ chung của mọi trình sửa trang (home/shared → InlineText):
+ * rê chuột: viền xanh nét đứt + nhãn "Bấm để sửa · tên ô"; bấm vào: viền cam, nền cam nhạt + thanh "Xong · Bỏ".
+ * Kiểu chữ lấy từ className (giống hệt chữ trên website). `fit`: ô chỉ rộng vừa bằng chữ (tiêu đề nét cọ, chữ
+ * trên nút); không có → ô rộng hết dòng. `singleLine`: không xuống dòng (Enter = xong). Đoạn văn: Shift + Enter.
+ * `autoFocus`: con trỏ vào ô ngay (ô vừa bấm "Thêm").
  */
 export function InlineText({
   value,
@@ -51,39 +55,20 @@ export function InlineText({
   autoFocus,
   fit,
 }) {
-  const cell =
-    "col-start-1 row-start-1 min-w-0 px-2 py-1 break-words whitespace-pre-wrap [text-align:inherit] [text-transform:inherit]";
+  const ref = useRef(null);
+  useEffect(() => {
+    if (autoFocus) ref.current?.querySelector("textarea")?.focus();
+  }, [autoFocus]);
   return (
-    <span
-      className={cn(
-        "-mx-2 -my-1",
-        fit ? "inline-grid max-w-[calc(100%+1rem)]" : "grid w-[calc(100%+1rem)]",
-        className,
-      )}
-    >
-      <span aria-hidden="true" className={cn(cell, "invisible")}>
-        {/* ký tự &nbsp; cuối giữ chỗ cho dòng trống cuối cùng */}
-        {value || placeholder}&nbsp;
-      </span>
-      <textarea
-        rows={1}
-        cols={1}
-        data-inline
-        value={value}
-        autoFocus={autoFocus}
-        aria-label={label}
+    <span ref={ref} className="contents">
+      <SharedInlineText
+        value={value ?? ""}
+        onChange={onChange}
         placeholder={placeholder}
-        onChange={(e) =>
-          onChange(singleLine ? e.target.value.replace(/\n+/g, " ") : e.target.value)
-        }
-        onKeyDown={singleLine ? (e) => e.key === "Enter" && e.preventDefault() : undefined}
-        className={cn(
-          cell,
-          "resize-none overflow-hidden rounded-lg bg-transparent outline-1 outline-transparent transition-colors outline-dashed",
-          dark
-            ? "placeholder:text-white/45 hover:outline-white/60 focus:bg-white/10 focus:outline-white [@media(hover:none)]:outline-white/30"
-            : "placeholder:text-slate-400 hover:outline-brand-300 focus:bg-brand-50/60 focus:outline-brand-500 [@media(hover:none)]:outline-slate-300",
-        )}
+        label={label}
+        multiline={!singleLine}
+        light={!dark}
+        className={cn(!fit && "grid w-full", className)}
       />
     </span>
   );
@@ -126,6 +111,7 @@ export function RemoveButton({ onClick, name, className }) {
 export function CardTools({ drag, onRemove, name, className }) {
   return (
     <span
+      data-edit-ui
       className={cn(
         "absolute -top-4 right-3 z-20 flex items-center rounded-full bg-white p-0.5 opacity-0 shadow-md ring-1 ring-slate-200 transition-opacity group-focus-within/item:opacity-100 group-hover/item:opacity-100 focus-within:opacity-100",
         drag.dragging && "opacity-100",
@@ -143,6 +129,7 @@ export function AddButton({ children, onClick, dark, disabled, className }) {
   return (
     <button
       type="button"
+      data-edit-ui
       onClick={onClick}
       disabled={disabled}
       className={cn(
@@ -163,7 +150,7 @@ export function AddButton({ children, onClick, dark, disabled, className }) {
  * Các thẻ chữ ngắn (phẩm chất, ngôn ngữ): trông đúng như thẻ trên website; rê chuột / bấm vào thẻ thì hiện
  * cụm nút nhỏ phía trên (kéo đổi chỗ, xoá). `chipClass`: kiểu thẻ y như website.
  */
-export function InlineChips({
+export const InlineChips = memo(function InlineChips({
   value,
   placeholders = [],
   onChange,
@@ -182,11 +169,12 @@ export function InlineChips({
           return (
             <span
               className={cn(
-                "group/chip relative inline-flex max-w-full items-center outline-1 outline-transparent transition outline-dashed",
+                // cùng màu với ô sửa chữ chung: rê chuột viền xanh nét đứt · đang gõ viền cam + nền cam nhạt
+                "group/chip relative inline-flex max-w-full cursor-text items-center outline-2 outline-offset-2 outline-transparent outline-dashed focus-within:outline-solid",
                 chipClass,
                 dark
-                  ? "focus-within:bg-white/10 focus-within:outline-white hover:outline-white/60"
-                  : "focus-within:bg-white focus-within:outline-brand-500 hover:outline-brand-300",
+                  ? "focus-within:bg-orange-500/20 focus-within:outline-orange-500 hover:outline-blue-400"
+                  : "focus-within:bg-orange-500/[0.08] focus-within:outline-orange-500 hover:outline-blue-500",
                 drag.dragging && "shadow-lg",
               )}
             >
@@ -204,15 +192,17 @@ export function InlineChips({
                   autoFocus={i === focusAt}
                   placeholder={hint}
                   aria-label={`${name} ${i + 1}`}
+                  title={`Bấm để sửa · ${name} ${i + 1}`}
                   onChange={(e) => onChange(value.map((x, k) => (k === i ? e.target.value : x)))}
                   className={cn(
-                    "col-start-1 row-start-1 w-full min-w-0 bg-transparent outline-none",
+                    "col-start-1 row-start-1 w-full min-w-0 bg-transparent caret-orange-500 outline-none",
                     dark ? "placeholder:text-white/45" : "placeholder:text-brand-700/45",
                   )}
                 />
               </span>
               {/* Cụm nút nổi phía trên thẻ: chạm sát mép trên thẻ để rê chuột từ thẻ lên không bị mất */}
               <span
+                data-edit-ui
                 className={cn(
                   "absolute bottom-[calc(100%-4px)] left-1/2 z-20 hidden -translate-x-1/2 items-center rounded-full bg-white p-0.5 text-slate-500 shadow-md ring-1 ring-slate-200 group-focus-within/chip:flex group-hover/chip:flex",
                   drag.dragging && "flex",
@@ -245,39 +235,47 @@ export function InlineChips({
       </AddButton>
     </>
   );
-}
-
+});
 /**
- * Nhãn nhỏ góc trên bên phải của khối KHÔNG sửa ở đây: nói rõ nội dung tự động lấy từ đâu và (nếu có)
- * link sang mục sửa. Nằm đè lên khối (không đẩy bố cục) → khối vẫn y như trang thật.
+ * Nhãn "⚡ Tự động · sửa ở …" ở góc khối KHÔNG sửa ở đây (cùng kiểu với Giao diện trang): bình thường chỉ là chấm ⚡
+ * nhỏ mờ; rê chuột lên khối (khung cha có lớp `group/auto`) hoặc lên chấm thì hiện đủ chữ + link sang mục sửa.
+ * Nằm đè lên khối (không đẩy bố cục) → khối vẫn y như trang thật.
  */
 export function AutoChip({ children, href, dark, className }) {
   const cls = cn(
-    "absolute top-3 right-3 z-20 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full px-3 py-1 text-[11px] leading-4 font-semibold shadow-sm ring-1 backdrop-blur transition",
+    "group/chip absolute top-3 right-3 z-20 inline-flex h-6 max-w-[calc(100%-1.5rem)] min-w-6 items-center justify-center gap-1 rounded-full px-1.5 text-[11px] leading-4 font-semibold opacity-70 shadow-sm ring-1 backdrop-blur group-hover/auto:px-2.5 group-hover/auto:opacity-100 hover:px-2.5 hover:opacity-100",
     dark
-      ? "bg-black/35 text-white/85 ring-white/20 hover:bg-black/50 hover:text-white"
-      : "bg-white/90 text-slate-600 ring-slate-200 hover:bg-white hover:text-brand-700",
+      ? "bg-slate-950/70 text-white/90 ring-white/15 hover:bg-slate-950/85"
+      : "bg-white/95 text-slate-600 ring-slate-900/10 hover:text-brand-700",
     className,
   );
   const body = (
     <>
-      <Sparkles className="size-3.5 shrink-0 opacity-70" />
-      <span className="truncate">{children}</span>
-      {href && <ArrowUpRight className="size-3.5 shrink-0" />}
+      <Zap className="size-3 shrink-0 text-amber-500" />
+      <span className="hidden truncate group-hover/auto:inline group-hover/chip:inline">
+        {children}
+      </span>
+      {href && (
+        <ArrowUpRight className="hidden size-3 shrink-0 opacity-60 group-hover/auto:block group-hover/chip:block" />
+      )}
     </>
   );
+  const title = typeof children === "string" ? children : undefined;
   return href ? (
-    <Link href={href} data-admin-link className={cls}>
+    <Link href={href} data-admin-link data-edit-ui title={title} aria-label={title} className={cls}>
       {body}
     </Link>
   ) : (
-    <span className={cls}>{body}</span>
+    <span data-edit-ui title={title} className={cls}>
+      {body}
+    </span>
   );
 }
 
 /* =========================================================================
- * Khung "trang web": viền + thanh địa chỉ. Bấm vào link bên trong bản xem trước không rời trang sửa
- * (trừ link của CMS có `data-admin-link`).
+ * Khung "trang web": cùng khung trình duyệt với Giao diện trang (thanh địa chỉ + Dịch tự động + tab ngôn ngữ).
+ * Bấm vào link bên trong bản xem trước không rời trang sửa (trừ link của CMS có `data-admin-link`).
+ * Bản xem trước đứng yên: không hiệu ứng chuyển động / trượt / hiện dần (site-preview + StillMotion).
  * ========================================================================= */
 
 const stayHere = (e) => {
@@ -285,68 +283,76 @@ const stayHere = (e) => {
   if (a && !a.closest("[data-admin-link]")) e.preventDefault();
 };
 
-export function MiniSite({ name, lang, children }) {
+export function MiniSite({ name, lang, tools, children }) {
   return (
-    <div className="@container w-full overflow-clip rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05),0_20px_48px_-24px_rgba(15,23,42,0.28)] ring-1 ring-slate-200">
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-100 px-3.5 py-2">
-        <span className="flex shrink-0 gap-1.5" aria-hidden="true">
-          <i className="size-2.5 rounded-full bg-sun-500/70" />
-          <i className="size-2.5 rounded-full bg-amber-400" />
-          <i className="size-2.5 rounded-full bg-emerald-400" />
-        </span>
-        <span className="mx-auto max-w-full min-w-0 truncate rounded-full bg-white px-4 py-1 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-          Vietlook Travel · {name}
-        </span>
-        <span className="hidden w-[42px] shrink-0 sm:block" aria-hidden="true" />
-      </div>
+    <EditorFrame name={name} lang={lang} tools={tools}>
       {/* cùng màu chữ / font như website; lang → chữ Trung dùng đúng font dự phòng */}
-      <div lang={lang} onClickCapture={stayHere} data-preview-canvas className="text-foreground">
-        {children}
+      <div
+        lang={lang}
+        onClickCapture={stayHere}
+        data-preview-canvas
+        className="site-preview @container w-full overflow-clip text-foreground"
+      >
+        <style>{PREVIEW_CSS}</style>
+        <StillMotion>{children}</StillMotion>
       </div>
-    </div>
+    </EditorFrame>
   );
 }
 
 /**
  * Đầu trang y như website (components/ui/PageHero.js → BrushHero): dải 1–3 ảnh ghép phủ tối, đường dẫn,
- * tiêu đề trên nét cọ, dòng mô tả. Ảnh đầu tiên đổi được (nút "Đổi ảnh"); `extraImages` là các ảnh ghép bên
- * cạnh (chỉ để xem).
+ * tiêu đề trên nét cọ, dòng mô tả. Bấm vào phần ảnh là đổi ảnh đầu trang (cùng kiểu đổi ảnh với mọi trang);
+ * `extraImages` là các ảnh ghép bên cạnh (chỉ để xem). memo: chỉ vẽ lại khi tiêu đề / mô tả / ảnh đổi.
  */
-export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
-  const [imageOpen, setImageOpen] = useState(false);
-  const first = d.image || fallbackImage;
+export const MiniHero = memo(function MiniHero({
+  title,
+  subtitle,
+  image,
+  lang,
+  set,
+  fallbackImage,
+  extraImages = [],
+}) {
+  const first = image || fallbackImage;
   const list = [...new Set([first, ...extraImages].filter(Boolean))].slice(0, 3);
-  const title = d.title[lang] || otherOf(d.title, lang);
+  const shown = title[lang] || otherOf(title, lang);
   return (
     <section className="relative isolate overflow-hidden bg-brand-950">
       <div className="absolute inset-0 -z-10 flex gap-[3px] bg-brand-950">
         {list.map((src, i) => (
           <div key={src} className={cn("relative h-full flex-1", i > 0 && "hidden md:block")}>
-            <Image
-              src={src}
-              alt=""
-              fill
-              sizes={list.length > 1 ? "(min-width: 768px) 34vw, 100vw" : "100vw"}
-              className="object-cover"
-            />
+            {/* ảnh vừa chọn chưa lưu (blob:) → <img> thường */}
+            {String(src).startsWith("blob:") ? (
+              // eslint-disable-next-line @next/next/no-img-element -- ảnh tạm trên máy, chưa có trên CDN
+              <img src={src} alt="" className="absolute inset-0 size-full object-cover" />
+            ) : (
+              <Image
+                src={src}
+                alt=""
+                fill
+                sizes={list.length > 1 ? "(min-width: 768px) 34vw, 100vw" : "100vw"}
+                className="object-cover"
+              />
+            )}
           </div>
         ))}
       </div>
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/50 via-black/25 to-black/50" />
-
-      {/* Nút đổi ảnh: nằm trên phần ảnh đầu tiên (chỗ thanh menu website phủ lên) */}
-      <button
-        type="button"
-        onClick={() => setImageOpen(true)}
-        className="absolute top-3 left-3 z-10 inline-flex h-9 items-center gap-1.5 rounded-full bg-white/95 px-3.5 text-xs font-semibold text-slate-800 shadow-md transition hover:bg-white"
-      >
-        <ImagePlus className="size-4" />
-        {first ? "Đổi ảnh" : "Thêm ảnh"}
-      </button>
+      <ImageSpot
+        value={image}
+        onChange={(v) => set({ image: v })}
+        crop={{ ratio: 12 / 5, width: 2400 }}
+        label="Ảnh đầu trang"
+        edited={!!image}
+        onReset={() => set({ image: "" })}
+        tagAt="top-3 left-3"
+        toolsAt="top-3 right-3"
+      />
 
       <Container className="flex min-h-[360px] flex-col items-center justify-center pt-24 pb-12 text-center text-white sm:min-h-[420px] lg:min-h-[460px] lg:pt-32">
         <Breadcrumbs
-          items={[{ label: "Vietlook", href: "/" }, { label: title || "…" }]}
+          items={[{ label: "Vietlook", href: "/" }, { label: shown || "…" }]}
           light
           className="mb-5"
         />
@@ -356,39 +362,20 @@ export function MiniHero({ d, lang, set, fallbackImage, extraImages = [] }) {
             fit
             singleLine
             label="Tiêu đề trang"
-            value={d.title[lang]}
-            onChange={(v) => set({ title: { ...d.title, [lang]: v } })}
-            placeholder={hintOf(lang, d.title, "Tiêu đề trang")}
+            value={title[lang]}
+            onChange={(v) => set({ title: { ...title, [lang]: v } })}
+            placeholder={hintOf(lang, title, "Tiêu đề trang")}
           />
         </h1>
         <InlineText
           dark
           label="Dòng mô tả dưới tiêu đề"
-          value={d.subtitle[lang]}
-          onChange={(v) => set({ subtitle: { ...d.subtitle, [lang]: v } })}
-          placeholder={hintOf(lang, d.subtitle, "Thêm một dòng mô tả ngắn")}
+          value={subtitle[lang]}
+          onChange={(v) => set({ subtitle: { ...subtitle, [lang]: v } })}
+          placeholder={hintOf(lang, subtitle, "Thêm một dòng mô tả ngắn")}
           className="mt-5 max-w-3xl text-base font-semibold drop-shadow-md sm:text-xl"
         />
       </Container>
-
-      <Modal
-        open={imageOpen}
-        onClose={() => setImageOpen(false)}
-        size="sm"
-        icon={ImagePlus}
-        title="Ảnh đầu trang"
-        description="Ảnh ngang phủ hết dải đầu trang (máy tính hiện phần giữa ảnh) — nên chọn ảnh rõ nét, chủ thể ở giữa."
-        footer={<Button onClick={() => setImageOpen(false)}>Xong</Button>}
-      >
-        <div className="flex justify-center">
-          <ImageField
-            value={d.image}
-            onChange={(image) => set({ image })}
-            folder="pages"
-            crop={{ ratio: 12 / 5, width: 2400 }}
-          />
-        </div>
-      </Modal>
     </section>
   );
-}
+});

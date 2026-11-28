@@ -12,14 +12,9 @@ import { SitePage, Zone } from "./site-frame";
 export default function NotFoundPreview({ lang }) {
   return (
     <SitePage lang={lang} path="/page-not-found">
-      <Zone name="Trang 404" dark at="left-3 bottom-3">
+      <Zone name="Trang 404" dark at="left-3 top-20 lg:top-[7.25rem]">
         <section className="relative isolate overflow-hidden bg-brand-950 text-white">
-          <Photo
-            f="image"
-            className="-z-10 [&_img]:opacity-35"
-            pill="bottom-3 right-3"
-            title="Ảnh nền"
-          />
+          <Photo f="image" className="-z-10 [&_img]:opacity-35" hero title="Ảnh nền" />
           <Container className="flex min-h-[min(70vh,720px)] flex-col items-center justify-center pt-36 pb-24 text-center">
             <p className="text-8xl font-extrabold tracking-tighter">404</p>
             <h1 className="mt-3 text-3xl font-bold">

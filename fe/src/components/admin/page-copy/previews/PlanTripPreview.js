@@ -15,9 +15,9 @@ export default function PlanTripPreview({ lang }) {
   const catalog = useCatalog();
   return (
     <SitePage lang={lang} path="/plan-your-trip">
-      <Zone name="Trang lên kế hoạch" dark at="left-3 bottom-3">
+      <Zone name="Trang lên kế hoạch" dark at="left-3 top-20 lg:top-[7.25rem]">
         <section className="relative isolate overflow-clip bg-brand-950 pt-28 pb-16 lg:flex lg:min-h-[min(100svh,960px)] lg:items-center lg:pt-[120px] lg:pb-12">
-          <Photo f="heroImage" className="-z-10 [&_img]:opacity-50" pill="bottom-3 right-3" />
+          <Photo f="heroImage" className="-z-10 [&_img]:opacity-50" hero />
           <div className="absolute inset-0 -z-10 bg-gradient-to-br from-brand-950 via-brand-950/80 to-brand-900/40" />
           <Container className="grid items-start gap-10 lg:grid-cols-[0.75fr_1.25fr]">
             <div className="text-white">

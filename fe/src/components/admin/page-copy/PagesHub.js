@@ -63,6 +63,7 @@ export default function PagesHub() {
   const canHome = canUser(user, "home", "view");
   const [state, setState] = useState({ loading: true, error: "", copies: [], pages: [] });
   const [homeImage, setHomeImage] = useState("");
+  const [home, setHome] = useState(null); // bản đã lưu của Trang chủ → đếm số mục đã sửa
 
   useEffect(() => {
     let alive = true;
@@ -80,10 +81,14 @@ export default function PagesHub() {
     api("/public/home")
       .then((r) => alive && setHomeImage(slideBackground(r.data?.banner?.slides?.[0])))
       .catch(() => {});
+    if (canHome)
+      api("/settings/home")
+        .then((r) => alive && setHome(r.data ?? null))
+        .catch(() => {});
     return () => {
       alive = false;
     };
-  }, []);
+  }, [canHome]);
 
   const copyOf = (key) => state.copies.find((x) => x.key === key);
   const pageOf = (key) => state.pages.find((x) => x.key === key);
@@ -91,6 +96,11 @@ export default function PagesHub() {
   const groups = [...new Set(PAGE_COPY_KEYS.map((k) => PAGE_COPY[k].group || "Trang khác"))];
   const about = CONTENT_PAGES[0];
   const aboutDoc = pageOf("about");
+  // Trang chủ: chữ, ảnh, con số, tên cánh sao đã thay (danh sách tour / điểm đến / chủ đề không tính)
+  const homeStats = home
+    ? editedStats([home.copy, home.images, home.statValues, home.starLabels])
+    : null;
+  const aboutStats = aboutDoc ? editedStats(pickContent(aboutDoc)) : null;
 
   return (
     <>
@@ -117,7 +127,9 @@ export default function PagesHub() {
                   icon={Home}
                   title="Trang chủ"
                   text="Banner, tour nổi bật, điểm đến, chủ đề và chữ / ảnh của mọi khối trên trang chủ."
-                  badge={<Badge tone="green">Đang hiện</Badge>}
+                  badge={homeStats && <EditedBadge n={homeStats.n} />}
+                  langs={homeStats?.anyLang ? homeStats.langs : null}
+                  updatedAt={home?.updatedAt}
                 />
               )}
               <HubCard
@@ -126,8 +138,8 @@ export default function PagesHub() {
                 icon={about.icon}
                 title={about.label}
                 text="Đầu trang, câu chuyện và 4 ảnh, tầm nhìn – sứ mệnh, giá trị cốt lõi, lý do chọn Vietlook, video và những con số."
-                badge={<ContentBadge doc={aboutDoc} />}
-                langs={langsOf(aboutDoc, true)}
+                badge={<StatusBadges doc={aboutDoc} n={aboutStats?.n ?? 0} />}
+                langs={aboutDoc ? langsOf(aboutDoc, true) : null}
                 updatedAt={aboutDoc?.updatedAt}
               />
             </div>
@@ -149,6 +161,7 @@ export default function PagesHub() {
                     const entry = PAGE_COPY[k];
                     const doc = copyOf(k);
                     const n = countEdited(entry, doc?.data);
+                    const stats = n ? editedStats(doc?.data) : null;
                     return (
                       <div key={k} className={cell}>
                         <HubCard
@@ -157,15 +170,9 @@ export default function PagesHub() {
                           icon={ICONS[k] ?? LayoutTemplate}
                           title={entry.name}
                           text={entry.summary}
-                          badge={
-                            n ? (
-                              <Badge tone="amber">Đã chỉnh sửa {n} mục</Badge>
-                            ) : (
-                              <Badge>Chưa chỉnh sửa</Badge>
-                            )
-                          }
-                          foot={n ? null : "Đang dùng nội dung mặc định"}
-                          updatedAt={n ? doc?.updatedAt : null}
+                          badge={<EditedBadge n={n} />}
+                          langs={stats?.anyLang ? stats.langs : null}
+                          updatedAt={doc?.updatedAt}
                         />
                       </div>
                     );
@@ -188,8 +195,14 @@ export default function PagesHub() {
                     icon={p.icon}
                     title={anyLang(doc?.title, "vi") || p.label}
                     text={p.text}
-                    badge={<ContentBadge doc={doc} />}
-                    langs={langsOf(doc, false)}
+                    badge={
+                      <StatusBadges
+                        doc={doc}
+                        n={doc ? editedStats(pickContent(doc)).n : 0}
+                        required
+                      />
+                    }
+                    langs={doc ? langsOf(doc, false) : null}
                     updatedAt={doc?.updatedAt}
                     compact
                   />
@@ -214,9 +227,62 @@ const langsOf = (doc, isAbout) =>
     ]),
   );
 
-function ContentBadge({ doc }) {
-  if (!doc) return <Badge tone="amber">Chưa có nội dung</Badge>;
-  return doc.isActive === false ? <Badge>Đang ẩn</Badge> : <Badge tone="green">Đang hiện</Badge>;
+const isObj = (v) => v != null && typeof v === "object" && !Array.isArray(v);
+const LANG_KEYS = LANGS.map((l) => l.key);
+const hasText = (v) =>
+  typeof v === "string"
+    ? Boolean(v.replace(/<[^>]*>/g, "").trim())
+    : Array.isArray(v) && v.length > 0;
+
+/**
+ * Đếm số mục đã điền trong 1 bản đã lưu (chuỗi 3 ngôn ngữ / ảnh / con số — mỗi ô tính 1) và ngôn ngữ nào
+ * đã có chữ. Dùng cho thẻ Trang chủ, Giới thiệu, chính sách và chip VI / EN / 中文 của mọi thẻ.
+ */
+function editedStats(value) {
+  const langs = Object.fromEntries(LANG_KEYS.map((l) => [l, false]));
+  let n = 0;
+  const visit = (node) => {
+    if (Array.isArray(node)) return node.forEach(visit);
+    if (isObj(node)) {
+      const keys = Object.keys(node);
+      if (keys.length && keys.every((k) => LANG_KEYS.includes(k))) {
+        const filled = keys.filter((k) => hasText(node[k]));
+        if (filled.length) n++;
+        for (const k of filled) langs[k] = true;
+        return;
+      }
+      return Object.values(node).forEach(visit);
+    }
+    if (typeof node === "string" ? node.trim() : typeof node === "number") n++;
+  };
+  visit(value);
+  return { n, langs, anyLang: Object.values(langs).some(Boolean) };
+}
+
+/** Phần nội dung của trang Giới thiệu / chính sách (bỏ khoá, ngày, trạng thái…) */
+const pickContent = (doc) => [doc.title, doc.subtitle, doc.body, doc.image, doc.data, doc.seo];
+
+/** Nhãn trên ảnh thẻ — cùng một kiểu cho mọi trang */
+function EditedBadge({ n }) {
+  return n ? (
+    <Badge tone="amber">Đã chỉnh sửa {n} mục</Badge>
+  ) : (
+    <Badge>Đang dùng nội dung mặc định</Badge>
+  );
+}
+
+/**
+ * Giới thiệu / chính sách: số mục đã sửa + "Đang ẩn" nếu trang đang tắt trên website.
+ * `required`: trang chính sách chưa có bản lưu thì website chưa có trang → báo "Chưa có nội dung".
+ */
+function StatusBadges({ doc, n, required }) {
+  if (!doc && required) return <Badge tone="amber">Chưa có nội dung</Badge>;
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <EditedBadge n={n} />
+      {doc?.isActive === false && <Badge tone="red">Đang ẩn trên website</Badge>}
+    </span>
+  );
 }
 
 function ListHeading({ children }) {
@@ -229,7 +295,7 @@ function ListHeading({ children }) {
 }
 
 /** 1 thẻ trang: ảnh thu nhỏ (tên trang nổi trên ảnh) + mô tả + trạng thái */
-function HubCard({ href, image, icon: Icon, title, text, badge, langs, foot, updatedAt, compact }) {
+function HubCard({ href, image, icon: Icon, title, text, badge, langs, updatedAt, compact }) {
   return (
     <Link
       href={href}
@@ -262,26 +328,25 @@ function HubCard({ href, image, icon: Icon, title, text, badge, langs, foot, upd
             {title}
           </span>
         </span>
-        <span className="absolute top-3 right-3">{badge}</span>
+        {badge && <span className="absolute top-3 right-3 max-w-[calc(100%-1.5rem)]">{badge}</span>}
       </div>
       <div className="flex min-w-0 flex-1 flex-col p-5">
         <p className="flex-1 text-sm leading-relaxed text-slate-500">{text}</p>
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
-          {langs
-            ? LANGS.map((l) => (
-                <span
-                  key={l.key}
-                  title={langs[l.key] ? `Đã có bản ${l.label}` : `Chưa có bản ${l.label}`}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                    langs[l.key] ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-400",
-                  )}
-                >
-                  {langs[l.key] && <Check className="size-3" />}
-                  {l.short}
-                </span>
-              ))
-            : foot && <span className="text-xs text-slate-400">{foot}</span>}
+          {langs &&
+            LANGS.map((l) => (
+              <span
+                key={l.key}
+                title={langs[l.key] ? `Đã có bản ${l.label}` : `Chưa có bản ${l.label}`}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                  langs[l.key] ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-400",
+                )}
+              >
+                {langs[l.key] && <Check className="size-3" />}
+                {l.short}
+              </span>
+            ))}
           <span className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
             <PencilLine className="size-3.5" />
             Sửa trang

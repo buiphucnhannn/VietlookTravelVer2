@@ -36,6 +36,6 @@ export const CONTENT_PAGES = [
     label: PAGE_LABELS.cancellation,
     icon: CalendarX2,
     url: "/policies/cancellation",
-    text: "Điều kiện và phí khi khách hủy hoặc đổi tour.",
+    text: "Điều kiện và phí khi khách huỷ hoặc đổi tour.",
   },
 ];

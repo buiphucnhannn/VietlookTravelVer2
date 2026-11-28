@@ -22,11 +22,18 @@ import {
   Select,
   fmtUSD,
   locText,
-  useUi,
 } from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
 import { REGIONS } from "./DestinationsPage";
 import { usePermission } from "./permissions";
+import {
+  FilterBar,
+  TrashActions,
+  TrashTabs,
+  ViewOnSiteLink,
+  trashNote,
+  useTrash,
+} from "./catalogShared";
 
 const PATH = "/admin/tours";
 const TAGS = ["tours"];
@@ -58,7 +65,6 @@ export const durationText = (t) => {
 export default function ToursPage() {
   const router = useRouter();
   const { canEdit, canDelete } = usePermission("tours");
-  const { confirm } = useUi();
   const list = useAdminList(PATH, {
     q: "",
     region: "",
@@ -67,8 +73,10 @@ export default function ToursPage() {
     status: "",
     featured: "",
     sort: "rank",
+    trash: "",
     limit: 20,
   });
+  const inTrash = list.query.trash === "1";
   const { run } = useMutation(TAGS);
   const [copying, setCopying] = useState(null);
 
@@ -85,28 +93,22 @@ export default function ToursPage() {
     ? destinations.filter((d) => d.region === list.query.region)
     : destinations;
 
-  const hasFilter =
-    list.query.q ||
-    list.query.region ||
-    list.query.destination ||
-    list.query.theme ||
-    list.query.status ||
-    list.query.featured;
+  const FILTER_KEYS = ["region", "destination", "theme", "status", "featured"];
+  const filterCount = FILTER_KEYS.filter((k) => list.query[k]).length;
+  const hasFilter = list.query.q || filterCount > 0;
+  const resetFilters = () => list.setQuery(Object.fromEntries(FILTER_KEYS.map((k) => [k, ""])));
 
-  const remove = async (t) => {
-    const ok = await confirm({
-      title: "Xoá tour?",
-      message: `Xoá vĩnh viễn "${tourTitle(t)}". Không thể hoàn tác — nếu chỉ muốn tạm ngừng bán, hãy ẩn tour thay vì xoá.`,
-      confirmText: "Xoá tour",
-      danger: true,
-    });
-    if (!ok) return;
-    // xoá → trang chủ cũng bỏ tour này (máy chủ đã gỡ) → xoá cache trang chủ
-    const removed = await run(() => api(`${PATH}/${t.id}`, { method: "DELETE" }), "Đã xoá tour", {
-      extraTags: ["settings"],
-    });
-    if (removed) list.reload();
-  };
+  // Xoá → Thùng rác 30 ngày (kèm "Hoàn tác"); trang chủ cũng bỏ tour này (máy chủ đã gỡ) → xoá cache trang chủ
+  const trash = useTrash({
+    path: PATH,
+    tags: TAGS,
+    noun: "tour",
+    nameOf: tourTitle,
+    onChange: list.reload,
+    removeExtraTags: ["settings"],
+  });
+  const showTrash = (on) =>
+    list.setQuery({ trash: on ? "1" : "", ...Object.fromEntries(FILTER_KEYS.map((k) => [k, ""])) });
 
   /** Nhân bản: tạo bản sao (đang ẩn) với đường dẫn thêm "-copy", rồi mở trang sửa bản sao */
   const duplicate = async (t) => {
@@ -155,87 +157,107 @@ export default function ToursPage() {
 
       <Card bodyClassName="p-0 sm:p-0">
         <div className="space-y-3 border-b border-slate-100 p-4 sm:px-5">
+          {canDelete && (
+            <TrashTabs
+              trash={inTrash}
+              onChange={showTrash}
+              countUrl={`${PATH}?trash=1&limit=1`}
+              activeLabel="Tour đang có"
+            />
+          )}
           <SearchBox
             value={list.query.q}
             onChange={(q) => list.setQuery({ q })}
-            placeholder="Tìm theo tên tour hoặc mã tour…"
+            placeholder={
+              inTrash
+                ? "Tìm trong Thùng rác theo tên hoặc mã tour…"
+                : "Tìm theo tên tour hoặc mã tour…"
+            }
           />
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            <Select
-              value={list.query.region}
-              onChange={(e) => list.setQuery({ region: e.target.value, destination: "" })}
-              aria-label="Miền"
-              className={FILTER}
+          {!inTrash && (
+            <FilterBar
+              count={filterCount}
+              onReset={resetFilters}
+              gridClass="gap-2 sm:grid-cols-3 xl:grid-cols-[repeat(5,minmax(0,1fr))_minmax(15rem,1.35fr)]"
             >
-              <option value="">Mọi miền</option>
-              {REGIONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={list.query.destination}
-              onChange={(e) => list.setQuery({ destination: e.target.value })}
-              aria-label="Điểm đến"
-              className={FILTER}
-            >
-              <option value="">Mọi điểm đến</option>
-              {destOptions.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={list.query.theme}
-              onChange={(e) => list.setQuery({ theme: e.target.value })}
-              aria-label="Chủ đề"
-              className={FILTER}
-            >
-              <option value="">Mọi chủ đề</option>
-              {themes.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={list.query.status}
-              onChange={(e) => list.setQuery({ status: e.target.value })}
-              aria-label="Trạng thái"
-              className={FILTER}
-            >
-              <option value="">Hiện & ẩn</option>
-              <option value="active">Đang hiện</option>
-              <option value="hidden">Đang ẩn</option>
-            </Select>
-            <Select
-              value={list.query.featured}
-              onChange={(e) => list.setQuery({ featured: e.target.value })}
-              aria-label="Nổi bật"
-              className={`${FILTER} max-sm:col-span-2`}
-            >
-              <option value="">Mọi loại tour</option>
-              <option value="featured">Tour nổi bật</option>
-              <option value="long">Tour dài ngày nổi bật</option>
-            </Select>
-            <Select
-              value={list.query.sort}
-              onChange={(e) => list.setQuery({ sort: e.target.value })}
-              aria-label="Sắp xếp"
-              className={`${FILTER} max-sm:col-span-2`}
-            >
-              {SORTS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  Sắp xếp: {s.label}
-                </option>
-              ))}
-            </Select>
-          </div>
+              <Select
+                value={list.query.region}
+                onChange={(e) => list.setQuery({ region: e.target.value, destination: "" })}
+                aria-label="Miền"
+                className={FILTER}
+              >
+                <option value="">Mọi miền</option>
+                {REGIONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={list.query.destination}
+                onChange={(e) => list.setQuery({ destination: e.target.value })}
+                aria-label="Điểm đến"
+                className={FILTER}
+              >
+                <option value="">Mọi điểm đến</option>
+                {destOptions.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={list.query.theme}
+                onChange={(e) => list.setQuery({ theme: e.target.value })}
+                aria-label="Chủ đề"
+                className={FILTER}
+              >
+                <option value="">Mọi chủ đề</option>
+                {themes.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={list.query.status}
+                onChange={(e) => list.setQuery({ status: e.target.value })}
+                aria-label="Trạng thái"
+                className={FILTER}
+              >
+                <option value="">Mọi trạng thái</option>
+                <option value="active">Đang hiện</option>
+                <option value="hidden">Đang ẩn</option>
+              </Select>
+              <Select
+                value={list.query.featured}
+                onChange={(e) => list.setQuery({ featured: e.target.value })}
+                aria-label="Nổi bật"
+                className={FILTER}
+              >
+                <option value="">Mọi loại tour</option>
+                <option value="featured">Tour nổi bật</option>
+                <option value="long">Tour dài ngày nổi bật</option>
+              </Select>
+              <Select
+                value={list.query.sort}
+                onChange={(e) => list.setQuery({ sort: e.target.value })}
+                aria-label="Sắp xếp"
+                className={FILTER}
+              >
+                {SORTS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    Sắp xếp: {s.label}
+                  </option>
+                ))}
+              </Select>
+            </FilterBar>
+          )}
           {list.meta && (
             <p className="text-xs text-slate-500">
-              {list.meta.total} tour{hasFilter ? " phù hợp bộ lọc" : ""}
+              {inTrash
+                ? `${list.meta.total} tour trong Thùng rác — tự xoá hẳn sau 30 ngày`
+                : `${list.meta.total} tour${hasFilter ? " phù hợp bộ lọc" : ""}`}
             </p>
           )}
         </div>
@@ -250,120 +272,158 @@ export default function ToursPage() {
         ) : !list.items.length ? (
           <EmptyState
             icon={MapIcon}
-            title={hasFilter ? "Không có tour phù hợp" : "Chưa có tour"}
+            title={
+              inTrash ? "Thùng rác trống" : hasFilter ? "Không có tour phù hợp" : "Chưa có tour"
+            }
             text={
-              hasFilter
-                ? "Thử đổi từ khoá hoặc bỏ bớt bộ lọc."
-                : "Thêm tour đầu tiên để bắt đầu bán."
+              inTrash
+                ? "Tour bị xoá sẽ nằm ở đây 30 ngày, khôi phục được bất cứ lúc nào."
+                : hasFilter
+                  ? "Thử đổi từ khoá hoặc bỏ bớt bộ lọc."
+                  : "Thêm tour đầu tiên để bắt đầu bán."
             }
           />
         ) : (
           <BusyArea busy={list.loading}>
             <ul className="divide-y divide-slate-100">
-              {list.items.map((t) => {
-                const href = `${ADMIN_BASE}/tours/${t.id}`;
-                const strike = t.originalPrice > (t.price ?? 0) ? t.originalPrice : null;
-                return (
+              {inTrash &&
+                list.items.map((t) => (
                   <li
                     key={t.id}
                     className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5"
                   >
-                    <Link
-                      href={href}
-                      className="relative aspect-[4/3] w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:w-24"
-                    >
+                    <span className="relative aspect-[4/3] w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:w-24">
                       {t.image && (
-                        <Image src={t.image} alt="" fill sizes="96px" className="object-cover" />
+                        <Image
+                          src={t.image}
+                          alt=""
+                          fill
+                          sizes="96px"
+                          className="object-cover opacity-70 grayscale"
+                        />
                       )}
-                    </Link>
+                    </span>
                     <div className="min-w-0 flex-1 basis-40 sm:basis-56">
+                      <p className="line-clamp-2 font-semibold text-slate-700">{tourTitle(t)}</p>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500">
+                        {t.code && <span className="font-mono font-semibold">{t.code}</span>}
+                        <span>{trashNote(t.deletedAt)}</span>
+                      </p>
+                    </div>
+                    <TrashActions
+                      busy={trash.busy}
+                      onRestore={() => trash.restore(t)}
+                      onPurge={() => trash.purge(t)}
+                      className="max-sm:w-full max-sm:justify-end"
+                    />
+                  </li>
+                ))}
+              {!inTrash &&
+                list.items.map((t) => {
+                  const href = `${ADMIN_BASE}/tours/${t.id}`;
+                  const strike = t.originalPrice > (t.price ?? 0) ? t.originalPrice : null;
+                  return (
+                    <li
+                      key={t.id}
+                      className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5"
+                    >
                       <Link
                         href={href}
-                        className="line-clamp-2 font-semibold text-slate-900 hover:text-brand-700"
+                        className="relative aspect-[4/3] w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:w-24"
                       >
-                        {tourTitle(t)}
+                        {t.image && (
+                          <Image src={t.image} alt="" fill sizes="96px" className="object-cover" />
+                        )}
                       </Link>
-                      <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500">
-                        {t.code && (
-                          <span className="font-mono font-semibold text-slate-600">{t.code}</span>
-                        )}
-                        {durationText(t) && <span>{durationText(t)}</span>}
-                        {t.tourType && (
-                          <span>{t.tourType === "group" ? "Tour ghép" : "Tour riêng"}</span>
-                        )}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {t.featured && <Badge tone="blue">Nổi bật</Badge>}
-                        {t.featuredLong && <Badge tone="violet">Dài ngày</Badge>}
-                        {t.cruise && (
-                          <Badge tone="gray">
-                            <Ship className="size-3" /> Du thuyền
-                          </Badge>
-                        )}
-                        {!t.content?.zh?.title && <Badge tone="amber">Chưa có tiếng Trung</Badge>}
-                        {!t.content?.vi?.title && <Badge tone="amber">Chưa có tiếng Việt</Badge>}
-                        {!t.image && <Badge tone="red">Chưa có ảnh</Badge>}
-                      </div>
-                    </div>
-                    {/* Điện thoại: giá + nút thao tác chung 1 hàng dưới tên tour */}
-                    <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
-                      <div className="sm:w-24 sm:text-right">
-                        <p className="font-bold text-slate-900">
-                          {t.price ? fmtUSD(t.price) : "Liên hệ"}
-                        </p>
-                        {strike && (
-                          <p className="text-xs text-slate-400 line-through">{fmtUSD(strike)}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <VisibilityToggle
-                          path={PATH}
-                          item={t}
-                          tags={TAGS}
-                          onDone={(doc) =>
-                            list.setItems((xs) =>
-                              xs.map((x) => (x.id === doc.id ? { ...x, ...doc } : x)),
-                            )
-                          }
-                        />
+                      <div className="min-w-0 flex-1 basis-40 sm:basis-56">
                         <Link
                           href={href}
-                          aria-label={canEdit ? "Sửa" : "Xem"}
-                          title={canEdit ? "Sửa" : "Xem"}
-                          className="grid size-9 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                          className="line-clamp-2 font-semibold text-slate-900 hover:text-brand-700"
                         >
-                          {canEdit ? <Pencil className="size-4" /> : <Eye className="size-4" />}
+                          {tourTitle(t)}
                         </Link>
-                        {canEdit && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => duplicate(t)}
-                            loading={copying === t.id}
-                            disabled={!!copying}
-                            aria-label="Nhân bản"
-                            title="Nhân bản"
-                          >
-                            {copying !== t.id && <Copy className="size-4" />}
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => remove(t)}
-                            aria-label="Xoá"
-                            title="Xoá"
-                            className="text-sun-600"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        )}
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500">
+                          {t.code && (
+                            <span className="font-mono font-semibold text-slate-600">{t.code}</span>
+                          )}
+                          {durationText(t) && <span>{durationText(t)}</span>}
+                          {t.tourType && (
+                            <span>{t.tourType === "group" ? "Tour ghép" : "Tour riêng"}</span>
+                          )}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {t.featured && <Badge tone="blue">Nổi bật</Badge>}
+                          {t.featuredLong && <Badge tone="violet">Dài ngày</Badge>}
+                          {t.cruise && (
+                            <Badge tone="gray">
+                              <Ship className="size-3" /> Du thuyền
+                            </Badge>
+                          )}
+                          {!t.content?.zh?.title && <Badge tone="amber">Chưa có tiếng Trung</Badge>}
+                          {!t.content?.vi?.title && <Badge tone="amber">Chưa có tiếng Việt</Badge>}
+                          {!t.image && <Badge tone="red">Chưa có ảnh</Badge>}
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                );
-              })}
+                      {/* Điện thoại: giá + nút thao tác chung 1 hàng dưới tên tour */}
+                      <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
+                        <div className="sm:w-24 sm:text-right">
+                          <p className="font-bold text-slate-900">
+                            {t.price ? fmtUSD(t.price) : "Liên hệ"}
+                          </p>
+                          {strike && (
+                            <p className="text-xs text-slate-400 line-through">{fmtUSD(strike)}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <VisibilityToggle
+                            path={PATH}
+                            item={t}
+                            tags={TAGS}
+                            onDone={(doc) =>
+                              list.setItems((xs) =>
+                                xs.map((x) => (x.id === doc.id ? { ...x, ...doc } : x)),
+                              )
+                            }
+                          />
+                          <Link
+                            href={href}
+                            aria-label={canEdit ? "Sửa" : "Xem"}
+                            title={canEdit ? "Sửa" : "Xem"}
+                            className="grid size-9 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                          >
+                            {canEdit ? <Pencil className="size-4" /> : <Eye className="size-4" />}
+                          </Link>
+                          <ViewOnSiteLink href={`/tours/${t.slug}`} visible={t.isActive} />
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => duplicate(t)}
+                              loading={copying === t.id}
+                              disabled={!!copying}
+                              aria-label="Nhân bản"
+                              title="Nhân bản"
+                            >
+                              {copying !== t.id && <Copy className="size-4" />}
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => trash.remove(t)}
+                              aria-label="Xoá"
+                              title="Xoá"
+                              className="text-sun-600"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
             </ul>
           </BusyArea>
         )}

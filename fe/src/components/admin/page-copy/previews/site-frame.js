@@ -15,9 +15,12 @@ import { buildNavigation } from "@/data/navigation";
 import { HeaderPreview } from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { SuccessPanel } from "@/components/forms/fields";
+import { StillMotion } from "@/components/ui/motion";
 import Link from "../../Link";
 import { Txt } from "../blocks";
 import { useSiteDict } from "./site-shared";
+import { PREVIEW_CSS } from "../chrome";
+import { BlockSwitch, DIM_TRANSITION, HIDDEN_DIM, usePageCopyHidden } from "../../block-visibility";
 
 /**
  * KHUNG "TRANG WEB THẬT" cho bản xem trước Giao diện trang — để phần sửa được và phần KHÔNG sửa được trông y như
@@ -123,7 +126,7 @@ export function useSiteInfo() {
   );
 }
 
-/** Từ điển website đúng như trang thật (đã điền điểm & số lượt đánh giá từ Cài đặt) — null khi đang tải */
+/** Từ điển website đúng như trang thật (đã điền điểm & số lượt đánh giá — CMS → Đánh giá) — null khi đang tải */
 export function useDict(lang) {
   const raw = useSiteDict(lang);
   const { reviewStats } = useSiteInfo();
@@ -157,28 +160,38 @@ export function usePageText(key, lang, dict) {
 
 const PAGES = `${ADMIN_BASE}/pages`;
 
-/** Nhãn "Tự động · sửa ở …" (link sang mục quản lý) */
+/**
+ * Nhãn "⚡ Tự động · sửa ở …" (link sang mục quản lý) — gọn: bình thường chỉ là chấm ⚡ nhỏ mờ ở góc, rê chuột lên
+ * khối (lớp `group/auto` của khung cha) hoặc lên chấm thì mới hiện đủ chữ → không đè lên nội dung trang.
+ */
 export function AutoChip({ href, label, dark, className }) {
   const body = (
     <>
       <Zap className="size-3 shrink-0 text-amber-500" />
-      <span className="truncate">{label}</span>
-      {href && <ArrowUpRight className="size-3 shrink-0 opacity-60" />}
+      <span className="hidden truncate group-hover/auto:inline group-hover/chip:inline">
+        <span className="sr-only">Tự động · </span>
+        {label}
+      </span>
+      {href && (
+        <ArrowUpRight className="hidden size-3 shrink-0 opacity-60 group-hover/auto:block group-hover/chip:block" />
+      )}
     </>
   );
   const cls = cn(
-    "z-30 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-full [zoom:var(--pz,1)] px-2.5 py-1 font-sans text-[11px] leading-none font-semibold tracking-normal whitespace-nowrap normal-case shadow-sm backdrop-blur transition",
+    "group/chip z-30 inline-flex h-6 max-w-[calc(100%-1rem)] min-w-6 items-center justify-center gap-1 rounded-full [zoom:var(--pz,1)] px-1.5 font-sans text-[11px] leading-none font-semibold tracking-normal whitespace-nowrap normal-case opacity-70 shadow-sm backdrop-blur group-hover/auto:px-2.5 group-hover/auto:opacity-100 hover:px-2.5 hover:opacity-100",
     dark
       ? "bg-slate-950/70 text-white/90 ring-1 ring-white/15 hover:bg-slate-950/85"
       : "bg-white/95 text-slate-600 ring-1 ring-slate-900/10 hover:text-brand-700",
     className,
   );
   return href ? (
-    <Link href={href} className={cls} title={label} data-admin-link>
+    <Link href={href} className={cls} title={label} aria-label={label} data-admin-link data-edit-ui>
       {body}
     </Link>
   ) : (
-    <span className={cls}>{body}</span>
+    <span className={cls} title={label} data-edit-ui>
+      {body}
+    </span>
   );
 }
 
@@ -200,8 +213,9 @@ const blockClicks = (e) => {
 export function Auto({ href, label, dark, live, className, at = "top-2 right-2", children }) {
   return (
     <div
+      data-auto
       className={cn(
-        "relative rounded-[inherit] outline-2 outline-offset-4 outline-transparent transition-[outline-color] outline-dashed",
+        "group/auto relative rounded-[inherit] outline-2 outline-offset-4 outline-transparent outline-dashed",
         dark ? "hover:outline-white/35" : "hover:outline-slate-400/60",
         className,
       )}
@@ -241,7 +255,10 @@ export function FormStates({ labels, title = "successTitle", text = "successText
   );
   return (
     <div className="relative">
-      <div className="absolute -top-3 left-0 z-30 flex [zoom:var(--pz,1)] items-center gap-0.5 rounded-full bg-white p-0.5 font-sans text-[11px] leading-none font-semibold shadow-sm ring-1 ring-slate-900/10">
+      <div
+        data-edit-ui
+        className="absolute -top-3 left-0 z-30 flex [zoom:var(--pz,1)] items-center gap-0.5 rounded-full bg-white p-0.5 font-sans text-[11px] leading-none font-semibold shadow-sm ring-1 ring-slate-900/10"
+      >
         {tab(!sent, "Form", () => setSent(false))}
         {tab(sent, "Sau khi gửi", () => setSent(true))}
       </div>
@@ -263,21 +280,53 @@ export function FormStates({ labels, title = "successTitle", text = "successText
 }
 
 /**
- * 1 khối của trang: nội dung y như trang thật (tự lo khoảng cách), thêm nhãn tên khối nhỏ ở góc (`at`).
- * Nhãn không chặn chuột.
+ * 1 khối của trang: nội dung y như trang thật (tự lo khoảng cách), thêm nhãn tên khối nhỏ.
+ * Nhãn là 1 thẻ DỌC sát mép trái khối (nằm trong lề trang, không đè lên chữ của khối); `at` chỉ chọn độ cao
+ * (vd. "top-20" để nằm dưới thanh menu, "bottom-3", "hidden"). Nhãn không chặn chuột và ẩn đi khi rê chuột vào khối
+ * → nhường chỗ cho nhãn / nút sửa.
+ * Khối bật / tắt được trên website (block-visibility.js): `hide` = khoá khối của trang (lib/hidden-blocks.mjs,
+ * đọc / ghi thẳng dữ liệu đang soạn), hoặc tự truyền `hidden` + `onHiddenChange` (Trang chủ) → công tắc
+ * "Hiện / Ẩn trên website" giữa mép trên khối (`switchAt` đổi chỗ); khối đang ẩn hiện mờ, vẫn sửa được.
+ * Chỉ truyền `hidden` (không `onHiddenChange`): chỉ làm mờ — nơi gọi tự đặt công tắc (khối Trang chủ).
  */
-export function Zone({ name, dark, at = "top-1.5 left-2", className, children }) {
+export function Zone({
+  name,
+  dark,
+  at = "top-3",
+  className,
+  hide,
+  hidden: hiddenProp,
+  onHiddenChange,
+  switchAt,
+  children,
+}) {
+  const [storeHidden, setStoreHidden] = usePageCopyHidden(hide);
+  const toggle = setStoreHidden ?? onHiddenChange;
+  const hidden = setStoreHidden ? storeHidden : !!hiddenProp;
+  const canHide = !!toggle || hiddenProp !== undefined; // chỉ `hidden` (không công tắc): nơi gọi tự đặt công tắc
   return (
-    <div className={cn("relative", className)}>
-      {children}
+    <div
+      data-jump={name}
+      data-jump-hidden={(canHide && hidden) || undefined}
+      className={cn("group/zl relative", className)}
+    >
+      {canHide ? (
+        <div className={cn(DIM_TRANSITION, hidden && HIDDEN_DIM)}>{children}</div>
+      ) : (
+        children
+      )}
+      {toggle && <BlockSwitch name={name} hidden={hidden} onChange={toggle} className={switchAt} />}
       <span
         aria-hidden
+        data-edit-ui
+        title={name}
         className={cn(
-          "pointer-events-none absolute z-30 [zoom:var(--pz,1)] rounded-md px-2 py-0.5 font-sans text-[10px] leading-4 font-semibold tracking-wide uppercase select-none",
+          "pointer-events-none absolute left-0 z-30 max-h-[min(18rem,calc((100%-0.75rem)/var(--pz,1)))] rotate-180 [zoom:var(--pz,1)] truncate rounded-l-md px-px py-1.5 font-sans text-[9px] leading-3 font-semibold tracking-wide whitespace-nowrap uppercase transition-opacity duration-150 select-none [writing-mode:vertical-rl] group-hover/zl:opacity-0 max-sm:hidden",
           dark
             ? "bg-slate-950/45 text-white/80 backdrop-blur-sm"
-            : "bg-slate-900/[0.06] text-slate-500",
-          at,
+            : "bg-slate-200/80 text-slate-500",
+          // chỉ giữ vị trí theo chiều dọc: nhãn luôn sát mép trái
+          at.replace(/(^|\s)(\w+:)?left-\S+/g, " "),
         )}
       >
         {name}
@@ -332,16 +381,20 @@ export function SitePage({ lang, path, chrome = true, editChrome, extras, childr
   const { ref, style } = useSiteScale();
   return (
     // link / nút trên trang chỉ để xem: bấm không chuyển trang (trừ link sang mục quản lý trong nhãn "Tự động")
-    <div ref={ref} className="overflow-hidden" onClickCapture={stopLinks}>
+    // site-preview: tắt mọi hiệu ứng chuyển động của website (globals.css) + PREVIEW_CSS bên dưới
+    <div ref={ref} className="site-preview overflow-hidden" onClickCapture={stopLinks}>
+      <style>{PREVIEW_CSS}</style>
       {/* font chữ website (Be Vietnam Pro) + màu chữ gốc của website; rộng đúng bằng cửa sổ trình duyệt rồi thu nhỏ vừa khung */}
       <div
         lang={lang}
         className="relative bg-white font-sans text-ink"
         style={{ "--font-be-vietnam": "var(--font-admin)", ...style }}
       >
-        {chrome && <SiteHeader lang={lang} path={path} edit={editChrome?.header} />}
-        {children}
-        {chrome && <SiteFooter lang={lang} edit={editChrome?.footer} />}
+        <StillMotion>
+          {chrome && <SiteHeader lang={lang} path={path} edit={editChrome?.header} />}
+          {children}
+          {chrome && <SiteFooter lang={lang} edit={editChrome?.footer} />}
+        </StillMotion>
       </div>
       {extras && <EditorExtras>{extras}</EditorExtras>}
     </div>
@@ -388,15 +441,17 @@ export function SiteHeader({ lang, path, edit, className }) {
   );
   return (
     // transform → header "fixed" của website bám vào khung xem trước (không bám màn hình CMS)
-    <div className={cn("relative z-40 h-0 [transform:translateZ(0)]", className)}>
+    <div className={cn("group/auto relative z-40 h-0 [transform:translateZ(0)]", className)}>
       {edit ? header : <div inert>{header}</div>}
       {!edit && (
-        <AutoChip
-          href={`${PAGES}?key=global`}
-          label="Đầu trang chung · sửa ở Đầu & chân trang"
-          dark
-          className="absolute top-12 right-3 z-[60] lg:top-[7.25rem]"
-        />
+        // vị trí theo toạ độ trang (ngay dưới thanh menu), nhãn bên trong phóng cỡ thật
+        <span className="absolute top-[4.25rem] right-3 z-[60] flex lg:top-[7.25rem]">
+          <AutoChip
+            href={`${PAGES}?key=global`}
+            label="Đầu trang chung · sửa ở Đầu & chân trang"
+            dark
+          />
+        </span>
       )}
     </div>
   );
@@ -417,7 +472,7 @@ export function SiteFooter({ lang, edit }) {
   );
   if (edit) return footer;
   return (
-    <div className="relative">
+    <div className="group/auto relative" data-auto>
       <div inert>{footer}</div>
       <AutoChip
         href={`${PAGES}?key=global`}

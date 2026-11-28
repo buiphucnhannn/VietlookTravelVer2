@@ -35,6 +35,7 @@ import {
 } from "./ui";
 import { usePendingImages } from "./pendingImages";
 import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
+import useDraft from "./useDraft";
 
 const PATH = "/admin/articles";
 const TAGS = ["articles"];
@@ -128,7 +129,16 @@ export default function ArticleEditor({ id }) {
     if (isNew) return;
     let alive = true;
     api(`${PATH}/${id}`)
-      .then((r) => alive && setState({ loading: false, error: "", doc: fromDoc(r.data) }))
+      .then(
+        (r) =>
+          alive &&
+          setState({
+            loading: false,
+            error: "",
+            doc: fromDoc(r.data),
+            updatedAt: r.data.updatedAt ?? null,
+          }),
+      )
       .catch((err) => alive && setState({ loading: false, error: errorMessage(err), doc: null }));
     return () => {
       alive = false;
@@ -155,10 +165,20 @@ export default function ArticleEditor({ id }) {
         <Notice tone="error">{state.error || "Không tìm thấy bài viết"}</Notice>
       </>
     );
-  return <EditorForm key={state.doc.id ?? "new"} initial={state.doc} back={back} />;
+  return (
+    <EditorForm
+      key={state.doc.id ?? "new"}
+      initial={state.doc}
+      updatedAt={state.updatedAt}
+      back={back}
+    />
+  );
 }
 
-function EditorForm({ initial, back }) {
+/** So sánh bản nháp với bản đã lưu: chỉ các trường của form (bản nháp cũ thiếu trường → bù mặc định) */
+const draftPayload = (d) => toPayload({ ...empty(), ...d });
+
+function EditorForm({ initial, updatedAt, back }) {
   const router = useRouter();
   const { toast, confirm } = useUi();
   const isNew = !initial.id;
@@ -191,6 +211,20 @@ function EditorForm({ initial, back }) {
   );
   useUnsavedGuard(dirty);
   const { canEdit } = usePermission("articles"); // chỉ xem → form chỉ đọc, không có thanh Lưu
+
+  // Bản nháp tự lưu: lỡ tải lại / đóng tab / hết phiên → mở lại được hỏi khôi phục
+  const savedJson = useMemo(() => JSON.stringify(saved), [saved]);
+  const draft = useDraft(isNew ? "article:new" : `article:${initial.id}`, d, savedJson, {
+    enabled: canEdit,
+    dirty,
+    updatedAt,
+    serialize: draftPayload,
+    onRestore: (data) => {
+      setD((x) => ({ ...x, ...data, id: x.id }));
+      if (isNew && data.slug && data.slug !== slugify(slugSource(data.title ?? {})))
+        setSlugTouched(true);
+    },
+  });
 
   const save = useCallback(async () => {
     if (!canEdit) return;
@@ -239,6 +273,7 @@ function EditorForm({ initial, back }) {
     const next = fromDoc(r.data);
     setSaved(next);
     setD(next);
+    draft.clear();
     if (failed)
       autoFill.offerRetry(async (t) => {
         const r2 = await api(`${PATH}/${r.data.id}`, {
@@ -250,7 +285,7 @@ function EditorForm({ initial, back }) {
         setD(again);
       });
     if (isNew) router.replace(`${BASE}/${r.data.id}`);
-  }, [d, isNew, router, run, toast, canEdit, autoFill, lang, images]);
+  }, [d, isNew, router, run, toast, canEdit, autoFill, lang, images, draft]);
 
   // Ctrl/⌘ + S để lưu nhanh
   const saveRef = useRef(save);
@@ -579,11 +614,19 @@ function EditorForm({ initial, back }) {
               <span className="hidden text-xs font-normal text-slate-400 sm:inline">
                 · Ctrl + S để lưu
               </span>
+              {dirty && draft.savedLabel && (
+                <span
+                  className="text-xs font-normal text-slate-400"
+                  title="Phần đang sửa được giữ tạm trên máy này — lỡ tải lại trang vẫn khôi phục được. Bấm Lưu để đưa lên website."
+                >
+                  · Đã tự lưu bản nháp lúc {draft.savedLabel}
+                </span>
+              )}
             </p>
             <div className="flex gap-2">
               {dirty && !isNew && (
                 <Button variant="ghost" onClick={() => setD(saved)}>
-                  Hoàn tác
+                  Bỏ thay đổi
                 </Button>
               )}
               <Button

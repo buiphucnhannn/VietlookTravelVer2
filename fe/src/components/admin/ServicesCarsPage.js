@@ -43,6 +43,7 @@ import {
 import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { slugSource, useAutoFill } from "./translate";
+import TipNotice from "./TipNotice";
 
 const CARS = "/admin/cars";
 const AREAS = "/admin/car-areas";
@@ -66,6 +67,31 @@ const EMPTY_CAR = {
   vip: false,
   order: 0,
   isActive: true,
+};
+
+/**
+ * Tên sân bay tiếng Việt để hiện trong trang quản trị. Ô "Sân bay" lưu chữ không dấu (vd. "Noi Bai (HAN)")
+ * và website hiện y nguyên ở mọi ngôn ngữ → chỉ đổi cách hiện ở đây, KHÔNG đổi dữ liệu.
+ */
+const AIRPORT_VI = {
+  HAN: "Sân bay Nội Bài",
+  SGN: "Sân bay Tân Sơn Nhất",
+  DAD: "Sân bay Đà Nẵng",
+  CXR: "Sân bay Cam Ranh",
+  DLI: "Sân bay Liên Khương",
+  PQC: "Sân bay Phú Quốc",
+  HPH: "Sân bay Cát Bi",
+  VDO: "Sân bay Vân Đồn",
+  VDH: "Sân bay Đồng Hới",
+  HUI: "Sân bay Phú Bài",
+  VCS: "Sân bay Côn Đảo",
+};
+const PLACE_VI = { "phan thiet": "Phan Thiết" };
+const airportLabel = (raw) => {
+  const s = String(raw ?? "").trim();
+  const code = s.match(/\(([A-Z]{3})\)\s*$/)?.[1];
+  if (code && AIRPORT_VI[code]) return AIRPORT_VI[code];
+  return PLACE_VI[s.toLowerCase()] ?? s;
 };
 
 const EMPTY_AREA = { key: "", name: L(), airport: "", image: "", order: 0, isActive: true };
@@ -113,13 +139,20 @@ export default function ServicesCarsPage() {
     <>
       <PageHeader
         title="Xe & khu vực"
-        description={`Các loại xe cho thuê kèm tài xế và khu vực phục vụ, hiện trên trang thuê xe của website.${canEdit ? " Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất kỳ." : ""}`}
+        description="Các loại xe cho thuê kèm tài xế và khu vực phục vụ, hiện trên trang Thuê xe của website."
       />
+
+      {canEdit && (
+        <TipNotice id="sort-cars" className="mb-4">
+          Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất
+          kỳ.
+        </TipNotice>
+      )}
 
       <div className="space-y-6">
         <CardSection
           title="Loại xe"
-          description="Thông tin, ảnh và đối tượng phù hợp của từng loại xe. Bảng giá theo tuyến do đơn vị phát triển cập nhật."
+          description="Thông tin, ảnh và đối tượng phù hợp của từng loại xe. Bảng giá theo tuyến do bộ phận kỹ thuật cập nhật — có giá mới, hãy gửi cho bộ phận kỹ thuật."
           addLabel="Thêm loại xe"
           onAdd={() => setCar(EMPTY_CAR)}
           list={cars}
@@ -171,7 +204,9 @@ export default function ServicesCarsPage() {
                 {a.airport && (
                   <>
                     <Plane className="size-3.5 shrink-0" />
-                    <span className="truncate">{a.airport}</span>
+                    <span className="truncate" title={a.airport}>
+                      {airportLabel(a.airport)}
+                    </span>
                   </>
                 )}
               </p>
@@ -571,7 +606,10 @@ function AreaEditor({ initial, nextOrder, onClose, onSaved }) {
                 }
               />
             </Field>
-            <Field label="Sân bay" hint="VD: Tân Sơn Nhất (SGN)">
+            <Field
+              label="Sân bay"
+              hint="Hiện y nguyên trên website ở mọi ngôn ngữ nên viết không dấu. VD: Tan Son Nhat (SGN)"
+            >
               <Input value={d.airport} onChange={(e) => set({ airport: e.target.value })} />
             </Field>
           </div>

@@ -32,7 +32,7 @@ import { WeChatIcon, WhatsAppIcon, ZaloIcon } from "@/components/ui/BrandIcons";
 import { cn } from "@/lib/utils";
 import { subgrid } from "@/lib/subgrid";
 import { Pic } from "../../home/shared";
-import { BgEdit, ImagePill, ListOf, Photo, Shown, Txt, useCopyField } from "../blocks";
+import { BgEdit, ImageEdit, ListOf, Photo, Shown, Txt, useCopyField } from "../blocks";
 import {
   Auto,
   Loading,
@@ -44,6 +44,7 @@ import {
   useSiteInfo,
 } from "./site-frame";
 import { FaqItem } from "./faq";
+import { CONTACT_SETTINGS_HREF } from "./site-shared";
 
 /**
  * Bản xem trước trang Thuê xe — dựng y như app/[lang]/car-rental/page.js (cùng bố cục, cỡ chữ, màu, ảnh).
@@ -79,14 +80,9 @@ export default function CarRentalPreview({ lang }) {
     <SitePage lang={lang} path="/car-rental">
       <CarQuoteProvider>
         {/* ========== HERO ========== */}
-        <Zone name="Đầu trang" dark at="bottom-3 left-3">
+        <Zone name="Đầu trang" dark at="left-3 top-20 lg:top-[7.25rem]">
           <section className="relative isolate flex flex-col overflow-hidden bg-[#0b1b2b] text-white lg:min-h-[min(100svh,960px)]">
-            <Photo
-              f="heroImage"
-              className="-z-20"
-              imgClassName="object-[50%_70%]"
-              pill="bottom-3 right-3"
-            />
+            <Photo f="heroImage" className="-z-20" imgClassName="object-[50%_70%]" hero />
             <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b1b2b]/90 via-[#0b1b2b]/55 to-transparent" />
             <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0b1b2b]/70 via-transparent to-transparent" />
 
@@ -148,7 +144,7 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== DẢI ĐIỂM MẠNH ========== */}
-        <Zone name="Dải điểm mạnh">
+        <Zone name="Dải điểm mạnh" hide="trust">
           <section className="border-t-2 border-amber-brand bg-white shadow-[0_10px_30px_-20px_rgba(0,0,0,0.3)]">
             <Container>
               <ul className="grid gap-6 py-8 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
@@ -197,7 +193,7 @@ export default function CarRentalPreview({ lang }) {
                 <Auto
                   dark
                   href={CARS}
-                  label="Hạng xe, ảnh & giá · sửa ở mục Xe & khu vực"
+                  label="Hạng xe & ảnh · sửa ở mục Xe & khu vực"
                   at="-top-8 right-0"
                 >
                   <FleetStage
@@ -256,7 +252,7 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== TUYẾN PHỔ BIẾN ========== */}
-        <Zone name="Tuyến phổ biến">
+        <Zone name="Tuyến phổ biến" hide="routes">
           <section className="bg-[#f6f1e8] py-14 lg:py-[4.5rem]">
             <Container>
               <header className="mb-10 max-w-2xl">
@@ -268,7 +264,11 @@ export default function CarRentalPreview({ lang }) {
                 </p>
               </header>
               {ready ? (
-                <Auto href={CARS} label="Tuyến & giá · sửa ở mục Xe & khu vực" at="-top-8 right-0">
+                <Auto
+                  href={CARS}
+                  label="Khu vực · sửa ở mục Xe & khu vực · giá tuyến do bộ phận kỹ thuật cập nhật"
+                  at="-top-8 right-0"
+                >
                   <RoutesExplorer
                     areas={data.areas}
                     routes={data.routes}
@@ -285,7 +285,7 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== KHU VỰC PHỤC VỤ TOÀN QUỐC ========== */}
-        <Zone name="Khu vực phục vụ">
+        <Zone name="Khu vực phục vụ" hide="areas">
           <section className="py-14 lg:py-[4.5rem]">
             <Container>
               <header className="mb-10 max-w-2xl">
@@ -338,9 +338,15 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== GIÁ ĐÃ BAO GỒM ========== */}
-        <Zone name="Giá đã bao gồm">
+        <Zone name="Giá đã bao gồm" hide="included">
           <section className="relative isolate overflow-hidden pt-8 pb-14 lg:pt-10 lg:pb-[4.5rem]">
-            <BgEdit f="includedImage" tone="light" />
+            {/* nhãn đổi ảnh + nút Cắt ảnh ở mép DƯỚI khối: mép trên là tiêu đề khối (điện thoại: chạm nhau) */}
+            <BgEdit
+              f="includedImage"
+              tone="light"
+              tagAt="bottom-7 left-3"
+              toolsAt="bottom-7 right-3"
+            />
             <Container>
               <header className="mb-10 max-w-2xl">
                 <h2 className="heading-lg text-ink">
@@ -382,7 +388,7 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== DẢI ẢNH ĐỘI XE (marquee) ========== */}
-        <Zone name="Dải ảnh đội xe">
+        <Zone name="Dải ảnh đội xe" hide="gallery">
           <section className="overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
             <Container className="mb-8 text-center lg:mb-10">
               <h2 className="heading-lg text-ink">
@@ -405,9 +411,9 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== CÁCH ĐẶT XE ========== */}
-        <Zone name="Cách đặt xe" dark>
+        <Zone name="Cách đặt xe" hide="how" dark>
           <section className="relative isolate overflow-hidden bg-[#0b1b2b] py-14 text-white lg:py-[4.5rem]">
-            <BgEdit f="howImage" tone="night" />
+            <BgEdit f="howImage" tone="night" tagAt="bottom-7 left-3" toolsAt="bottom-7 right-3" />
             <div className="absolute -top-40 -right-40 size-[520px] rounded-full bg-amber-brand/10 blur-3xl" />
             <Container className="relative">
               <h2 className="heading-lg">
@@ -450,7 +456,7 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== KHÁCH HÀNG NÓI GÌ ========== */}
-        <Zone name="Đánh giá">
+        <Zone name="Đánh giá" hide="reviews">
           <section className="bg-[#f6f1e8] py-14 lg:py-[4.5rem]">
             <Container>
               <SectionHeading title={<Txt f="reviewsTitle" />} subtitle={<Txt f="reviewsSub" />} />
@@ -512,7 +518,7 @@ export default function CarRentalPreview({ lang }) {
         </Zone>
 
         {/* ========== CÂU HỎI THƯỜNG GẶP ========== */}
-        <Zone name="Câu hỏi thường gặp">
+        <Zone name="Câu hỏi thường gặp" hide="faq">
           <section className="py-14 lg:py-[4.5rem]">
             <Container className="grid items-start gap-10 lg:grid-cols-[0.75fr_1.25fr]">
               <div className="lg:sticky lg:top-32">
@@ -585,8 +591,8 @@ export default function CarRentalPreview({ lang }) {
                       <Txt f="talkText" />
                     </p>
                     <Auto
-                      href={`${ADMIN_BASE}/settings#contact`}
-                      label="Hotline & kênh chat · sửa ở Cài đặt"
+                      href={`${ADMIN_BASE}${CONTACT_SETTINGS_HREF}`}
+                      label="Hotline & kênh chat · sửa ở Thông tin liên hệ"
                       at="-top-3 right-0"
                     >
                       <span className="mt-6 flex items-center gap-4 rounded-2xl bg-cream-50 p-4 ring-1 ring-sand-300/70">
@@ -629,7 +635,7 @@ export default function CarRentalPreview({ lang }) {
                 </div>
                 <div className="relative mt-6 h-56 overflow-hidden rounded-3xl bg-slate-100">
                   <Pic src={aside.value || aside.def} sizes="(min-width: 1024px) 35vw, 100vw" />
-                  <ImagePill f="asideImage" className="top-3 right-3" />
+                  <ImageEdit f="asideImage" />
                 </div>
               </aside>
             </Container>

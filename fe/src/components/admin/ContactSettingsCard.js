@@ -46,6 +46,7 @@ import {
   ZaloIcon,
 } from "@/components/ui/BrandIcons";
 import { useMutation } from "./hooks";
+import { ReadOnlyArea } from "./permissions";
 import {
   Button,
   Card,
@@ -60,11 +61,12 @@ import {
 } from "./ui";
 
 /**
- * CMS → Cài đặt → Thông tin liên hệ: số điện thoại (kèm kênh Gọi / Zalo / WhatsApp / WeChat / LINE), email,
+ * CMS → Thông tin liên hệ (trang riêng, quyền "contact"): số điện thoại (kèm kênh Gọi / Zalo / WhatsApp / WeChat / LINE), email,
  * địa chỉ, giờ làm việc, mạng xã hội, bản đồ. Dùng ở MỌI trang website (thanh trên cùng, chân trang, trang Liên hệ,
  * nút chat nổi, ô liên hệ trang tour / thuê xe, dữ liệu cho Google) + email gửi khách.
  * Lưu: PUT /settings/contact (máy chủ kiểm tra lại: contact.validator.js) → làm mới thẻ cache "settings" ngay.
  * Bên phải: bản xem trước trực tiếp, đổi theo từng chữ đang gõ.
+ * readOnly (quyền Xem): xem được hết + bản xem trước, không gõ / không có nút Lưu (backend vẫn chặn PUT).
  */
 
 const TAGS = ["settings"];
@@ -229,7 +231,7 @@ function validate(f) {
     else if (bad === "bad") e[l.name] = "Link chưa đúng — hãy dán nguyên link từ trình duyệt";
     else if (bad) e[l.name] = `Link chưa đúng trang (${l.hosts[0]})`;
     else if (l.embed && !/output=embed|\/maps\/embed/.test(v))
-      e[l.name] = "Dùng link “Nhúng bản đồ” của Google Maps (có /maps/embed)";
+      e[l.name] = "Link chưa đúng — dùng link “Nhúng bản đồ” của Google Maps";
   }
   return e;
 }
@@ -254,8 +256,8 @@ const toBody = (f) => {
   };
 };
 
-export default function ContactSettingsCard() {
-  const title = "Thông tin liên hệ";
+export default function ContactSettingsCard({ readOnly = false }) {
+  const title = "Liên hệ công ty";
   const [state, setState] = useState({ saved: null, form: null, error: "" });
   const [nonce, setNonce] = useState(0);
   const [lang, setLang] = useState("vi");
@@ -358,7 +360,7 @@ export default function ContactSettingsCard() {
         icon={Contact}
         title={title}
         className="overflow-visible"
-        description="Số điện thoại, email, địa chỉ, mạng xã hội — hiện trên mọi trang website (đầu trang, chân trang, trang Liên hệ, nút chat) và trong email gửi khách."
+        description="Điện thoại & kênh chat, email, địa chỉ, giờ làm việc, mạng xã hội, bản đồ."
         actions={
           <LangTabs
             value={lang}
@@ -372,367 +374,374 @@ export default function ContactSettingsCard() {
           />
         }
       >
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)]">
-          <div className="min-w-0 space-y-8">
-            {/* ---------- Công ty & địa chỉ ---------- */}
-            <Group
-              onFocus={() => setPv(GROUP_VIEW.company)}
-              icon={Building2}
-              title="Công ty & địa chỉ"
-            >
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field
-                  label="Tên công ty (tiếng Anh)"
-                  hint="Hiện ở chân trang và trang Liên hệ (mọi ngôn ngữ)."
-                  error={err("legalName")}
-                  required
-                >
-                  <Input
-                    value={form.legalName}
-                    maxLength={160}
-                    placeholder="Vietlook Travel and Trading Company Limited"
-                    onChange={(e) => set({ legalName: e.target.value })}
-                  />
-                </Field>
-                <Field
-                  label="Tên công ty (tiếng Việt)"
-                  hint="Dùng ở chân email gửi khách tiếng Việt."
-                  error={err("legalNameVi")}
-                  required
-                >
-                  <Input
-                    value={form.legalNameVi}
-                    maxLength={160}
-                    placeholder="Công ty TNHH Du lịch và Thương mại Vietlook"
-                    onChange={(e) => set({ legalNameVi: e.target.value })}
-                  />
-                </Field>
-                <Field label="Mã số doanh nghiệp" error={err("businessNo")} required>
-                  <Input
-                    value={form.businessNo}
-                    maxLength={40}
-                    placeholder="0104189511"
-                    onChange={(e) => set({ businessNo: e.target.value })}
-                  />
-                </Field>
-                <Field label="Số giấy phép lữ hành quốc tế" error={err("licenceNo")} required>
-                  <Input
-                    value={form.licenceNo}
-                    maxLength={80}
-                    placeholder="01-176/2022/CDLQGVN-GP LHQT"
-                    onChange={(e) => set({ licenceNo: e.target.value })}
-                  />
-                </Field>
-              </div>
-              <Field
-                label={`Địa chỉ văn phòng · ${LANG_NAME[lang]}`}
-                hint="Đổi ngôn ngữ ở nút VI / EN / 中文 phía trên. Cần nhập đủ cả 3 ngôn ngữ."
-                error={
-                  err(`address.${lang}`) || LANGS.map((l) => err(`address.${l.key}`)).find(Boolean)
-                }
-                required
+        <ReadOnlyArea readOnly={readOnly}>
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)]">
+            <div className="min-w-0 space-y-8">
+              {/* ---------- Công ty & địa chỉ ---------- */}
+              <Group
+                onFocus={() => setPv(GROUP_VIEW.company)}
+                icon={Building2}
+                title="Công ty & địa chỉ"
               >
-                <Input
-                  value={form.address[lang] ?? ""}
-                  maxLength={300}
-                  placeholder={CONTACT_DEFAULTS.address[lang]}
-                  onChange={(e) => set({ address: { ...form.address, [lang]: e.target.value } })}
-                />
-              </Field>
-              <details className="group rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
-                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-700">
-                  <ChevronRight className="size-4 transition group-open:rotate-90" />
-                  Địa chỉ cho Google (tiếng Anh, tách từng phần)
-                  {(errors.streetAddress || errors.city) && tried && (
-                    <span className="ml-auto text-xs font-medium text-sun-600">Cần sửa</span>
-                  )}
-                </summary>
-                <p className="mt-2 text-xs text-slate-500">
-                  Google đọc phần này để hiện đúng địa chỉ công ty trong kết quả tìm kiếm. Khách
-                  không nhìn thấy.
-                </p>
-                <div className="mt-3 grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
-                  <Field label="Số nhà, đường, quận" error={err("streetAddress")} required>
-                    <Input
-                      value={form.streetAddress}
-                      maxLength={200}
-                      placeholder="01 Lien Ke 20, Van Khe Urban Area, Ha Dong"
-                      onChange={(e) => set({ streetAddress: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Thành phố" error={err("city")} required>
-                    <Input
-                      value={form.city}
-                      maxLength={80}
-                      placeholder="Hanoi"
-                      onChange={(e) => set({ city: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Mã bưu chính">
-                    <Input
-                      value={form.postalCode}
-                      maxLength={20}
-                      placeholder="12113"
-                      onChange={(e) => set({ postalCode: e.target.value })}
-                    />
-                  </Field>
-                </div>
-              </details>
-            </Group>
-
-            {/* ---------- Điện thoại & nhắn tin ---------- */}
-            <Group
-              onFocus={() => setPv(GROUP_VIEW.phones)}
-              icon={Smartphone}
-              title="Điện thoại & nhắn tin"
-              text="Tích các kênh khách dùng được với từng số. Số đầu tiên có “Gọi” là số hotline ở đầu trang."
-            >
-              <ul className="space-y-3">
-                {form.phones.map((p, i) => {
-                  const e = err(`phones.${i}`);
-                  const n = normalizePhone(p.number);
-                  const chips = phoneChannels(p)[lang];
-                  return (
-                    <li
-                      key={i}
-                      className={cn(
-                        "rounded-2xl p-3.5 ring-1 sm:p-4",
-                        e ? "ring-sun-200 bg-sun-50/40" : "bg-white ring-slate-200",
-                      )}
-                    >
-                      <div className="flex flex-wrap items-start gap-3">
-                        <span className="mt-2 grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-700">
-                          {i + 1}
-                        </span>
-                        <div className="min-w-0 flex-1 basis-56">
-                          <Input
-                            value={p.number}
-                            inputMode="tel"
-                            maxLength={40}
-                            aria-label={`Số điện thoại ${i + 1}`}
-                            aria-invalid={!!e}
-                            placeholder="+84 98 339 3588"
-                            className="font-semibold tabular-nums"
-                            onChange={(ev) => setPhone(i, { number: ev.target.value })}
-                            onBlur={() => n && n !== p.number && setPhone(i, { number: n })}
-                          />
-                          {e ? (
-                            <p className="mt-1.5 text-xs font-medium text-sun-600">{e}</p>
-                          ) : (
-                            n &&
-                            n !== p.number.trim() && (
-                              <p className="mt-1.5 text-xs text-slate-500">
-                                Sẽ lưu là <b className="text-slate-700">{n}</b>
-                              </p>
-                            )
-                          )}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <IconBtn
-                            icon={ArrowUp}
-                            label="Lên trên"
-                            disabled={i === 0}
-                            onClick={() => movePhone(i, -1)}
-                          />
-                          <IconBtn
-                            icon={ArrowDown}
-                            label="Xuống dưới"
-                            disabled={i === form.phones.length - 1}
-                            onClick={() => movePhone(i, 1)}
-                          />
-                          <IconBtn
-                            icon={Trash2}
-                            label="Xoá số này"
-                            danger
-                            disabled={form.phones.length === 1}
-                            onClick={() => set({ phones: form.phones.filter((_, j) => j !== i) })}
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:pl-10">
-                        <span className="mr-1 text-xs font-medium text-slate-500">Dùng để:</span>
-                        {PURPOSES.map((x) => (
-                          <label
-                            key={x.key}
-                            className={cn(
-                              "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition select-none has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-500",
-                              p[x.key]
-                                ? x.on
-                                : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50",
-                            )}
-                          >
-                            <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={p[x.key]}
-                              onChange={(ev) => setPhone(i, { [x.key]: ev.target.checked })}
-                            />
-                            <x.icon className="size-3.5" />
-                            {x.label}
-                          </label>
-                        ))}
-                      </div>
-                      <p className="mt-2.5 text-xs text-slate-500 sm:pl-10">
-                        Dòng chữ dưới số trên website:{" "}
-                        <span className="font-medium text-slate-700">
-                          {chips || "— (chưa tích kênh nào)"}
-                        </span>
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
-              {err("phones") && <p className="text-xs font-medium text-sun-600">{err("phones")}</p>}
-              {form.phones.length < 6 && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={Plus}
-                  onClick={() => set({ phones: [...form.phones, blankPhone()] })}
-                >
-                  Thêm số điện thoại
-                </Button>
-              )}
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field
-                  label="WeChat ID"
-                  hint="Khách Trung Quốc tìm ID này trong WeChat để kết bạn."
-                  error={err("wechatId")}
-                  required
-                >
-                  <Input
-                    value={form.wechatId}
-                    maxLength={60}
-                    placeholder="TA14102014"
-                    autoComplete="off"
-                    spellCheck={false}
-                    onChange={(e) => set({ wechatId: e.target.value.trim() })}
-                  />
-                </Field>
-                <Field
-                  label="LINE ID (không bắt buộc)"
-                  hint="Để trống thì khách kết bạn LINE bằng các số tích “LINE”."
-                  error={err("lineId")}
-                >
-                  <Input
-                    value={form.lineId}
-                    maxLength={60}
-                    placeholder="@vietlook"
-                    autoComplete="off"
-                    spellCheck={false}
-                    onChange={(e) => set({ lineId: e.target.value.trim() })}
-                  />
-                </Field>
-              </div>
-            </Group>
-
-            {/* ---------- Email ---------- */}
-            <Group onFocus={() => setPv(GROUP_VIEW.email)} icon={Mail} title="Email">
-              <Field
-                label="Email liên hệ hiện cho khách"
-                hint="Hiện ở đầu trang, chân trang, trang Liên hệ và email gửi khách. (Hộp thư NHẬN thông báo đơn mới cài ở mục “Email thông báo đơn mới” bên dưới.)"
-                error={err("email")}
-                required
-              >
-                <Input
-                  type="email"
-                  value={form.email}
-                  maxLength={254}
-                  placeholder="info@vietlooktravel.com"
-                  onChange={(e) => set({ email: e.target.value })}
-                />
-              </Field>
-            </Group>
-
-            {/* ---------- Mạng xã hội & bản đồ ---------- */}
-            <Group
-              onFocus={() => setPv(GROUP_VIEW.social)}
-              icon={Share2}
-              title="Mạng xã hội & bản đồ"
-            >
-              <div className="grid gap-5 lg:grid-cols-2">
-                {LINKS.map((l) => (
+                <div className="grid gap-5 sm:grid-cols-2">
                   <Field
-                    key={l.name}
-                    label={
-                      <span className="inline-flex items-center gap-1.5">
-                        <l.icon className={cn("size-4", l.iconClass)} />
-                        {l.label}
-                      </span>
-                    }
-                    hint={l.hint}
-                    error={err(l.name)}
+                    label="Tên công ty (tiếng Anh)"
+                    hint="Hiện ở chân trang và trang Liên hệ (mọi ngôn ngữ)."
+                    error={err("legalName")}
                     required
                   >
                     <Input
-                      value={form[l.name]}
-                      maxLength={l.embed ? 2000 : 600}
-                      placeholder={l.placeholder}
-                      spellCheck={false}
-                      autoComplete="off"
-                      onChange={(e) =>
-                        set({
-                          [l.name]: l.embed
-                            ? embedSrc(e.target.value.trim())
-                            : e.target.value.trim(),
-                        })
-                      }
+                      value={form.legalName}
+                      maxLength={160}
+                      placeholder="Vietlook Travel and Trading Company Limited"
+                      onChange={(e) => set({ legalName: e.target.value })}
                     />
                   </Field>
-                ))}
-              </div>
-            </Group>
+                  <Field
+                    label="Tên công ty (tiếng Việt)"
+                    hint="Dùng ở chân email gửi khách tiếng Việt."
+                    error={err("legalNameVi")}
+                    required
+                  >
+                    <Input
+                      value={form.legalNameVi}
+                      maxLength={160}
+                      placeholder="Công ty TNHH Du lịch và Thương mại Vietlook"
+                      onChange={(e) => set({ legalNameVi: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Mã số doanh nghiệp" error={err("businessNo")} required>
+                    <Input
+                      value={form.businessNo}
+                      maxLength={40}
+                      placeholder="0104189511"
+                      onChange={(e) => set({ businessNo: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Số giấy phép lữ hành quốc tế" error={err("licenceNo")} required>
+                    <Input
+                      value={form.licenceNo}
+                      maxLength={80}
+                      placeholder="01-176/2022/CDLQGVN-GP LHQT"
+                      onChange={(e) => set({ licenceNo: e.target.value })}
+                    />
+                  </Field>
+                </div>
+                <Field
+                  label={`Địa chỉ văn phòng · ${LANG_NAME[lang]}`}
+                  hint="Đổi ngôn ngữ ở nút VI / EN / 中文 phía trên. Cần nhập đủ cả 3 ngôn ngữ."
+                  error={
+                    err(`address.${lang}`) ||
+                    LANGS.map((l) => err(`address.${l.key}`)).find(Boolean)
+                  }
+                  required
+                >
+                  <Input
+                    value={form.address[lang] ?? ""}
+                    maxLength={300}
+                    placeholder={CONTACT_DEFAULTS.address[lang]}
+                    onChange={(e) => set({ address: { ...form.address, [lang]: e.target.value } })}
+                  />
+                </Field>
+                <details className="group rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-700">
+                    <ChevronRight className="size-4 transition group-open:rotate-90" />
+                    Địa chỉ cho Google (tiếng Anh, tách từng phần)
+                    {(errors.streetAddress || errors.city) && tried && (
+                      <span className="ml-auto text-xs font-medium text-sun-600">Cần sửa</span>
+                    )}
+                  </summary>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Google đọc phần này để hiện đúng địa chỉ công ty trong kết quả tìm kiếm. Khách
+                    không nhìn thấy.
+                  </p>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
+                    <Field label="Số nhà, đường, quận" error={err("streetAddress")} required>
+                      <Input
+                        value={form.streetAddress}
+                        maxLength={200}
+                        placeholder="01 Lien Ke 20, Van Khe Urban Area, Ha Dong"
+                        onChange={(e) => set({ streetAddress: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="Thành phố" error={err("city")} required>
+                      <Input
+                        value={form.city}
+                        maxLength={80}
+                        placeholder="Hanoi"
+                        onChange={(e) => set({ city: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="Mã bưu chính">
+                      <Input
+                        value={form.postalCode}
+                        maxLength={20}
+                        placeholder="12113"
+                        onChange={(e) => set({ postalCode: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+                </details>
+              </Group>
 
-            {/* ---------- Giờ làm việc ---------- */}
-            <Group onFocus={() => setPv(GROUP_VIEW.hours)} icon={Clock} title="Giờ làm việc">
-              <Field
-                label={`Giờ làm việc · ${LANG_NAME[lang]}`}
-                hint="Hiện ở trang Liên hệ. Cần nhập đủ cả 3 ngôn ngữ (nút VI / EN / 中文 phía trên)."
-                error={
-                  err(`hours.${lang}`) || LANGS.map((l) => err(`hours.${l.key}`)).find(Boolean)
-                }
-                required
+              {/* ---------- Điện thoại & nhắn tin ---------- */}
+              <Group
+                onFocus={() => setPv(GROUP_VIEW.phones)}
+                icon={Smartphone}
+                title="Điện thoại & nhắn tin"
+                text="Tích các kênh khách dùng được với từng số. Số đầu tiên có “Gọi” là số hotline ở đầu trang."
               >
-                <Input
-                  value={form.hours[lang] ?? ""}
-                  maxLength={200}
-                  placeholder={CONTACT_DEFAULTS.hours[lang]}
-                  onChange={(e) => set({ hours: { ...form.hours, [lang]: e.target.value } })}
-                />
-              </Field>
-            </Group>
-          </div>
+                <ul className="space-y-3">
+                  {form.phones.map((p, i) => {
+                    const e = err(`phones.${i}`);
+                    const n = normalizePhone(p.number);
+                    const chips = phoneChannels(p)[lang];
+                    return (
+                      <li
+                        key={i}
+                        className={cn(
+                          "rounded-2xl p-3.5 ring-1 sm:p-4",
+                          e ? "ring-sun-200 bg-sun-50/40" : "bg-white ring-slate-200",
+                        )}
+                      >
+                        <div className="flex flex-wrap items-start gap-3">
+                          <span className="mt-2 grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-700">
+                            {i + 1}
+                          </span>
+                          <div className="min-w-0 flex-1 basis-56">
+                            <Input
+                              value={p.number}
+                              inputMode="tel"
+                              maxLength={40}
+                              aria-label={`Số điện thoại ${i + 1}`}
+                              aria-invalid={!!e}
+                              placeholder="+84 98 339 3588"
+                              className="font-semibold tabular-nums"
+                              onChange={(ev) => setPhone(i, { number: ev.target.value })}
+                              onBlur={() => n && n !== p.number && setPhone(i, { number: n })}
+                            />
+                            {e ? (
+                              <p className="mt-1.5 text-xs font-medium text-sun-600">{e}</p>
+                            ) : (
+                              n &&
+                              n !== p.number.trim() && (
+                                <p className="mt-1.5 text-xs text-slate-500">
+                                  Sẽ lưu là <b className="text-slate-700">{n}</b>
+                                </p>
+                              )
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <IconBtn
+                              icon={ArrowUp}
+                              label="Lên trên"
+                              disabled={i === 0}
+                              onClick={() => movePhone(i, -1)}
+                            />
+                            <IconBtn
+                              icon={ArrowDown}
+                              label="Xuống dưới"
+                              disabled={i === form.phones.length - 1}
+                              onClick={() => movePhone(i, 1)}
+                            />
+                            <IconBtn
+                              icon={Trash2}
+                              label="Xoá số này"
+                              danger
+                              disabled={form.phones.length === 1}
+                              onClick={() => set({ phones: form.phones.filter((_, j) => j !== i) })}
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:pl-10">
+                          <span className="mr-1 text-xs font-medium text-slate-500">Dùng để:</span>
+                          {PURPOSES.map((x) => (
+                            <label
+                              key={x.key}
+                              className={cn(
+                                "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition select-none has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-500",
+                                p[x.key]
+                                  ? x.on
+                                  : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50",
+                              )}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={p[x.key]}
+                                onChange={(ev) => setPhone(i, { [x.key]: ev.target.checked })}
+                              />
+                              <x.icon className="size-3.5" />
+                              {x.label}
+                            </label>
+                          ))}
+                        </div>
+                        <p className="mt-2.5 text-xs text-slate-500 sm:pl-10">
+                          Dòng chữ dưới số trên website:{" "}
+                          <span className="font-medium text-slate-700">
+                            {chips || "— (chưa tích kênh nào)"}
+                          </span>
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {err("phones") && (
+                  <p className="text-xs font-medium text-sun-600">{err("phones")}</p>
+                )}
+                {form.phones.length < 6 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Plus}
+                    onClick={() => set({ phones: [...form.phones, blankPhone()] })}
+                  >
+                    Thêm số điện thoại
+                  </Button>
+                )}
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field
+                    label="WeChat ID"
+                    hint="Khách Trung Quốc tìm ID này trong WeChat để kết bạn."
+                    error={err("wechatId")}
+                    required
+                  >
+                    <Input
+                      value={form.wechatId}
+                      maxLength={60}
+                      placeholder="TA14102014"
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(e) => set({ wechatId: e.target.value.trim() })}
+                    />
+                  </Field>
+                  <Field
+                    label="LINE ID (không bắt buộc)"
+                    hint="Để trống thì khách kết bạn LINE bằng các số tích “LINE”."
+                    error={err("lineId")}
+                  >
+                    <Input
+                      value={form.lineId}
+                      maxLength={60}
+                      placeholder="@vietlook"
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(e) => set({ lineId: e.target.value.trim() })}
+                    />
+                  </Field>
+                </div>
+              </Group>
 
-          {/* ---------- Xem trước: dính khi cuộn, tab theo nhóm ô đang sửa ---------- */}
-          <div className="min-w-0">
-            <div className="xl:sticky xl:top-20">
-              <PreviewPanel view={view} lang={lang} active={pv} onPick={setPv} />
+              {/* ---------- Email ---------- */}
+              <Group onFocus={() => setPv(GROUP_VIEW.email)} icon={Mail} title="Email">
+                <Field
+                  label="Email liên hệ hiện cho khách"
+                  hint="Hiện ở đầu trang, chân trang, trang Liên hệ và email gửi khách. Email nhận thông báo đơn mới cài ở Cài đặt."
+                  error={err("email")}
+                  required
+                >
+                  <Input
+                    type="email"
+                    value={form.email}
+                    maxLength={254}
+                    placeholder="info@vietlooktravel.com"
+                    onChange={(e) => set({ email: e.target.value })}
+                  />
+                </Field>
+              </Group>
+
+              {/* ---------- Mạng xã hội & bản đồ ---------- */}
+              <Group
+                onFocus={() => setPv(GROUP_VIEW.social)}
+                icon={Share2}
+                title="Mạng xã hội & bản đồ"
+              >
+                <div className="grid gap-5 lg:grid-cols-2">
+                  {LINKS.map((l) => (
+                    <Field
+                      key={l.name}
+                      label={
+                        <span className="inline-flex items-center gap-1.5">
+                          <l.icon className={cn("size-4", l.iconClass)} />
+                          {l.label}
+                        </span>
+                      }
+                      hint={l.hint}
+                      error={err(l.name)}
+                      required
+                    >
+                      <Input
+                        value={form[l.name]}
+                        maxLength={l.embed ? 2000 : 600}
+                        placeholder={l.placeholder}
+                        spellCheck={false}
+                        autoComplete="off"
+                        onChange={(e) =>
+                          set({
+                            [l.name]: l.embed
+                              ? embedSrc(e.target.value.trim())
+                              : e.target.value.trim(),
+                          })
+                        }
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </Group>
+
+              {/* ---------- Giờ làm việc ---------- */}
+              <Group onFocus={() => setPv(GROUP_VIEW.hours)} icon={Clock} title="Giờ làm việc">
+                <Field
+                  label={`Giờ làm việc · ${LANG_NAME[lang]}`}
+                  hint="Hiện ở trang Liên hệ. Cần nhập đủ cả 3 ngôn ngữ (nút VI / EN / 中文 phía trên)."
+                  error={
+                    err(`hours.${lang}`) || LANGS.map((l) => err(`hours.${l.key}`)).find(Boolean)
+                  }
+                  required
+                >
+                  <Input
+                    value={form.hours[lang] ?? ""}
+                    maxLength={200}
+                    placeholder={CONTACT_DEFAULTS.hours[lang]}
+                    onChange={(e) => set({ hours: { ...form.hours, [lang]: e.target.value } })}
+                  />
+                </Field>
+              </Group>
+            </div>
+
+            {/* ---------- Xem trước: dính khi cuộn, tab theo nhóm ô đang sửa ---------- */}
+            <div className="min-w-0">
+              <div className="xl:sticky xl:top-20">
+                <PreviewPanel view={view} lang={lang} active={pv} onPick={setPv} />
+              </div>
             </div>
           </div>
-        </div>
+        </ReadOnlyArea>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-slate-100 pt-5">
-          <p className="min-w-0 text-xs leading-relaxed text-slate-500">
-            {dirty ? (
-              <span className="font-semibold text-amber-700">
-                Có thay đổi chưa lưu
-                {tried && errCount ? ` · còn ${errCount} ô cần sửa` : ""}
-              </span>
-            ) : (
-              "Bấm Lưu → website và email gửi khách dùng thông tin mới ngay."
-            )}
-          </p>
-          <div className="ml-auto flex flex-wrap justify-end gap-2">
-            {dirty && (
-              <Button variant="ghost" icon={RotateCcw} onClick={undo} disabled={busy}>
-                Hoàn tác
+        {!readOnly && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-slate-100 pt-5">
+            <p className="min-w-0 text-xs leading-relaxed text-slate-500">
+              {dirty ? (
+                <span className="font-semibold text-amber-700">
+                  Có thay đổi chưa lưu
+                  {tried && errCount ? ` · còn ${errCount} ô cần sửa` : ""}
+                </span>
+              ) : (
+                "Lưu xong, website và email gửi khách dùng thông tin mới ngay."
+              )}
+            </p>
+            <div className="ml-auto flex flex-wrap justify-end gap-2">
+              {dirty && (
+                <Button variant="ghost" icon={RotateCcw} onClick={undo} disabled={busy}>
+                  Bỏ thay đổi
+                </Button>
+              )}
+              <Button icon={Save} onClick={save} loading={busy} disabled={!dirty}>
+                Lưu thay đổi
               </Button>
-            )}
-            <Button icon={Save} onClick={save} loading={busy} disabled={!dirty}>
-              Lưu
-            </Button>
+            </div>
           </div>
-        </div>
+        )}
       </Card>
     </div>
   );

@@ -1,8 +1,7 @@
 "use client";
 
 import { ADMIN_BASE } from "@/config/urls.mjs";
-import { Container } from "@/components/ui";
-import { ImagePill, Txt, usePlain } from "../blocks";
+import { ImageEdit, Txt, usePlain } from "../blocks";
 import { CONTACT_SETTINGS_HREF } from "./site-shared";
 import { AutoChip, SiteFooter, SiteHeader, SitePage, Zone } from "./site-frame";
 
@@ -10,7 +9,7 @@ import { AutoChip, SiteFooter, SiteHeader, SitePage, Zone } from "./site-frame";
  * Bản xem trước "Đầu & chân trang" — dựng bằng đúng Header + Footer của website (components/layout).
  * Sửa được: dòng giới thiệu thanh trên cùng, chữ link B2B, nút lên kế hoạch, dải "biết đến chúng tôi qua",
  * dải mời lên kế hoạch (ảnh + chữ + nút), tiêu đề 4 cột, chữ trước logo thanh toán, câu bản quyền.
- * Chỉ xem: số điện thoại, email, địa chỉ, WeChat, mạng xã hội (CMS → Cài đặt → Thông tin liên hệ); tên các mục menu
+ * Chỉ xem: số điện thoại, email, địa chỉ, WeChat, mạng xã hội (CMS → Thông tin liên hệ); tên các mục menu
  * & link (cấu trúc điều hướng, giữ cố định).
  */
 
@@ -36,6 +35,11 @@ export default function GlobalPreview({ lang }) {
     rights: <Txt f="rights" />,
     ctaImage: plain("ctaImage"),
     ctaPhoto: plain("ctaPhoto"),
+    // đổi ảnh ngay trên 2 ảnh của dải mời lên kế hoạch
+    ctaImageEdit: <ImageEdit f="ctaImage" title="Ảnh nền dải mời" />,
+    ctaPhotoEdit: (
+      <ImageEdit f="ctaPhoto" title="Ảnh nhỏ" tagAt="-top-3 -left-3" toolsAt="-bottom-3 -right-3" />
+    ),
   };
   return (
     <SitePage lang={lang} path="/" chrome={false}>
@@ -64,22 +68,15 @@ export default function GlobalPreview({ lang }) {
       </Zone>
 
       {/* 3. Chân trang */}
-      <Zone name="Chân trang (mọi trang)" dark at="right-3 top-[4.5rem]">
-        <div className="relative z-10 border-y border-dashed border-slate-300 bg-slate-50 py-2">
-          <Container className="flex flex-wrap items-center gap-2">
-            <span className="[zoom:var(--pz,1)] font-sans text-xs font-semibold text-slate-500">
-              Ảnh dải mời lên kế hoạch:
-            </span>
-            <ImagePill f="ctaImage" floating={false} title="Ảnh nền" />
-            <ImagePill f="ctaPhoto" floating={false} title="Ảnh nhỏ nghiêng" />
-            <AutoChip
-              href={SETTINGS}
-              label="Điện thoại, email, địa chỉ, mạng xã hội · sửa ở Cài đặt"
-              className="ml-auto"
-            />
-          </Container>
+      <Zone name="Chân trang (mọi trang)">
+        <div className="group/auto relative">
+          <SiteFooter lang={lang} edit={footer} />
+          <AutoChip
+            href={SETTINGS}
+            label="Điện thoại, email, địa chỉ, mạng xã hội · sửa ở Thông tin liên hệ"
+            className="absolute top-3 right-3"
+          />
         </div>
-        <SiteFooter lang={lang} edit={footer} />
       </Zone>
     </SitePage>
   );

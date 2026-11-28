@@ -19,12 +19,11 @@ export default function TooManyRequestsPage({ searchParams }) {
           <Hourglass className="size-7" />
         </span>
         <p className="mt-6 text-[11px] font-semibold tracking-[0.3em] text-sun-400 uppercase">
-          429 · Tạm dừng một chút
+          Tạm dừng một chút
         </p>
         <h1 className="mt-3 text-3xl font-bold">Bạn thao tác hơi nhanh</h1>
         <p className="mt-3 text-sm leading-relaxed text-white/70">
-          Để bảo vệ tài khoản, hệ thống tạm giới hạn yêu cầu. Vui lòng chờ trong giây lát rồi thử
-          lại.
+          Để bảo vệ tài khoản, hệ thống tạm chặn thao tác trong giây lát. Vui lòng chờ rồi thử lại.
         </p>
         <div className="mt-8">
           <Suspense fallback={<RetryButton seconds={60} href={ADMIN_BASE} />}>

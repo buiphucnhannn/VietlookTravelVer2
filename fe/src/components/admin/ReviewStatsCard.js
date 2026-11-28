@@ -18,7 +18,7 @@ import { usePermission } from "./permissions";
 import { Button, Card, LoadingBlock, Notice, fmtDateTime, useUi } from "./ui";
 
 /**
- * "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)" — ở Cài đặt (admin) và cuối trang Đánh giá (nhân viên có quyền).
+ * "Điểm & số lượt đánh giá (tự cập nhật hằng ngày)" — đầu trang Đánh giá (CMS → Đánh giá; admin + nhân viên có quyền xem).
  * Quyền "Đánh giá": Xem → thấy số, trạng thái, hạn mức; Sửa trở lên → thêm nút "Cập nhật ngay" (tốn hạn mức Apify).
  * Điểm + số lượt đánh giá công ty trên Google / Tripadvisor tự cập nhật mỗi sáng qua dịch vụ Apify (mã đặt trên
  * máy chủ, không nhập ở đây). Thẻ hiện số đang dùng, trạng thái lần chạy cuối, lần tự cập nhật tiếp theo,
@@ -40,7 +40,7 @@ const SOURCES = [
 ];
 
 const fmtStats = (s) => `${Number(s.rating).toFixed(1)} · ${s.count} đánh giá`;
-const money = (p, v) => (p?.unit === "searches" ? `${v} lượt` : `~${fmtUsd(v)} USD`);
+const money = (p, v) => (p?.unit === "searches" ? `${v} lượt` : `${fmtUsd(v)} USD`);
 
 /** Số phút còn phải chờ trước khi bấm lại (0 = bấm được) — tự đếm lùi */
 function useCooldown(until) {
@@ -146,9 +146,9 @@ export default function ReviewStatsCard() {
   const hint = busy
     ? "Đang lấy số mới từ Google và Tripadvisor… có thể mất khoảng 1 phút. Bạn cứ làm việc khác, kết quả sẽ tự hiện ở đây."
     : !canEdit
-      ? "Máy chủ tự lấy số mới mỗi sáng. Bạn đang ở chế độ chỉ xem nên không bấm “Cập nhật ngay” được."
+      ? "Số tự cập nhật mỗi sáng. Bạn đang ở chế độ chỉ xem nên không bấm “Cập nhật ngay” được."
       : !configured
-        ? "Nút cập nhật sẽ dùng được khi máy chủ có mã Apify."
+        ? "Nút cập nhật sẽ dùng được sau khi bộ phận kỹ thuật bật kết nối."
         : noQuota
           ? "Tạm chưa bấm được vì hạn mức tháng này còn quá ít — số tự cập nhật lại khi sang chu kỳ mới."
           : waitMin > 0
@@ -159,12 +159,11 @@ export default function ReviewStatsCard() {
     <Card
       icon={Star}
       title={title}
-      description="Điểm và số lượt đánh giá của công ty trên Google và Tripadvisor — hiện ở đầu trang, trang chủ, chân trang và trang tour. Máy chủ tự lấy số mới mỗi sáng, không cần nhập tay."
+      description="Điểm và số lượt đánh giá của công ty trên Google và Tripadvisor — hiện ở đầu trang, trang chủ, chân trang và trang tour. Số tự cập nhật mỗi sáng, không cần nhập tay."
     >
       {!configured && (
         <Notice tone="info" className="mb-4" title="Chưa bật tự cập nhật — số đang giữ nguyên">
-          Cài mã {provider?.name ?? "Apify"} trên máy chủ để bật tự cập nhật (nhờ đơn vị phát triển
-          website).
+          Nhờ bộ phận kỹ thuật bật kết nối dịch vụ lấy đánh giá để số tự cập nhật.
         </Notice>
       )}
 
@@ -194,13 +193,8 @@ export default function ReviewStatsCard() {
           <UsageQuota quota={quota} />
           {provider?.syncCost > 0 && (
             <p className="text-xs leading-relaxed text-slate-500">
-              Chi phí ước tính: tự cập nhật mỗi ngày {money(provider, provider.syncCost)}/lần (
-              {money(provider, provider.syncCost * 30)}/tháng) · mỗi lần bấm “Cập nhật ngay”{" "}
-              {money(provider, provider.syncCost)}
-              {provider.reviewCost
-                ? ` · mỗi lần “Lấy đánh giá” ở mục Đánh giá ${money(provider, provider.reviewCost)}`
-                : ""}
-              .
+              Mỗi lần cập nhật (tự động hoặc bấm tay) dùng khoảng{" "}
+              {money(provider, provider.syncCost)} hạn mức.
             </p>
           )}
         </div>
@@ -229,11 +223,6 @@ export default function ReviewStatsCard() {
             className="ml-auto"
           >
             {busy ? "Đang cập nhật…" : "Cập nhật ngay"}
-            {!busy && configured && provider?.syncCost > 0 && (
-              <span className="ml-1 text-xs font-normal text-slate-500">
-                · {money(provider, provider.syncCost)}
-              </span>
-            )}
           </Button>
         )}
       </div>

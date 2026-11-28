@@ -49,6 +49,7 @@ import {
 } from "./ui";
 import { usePermission } from "./permissions";
 import { slugSource, useAutoFill } from "./translate";
+import TipNotice from "./TipNotice";
 
 const VISA = "/admin/visa-types";
 const FT = "/admin/fast-track";
@@ -57,12 +58,16 @@ const VISA_PAGE = 8; // 4 hàng × 2 cột
 const FT_PAGE = 10;
 const L = () => ({ en: "", zh: "", vi: "" });
 
+/**
+ * 5 sân bay có fast-track. `code` là khoá lưu trong dữ liệu (giữ nguyên), chỉ dùng nội bộ —
+ * giao diện hiện tên thành phố + tên sân bay tiếng Việt.
+ */
 export const AIRPORTS = [
-  { code: "SGN", label: "Tân Sơn Nhất" },
-  { code: "HAN", label: "Nội Bài" },
-  { code: "DAD", label: "Đà Nẵng" },
-  { code: "CXR", label: "Cam Ranh" },
-  { code: "PQC", label: "Phú Quốc" },
+  { code: "SGN", city: "TP.HCM", airport: "Tân Sơn Nhất", label: "TP.HCM (Tân Sơn Nhất)" },
+  { code: "HAN", city: "Hà Nội", airport: "Nội Bài", label: "Hà Nội (Nội Bài)" },
+  { code: "DAD", city: "Đà Nẵng", airport: "", label: "Đà Nẵng" },
+  { code: "CXR", city: "Nha Trang", airport: "Cam Ranh", label: "Nha Trang (Cam Ranh)" },
+  { code: "PQC", city: "Phú Quốc", airport: "", label: "Phú Quốc" },
 ];
 
 const GROUPS = [
@@ -141,8 +146,14 @@ export default function ServicesVisaPage() {
     <>
       <PageHeader
         title="Visa & fast-track"
-        description={`Các loại visa Việt Nam và gói đón tiễn nhanh (fast-track) tại sân bay, hiện trên trang dịch vụ của website.${canEdit ? " Giữ và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ." : ""}`}
+        description="Gói đón tiễn nhanh tại sân bay (fast-track) và các loại visa Việt Nam, hiện trên trang Visa & fast-track của website."
       />
+
+      {canEdit && (
+        <TipNotice id="sort-visa" className="mb-4">
+          Giữ và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ.
+        </TipNotice>
+      )}
 
       {/* Cùng thứ tự với trang Visa & fast-track: gói fast-track ở đầu trang, bảng loại visa ở dưới */}
       <div className="space-y-6">
@@ -302,7 +313,7 @@ export default function ServicesVisaPage() {
 }
 
 // độ rộng cột dùng chung cho hàng tiêu đề và hàng dữ liệu (màn hình rộng)
-const COL_PRICES = "grid w-full grid-cols-5 gap-2 xl:w-[400px] xl:flex-none";
+const COL_PRICES = "grid w-full grid-cols-5 gap-2 xl:w-[460px] xl:flex-none";
 const COL_ACTIONS = "w-full xl:w-[196px] xl:flex-none xl:pl-4";
 
 /** 1 nhóm gói fast-track: các hàng kéo – thả được, phân trang riêng */
@@ -340,13 +351,16 @@ function FastTrackGroup({ group: g, list, onEdit, onAdd, reveal }) {
         <p className="px-4 text-xs text-slate-400 sm:px-5">Chưa có gói nào.</p>
       ) : (
         <>
-          <div className="hidden items-center gap-3 px-5 pb-1.5 text-[11px] font-semibold tracking-wide text-slate-500 uppercase xl:flex">
+          <div className="hidden items-end gap-3 px-5 pb-1.5 text-xs font-semibold text-slate-500 xl:flex">
             <span className="w-16 shrink-0" />
             <span className="flex-1">Gói</span>
             <span className={COL_PRICES}>
               {AIRPORTS.map((a) => (
-                <span key={a.code} className="text-center" title={a.label}>
-                  {a.code}
+                <span key={a.code} className="text-center leading-tight" title={a.label}>
+                  <span className="block text-slate-700">{a.city}</span>
+                  <span className="block min-h-[1.1em] text-[11px] font-normal text-slate-400">
+                    {a.airport}
+                  </span>
                 </span>
               ))}
             </span>
@@ -388,8 +402,11 @@ function FastTrackGroup({ group: g, list, onEdit, onAdd, reveal }) {
                       key={a.code}
                       className="rounded-lg bg-slate-50 py-1.5 text-center whitespace-nowrap tabular-nums xl:bg-transparent xl:py-0"
                     >
-                      <span className="block text-[10px] font-semibold text-slate-400 xl:hidden">
-                        {a.code}
+                      <span
+                        className="block truncate px-0.5 text-[10px] font-semibold text-slate-500 xl:hidden"
+                        title={a.label}
+                      >
+                        {a.city}
                       </span>
                       {x.prices?.[a.code] == null ? (
                         <span className="text-xs text-slate-400">Liên hệ</span>
@@ -610,9 +627,12 @@ function FastTrackEditor({ initial, all, onClose, onSaved }) {
         <FormSection title="Giá theo sân bay (USD)" className="border-t border-slate-100 pt-5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {AIRPORTS.map((a) => (
-              <label key={a.code} className="block">
-                <span className="mb-1 block truncate text-xs font-semibold text-slate-600">
-                  {a.code} <span className="font-normal text-slate-400">· {a.label}</span>
+              <label key={a.code} className="flex flex-col justify-end">
+                <span className="mb-1 block text-xs leading-snug font-semibold text-slate-600">
+                  {a.city}
+                  {a.airport && (
+                    <span className="block font-normal text-slate-400">Sân bay {a.airport}</span>
+                  )}
                 </span>
                 <Input
                   type="number"

@@ -43,6 +43,8 @@ import {
 import { usePendingImages } from "./pendingImages";
 import { usePermission } from "./permissions";
 import { slugSource, useAutoFill } from "./translate";
+import { SeoFields, normalizeSeo, seoEmpty } from "./SeoFields";
+import TipNotice from "./TipNotice";
 
 const PATH = "/admin/destinations";
 // điểm đến thay đổi → trang điểm đến, menu, trang chủ, thẻ tour (tên điểm đến) đều đổi
@@ -59,6 +61,14 @@ const regionLabel = (v) => REGIONS.find((r) => r.value === v)?.label ?? v;
 
 const L = () => ({ en: "", zh: "", vi: "" });
 
+/** Tiêu đề Google website tự tạo khi để trống (giống mẫu câu mặc định của trang điểm đến) — chỉ để xem trước */
+const AUTO_TITLE = {
+  en: "The best {name} tours & local experiences",
+  vi: "Tour {name} hay nhất & trải nghiệm bản địa",
+  zh: "{name}精选线路与本地体验",
+};
+const autoTitle = (name, lang) => (name ? AUTO_TITLE[lang].replace("{name}", name) : "");
+
 const EMPTY = {
   slug: "",
   region: "north-vietnam",
@@ -68,6 +78,7 @@ const EMPTY = {
   image: "",
   hero: "",
   keywords: [],
+  seo: seoEmpty(),
   order: 0,
   isActive: true,
 };
@@ -82,6 +93,7 @@ const toPayload = (d) => ({
   image: d.image,
   hero: d.hero,
   keywords: d.keywords,
+  seo: normalizeSeo(d.seo, { trim: true }),
   order: Number(d.order) || 0,
   isActive: d.isActive,
 });
@@ -153,7 +165,7 @@ export default function DestinationsPage() {
     <>
       <PageHeader
         title="Điểm đến"
-        description={`Điểm đến theo 3 miền Bắc – Trung – Nam. Hiện trên menu, trang chủ, bộ lọc tour và trang điểm đến.${canEdit ? " Giữ và kéo thẻ để đổi thứ tự, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới vị trí bất kỳ." : ""}`}
+        description="Điểm đến theo 3 miền Bắc – Trung – Nam, hiện trên menu, trang chủ, bộ lọc tour và trang điểm đến."
         actions={
           canEdit && (
             <Button icon={Plus} onClick={() => setEditing({ ...EMPTY, region })}>
@@ -162,6 +174,8 @@ export default function DestinationsPage() {
           )
         }
       />
+
+      {canEdit && <SortTip />}
 
       <Card bodyClassName="p-0">
         <div className="flex flex-col items-center gap-3 border-b border-slate-100 p-4 sm:px-5">
@@ -289,7 +303,7 @@ export default function DestinationsPage() {
 function DestinationEditor({ initial, all, onClose, onSaved }) {
   const editVerb = useEditVerb();
   const isNew = !initial.id;
-  const [d, setD] = useState({ ...EMPTY, ...initial });
+  const [d, setD] = useState({ ...EMPTY, ...initial, seo: normalizeSeo(initial.seo) });
   const [lang, setLang] = useState(DEFAULT_LANG);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const [kw, setKw] = useState((initial.keywords ?? []).join(", "));
@@ -461,8 +475,32 @@ function DestinationEditor({ initial, all, onClose, onSaved }) {
               />
             </div>
           </FormSection>
+
+          <FormSection title="Hiển thị trên Google">
+            <p className="-mt-2 text-xs leading-5 text-slate-500">
+              Để trống thì website tự tạo từ tên và mô tả ngắn của điểm đến.
+            </p>
+            <SeoFields
+              value={d.seo}
+              onChange={(seo) => set({ seo })}
+              lang={lang}
+              fallbackTitle={autoTitle(anyLang(d.name, lang), lang)}
+              fallbackDescription={anyLang(d.intro, lang)}
+              path={`destinations/${d.slug || "…"}`}
+            />
+          </FormSection>
         </div>
       </div>
     </EditorModal>
+  );
+}
+
+/** Mẹo kéo thả — hiện 1 lần, bấm × để ẩn hẳn trên máy này */
+function SortTip() {
+  return (
+    <TipNotice id="sort-destinations" className="mb-4">
+      Giữ và kéo thẻ để đổi thứ tự trong từng miền, hoặc bấm số thứ tự trên thẻ để chuyển nhanh tới
+      vị trí bất kỳ.
+    </TipNotice>
   );
 }

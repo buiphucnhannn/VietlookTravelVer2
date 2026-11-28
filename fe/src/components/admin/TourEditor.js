@@ -73,6 +73,7 @@ import { canonicalVideo, parseVideo } from "@/lib/video";
 import { REGIONS } from "./DestinationsPage";
 import { usePendingImages } from "./pendingImages";
 import TourReviewFinder from "./TourReviewFinder";
+import useDraft from "./useDraft";
 import { NoAccess, ReadOnlyArea, usePermission } from "./permissions";
 
 /** Nhãn nổi bật trên thẻ tour (khớp TOUR_LABELS ở be/src/constants/content.js) */
@@ -101,6 +102,16 @@ const LANG_KEYS = LANGS.map((l) => l.key);
 let keySeq = 0;
 /** khoá React ổn định cho từng phần tử danh sách (ngày lịch trình, FAQ, bảng giá) — bỏ khi gửi */
 const newKey = () => `k${++keySeq}`;
+
+/** Bản nháp khôi phục: cấp lại khoá danh sách (_k) để không trùng khoá mới sinh trong phiên này */
+const rekeyDeep = (v) =>
+  Array.isArray(v)
+    ? v.map(rekeyDeep)
+    : v && typeof v === "object"
+      ? Object.fromEntries(
+          Object.entries(v).map(([k, x]) => [k, k === "_k" ? newKey() : rekeyDeep(x)]),
+        )
+      : v;
 
 const str = (v) => (v == null ? "" : String(v));
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -553,6 +564,11 @@ export default function TourEditor({ id }) {
   const [savedSlug, setSavedSlug] = useState("");
   const [savedActive, setSavedActive] = useState(false);
   const slugTouched = useRef(!isNew);
+  // bản đã lưu gần nhất (để so với bản nháp tự lưu trong trình duyệt) + lúc lưu trên máy chủ
+  const [savedJson, setSavedJson] = useState(() =>
+    isNew ? JSON.stringify(normalizeTour()) : null,
+  );
+  const [savedAt, setSavedAt] = useState(null);
 
   useUnsavedGuard(dirty);
 
@@ -562,7 +578,10 @@ export default function TourEditor({ id }) {
     api(`${PATH}/${id}`)
       .then((r) => {
         if (!alive) return;
-        setT(normalizeTour(r.data));
+        const tour = normalizeTour(r.data);
+        setT(tour);
+        setSavedJson(JSON.stringify(tour));
+        setSavedAt(r.data.updatedAt ?? null);
         setSavedSlug(r.data.slug);
         setSavedActive(!!r.data.isActive);
       })
@@ -635,6 +654,20 @@ export default function TourEditor({ id }) {
   }));
   const { canEdit } = usePermission("tours");
 
+  // Bản nháp tự lưu: lỡ tải lại / đóng tab / hết phiên → mở lại được hỏi khôi phục
+  const draft = useDraft(isNew ? "tour:new" : `tour:${id}`, t, savedJson, {
+    enabled: canEdit && !!t,
+    dirty,
+    updatedAt: savedAt,
+    onRestore: (data) => {
+      const next = rekeyDeep(data);
+      if (isNew && next.slug && next.slug !== slugify(slugSource(titlesOf(next))).slice(0, 120))
+        slugTouched.current = true;
+      setT((x) => ({ ...x, ...next }));
+      setDirty(true);
+    },
+  });
+
   if (isNew && !canEdit) return <NoAccess />;
   if (loadError)
     return (
@@ -658,9 +691,13 @@ export default function TourEditor({ id }) {
       onTranslated={applyTranslation}
       savedSlug={savedSlug}
       savedActive={savedActive}
+      draftLabel={draft.savedLabel}
       onSaved={(doc) => {
         setSavedSlug(doc.slug);
         setSavedActive(!!doc.isActive);
+        setSavedJson(JSON.stringify(normalizeTour(doc)));
+        setSavedAt(doc.updatedAt ?? null);
+        draft.clear();
       }}
       destinations={destinations}
       themes={themes}
@@ -692,6 +729,7 @@ function EditorBody({
   savedSlug,
   savedActive,
   onSaved,
+  draftLabel,
   destinations,
   themes,
 }) {
@@ -811,6 +849,14 @@ function EditorBody({
               {t.code && <Badge tone="gray">{t.code}</Badge>}
               {!isNew && !savedActive && <Badge tone="gray">Đang ẩn</Badge>}
               {dirty && <Badge tone="amber">Chưa lưu</Badge>}
+              {dirty && draftLabel && (
+                <span
+                  className="text-xs text-slate-400"
+                  title="Phần đang sửa được giữ tạm trên máy này — lỡ tải lại trang vẫn khôi phục được. Bấm Lưu để đưa lên website."
+                >
+                  Đã tự lưu bản nháp lúc {draftLabel}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -2326,7 +2372,7 @@ const PriceTablesEditor = memo(function PriceTablesEditor({ value, onChange }) {
     <div>
       <SubHead
         title={`Bảng giá dạng chữ (${value.length})`}
-        hint="Kiểu bảng cũ, hiện nguyên văn trong trang tour. Tour mới nên dùng bảng giá ở mục 3."
+        hint="Hiện nguyên văn trong trang tour. Nên dùng bảng “Giá theo số khách và hạng khách sạn” ở trên."
       />
       <Sortable items={value} getId={byKey} onReorder={(next) => emit(next)} className="space-y-4">
         {(tb, i, drag) => (

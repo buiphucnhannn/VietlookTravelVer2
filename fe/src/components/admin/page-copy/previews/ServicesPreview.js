@@ -9,7 +9,7 @@ import { SitePage, Zone } from "./site-frame";
 
 /**
  * Bản xem trước trang Dịch vụ — dựng y như app/[lang]/services/page.js.
- * Ảnh đầu trang = ảnh của 3 dịch vụ đầu (đổi ảnh ở từng thẻ dịch vụ bên dưới).
+ * Ảnh đầu trang = ảnh của 3 dịch vụ đầu (đổi ở đầu trang hay ở thẻ dịch vụ bên dưới đều được — cùng 1 ảnh).
  */
 
 const icons = [Users, Map, Car, Stamp, BookOpen];
@@ -17,7 +17,7 @@ const icons = [Users, Map, Car, Stamp, BookOpen];
 export default function ServicesPreview({ lang }) {
   return (
     <SitePage lang={lang} path="/services">
-      <BrushHeroPreview images="images" title="heroTitle" subtitle="heroSubtitle" pills={false} />
+      <BrushHeroPreview images="images" title="heroTitle" subtitle="heroSubtitle" />
 
       <Zone name="5 dịch vụ chính">
         <section className="py-14 lg:py-[4.5rem]">
@@ -39,10 +39,12 @@ export default function ServicesPreview({ lang }) {
                           flip && "lg:order-2",
                         )}
                       >
+                        {/* góc trái trên là số thứ tự 01, 02… → nhãn "Bấm để đổi ảnh" ở trái dưới, nút Cắt ảnh ở phải trên */}
                         <Photo
                           f={`images.${i}`}
                           sizes="(min-width: 1024px) 50vw, 100vw"
-                          pill="bottom-4 right-4"
+                          tagAt="bottom-3 left-3"
+                          toolsAt="top-2 right-2"
                         />
                         <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-950/40 to-transparent" />
                         <span className="pointer-events-none absolute top-5 left-5 font-hand text-6xl leading-none text-white/90 drop-shadow-lg">

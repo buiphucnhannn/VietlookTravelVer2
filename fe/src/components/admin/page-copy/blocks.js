@@ -1,23 +1,32 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
-import { ArrowUpRight, Crop, ImagePlus, RotateCcw, Upload } from "lucide-react";
-import { errorMessage } from "@/lib/api";
+import { ArrowUpRight, ImageOff, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LANGS, specAt } from "@/lib/page-copy/resolve.mjs";
 import Link from "../Link";
-import { canRecrop, useImageCrop } from "../ImageCropper";
-import { ImageField, ImageUrlDialog, Spinner, useUi } from "../ui";
 import { InlineText, Pic, Sec } from "../home/shared";
+import { ImageSpot, SpotLayer, useImageChange, useImageHost } from "./image-edit";
 
 /**
  * KHỐI DÙNG CHUNG cho bản xem trước "Giao diện trang" (CMS → Giao diện trang → 1 trang).
  *
  * Bản xem trước của mỗi trang (previews/*.js) chỉ việc ghép các khối này theo đúng thứ tự / bố cục trang thật:
  *   <Txt f="heroTitle" className="…kiểu chữ…" />      chữ bấm vào là sửa (đúng ngôn ngữ đang chọn)
- *   <Img f="asideImage" aspect="aspect-[16/9]" />      ô ảnh có nút Đổi ảnh / Dán link / Cắt ảnh / Về ảnh mặc định
- *   <BgPhoto f="heroImage" />                          ảnh nền phủ kín khối + thanh nút đổi ảnh nhỏ ở góc
+ *   <Img f="asideImage" aspect="aspect-[16/9]" />      khung ảnh — bấm vào ảnh là đổi ảnh
+ *   <BgPhoto f="heroImage" />                          ảnh nền phủ kín khối — bấm vào phần nền là đổi ảnh
  *   <Sec name="Tên khối">…</Sec>                        1 khối của trang (nhãn tên khối ở góc)
  *   <SectionHead title="…" subtitle="…" />             tiêu đề khối (căn giữa / căn trái, có gạch ngắn)
  *   <ListOf f="services">{(i) => …}</ListOf>           lặp theo số phần tử của 1 danh sách
@@ -25,13 +34,38 @@ import { InlineText, Pic, Sec } from "../home/shared";
  *   <ModuleNote href="/cars" …>                         phần dữ liệu có mục quản lý riêng (không sửa ở đây)
  * `f` là đường dẫn ô trong registry ("heroTitle", "faq.2.q", "heroImages.1").
  * Ô đã sửa khác mặc định có chấm cam; rê chuột / bấm vào ô → nút "Khôi phục mặc định".
+ *
+ * Ảnh: mọi ảnh đều đổi NGAY TRÊN ẢNH (image-edit.js → ImageSpot): rê chuột → viền xanh + nhãn "Bấm để đổi ảnh",
+ * bấm vào ảnh → hộp "Đổi ảnh"; "Cắt ảnh" / "Về ảnh mặc định" ở góc phải khi rê chuột.
+ *
+ * Hiệu năng: dữ liệu đang soạn nằm trong 1 "kho" (createCopyStore) — mỗi ô chỉ theo dõi đúng giá trị của nó
+ * (useSyncExternalStore), nên gõ 1 chữ chỉ vẽ lại đúng ô đó, không vẽ lại cả trang thu nhỏ.
  */
 
 /* ---------- Dữ liệu đang soạn ---------- */
 
+/** Kho dữ liệu đang soạn: get() · set(next | fn) · subscribe(cb) */
+export function createCopyStore(initial) {
+  let state = initial;
+  const subs = new Set();
+  return {
+    get: () => state,
+    set: (next) => {
+      const v = typeof next === "function" ? next(state) : next;
+      if (v === state) return;
+      state = v;
+      subs.forEach((cb) => cb());
+    },
+    subscribe: (cb) => {
+      subs.add(cb);
+      return () => subs.delete(cb);
+    },
+  };
+}
+
 /**
- * { entry, state, setState, defs, lang } — state: dữ liệu đang soạn (fillPage), defs: mặc định { en, zh, vi }
- * (pageDefaults từng ngôn ngữ), setState(fn).
+ * { entry, store, defs, lang } — store: kho dữ liệu đang soạn (fillPage, xem createCopyStore),
+ * defs: mặc định { en, zh, vi } (pageDefaults từng ngôn ngữ).
  */
 export const PageCopyContext = createContext(null);
 
@@ -45,11 +79,19 @@ const setIn = (obj, keys, value) => {
   return next;
 };
 const same = (a, b) => String(a ?? "").trim() === String(b ?? "").trim();
+const noSub = () => () => {};
 
 /** Ô lá (chữ 3 ngôn ngữ / ảnh) đã khác mặc định chưa */
 export function leafEdited(spec, value, defs, keys) {
   if (spec?.type === "image") return !same(value, getIn(defs.en, keys));
   return LANGS.some((l) => !same(value?.[l], getIn(defs[l], keys)));
+}
+
+/** Giá trị thô của 1 ô trong kho — chỉ vẽ lại khi chính ô này đổi */
+function useLeaf(ctx, keys) {
+  const store = ctx?.store;
+  const snap = () => (store ? getIn(store.get(), keys) : undefined);
+  return useSyncExternalStore(store?.subscribe ?? noSub, snap, snap);
 }
 
 /**
@@ -58,21 +100,19 @@ export function leafEdited(spec, value, defs, keys) {
  */
 export function useCopyField(path) {
   const ctx = useContext(PageCopyContext);
-  const keys = keysOf(path);
+  const keys = useMemo(() => keysOf(path), [path]);
+  const raw = useLeaf(ctx, keys);
   const spec = specAt(ctx?.entry, path);
-  const raw = getIn(ctx?.state, keys);
   const image = spec?.type === "image";
-  const def = image ? getIn(ctx?.defs.en, keys) : getIn(ctx?.defs[ctx?.lang], keys);
-  return {
-    spec,
-    lang: ctx?.lang,
-    value: image ? (raw ?? "") : (raw?.[ctx?.lang] ?? ""),
-    def: def ?? "",
-    edited: !!spec && !!ctx && leafEdited(spec, raw, ctx.defs, keys),
-    set: (v) => ctx.setState((s) => setIn(s, image ? keys : [...keys, ctx.lang], v)),
-    /** Về mặc định (cả 3 ngôn ngữ) */
-    reset: () =>
-      ctx.setState((s) =>
+  const lang = ctx?.lang;
+  const def = image ? getIn(ctx?.defs.en, keys) : getIn(ctx?.defs[lang], keys);
+  const set = useCallback(
+    (v) => ctx.store.set((s) => setIn(s, image ? keys : [...keys, lang], v)),
+    [ctx, keys, image, lang],
+  );
+  const reset = useCallback(
+    () =>
+      ctx.store.set((s) =>
         setIn(
           s,
           keys,
@@ -81,6 +121,17 @@ export function useCopyField(path) {
             : Object.fromEntries(LANGS.map((l) => [l, getIn(ctx.defs[l], keys) ?? ""])),
         ),
       ),
+    [ctx, keys, image],
+  );
+  return {
+    spec,
+    lang,
+    value: image ? (raw ?? "") : (raw?.[lang] ?? ""),
+    def: def ?? "",
+    edited: !!spec && !!ctx && leafEdited(spec, raw, ctx.defs, keys),
+    set,
+    /** Về mặc định (cả 3 ngôn ngữ) */
+    reset,
   };
 }
 
@@ -93,14 +144,27 @@ export function Shown({ f }) {
 /**
  * Hàm đọc chữ / ảnh đang dùng (chỉ để hiện, không sửa) theo đường dẫn: plain("heroImages.1"), plain("heroEyebrow").
  * Dùng khi truyền vào component của website cần chuỗi thật (link ảnh, chữ lặp lại ở đường dẫn trang…).
+ * Chỉ vẽ lại component khi một trong các ô ĐÃ ĐỌC đổi (gõ ở ô khác không vẽ lại).
  */
 export function usePlain() {
   const ctx = useContext(PageCopyContext);
+  const read = useCallback(
+    (state, path) => {
+      const keys = keysOf(path);
+      const raw = getIn(state, keys);
+      if (specAt(ctx?.entry, path)?.type === "image") return raw || getIn(ctx?.defs.en, keys) || "";
+      return raw?.[ctx?.lang] || getIn(ctx?.defs[ctx?.lang], keys) || "";
+    },
+    [ctx],
+  );
+  // các ô component này đã đọc (chỉ thêm, không bớt) → "ảnh chụp" để biết khi nào cần vẽ lại
+  const [paths] = useState(() => new Set());
+  const store = ctx?.store;
+  const snap = () => (store ? [...paths].map((p) => read(store.get(), p)).join("\u0000") : "");
+  useSyncExternalStore(store?.subscribe ?? noSub, snap, snap);
   return (path) => {
-    const keys = keysOf(path);
-    const raw = getIn(ctx?.state, keys);
-    if (specAt(ctx?.entry, path)?.type === "image") return raw || getIn(ctx?.defs.en, keys) || "";
-    return raw?.[ctx?.lang] || getIn(ctx?.defs[ctx?.lang], keys) || "";
+    paths.add(path);
+    return store ? read(store.get(), path) : "";
   };
 }
 
@@ -114,11 +178,11 @@ export function useListCount(path) {
 
 function EditedMark({ onReset, label, className }) {
   return (
-    <span className={cn("absolute -top-2.5 -right-2.5 z-20 flex", className)}>
+    <span data-edit-ui className={cn("absolute -top-2.5 -right-2.5 z-20 flex", className)}>
       {/* chấm cam: luôn hiện; rê chuột / đang sửa → hiện nút khôi phục */}
       <span
         aria-hidden
-        className="size-2.5 rounded-full bg-amber-400 ring-2 ring-white group-focus-within/f:hidden group-hover/f:hidden"
+        className="size-2.5 [zoom:var(--pz,1)] rounded-full bg-amber-400 ring-2 ring-white group-focus-within/f:hidden group-hover/f:hidden"
       />
       <button
         type="button"
@@ -126,7 +190,7 @@ function EditedMark({ onReset, label, className }) {
         onClick={onReset}
         title={`Khôi phục mặc định${label ? ` — ${label}` : ""}`}
         aria-label="Khôi phục mặc định"
-        className="hidden size-6 place-items-center rounded-full bg-amber-400 text-white shadow-md ring-2 ring-white transition group-focus-within/f:grid group-hover/f:grid hover:scale-110 hover:bg-amber-500"
+        className="hidden size-6 [zoom:var(--pz,1)] place-items-center rounded-full bg-amber-400 text-white shadow-md ring-2 ring-white group-focus-within/f:grid group-hover/f:grid hover:bg-amber-500"
       >
         <RotateCcw className="size-3" />
       </button>
@@ -141,8 +205,9 @@ function EditedMark({ onReset, label, className }) {
  * `dark`: chữ nằm trên nền tối / ảnh. Đoạn văn (kiểu "para") tự cho xuống dòng.
  * Xoá trống ô → hiện mờ câu mặc định (lưu lại = dùng câu mặc định).
  * `placeholder`: chữ mờ khi ô trống mà không có câu mặc định (ô tuỳ chọn, vd. "Bấm để thêm…").
+ * memo: chỉ vẽ lại khi chính ô này đổi (hoặc đổi ngôn ngữ).
  */
-export function Txt({ f, className, dark, label, placeholder }) {
+export const Txt = memo(function Txt({ f, className, dark, label, placeholder }) {
   const fld = useCopyField(f);
   if (!fld.spec) return null;
   const name = label ?? fld.spec.label;
@@ -162,183 +227,100 @@ export function Txt({ f, className, dark, label, placeholder }) {
       {fld.edited && <EditedMark onReset={fld.reset} label={name} />}
     </span>
   );
-}
+});
 
 /* ---------- Ảnh ---------- */
 
 /**
- * Ô ảnh (ảnh chi tiết trong khối): đủ nút Đổi ảnh / Dán link / Cắt ảnh / Về ảnh mặc định (ImageField).
+ * Lớp đổi ảnh cho ô ảnh `f`, đặt làm con trực tiếp của khung ảnh (`relative`) — bấm vào phần ảnh là đổi ảnh.
+ * `tagAt` / `toolsAt`: vị trí nhãn "Bấm để đổi ảnh" / nút Cắt ảnh · Về mặc định. `host`: xem ImageSpot.
+ */
+export const ImageEdit = memo(function ImageEdit({ f, title, tagAt, toolsAt, host }) {
+  const fld = useCopyField(f);
+  if (!fld.spec) return null;
+  return (
+    <ImageSpot
+      value={fld.value}
+      onChange={fld.set}
+      crop={fld.spec.crop}
+      label={title ?? fld.spec.label}
+      edited={fld.edited}
+      onReset={fld.reset}
+      tagAt={tagAt}
+      toolsAt={toolsAt}
+      host={host}
+    />
+  );
+});
+
+/**
+ * Khung ảnh (ảnh chi tiết trong khối / ô chỉ có trong trình sửa) — bấm vào ảnh là đổi ảnh.
  * `aspect`: tỉ lệ khung đúng như trên web.
  */
 export function Img({ f, aspect = "aspect-[16/10]", className, label }) {
   const fld = useCopyField(f);
   if (!fld.spec) return null;
-  return (
-    <div className={cn("group/f relative w-full [&>div]:max-w-none", className)}>
-      <ImageField
-        value={fld.value}
-        onChange={(v) => fld.set(v || fld.def)}
-        folder="pages"
-        aspect={aspect}
-        crop={fld.spec.crop}
-        label={label ?? fld.spec.label}
-        fallback={fld.def || undefined}
-      />
-      {fld.edited && <EditedMark onReset={fld.reset} label={fld.spec.label} />}
-    </div>
-  );
-}
-
-/** Nút nhỏ trên thanh ảnh nền */
-function PillBtn({ icon: Icon, label, onClick, iconOnly }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-    >
-      <Icon className="size-3.5 shrink-0" />
-      {!iconOnly && <span className="max-sm:hidden">{label}</span>}
-    </button>
-  );
-}
-
-/**
- * Thanh đổi ảnh nhỏ (cho ảnh nền phủ kín khối, nơi không đặt được ô ảnh lớn):
- * Đổi ảnh · Dán link · Cắt ảnh · Về ảnh mặc định. Kéo thả ảnh vào khối cũng được (BgPhoto).
- */
-export function ImagePill({ f, className, title, floating = true }) {
-  const fld = useCopyField(f);
-  const { toast } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const cropper = useImageCrop(fld.spec?.crop ?? { ratio: 16 / 9, width: 1920 }, "pages");
-  if (!fld.spec) return null;
-
-  const run = async (job, done) => {
-    setBusy(true);
-    try {
-      const url = await job();
-      if (url) {
-        fld.set(url);
-        toast(done);
-      }
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const fromLinks = async ([link]) => {
-    setBusy(true);
-    try {
-      const { urls } = await cropper.importLinks([link], { beforeCrop: () => setLinkOpen(false) });
-      setLinkOpen(false);
-      if (urls[0]) {
-        fld.set(urls[0]);
-        toast("Đã thêm ảnh từ link — bấm Lưu để lưu lại");
-      }
-      return true;
-    } catch (err) {
-      toast(errorMessage(err), "error");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  const src = fld.value || fld.def;
   return (
     <div
       className={cn(
-        "group/f z-20 flex [zoom:var(--pz,1)] items-center gap-0.5 rounded-full bg-white/95 p-0.5 pl-2.5 shadow-lg ring-1 ring-slate-900/10 backdrop-blur",
-        floating ? "absolute" : "relative",
+        "relative w-full overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200",
+        aspect,
         className,
       )}
     >
-      <span className="mr-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-        <ImagePlus className="size-3.5 text-brand-600" />
-        <span className="max-w-32 truncate max-md:hidden">{title ?? fld.spec.label}</span>
-      </span>
-      {busy ? (
-        <Spinner className="m-1.5 size-4" />
+      {src ? (
+        <Pic src={src} sizes="600px" />
       ) : (
-        <>
-          <PillBtn icon={Upload} label="Đổi ảnh" onClick={() => setLinkOpen(true)} />
-          {canRecrop(fld.value) && (
-            <PillBtn
-              icon={Crop}
-              label="Cắt ảnh"
-              iconOnly
-              onClick={() => run(() => cropper.recrop(fld.value), "Đã cắt lại ảnh")}
-            />
-          )}
-          {fld.edited && (
-            <PillBtn
-              icon={RotateCcw}
-              label="Về ảnh mặc định"
-              iconOnly
-              onClick={() => {
-                fld.reset();
-                toast("Đã trả về ảnh mặc định — bấm Lưu để lưu lại");
-              }}
-            />
-          )}
-        </>
+        <span className="absolute inset-0 grid place-items-center text-slate-300">
+          <ImageOff className="size-8" />
+        </span>
       )}
-      {fld.edited && (
-        <span
-          aria-hidden
-          className="absolute -top-1 -right-1 size-2.5 rounded-full bg-amber-400 ring-2 ring-white"
-        />
-      )}
-      <ImageUrlDialog
-        open={linkOpen}
-        onClose={() => setLinkOpen(false)}
-        onSubmit={fromLinks}
-        onFiles={([file]) =>
-          file &&
-          run(
-            async () => (await cropper.uploadFiles([file], { max: 1 }))[0],
-            "Đã chọn ảnh — bấm Lưu để lưu lại",
-          )
-        }
-        busy={busy}
-      />
-      {cropper.dialog}
+      <ImageEdit f={f} title={label} />
     </div>
   );
 }
 
 /**
- * Ảnh nền phủ kín khối cha (cha cần `relative isolate`) + thanh đổi ảnh ở góc (`pill`: lớp vị trí,
- * mặc định góc trên bên phải). `fade`: lớp phủ làm mờ ảnh như trang thật (vd. "bg-white/85").
+ * Lớp đổi ảnh đặt trong khung ảnh có sẵn (khung cha cần `relative`). Giữ tên cũ cho các bản xem trước;
+ * `className` (vị trí thanh nút cũ) không còn dùng — nhãn / nút nằm ngay trên ảnh.
  */
-export function BgPhoto({ f, sizes = "1200px", className, fade, pill = "top-3 right-3", title }) {
+export function ImagePill({ f, title }) {
+  return <ImageEdit f={f} title={title} />;
+}
+
+/**
+ * Ảnh nền phủ kín khối cha (cha cần `relative isolate`) — bấm vào phần nền ảnh là đổi ảnh.
+ * `fade`: lớp phủ làm mờ ảnh như trang thật (vd. "bg-white/85").
+ */
+export function BgPhoto({ f, sizes = "1200px", className, fade, title, tagAt, toolsAt }) {
   const fld = useCopyField(f);
   return (
     <>
-      <span className={cn("absolute inset-0 -z-10", className)}>
+      <span className={cn("pointer-events-none absolute inset-0 -z-10", className)}>
         <Pic src={fld.value || fld.def} sizes={sizes} />
       </span>
-      {fade && <span className={cn("absolute inset-0 -z-10", fade)} />}
-      <ImagePill f={f} className={pill} title={title} />
+      {fade && <span className={cn("pointer-events-none absolute inset-0 -z-10", fade)} />}
+      <ImageEdit f={f} title={title} tagAt={tagAt} toolsAt={toolsAt} />
     </>
   );
 }
 
 /**
- * Ảnh phủ kín khung cha (cha cần `relative`), đúng như ảnh trên website + thanh đổi ảnh ở góc `pill`.
+ * Ảnh phủ kín khung cha (cha cần `relative`), đúng như ảnh trên website — bấm vào ảnh là đổi ảnh.
  * `className`: lớp của lớp ảnh (vd. "-z-10"), `imgClassName`: lớp của ảnh (vd. "object-[50%_70%]").
+ * `pill={false}`: chỉ hiện ảnh (không sửa ở chỗ này). `hero`: ảnh đầu trang (nhãn / nút nằm dưới thanh menu).
  */
 export function Photo({
   f,
   sizes = "100vw",
   className,
   imgClassName,
-  pill = "top-3 right-3",
+  pill = true,
   title,
+  hero,
+  tagAt = hero ? HERO_TAG : undefined,
+  toolsAt = hero ? HERO_TOOLS : undefined,
 }) {
   const fld = useCopyField(f);
   return (
@@ -346,7 +328,7 @@ export function Photo({
       <span className={cn("absolute inset-0", className)}>
         <Pic src={fld.value || fld.def} sizes={sizes} className={imgClassName} />
       </span>
-      {pill && <ImagePill f={f} className={pill} title={title} />}
+      {pill && <ImageEdit f={f} title={title} tagAt={tagAt} toolsAt={toolsAt} />}
     </>
   );
 }
@@ -379,32 +361,198 @@ export function PreviewImage({
   return <Image src={src} alt={alt} className={className} style={style} {...rest} />;
 }
 
-/**
- * Hàng nút đổi ảnh cho dải 1–3 ảnh ghép của đầu trang (BrushHero): mỗi nút nằm giữa ảnh tương ứng; điện thoại chỉ
- * hiện ảnh đầu (như website). Đặt trong khối `relative`.
- */
-export function HeroImagePills({ f, count = 3, className = "bottom-1.5", extraClassName }) {
+/* ---------- Ảnh ghép của đầu trang (BrushHero) ---------- */
+
+/** Vị trí nhãn / nút đổi ảnh ở ảnh đầu trang: góc dưới (không đè tiêu đề / thanh menu trong suốt của website) */
+export const HERO_TAG = "left-3 bottom-3";
+export const HERO_TOOLS = "right-3 bottom-3";
+
+/** 1 cột ảnh của dải ảnh đầu trang: tự lo hộp đổi ảnh của ô `f`, báo hàm "mở" lên cho lớp chung */
+function HeroCol({ f, title, on, register, className, tagAt, toolsAt }) {
+  const fld = useCopyField(f);
+  const img = useImageChange({ value: fld.value, onChange: fld.set, crop: fld.spec?.crop });
+  const open = img.open;
+  useLayoutEffect(() => register(f, open), [register, f, open]);
   return (
-    <div
-      className={cn("pointer-events-none absolute inset-x-0 z-20 flex gap-[3px] px-2", className)}
+    <span data-col className={cn("relative h-full flex-1", className)}>
+      <SpotLayer
+        on={on}
+        busy={img.busy}
+        label={title ?? fld.spec?.label}
+        edited={fld.edited}
+        canCrop={img.canCrop}
+        onOpen={img.open}
+        onCrop={img.recrop}
+        onReset={fld.reset}
+        tagAt={tagAt}
+        toolsAt={toolsAt}
+      />
+      {img.dialogs}
+    </span>
+  );
+}
+
+/**
+ * Đổi ảnh dải 1–3 ảnh ghép của đầu trang (BrushHero) ngay trên từng ảnh: rê chuột lên ảnh nào thì viền + nhãn hiện
+ * trên ảnh đó, bấm vào là đổi đúng ảnh đó. Cột dựng y như dải ảnh của website (điện thoại chỉ ảnh đầu; có khung ảnh
+ * ghép bên phải → màn lớn chỉ giữ ảnh nền đầu). Đặt BÊN TRONG section của BrushHero.
+ *   fields: đường dẫn các ô ảnh theo đúng thứ tự cột (đã bỏ ảnh trùng / trống như website)
+ *   split : có khung ảnh ghép bên phải
+ */
+export function HeroImageSpots({ fields, split, titles, tagAt = HERO_TAG, toolsAt = HERO_TOOLS }) {
+  const ref = useRef(null);
+  const opens = useRef(new Map());
+  const [active, setActive] = useState(0);
+  const register = useCallback((f, open) => {
+    opens.current.set(f, open);
+  }, []);
+  /** Cột (đang hiện) nằm dưới con trỏ */
+  const colAt = (x) => {
+    const cols = [...(ref.current?.querySelectorAll(":scope > [data-col]") ?? [])];
+    const i = cols.findIndex((c) => {
+      const r = c.getBoundingClientRect();
+      return r.width > 0 && x >= r.left && x <= r.right;
+    });
+    return i;
+  };
+  const on = useImageHost(
+    ref,
+    (e) => {
+      const i = colAt(e.clientX);
+      opens.current.get(fields[i >= 0 ? i : 0])?.();
+    },
+    (e) => {
+      const i = colAt(e.clientX);
+      if (i >= 0) setActive(i);
+    },
+    "section",
+  );
+  return (
+    <span
+      ref={ref}
+      data-edit-ui
+      className="pointer-events-none absolute inset-0 z-[25] flex gap-[3px]"
     >
-      {Array.from({ length: count }, (_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "flex flex-1 justify-center",
-            i > 0 && cn("hidden md:flex", extraClassName),
-          )}
-        >
-          <ImagePill
-            f={`${f}.${i}`}
-            title={count > 1 ? `Ảnh ${i + 1}` : undefined}
-            floating={false}
-            className="pointer-events-auto"
-          />
-        </div>
+      {fields.map((f, i) => (
+        <HeroCol
+          key={f}
+          f={f}
+          title={titles?.[i] ?? (fields.length > 1 ? `Ảnh đầu trang ${i + 1}` : undefined)}
+          on={on && active === i}
+          register={register}
+          tagAt={tagAt}
+          toolsAt={toolsAt}
+          className={cn(i > 0 && "hidden md:block", i > 0 && split && "lg:hidden")}
+        />
       ))}
-    </div>
+    </span>
+  );
+}
+
+/* Khung "giọt nước" 1–3 ảnh ghép bên phải đầu trang (BrushHero collage): ranh giới các dải ảnh chéo theo toạ độ 0–1 */
+const BAND_EDGES = {
+  1: [],
+  2: [(x) => 0.68 - 0.3 * x],
+  3: [(x) => 0.5 - 0.28 * x, (x) => 0.9 - 0.28 * x],
+};
+const BAND_CLIPS = {
+  1: ["none"],
+  2: ["polygon(0 0, 100% 0, 100% 38%, 0 68%)", "polygon(0 70.5%, 100% 40.5%, 100% 100%, 0 100%)"],
+  3: [
+    "polygon(0 0, 100% 0, 100% 22%, 0 50%)",
+    "polygon(0 52.5%, 100% 24.5%, 100% 62%, 0 90%)",
+    "polygon(0 92.5%, 100% 64.5%, 100% 100%, 0 100%)",
+  ],
+};
+
+/** 1 dải ảnh của khung ghép: hộp đổi ảnh riêng của ô `f`; nhãn + nút chỉ hiện khi dải đang được rê chuột */
+function CollageBand({ f, index, show, register }) {
+  const fld = useCopyField(f);
+  const img = useImageChange({ value: fld.value, onChange: fld.set, crop: fld.spec?.crop });
+  const open = img.open;
+  useLayoutEffect(() => register(f, open), [register, f, open]);
+  return (
+    <>
+      {show && (
+        <SpotLayer
+          on
+          busy={img.busy}
+          label={`Ảnh ghép ${index + 1}`}
+          edited={fld.edited}
+          canCrop={img.canCrop}
+          onOpen={img.open}
+          onCrop={img.recrop}
+          onReset={fld.reset}
+          tagAt="top-0 left-6"
+          toolsAt="bottom-0 right-6"
+          className="ring-0"
+        />
+      )}
+      {img.dialogs}
+    </>
+  );
+}
+
+/**
+ * Đổi ảnh khung "giọt nước" (ảnh ghép bên phải đầu trang, màn lớn) ngay trên từng dải ảnh. Gắn vào đúng khung của
+ * website (tìm trong section đầu trang) — rê chuột lên dải nào thì dải đó sáng lên, bấm là đổi ảnh dải đó.
+ */
+export function CollageSpots({ fields }) {
+  const probe = useRef(null);
+  const [frame, setFrame] = useState(null);
+  useLayoutEffect(() => {
+    const el = probe.current?.closest("section")?.querySelector('[class*="aspect-[5/4]"]');
+    setFrame(el ?? null);
+  }, []);
+  return (
+    <>
+      <span ref={probe} hidden />
+      {frame && createPortal(<CollageLayer fields={fields} />, frame)}
+    </>
+  );
+}
+
+function CollageLayer({ fields }) {
+  const ref = useRef(null);
+  const opens = useRef(new Map());
+  const [active, setActive] = useState(0);
+  const register = useCallback((f, open) => {
+    opens.current.set(f, open);
+  }, []);
+  const n = Math.min(3, fields.length) || 1;
+  const bandAt = (e) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r?.width) return 0;
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    return BAND_EDGES[n].filter((edge) => y > edge(x)).length;
+  };
+  const on = useImageHost(
+    ref,
+    (e) => opens.current.get(fields[bandAt(e)])?.(),
+    (e) => setActive(bandAt(e)),
+  );
+  return (
+    <span ref={ref} data-edit-ui className="pointer-events-none absolute inset-0 z-[25]">
+      {on && (
+        <span className="absolute inset-0 [clip-path:url(#vl-hero-blob)]">
+          <span
+            className="absolute inset-0 bg-blue-500/25"
+            style={{ clipPath: BAND_CLIPS[n][active] }}
+          />
+        </span>
+      )}
+      {fields.slice(0, 3).map((f, i) => (
+        <CollageBand key={f} f={f} index={i} show={on && active === i} register={register} />
+      ))}
+    </span>
+  );
+}
+
+/** Giữ tên cũ: dải ảnh đầu trang → HeroImageSpots (bấm thẳng vào từng ảnh) */
+export function HeroImagePills({ f, count = 3, split }) {
+  return (
+    <HeroImageSpots fields={Array.from({ length: count }, (_, i) => `${f}.${i}`)} split={split} />
   );
 }
 
@@ -422,10 +570,10 @@ export const TONES = {
 };
 
 /**
- * Ảnh nền khối y như components/ui/BgImage.js (ảnh + lớp màu `tone`) + thanh đổi ảnh ở góc `pill`.
+ * Ảnh nền khối y như components/ui/BgImage.js (ảnh + lớp màu `tone`) — bấm vào phần nền là đổi ảnh.
  * Đặt làm con đầu tiên của section có `relative isolate overflow-hidden`.
  */
-export function BgEdit({ f, tone = "light", pill = "top-3 right-3", title }) {
+export function BgEdit({ f, tone = "light", title, tagAt, toolsAt }) {
   const fld = useCopyField(f);
   return (
     <>
@@ -433,7 +581,7 @@ export function BgEdit({ f, tone = "light", pill = "top-3 right-3", title }) {
         <Pic src={fld.value || fld.def} sizes="100vw" />
         <div className={cn("absolute inset-0", TONES[tone])} />
       </div>
-      <ImagePill f={f} className={pill} title={title} />
+      <ImageEdit f={f} title={title} tagAt={tagAt} toolsAt={toolsAt} />
     </>
   );
 }

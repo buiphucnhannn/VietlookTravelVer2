@@ -16,6 +16,7 @@ import { ADMIN_BASE } from "@/config/urls.mjs";
 /**
  * Phân quyền chi tiết theo từng mục (tab) của trang quản trị.
  * - Quản trị viên (admin): toàn quyền, gồm Cài đặt + Tài khoản quản trị (2 mục này không cấp cho nhân viên).
+ * - Thông tin liên hệ (contact): cấp riêng Không / Xem / Sửa — tài khoản cũ không có mục này = Không.
  * - Nhân viên (editor): chỉ các mục được cấp, mỗi mục 1 mức: Không / Xem / Sửa / Toàn quyền.
  * Giao diện chỉ ẩn / khoá nút cho dễ dùng — backend (be/src/constants/permissions.js) mới là nơi kiểm tra thật.
  * Đồng bộ danh sách mục với backend.
@@ -34,7 +35,7 @@ export const levelLabel = (l) => LEVELS.find((x) => x.value === l)?.long ?? "Kh�
 
 /**
  * Các mục cấp được, nhóm như thanh menu. hint: mục này là gì; edit / full: "Sửa" / "Toàn quyền" làm được gì thêm.
- * levels: mức cho phép — giống MODULES ở backend: mục không có gì để xoá (Trang chủ, Giao diện trang) chỉ tới
+ * levels: mức cho phép — giống MODULES ở backend: mục không có gì để xoá (Trang chủ, Giao diện trang, Thông tin liên hệ) chỉ tới
  * "Sửa"; Nhật ký thao tác chỉ xem. Quyền cũ lưu cao hơn → tự hiểu là mức cao nhất của mục (clamp).
  */
 const CONTENT_EDIT = "Thêm mới, sửa, ẩn/hiện, sắp xếp";
@@ -114,6 +115,14 @@ export const PERMISSION_GROUPS = [
         levels: NO_DELETE,
       },
       {
+        key: "contact",
+        label: "Thông tin liên hệ",
+        hint: "Số điện thoại, email, địa chỉ, mạng xã hội, giờ làm việc — hiện trên mọi trang và trong email gửi khách",
+        edit: "Sửa thông tin rồi lưu (website và email cập nhật ngay)",
+        href: A("/contact"),
+        levels: NO_DELETE,
+      },
+      {
         key: "reviews",
         label: "Đánh giá",
         hint: "Đánh giá của khách và điểm Tripadvisor / Google hiện trên website",
@@ -172,7 +181,7 @@ export const PRESETS = [
   {
     key: "content",
     label: "Biên tập nội dung",
-    hint: "Toàn quyền tour, dịch vụ, trang chủ, giao diện trang, bài viết, đánh giá",
+    hint: "Toàn quyền tour, dịch vụ, trang chủ, giao diện trang, thông tin liên hệ, bài viết, đánh giá",
     value: () => fill((k) => (CONTENT_KEYS.includes(k) ? "full" : "none")),
   },
   {

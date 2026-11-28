@@ -6,7 +6,7 @@ import { lp, tr } from "@/i18n/config";
 import { cardLabels } from "@/lib/labels";
 import AdviceBox from "@/components/ui/AdviceBox";
 import TourExplorer from "@/components/tours/TourExplorer";
-import { HeroImagePills, ImagePill, Txt } from "../blocks";
+import { Txt } from "../blocks";
 import BrushHeroPreview from "./BrushHeroPreview";
 import { Auto, Loading } from "./site-frame";
 
@@ -26,22 +26,7 @@ export function TourHero({ collage }) {
       title="heroTitle"
       subtitle="heroIntro"
       collage={collage ? "collageImages" : undefined}
-      pills={false}
-    >
-      <HeroImagePills f="heroImages" extraClassName={collage && "lg:invisible"} />
-      {collage && (
-        <div className="absolute right-4 bottom-1.5 z-20 hidden items-center gap-1 lg:flex">
-          {[0, 1, 2].map((i) => (
-            <ImagePill
-              key={i}
-              f={`collageImages.${i}`}
-              title={`Ảnh ghép ${i + 1}`}
-              floating={false}
-            />
-          ))}
-        </div>
-      )}
-    </BrushHeroPreview>
+    />
   );
 }
 

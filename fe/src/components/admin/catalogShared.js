@@ -1,14 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { Eye, GripVertical, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ArchiveRestore,
+  ExternalLink,
+  Eye,
+  GripVertical,
+  ImageOff,
+  Pencil,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { useMutation } from "./hooks";
+import { TODO_EVENT, useMutation } from "./hooks";
 import { DragHandle, PositionBadge, Sortable } from "./Sortable";
 import { AutoTranslate } from "./translate";
-import { Button, Input, LangTabs, Modal, filledOf, locText, useUi, useUnsavedGuard } from "./ui";
+import {
+  Button,
+  Input,
+  LangTabs,
+  Modal,
+  filledOf,
+  fmtDate,
+  locText,
+  useUi,
+  useUnsavedGuard,
+} from "./ui";
 import VisibilityToggle from "./VisibilityToggle";
 import { unsavedNote } from "./pendingImages";
 import { ReadOnlyArea, usePermission } from "./permissions";
@@ -319,5 +339,245 @@ export function Lines({
         </Button>
       )}
     </div>
+  );
+}
+
+/* =========================================================================
+ * Thùng rác (tour, bài viết, đơn / yêu cầu): xoá → giữ 30 ngày, khôi phục được
+ * ========================================================================= */
+
+/** Số ngày giữ trong Thùng rác (khớp backend TRASH_DAYS) */
+export const TRASH_DAYS = 30;
+const DAY_MS = 24 * 3600_000;
+const capFirst = (s) => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
+
+/** "Đã xoá 12/11/2026 · tự xoá hẳn sau 18 ngày" */
+export function trashNote(deletedAt) {
+  if (!deletedAt) return "Đã xoá";
+  const left = Math.max(
+    0,
+    Math.ceil((new Date(deletedAt).getTime() + TRASH_DAYS * DAY_MS - Date.now()) / DAY_MS),
+  );
+  const tail = left > 1 ? `tự xoá hẳn sau ${left} ngày` : "sắp tự xoá hẳn";
+  return `Đã xoá ${fmtDate(deletedAt)} · ${tail}`;
+}
+
+/**
+ * Xoá vào Thùng rác (kèm "Hoàn tác" 8 giây), khôi phục, xoá hẳn.
+ *   const trash = useTrash({ path: "/admin/tours", tags, noun: "tour", nameOf: tourTitle, onChange: list.reload });
+ *   trash.remove(item)   hỏi lại → DELETE → thông báo "Đã xoá «tên» · Hoàn tác"
+ *   trash.restore(item)  POST /:id/restore
+ *   trash.purge(item)    hỏi lại → DELETE /:id?hard=1 (không khôi phục được nữa)
+ * removeExtraTags: thẻ cache website xoá thêm khi xoá (vd. ["settings"] — tour bị gỡ khỏi trang chủ).
+ * removeMessage: câu giải thích trong hộp hỏi lại (mặc định "… sẽ được gỡ khỏi website…").
+ */
+export function useTrash({
+  path,
+  tags,
+  noun,
+  nameOf,
+  onChange,
+  removeExtraTags = [],
+  removeMessage = `${capFirst(noun)} sẽ được gỡ khỏi website và chuyển vào Thùng rác.`,
+}) {
+  const { confirm, toast } = useUi();
+  const { run, busy } = useMutation(tags);
+
+  const restore = async (item) => {
+    const name = nameOf(item);
+    const r = await run(() => api(`${path}/${item.id}/restore`, { method: "POST" }), null, {
+      retry: () => restore(item),
+    });
+    if (!r) return null;
+    onChange?.();
+    if (r.data?.slugChanged)
+      toast.info(
+        `Địa chỉ trang cũ đã có ${noun} khác dùng nên ${noun} được khôi phục với địa chỉ mới (thêm số ở cuối). Có thể đổi lại trong trang sửa.`,
+        { title: `Đã khôi phục «${name}»` },
+      );
+    else toast(`Đã khôi phục «${name}»`);
+    return r.data ?? true;
+  };
+
+  const remove = async (item) => {
+    const name = nameOf(item);
+    const ok = await confirm({
+      title: `Xoá ${noun} «${name}»?`,
+      message: `${removeMessage} Bạn có ${TRASH_DAYS} ngày để khôi phục trong Thùng rác.`,
+      confirmText: `Xoá ${noun}`,
+      danger: true,
+    });
+    if (!ok) return false;
+    const r = await run(() => api(`${path}/${item.id}`, { method: "DELETE" }), null, {
+      extraTags: removeExtraTags,
+      retry: () => remove(item),
+    });
+    if (!r) return false;
+    onChange?.();
+    toast(`Đã xoá «${name}»`, {
+      duration: 8000,
+      action: { label: "Hoàn tác", onClick: () => restore(item) },
+    });
+    return true;
+  };
+
+  const purge = async (item) => {
+    const name = nameOf(item);
+    const ok = await confirm({
+      title: `Xoá hẳn «${name}»?`,
+      message: `${capFirst(noun)} sẽ bị xoá vĩnh viễn khỏi Thùng rác và không khôi phục được nữa.`,
+      confirmText: "Xoá hẳn",
+      danger: true,
+    });
+    if (!ok) return false;
+    const r = await run(
+      () => api(`${path}/${item.id}?hard=1`, { method: "DELETE" }),
+      `Đã xoá hẳn «${name}»`,
+    );
+    if (r) onChange?.();
+    return Boolean(r);
+  };
+
+  return { remove, restore, purge, busy };
+}
+
+/**
+ * Chuyển giữa danh sách đang dùng và Thùng rác. `countUrl` = danh sách Thùng rác (limit=1) để đếm số mục.
+ *   <TrashTabs trash={list.query.trash === "1"} onChange={(on) => …} countUrl="/admin/tours?trash=1&limit=1" />
+ */
+export function TrashTabs({ trash, onChange, countUrl, activeLabel = "Đang dùng", className }) {
+  const [count, setCount] = useState(null);
+  const load = useCallback(() => {
+    if (!countUrl) return;
+    api(countUrl)
+      .then((r) => setCount(r.meta?.total ?? r.data?.length ?? 0))
+      .catch(() => {});
+  }, [countUrl]);
+  useEffect(() => {
+    load();
+    window.addEventListener(TODO_EVENT, load); // xoá / khôi phục ở bất kỳ đâu → đếm lại
+    return () => window.removeEventListener(TODO_EVENT, load);
+  }, [load]);
+  const tab = (on, label, icon, n) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={trash === on}
+      onClick={() => trash !== on && onChange(on)}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold transition",
+        trash === on
+          ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+          : "text-slate-500 hover:text-slate-800",
+      )}
+    >
+      {icon}
+      {label}
+      {n != null && n > 0 && (
+        <span className="min-w-5 rounded-full bg-slate-200/80 px-1.5 text-center text-[10px] leading-4 font-bold text-slate-600">
+          {n}
+        </span>
+      )}
+    </button>
+  );
+  return (
+    <div
+      role="tablist"
+      aria-label="Danh sách"
+      className={cn("inline-flex rounded-xl bg-slate-100 p-1", className)}
+    >
+      {tab(false, activeLabel)}
+      {tab(true, "Thùng rác", <Trash2 className="size-3.5" />, count)}
+    </div>
+  );
+}
+
+/** Nút của 1 mục trong Thùng rác: Khôi phục · Xoá hẳn */
+export function TrashActions({ onRestore, onPurge, busy, className }) {
+  return (
+    <div className={cn("flex items-center gap-1.5", className)}>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={ArchiveRestore}
+        onClick={onRestore}
+        disabled={busy}
+      >
+        Khôi phục
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={Trash2}
+        onClick={onPurge}
+        disabled={busy}
+        className="text-sun-600 hover:bg-sun-50"
+      >
+        Xoá hẳn
+      </Button>
+    </div>
+  );
+}
+
+/** Nút mở trang trên website (tab mới) — chỉ hiện với mục đang hiện trên website */
+export function ViewOnSiteLink({ href, visible = true, className }) {
+  if (!visible || !href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Xem trên website"
+      title="Xem trên website"
+      className={cn(
+        "grid size-9 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900",
+        className,
+      )}
+    >
+      <ExternalLink className="size-4" />
+    </a>
+  );
+}
+
+/**
+ * Bộ lọc: máy tính / máy tính bảng hiện thẳng (lưới `gridClass`); điện thoại gọn thành nút "Bộ lọc (n)"
+ * mở bảng chọn. `count` = số bộ lọc đang chọn, `onReset` = bỏ hết lọc.
+ */
+export function FilterBar({ count = 0, onReset, gridClass, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className={cn("hidden sm:grid", gridClass)}>{children}</div>
+      <Button
+        variant="secondary"
+        icon={SlidersHorizontal}
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        className={cn("w-full sm:hidden", count > 0 && "text-brand-700")}
+      >
+        {count > 0 ? `Bộ lọc (${count})` : "Bộ lọc"}
+      </Button>
+      {open && (
+        <Modal
+          open
+          size="sm"
+          icon={SlidersHorizontal}
+          title="Bộ lọc"
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              {count > 0 && onReset && (
+                <Button variant="ghost" onClick={onReset} className="mr-auto">
+                  Bỏ lọc
+                </Button>
+              )}
+              <Button onClick={() => setOpen(false)}>Xem kết quả</Button>
+            </>
+          }
+        >
+          <div className="grid gap-3">{children}</div>
+        </Modal>
+      )}
+    </>
   );
 }

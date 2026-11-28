@@ -1,12 +1,12 @@
 "use client";
 
 import { BrushHero } from "@/components/ui/PageHero";
-import { HeroImagePills, ImagePill, PreviewImage, Shown, Txt, usePlain } from "../blocks";
+import { CollageSpots, HeroImageSpots, PreviewImage, Shown, Txt, usePlain } from "../blocks";
 import { Zone } from "./site-frame";
 
 /**
  * Đầu trang kiểu BrushHero — dựng bằng đúng component website (components/ui/PageHero.js): dải 1–3 ảnh ghép, phủ
- * tối, tiêu đề nét cọ, header trong suốt phủ lên. Chữ bấm vào là sửa, mỗi ảnh có nút đổi ảnh.
+ * tối, tiêu đề nét cọ, header trong suốt phủ lên. Chữ bấm vào là sửa, bấm thẳng vào ảnh nào là đổi ảnh đó.
  *   images   : đường dẫn danh sách ảnh sửa được ("heroImages") · count: số ảnh (website hiện tối đa 3)
  *   image    : hoặc 1 ô ảnh đơn ("heroImage")
  *   fixedImages: ảnh cố định (không sửa ở đây) thay cho `images`
@@ -29,30 +29,33 @@ export default function BrushHeroPreview({
   children,
 }) {
   const plain = usePlain();
-  const list =
-    fixedImages ??
-    (image ? [plain(image)] : Array.from({ length: count }, (_, i) => plain(`${images}.${i}`)));
+  const paths = image
+    ? [image]
+    : images
+      ? Array.from({ length: count }, (_, i) => `${images}.${i}`)
+      : [];
+  const list = fixedImages ?? paths.map(plain);
+  // cột ảnh đúng như website dựng (bỏ ảnh trống / trùng, tối đa 3) → ô ảnh tương ứng từng cột
+  const seen = new Set();
+  const cols = fixedImages
+    ? []
+    : paths.filter((_, i) => list[i] && !seen.has(list[i]) && seen.add(list[i])).slice(0, 3);
+  const collagePaths = collage ? [0, 1, 2].map((i) => `${collage}.${i}`) : null;
   return (
-    <Zone
-      name="Đầu trang"
-      dark
-      at={collage ? "left-3 bottom-12" : "left-3 top-20 lg:top-[7.25rem]"}
-    >
+    <Zone name="Đầu trang" dark at="left-3 top-20 lg:top-[7.25rem]">
       <BrushHero
         ImageComponent={PreviewImage}
         title={<Txt f={title} dark />}
         subtitle={subtitle && <Txt f={subtitle} dark />}
         images={list}
-        collage={collage && Array.from({ length: 3 }, (_, i) => plain(`${collage}.${i}`))}
+        collage={collagePaths?.map(plain)}
         compact={compact}
         cta={cta}
         breadcrumbs={[{ label: "Vietlook", href: "#" }, { label: crumb ?? <Shown f={title} /> }]}
       >
         {children}
-        {pills && images && !fixedImages && (
-          <HeroImagePills f={images} count={collage ? 1 : count} />
-        )}
-        {pills && image && <ImagePill f={image} className="right-3 bottom-3" />}
+        {pills && cols.length > 0 && <HeroImageSpots fields={cols} split={!!collage} />}
+        {pills && collagePaths && <CollageSpots fields={collagePaths} />}
       </BrushHero>
     </Zone>
   );

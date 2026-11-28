@@ -1,6 +1,7 @@
 "use client";
 
-import { Mail, Phone } from "lucide-react";
+import { memo } from "react";
+import { Mail, Pencil, Phone } from "lucide-react";
 import Link from "@/components/admin/Link";
 import { cn } from "@/lib/utils";
 import { ADMIN_BASE } from "@/config/urls.mjs";
@@ -57,7 +58,8 @@ const PROSE = cn(
  * `menu`: [{ key, href, icon, title, active, hidden, onClick }] — các trang chính sách (bấm để chuyển sang sửa
  * trang đó; `onClick` hỏi lại nếu còn thay đổi chưa lưu)
  */
-export function PolicyBody({ d, lang, set, menu = [] }) {
+export const PolicyBody = memo(function PolicyBody({ body, lang, set, menu = [] }) {
+  const d = { body };
   const live = usePublicData(lang);
   const t = { ...FALLBACK[lang], ...live?.dict.policy };
   const toc = tocOf(d.body[lang] || otherOf(d.body, lang));
@@ -67,7 +69,10 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
     // (website ẩn cột phải khi màn hẹp — ở đây vẫn hiện để người sửa thấy đủ các phần của trang).
     <Container className="grid gap-10 py-12 lg:grid-cols-[270px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-10 lg:gap-y-6 lg:py-14 @min-[1240px]:grid-cols-[270px_minmax(0,1fr)_290px] @min-[1240px]:grid-rows-1 @min-[1240px]:gap-12">
       {/* Menu chính sách */}
-      <nav className="self-start rounded-2xl border border-border bg-white p-3 lg:col-start-1 lg:row-start-1">
+      <nav
+        data-jump="Menu chính sách"
+        className="self-start rounded-2xl border border-border bg-white p-3 lg:col-start-1 lg:row-start-1"
+      >
         <p className="px-3 pt-2 pb-3 text-xs font-bold tracking-[0.18em] text-brand-700 uppercase">
           {t.title}
         </p>
@@ -106,30 +111,43 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
 
       {/* Bài viết (sửa tại chỗ) */}
       <div
+        data-jump="Nội dung chính sách"
         className={cn(
           "max-w-3xl min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 @min-[1240px]:row-span-1",
           PROSE,
         )}
       >
-        {/* key theo ngôn ngữ: mỗi ngôn ngữ có lời nhắc riêng khi còn trống */}
-        <RichText
-          key={lang}
-          lang={lang}
-          value={d.body[lang]}
-          onChange={(html) => set({ body: { ...d.body, [lang]: html } })}
-          folder="pages"
-          minHeight={420}
-          placeholder={
-            otherOf(d.body, lang)
-              ? `Chưa có bản ${LANG_NAME[lang]} — khi lưu sẽ tự dịch từ ngôn ngữ đã viết. Bấm vào đây để tự viết…`
-              : "Bấm vào đây để viết nội dung…"
-          }
-        />
+        {/* Khung sửa nội dung: cùng màu với ô sửa chữ chung — rê chuột viền xanh nét đứt + nhãn "Bấm để sửa nội
+            dung", đang gõ viền cam + nền cam nhạt. key theo ngôn ngữ: mỗi ngôn ngữ có lời nhắc riêng khi còn trống */}
+        <div className="group/rt relative cursor-text rounded-md outline-2 outline-offset-[6px] outline-transparent outline-dashed focus-within:bg-orange-500/[0.04] focus-within:outline-orange-500 focus-within:outline-solid hover:outline-blue-500 focus-within:hover:outline-orange-500">
+          <span
+            data-edit-ui
+            aria-hidden
+            className="pointer-events-none absolute -top-9 left-0 z-20 hidden items-center gap-1 rounded-md bg-blue-600 px-2 py-1 font-sans text-[11px] leading-none font-semibold text-white shadow-lg group-focus-within/rt:hidden group-hover/rt:flex"
+          >
+            <Pencil className="size-3" />
+            Bấm để sửa nội dung
+            <span className="font-normal text-white/75">· Nội dung chính sách</span>
+          </span>
+          <RichText
+            key={lang}
+            lang={lang}
+            value={d.body[lang]}
+            onChange={(html) => set({ body: { ...d.body, [lang]: html } })}
+            folder="pages"
+            minHeight={420}
+            placeholder={
+              otherOf(d.body, lang)
+                ? `Chưa có bản ${LANG_NAME[lang]} — khi lưu sẽ tự dịch từ ngôn ngữ đã viết. Bấm vào đây để tự viết…`
+                : "Bấm vào đây để viết nội dung…"
+            }
+          />
+        </div>
       </div>
 
       {/* Cột phải: mục lục + thẻ hỏi đáp (tự động, không sửa ở đây) */}
       <aside className="hidden space-y-6 self-start lg:col-start-1 lg:row-start-2 lg:block @min-[1240px]:col-start-3 @min-[1240px]:row-start-1">
-        <div className="relative rounded-2xl border border-border p-5">
+        <div className="group/auto relative rounded-2xl border border-border p-5">
           <AutoChip className="top-0 right-4 -translate-y-1/2">
             Tự động — theo đề mục lớn trong bài
           </AutoChip>
@@ -149,7 +167,7 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
             </ol>
           ) : (
             <p className="text-sm leading-relaxed text-slate-400">
-              Các đề mục lớn (H2) trong bài sẽ tự hiện thành mục lục ở đây.
+              Các tiêu đề lớn trong bài sẽ tự hiện thành mục lục ở đây.
             </p>
           )}
         </div>
@@ -158,9 +176,9 @@ export function PolicyBody({ d, lang, set, menu = [] }) {
       </aside>
     </Container>
   );
-}
+});
 
-/** Thẻ "Câu hỏi về chính sách này?" — 3 kênh liên hệ lấy từ Cài đặt → Thông tin liên hệ */
+/** Thẻ "Câu hỏi về chính sách này?" — 3 kênh liên hệ lấy từ CMS → Thông tin liên hệ */
 function HelpCard({ t, dict, contact }) {
   const channels = [
     { href: contact?.messaging.whatsapp, icon: WhatsAppIcon, label: "WhatsApp" },
@@ -168,9 +186,9 @@ function HelpCard({ t, dict, contact }) {
     { href: contact && `mailto:${contact.contact.email}`, icon: Mail, label: "Email" },
   ];
   return (
-    <div className="relative rounded-2xl border border-border bg-white p-5">
-      <AutoChip href={`${ADMIN_BASE}/settings`} className="top-0 right-4 -translate-y-1/2">
-        Tự động — sửa ở Cài đặt
+    <div className="group/auto relative rounded-2xl border border-border bg-white p-5">
+      <AutoChip href={`${ADMIN_BASE}/contact`} className="top-0 right-4 -translate-y-1/2">
+        Tự động — sửa ở Thông tin liên hệ
       </AutoChip>
       {dict ? (
         <>

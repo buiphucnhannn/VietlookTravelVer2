@@ -133,12 +133,17 @@ export function useRect(ref, active) {
   return active ? rect : null;
 }
 
+/** Chờ ngần này sau phím cuối cùng mới đưa chữ lên trang (gõ liên tục không phải vẽ lại cả trang mỗi phím) */
+const COMMIT_MS = 200;
+
 /**
  * Chữ sửa TẠI CHỖ trên bản xem trước — giữ nguyên font, cỡ, màu của trang thật (kiểu chữ ở `className`).
- * - Rê chuột: viền XANH nét đứt + nhãn "Bấm để sửa" (màn cảm ứng: viền mờ luôn hiện để biết chữ nào sửa được).
+ * - Rê chuột: viền XANH nét đứt + nhãn "Bấm để sửa · tên ô" (màn cảm ứng: viền mờ luôn hiện để biết chữ nào sửa được).
  * - Bấm vào: gõ trực tiếp (viền CAM, nền cam nhạt) + thanh nổi "Xong · Bỏ · số ký tự".
  * - Enter / "Xong": nhận · Esc / "Bỏ": trả lại chữ trước khi sửa · đoạn văn (multiline): Shift + Enter xuống dòng.
  * - `light`: chữ trên nền sáng; không có → chữ trên nền tối / ảnh.
+ * - Gõ không giật: chữ đang gõ giữ ngay trong ô (bản nháp); COMMIT_MS sau phím cuối, hoặc khi bấm ra ngoài /
+ *   Xong, mới gọi `onChange` → cả trang chỉ vẽ lại lúc đó, không phải mỗi phím.
  */
 export function InlineText({
   value,
@@ -153,31 +158,65 @@ export function InlineText({
   const wrap = useRef(null);
   const area = useRef(null);
   const before = useRef(value);
+  const timer = useRef(null);
+  const pending = useRef(null); // chữ đang chờ đưa lên trang (null = không có)
+  const change = useRef(onChange);
+  useLayoutEffect(() => {
+    change.current = onChange;
+  });
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
+  const [draft, setDraft] = useState(null); // chữ đang gõ (null = hiện đúng `value`)
   const rect = useRect(wrap, hover || focus);
-  const count = (value ?? "").length;
+  const shown = draft ?? value ?? "";
+  const count = shown.length;
 
+  /** Đưa ngay chữ đang chờ lên trang */
+  const flush = () => {
+    clearTimeout(timer.current);
+    timer.current = null;
+    if (pending.current === null) return;
+    const v = pending.current;
+    pending.current = null;
+    change.current?.(v);
+  };
+  // ô bị gỡ khi đang gõ dở (đổi ngôn ngữ, rời trang) → vẫn giữ chữ đã gõ
+  useEffect(() => () => flush(), []);
+
+  const type = (v) => {
+    setDraft(v);
+    pending.current = v;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, COMMIT_MS);
+  };
   const done = () => area.current?.blur();
   const cancel = () => {
-    if ((value ?? "") !== (before.current ?? "")) onChange(before.current ?? "");
+    clearTimeout(timer.current);
+    timer.current = null;
+    pending.current = null;
+    if ((value ?? "") !== (before.current ?? "")) change.current?.(before.current ?? "");
+    setDraft(null);
     area.current?.blur();
   };
 
   return (
     <span
       ref={wrap}
+      data-edit-ui
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className={cn(
         "relative inline-grid max-w-full cursor-text rounded-[4px] outline-2 outline-offset-[4px] transition-[outline-color,background-color] duration-150",
         focus
-          ? cn("outline-orange-500 outline-solid", light ? "bg-orange-500/[0.08]" : "bg-black/30")
+          ? cn(
+              "outline-orange-500 outline-solid",
+              light ? "bg-orange-500/[0.08]" : "bg-orange-500/20",
+            )
           : cn(
               "outline-transparent outline-dashed",
               light
                 ? "hover:outline-blue-500 [@media(hover:none)]:outline-blue-500/40"
-                : "hover:outline-sky-300 [@media(hover:none)]:outline-sky-300/50",
+                : "hover:outline-blue-400 [@media(hover:none)]:outline-blue-400/50",
             ),
         className,
       )}
@@ -186,7 +225,7 @@ export function InlineText({
         aria-hidden
         className="invisible col-start-1 row-start-1 min-w-[2ch] break-words whitespace-pre-wrap"
       >
-        {(value || placeholder || "") + "​"}
+        {(shown || placeholder || "") + "​"}
       </span>
       <textarea
         ref={area}
@@ -195,7 +234,7 @@ export function InlineText({
         data-inline
         // cols=1: bề rộng do dòng chữ "bóng" phía trên quyết định (mặc định 20 cột làm nút / nhãn ngắn bị kéo dài)
         cols={1}
-        value={value}
+        value={shown}
         aria-label={label ? `Sửa: ${label}` : "Sửa chữ"}
         placeholder={placeholder}
         maxLength={maxLength}
@@ -205,10 +244,12 @@ export function InlineText({
           setFocus(true);
           setHover(false);
         }}
-        onBlur={() => setFocus(false)}
-        onChange={(e) =>
-          onChange(multiline ? e.target.value : e.target.value.replace(/[\r\n]+/g, " "))
-        }
+        onBlur={() => {
+          flush();
+          setFocus(false);
+          setDraft(null);
+        }}
+        onChange={(e) => type(multiline ? e.target.value : e.target.value.replace(/[\r\n]+/g, " "))}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !(multiline && e.shiftKey)) {
             e.preventDefault();

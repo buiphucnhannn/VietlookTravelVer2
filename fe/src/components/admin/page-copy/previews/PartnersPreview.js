@@ -45,7 +45,7 @@ export default function PartnersPreview({ lang }) {
         </Container>
       </Zone>
 
-      <Zone name="Ưu đãi đối tác">
+      <Zone name="Ưu đãi đối tác" hide="offers">
         <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
           <BgEdit f="offersImage" tone="light" />
           <Container>
@@ -77,7 +77,7 @@ export default function PartnersPreview({ lang }) {
         </section>
       </Zone>
 
-      <Zone name="Dự án đã phục vụ">
+      <Zone name="Dự án đã phục vụ" hide="projects">
         <section className="bg-white py-14 lg:py-[4.5rem]">
           <Container>
             {homeCopy ? (
@@ -117,7 +117,6 @@ export default function PartnersPreview({ lang }) {
                           ? "(min-width: 1024px) 50vw, 100vw"
                           : "(min-width: 1024px) 25vw, 50vw"
                       }
-                      pill="bottom-3 left-3"
                       title={`Ảnh ${i + 1}`}
                     />
                   </div>

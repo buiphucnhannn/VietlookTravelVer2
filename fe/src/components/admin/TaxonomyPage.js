@@ -35,6 +35,7 @@ import VisibilityToggle from "./VisibilityToggle";
 import { usePendingImages } from "./pendingImages";
 import { ReadOnlyArea, usePermission } from "./permissions";
 import { useConfirmClose } from "./catalogShared";
+import TipNotice from "./TipNotice";
 
 // đổi chuyên mục / tác giả → menu cẩm nang, trang chuyên mục, trang tác giả và thẻ bài viết đều đổi
 const TAGS = ["taxonomy", "articles"];
@@ -107,8 +108,14 @@ export default function TaxonomyPage() {
     <>
       <PageHeader
         title="Chuyên mục & tác giả"
-        description={`Phân loại bài viết trong cẩm nang du lịch.${canEdit ? " Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị trí bất kỳ." : ""}`}
+        description="Chuyên mục và tác giả của bài viết trong cẩm nang du lịch."
       />
+      {canEdit && (
+        <TipNotice id="sort-taxonomy" className="mb-6">
+          Giữ nút 6 chấm ở đầu dòng và kéo để đổi thứ tự, hoặc bấm số thứ tự để chuyển nhanh tới vị
+          trí bất kỳ.
+        </TipNotice>
+      )}
       <div className="grid gap-6 xl:grid-cols-2">
         <TaxonomyCard kind="category" />
         <TaxonomyCard kind="author" />

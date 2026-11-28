@@ -654,7 +654,7 @@ function CropBody({ job, spec, onDecide, confirmRef }) {
     : chosenW >= need * 1.4
       ? {
           tone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-          text: "Rất nét — đủ cho màn hình Retina",
+          text: "Rất nét — đẹp cả trên màn hình độ phân giải cao",
         }
       : chosenW >= need * 0.8
         ? { tone: "bg-emerald-50 text-emerald-700 ring-emerald-100", text: "Nét" }

@@ -289,14 +289,14 @@ export default function RichText({
         <G>
           <B
             off={off}
-            title="Tiêu đề lớn (H2) — hiện trong mục lục bài viết"
+            title="Tiêu đề lớn — hiện trong mục lục bài viết"
             icon={Heading2}
             on={is("heading", { level: 2 })}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           />
           <B
             off={off}
-            title="Tiêu đề nhỏ (H3)"
+            title="Tiêu đề nhỏ"
             icon={Heading3}
             on={is("heading", { level: 3 })}
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
@@ -508,7 +508,7 @@ export default function RichText({
               checked={linkState.blank}
               onChange={(blank) => setLinkState((x) => ({ ...x, blank }))}
               label="Mở trong tab mới"
-              hint="Nên bật với link sang website khác (tự thêm thuộc tính an toàn). Link trong website không cần."
+              hint="Nên bật với link sang website khác. Link trong website không cần."
             />
           </div>
         )}

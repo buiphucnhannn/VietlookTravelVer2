@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarCheck,
   Car,
+  Contact,
   ExternalLink,
   FileText,
   Home,
@@ -51,7 +52,8 @@ const A = (p = "") => `${ADMIN_BASE}${p}`;
 
 /**
  * Menu CMS theo nhóm. count: số việc cần xử lý (đơn / yêu cầu mới).
- * Mục nào hiện tuỳ quyền của tài khoản (permissions.js → moduleForPath): Cài đặt, Tài khoản chỉ admin.
+ * Mục nào hiện tuỳ quyền của tài khoản (permissions.js → moduleForPath): Cài đặt, Tài khoản chỉ admin;
+ * Thông tin liên hệ theo quyền "contact".
  */
 const NAV = [
   { group: null, items: [{ href: A(), label: "Tổng quan", Icon: LayoutDashboard }] },
@@ -84,6 +86,8 @@ const NAV = [
       // đang sửa Trang chủ (/home) cũng đánh dấu mục này. Tài khoản chỉ có quyền Trang chủ → hiện mục Trang chủ riêng.
       { href: A("/pages"), label: "Giao diện trang", Icon: PanelsTopLeft, also: [A("/home")] },
       { href: A("/home"), label: "Trang chủ", Icon: Home, hideIf: (u) => canUser(u, "pages") },
+      // Điện thoại, email, địa chỉ… dùng chung cho mọi trang + email gửi khách (quyền riêng "Thông tin liên hệ")
+      { href: A("/contact"), label: "Thông tin liên hệ", Icon: Contact },
       { href: A("/articles"), label: "Bài viết", Icon: Newspaper },
       { href: A("/taxonomy"), label: "Chuyên mục & tác giả", Icon: FileText },
       { href: A("/reviews"), label: "Đánh giá", Icon: MessageSquareQuote },

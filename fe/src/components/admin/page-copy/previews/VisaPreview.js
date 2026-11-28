@@ -220,7 +220,7 @@ export default function VisaPreview({ lang }) {
       </Zone>
 
       {/* 2. Quy trình 5 bước + 3. Hai lưu ý */}
-      <Zone name="Quy trình & lưu ý">
+      <Zone name="Quy trình & lưu ý" hide="process">
         <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
           <BgEdit f="processImage" tone="light" />
           <Container>
@@ -252,7 +252,7 @@ export default function VisaPreview({ lang }) {
       </Zone>
 
       {/* 4. Thuật ngữ chuẩn EN / ZH */}
-      <Zone name="Thuật ngữ">
+      <Zone name="Thuật ngữ" hide="terms">
         <section className="bg-cream-100 py-14 lg:py-[4.5rem]">
           <Container>
             <SectionHeading title={<Txt f="termsTitle" />} subtitle={<Txt f="termsSubtitle" />} />

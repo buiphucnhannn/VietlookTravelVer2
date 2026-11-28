@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BarChart3, CreditCard, Mail, Save, Users } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { toastError, useMutation } from "./hooks";
-import ReviewStatsCard from "./ReviewStatsCard";
-import ContactSettingsCard from "./ContactSettingsCard";
 import { SECRET_RULES, SecretKeyField, secretError, useReauth } from "./secrets";
 import {
   Button,
@@ -22,25 +21,162 @@ import {
 } from "./ui";
 
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAIL_OFF_TEXT =
-  "Tính năng gửi email chưa được bật. Liên hệ đơn vị phát triển website để bật.";
+const MAIL_OFF_TEXT = "Tính năng gửi email chưa được bật. Liên hệ bộ phận kỹ thuật để bật.";
 
 export default function SettingsPage() {
   return (
     <>
       <PageHeader
         title="Cài đặt"
-        description="Thông tin liên hệ công ty, email nhận thông báo, thanh toán 9Pay, phụ thu nhóm nhỏ, điểm đánh giá Tripadvisor / Google và mã đo lường của Google."
+        description="Email thông báo, thanh toán, phụ thu nhóm nhỏ và mã đo lường. Mỗi mục có nút Lưu riêng."
       />
+      {/* Thông tin liên hệ: trang riêng trên menu (quyền "Thông tin liên hệ"); điểm đánh giá: trang Đánh giá */}
+      <SectionNav />
       <div className="space-y-6">
-        <ContactSettingsCard />
-        <NotificationsCard />
-        <PaymentCard />
-        <SmallGroupCard />
-        <ReviewStatsCard />
-        <TrackingCard />
+        <Section id="notifications">
+          <NotificationsCard />
+        </Section>
+        <Section id="payment">
+          <PaymentCard />
+        </Section>
+        <Section id="small-group">
+          <SmallGroupCard />
+        </Section>
+        <Section id="tracking">
+          <TrackingCard />
+        </Section>
       </div>
     </>
+  );
+}
+
+/* ---------- Thanh mục dính ở đầu trang: bấm để nhảy tới, tự tô sáng mục đang xem ---------- */
+
+const SECTIONS = [
+  { id: "notifications", label: "Email thông báo" },
+  { id: "payment", label: "Thanh toán 9Pay" },
+  { id: "small-group", label: "Phụ thu nhóm nhỏ" },
+  { id: "tracking", label: "Mã đo lường" },
+];
+
+function Section({ id, children }) {
+  return (
+    <div id={id} className="scroll-mt-40 lg:scroll-mt-24">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Mép dưới thanh mục KHI ĐÃ DÍNH (top dính + chiều cao) — vạch để tính mục đang xem và chỗ dừng khi nhảy tới.
+ * Không đo vị trí hiện tại: lúc ở đầu trang thanh mục chưa dính, nằm thấp hơn → nhảy tới sẽ bị lệch.
+ */
+const navBottom = () => {
+  const nav = document.querySelector("[data-settings-nav]");
+  if (!nav) return 0;
+  return (parseFloat(getComputedStyle(nav).top) || 0) + nav.offsetHeight;
+};
+
+/**
+ * Mục đang xem: mục cuối cùng có mép trên đã đi qua vạch ngay dưới thanh mục.
+ * Cuộn tới đáy trang → mục cuối (mục ngắn ở cuối có thể không bao giờ chạm vạch).
+ * (Cùng cách làm với menu mục của trang sửa tour, viết riêng ở đây.)
+ */
+function useActiveSection(sections) {
+  const [active, setActive] = useState(sections[0].id);
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const line = Math.max(navBottom() + 80, Math.min(window.innerHeight / 3, 260));
+      let cur = sections[0].id;
+      for (const { id } of sections) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= line) cur = id;
+      }
+      const doc = document.documentElement;
+      if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4)
+        cur = sections[sections.length - 1].id;
+      setActive(cur);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    window.addEventListener("resize", onScroll);
+    // các thẻ tải xong làm trang dài ra (lúc đang tải trang ngắn → tưởng đã cuộn tới đáy) → tính lại
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onScroll);
+    ro?.observe(document.body);
+    return () => {
+      ro?.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [sections]);
+  return active;
+}
+
+function SectionNav() {
+  const active = useActiveSection(SECTIONS);
+  const barRef = useRef(null);
+
+  // điện thoại: thanh cuộn ngang → giữ mục đang xem trong tầm nhìn
+  useEffect(() => {
+    const bar = barRef.current;
+    const el = bar?.querySelector(`[data-id="${active}"]`);
+    if (!bar || !el || bar.scrollWidth <= bar.clientWidth) return;
+    bar.scrollTo({
+      left: el.offsetLeft - bar.clientWidth / 2 + el.clientWidth / 2,
+      behavior: "smooth",
+    });
+  }, [active]);
+
+  const go = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - navBottom() - 16;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
+  };
+
+  return (
+    <nav
+      data-settings-nav
+      aria-label="Các mục cài đặt"
+      className="sticky z-30 mb-6 rounded-2xl bg-white/95 p-1.5 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/80 backdrop-blur max-lg:top-[4.5rem] lg:top-3"
+    >
+      <ul
+        ref={barRef}
+        className="flex [scrollbar-width:none] gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+      >
+        {SECTIONS.map((s) => {
+          const on = s.id === active;
+          return (
+            <li key={s.id} className="shrink-0">
+              <a
+                href={`#${s.id}`}
+                data-id={s.id}
+                aria-current={on ? "true" : undefined}
+                onClick={(e) => {
+                  e.preventDefault();
+                  go(s.id);
+                }}
+                className={cn(
+                  "block rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition",
+                  on
+                    ? "bg-brand-50 text-brand-800 ring-1 ring-brand-100"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                )}
+              >
+                {s.label}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
@@ -159,6 +295,13 @@ function NotificationsCard() {
       title="Email thông báo đơn mới"
       description="Mỗi khi khách đặt tour hoặc gửi yêu cầu trên website, hệ thống gửi thư báo ngay cho nhân viên và thư xác nhận cho khách."
     >
+      {/* Danh sách đã lưu trống → không ai nhận thư báo (không còn email dự phòng trên máy chủ) */}
+      {!data.recipients?.length && (
+        <Notice tone="error" className="mb-5" title="Chưa có email nhận thông báo">
+          Đơn mới vẫn lưu trong trang quản trị nhưng chưa ai nhận email báo. Thêm ít nhất 1 email
+          bên dưới rồi bấm Lưu.
+        </Notice>
+      )}
       {!data.mailConfigured && (
         <Notice tone="warn" className="mb-5">
           {MAIL_OFF_TEXT} Đơn và yêu cầu của khách vẫn được lưu đầy đủ trong trang quản trị.

@@ -1,18 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, RotateCcw, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { siteConfig } from "@/constants/site";
 import { fillReviewStats, formatScore, normalizeReviewStats } from "@/lib/review-stats";
 import { defaultHomeCopy, fillCopy, stripCopy } from "@/components/home/copy";
 import { useMutation, useOptions, useOptionsState } from "./hooks";
-import { AutoTranslate, useAutoFill } from "./translate";
+import { useAutoFill } from "./translate";
 import {
-  Badge,
   Button,
-  LangTabs,
   LoadingBlock,
   Notice,
   DEFAULT_LANG,
@@ -27,11 +25,27 @@ import {
 } from "./ui";
 import HomeSitePreview from "./home/SitePreview";
 import { HomeImagesContext } from "./home/ImageSlot";
-import { autoFeaturedTours, autoLongTours } from "@/lib/tour-picks";
 import { CopyContext, EMPTY_SLIDE, L, validBannerVideo, validImage } from "./home/shared";
 import { usePendingImages } from "./pendingImages";
 import { usePendingVideos } from "./pendingVideos";
 import { ReadOnlyArea, usePermission } from "./permissions";
+import { SeoCard, normalizeSeo } from "./SeoFields";
+import {
+  EditorFrame,
+  EditorHeader,
+  HUB,
+  HistoryButton,
+  LangTools,
+  QuickHelp,
+  RELOAD,
+  ResetAllButton,
+  SaveBar,
+  ViewLiveLink,
+  useConflictSave,
+  useSaveShortcut,
+} from "./page-copy/chrome";
+import HistoryDrawer, { diffParts } from "./page-copy/HistoryDrawer";
+import JumpMenu from "./page-copy/JumpMenu";
 
 const PATH = "/settings/home";
 const TAGS = ["settings"];
@@ -39,7 +53,7 @@ const STATS = 6;
 
 /**
  * Câu mặc định của website theo 3 ngôn ngữ (chữ đang hiện trên trang chủ khi chưa ai sửa), đã điền điểm &
- * số lượt đánh giá đang dùng (Cài đặt → Điểm & số lượt đánh giá) để nhân viên thấy đúng như trên website.
+ * số lượt đánh giá đang dùng (Đánh giá → Điểm & số lượt đánh giá) để nhân viên thấy đúng như trên website.
  * `reviewStats`: số liệu đó (huy hiệu banner, con số nổi bật).
  */
 const loadDefaults = async () => {
@@ -51,7 +65,9 @@ const loadDefaults = async () => {
   ]);
   const reviewStats = normalizeReviewStats(site?.data?.reviewStats);
   const copy = (mod, l) => fillReviewStats(defaultHomeCopy(mod.default.home, l), reviewStats, l);
-  return { en: copy(en, "en"), zh: copy(zh, "zh"), vi: copy(vi, "vi"), reviewStats };
+  // tiêu đề / mô tả trang chủ trên Google khi chưa nhập (từ điển: meta)
+  const meta = { en: en.default.meta, zh: zh.default.meta, vi: vi.default.meta };
+  return { en: copy(en, "en"), zh: copy(zh, "zh"), vi: copy(vi, "vi"), reviewStats, meta };
 };
 
 const slots = (arr, n) => Array.from({ length: n }, (_, i) => arr?.[i] ?? "");
@@ -84,6 +100,10 @@ const normalize = (s = {}, defs) => ({
     b2bSouth: slots(s.images?.b2bSouth, 3),
     about: s.images?.about ?? "",
   },
+  // tiêu đề + mô tả trên Google (trống = câu mặc định của website)
+  seo: normalizeSeo(s.seo),
+  // khối đang ẩn trên website — chỉ giữ cờ true (bật lại khối = như chưa từng tắt, không báo "Chưa lưu")
+  hidden: Object.fromEntries(Object.entries(s.hidden ?? {}).filter(([, v]) => v === true)),
   // tên địa điểm 6 cánh ngôi sao (đủ 6 ô, mỗi ô 3 ngôn ngữ)
   starLabels: Array.from({ length: 6 }, (_, i) => ({
     en: "",
@@ -167,8 +187,12 @@ export default function HomeSettingsPage() {
   const [defs, setDefs] = useState(null);
   const [saved, setSaved] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [updatedAt, setUpdatedAt] = useState(null);
   const [lang, setLang] = useState(DEFAULT_LANG);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const router = useRouter();
+  const guarded = useConflictSave();
   const { run, busy } = useMutation(TAGS);
   const autoFill = useAutoFill();
   const images = usePendingImages(data);
@@ -246,16 +270,6 @@ export default function HomeSettingsPage() {
     },
     [rememberTours],
   );
-  const autoFeatured = useMemo(
-    () => autoFeaturedTours(publicTours).map((t) => t.slug),
-    [publicTours],
-  );
-  const shownFeatured = data?.featuredTours?.length ? data.featuredTours : autoFeatured;
-  const autoLong = useMemo(
-    () => autoLongTours(publicTours, { avoid: shownFeatured }).map((t) => t.slug),
-    [publicTours, shownFeatured],
-  );
-
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
     let alive = true;
@@ -266,6 +280,7 @@ export default function HomeSettingsPage() {
         setDefs(d);
         setData(n);
         setSaved(JSON.stringify(n));
+        setUpdatedAt(r.data?.updatedAt ?? null);
       })
       .catch((err) => alive && setLoadError(errorMessage(err)));
     return () => {
@@ -303,13 +318,36 @@ export default function HomeSettingsPage() {
   const dirty = !!data && JSON.stringify(data) !== saved;
   useUnsavedGuard(dirty);
 
-  const set = (patch) => setData((d) => ({ ...d, ...patch }));
+  // patch: object, hoặc hàm (dữ liệu mới nhất) → object. Giữ nguyên hàm qua các lần vẽ → các khối của bản xem
+  // trước (React.memo) không phải vẽ lại khi khối khác đổi
+  const set = useCallback(
+    (patch) => setData((d) => ({ ...d, ...(typeof patch === "function" ? patch(d) : patch) })),
+    [],
+  );
   // patch: object, hoặc hàm (banner mới nhất) → object — dùng khi cập nhật sau một lúc chờ (video Drive)
-  const setBanner = (patch) =>
-    setData((d) => ({
-      ...d,
-      banner: { ...d.banner, ...(typeof patch === "function" ? patch(d.banner) : patch) },
-    }));
+  const setBanner = useCallback(
+    (patch) =>
+      setData((d) => ({
+        ...d,
+        banner: { ...d.banner, ...(typeof patch === "function" ? patch(d.banner) : patch) },
+      })),
+    [],
+  );
+
+  // Con số website tự tính cho khối "con số nổi bật" (hiện mờ khi nhân viên không tự nhập)
+  // (giống website: số sân bay có giá fast-track, số chỗ xe nhỏ nhất – lớn nhất tính từ Xe & Visa)
+  const tripRating = defs?.reviewStats?.tripadvisor.rating;
+  const autoStats = useMemo(
+    () => [
+      String(siteConfig.since),
+      tours.length ? `${shown(tours)}+` : "…",
+      destinations.length ? String(shown(destinations)) : "…",
+      services ? String(services.airports) : "…",
+      services ? services.seats : "…",
+      `${formatScore(tripRating ?? 5)}★`,
+    ],
+    [tours, destinations, services, tripRating],
+  );
 
   const problems = useMemo(() => (data ? mediaProblems(data.banner.slides) : []), [data]);
 
@@ -335,6 +373,7 @@ export default function HomeSettingsPage() {
   );
 
   const save = async () => {
+    if (!canEdit || !data || !dirty) return;
     // video Drive còn đang chuẩn bị → chờ xong rồi tự lưu (nút Lưu hiện "Đang chuẩn bị video…", có nút Huỷ)
     if (videos.copying) return videos.waitAndSave();
     if (problems.length) {
@@ -347,35 +386,117 @@ export default function HomeSettingsPage() {
     if (!withImages) return;
     // ngôn ngữ còn trống → tự dịch từ ngôn ngữ đã viết rồi mới lưu
     const { value: body, failed } = await autoFill.fill(withImages, { lang });
-    const r = await run(() => api(PATH, { method: "PUT", body }), "Đã lưu trang chủ");
-    if (r) {
-      videos.saved(body); // video vừa lấy về đã được lưu → không còn bị dọn khi rời trang
-      const n = normalize(r.data ?? body, defs);
-      setData(n);
-      setSaved(JSON.stringify(n));
-      if (failed)
-        autoFill.offerRetry(async (t) => {
-          const r2 = await api(PATH, { method: "PUT", body: t });
-          const again = normalize(r2?.data ?? t, defs);
-          setData(again);
-          setSaved(JSON.stringify(again));
-        });
-    }
+    const put = (b, at) =>
+      api(PATH, { method: "PUT", body: { ...b, ...(at && { baseUpdatedAt: at }) } });
+    const r = await run(() => guarded((at) => put(body, at), updatedAt));
+    if (r === RELOAD) return load();
+    if (!r) return;
+    toast("Đã lưu trang chủ");
+    videos.saved(body); // video vừa lấy về đã được lưu → không còn bị dọn khi rời trang
+    const n = normalize(r.data ?? body, defs);
+    setData(n);
+    setSaved(JSON.stringify(n));
+    setUpdatedAt(r.data?.updatedAt ?? null);
+    if (failed)
+      autoFill.offerRetry(async (t) => {
+        const r2 = await put(t, r.data?.updatedAt);
+        const again = normalize(r2?.data ?? t, defs);
+        setData(again);
+        setSaved(JSON.stringify(again));
+        setUpdatedAt(r2?.data?.updatedAt ?? null);
+      });
   };
   // video Drive đang chuẩn bị / đã lấy về mà chưa lưu (bỏ thì tự dọn); onReady: lưu tiếp khi đang chờ video
   const videos = usePendingVideos(data, { onReady: save });
+  useSaveShortcut(save, canEdit);
 
   const discard = async () => {
     const ok = await confirm({
       title: "Bỏ các thay đổi chưa lưu?",
       message: "Trang chủ sẽ trở lại như lần lưu gần nhất.",
       confirmText: "Bỏ thay đổi",
+      cancelText: "Sửa tiếp",
       danger: true,
     });
     if (!ok) return;
     setData(JSON.parse(saved));
     setSlideIndex(0);
   };
+
+  /** Nội dung mặc định của cả trang chủ (website tự chọn tour / chủ đề / điểm đến, chữ & ảnh có sẵn) */
+  const blank = useMemo(() => (defs ? normalize({}, defs) : null), [defs]);
+  const edited =
+    !!data &&
+    !!blank &&
+    JSON.stringify(toBody({ ...data, seo: blank.seo }, defs)) !==
+      JSON.stringify(toBody(blank, defs));
+  const resetAll = async () => {
+    const ok = await confirm({
+      title: "Đưa cả trang chủ về nội dung mặc định?",
+      message:
+        "Mọi chữ, ảnh, video banner và danh sách tour / chủ đề / điểm đến đã chọn (cả 3 ngôn ngữ) sẽ trở về như ban đầu — website tự chọn lại. Bạn vẫn có thể bấm “Bỏ thay đổi” trước khi lưu, hoặc dùng lại bản cũ trong Lịch sử.",
+      confirmText: "Về mặc định",
+      cancelText: "Thôi",
+      danger: true,
+    });
+    if (!ok) return;
+    // giữ phần "Hiển thị trên Google" và các cài đặt khác ngoài nội dung khối
+    setData((d) => ({ ...d, ...blank, seo: d.seo }));
+    setSlideIndex(0);
+  };
+
+  const goBack = async (e) => {
+    if (!dirty) return;
+    e.preventDefault();
+    const ok = await confirm({
+      title: "Rời trang khi chưa lưu?",
+      message: "Nội dung bạn đang sửa chưa được lưu và sẽ mất nếu rời trang này.",
+      confirmText: "Rời trang",
+      cancelText: "Ở lại",
+      danger: true,
+    });
+    if (ok) {
+      setData(JSON.parse(saved));
+      router.push(HUB);
+    }
+  };
+
+  // Lịch sử: bản cũ khác bản đang lưu ở phần nào; dùng lại bản cũ → nạp vào trình sửa
+  const describe = useCallback(
+    (rev) => {
+      if (!defs || !saved) return [];
+      const a = toBody(normalize(rev, defs), defs);
+      const b = toBody(JSON.parse(saved), defs);
+      return diffParts(
+        [
+          ["Banner đầu trang", (x) => x.banner],
+          ["Tour nổi bật", (x) => x.featuredTours],
+          ["Tour dài ngày", (x) => x.longTours],
+          ["Chủ đề tour", (x) => x.homeThemes],
+          ["Điểm đến nổi bật", (x) => x.featuredDestinations],
+          ["Chữ các khối", (x) => x.copy],
+          ["Con số nổi bật", (x) => x.statValues],
+          ["Ảnh các khối", (x) => x.images],
+          ["Tên địa điểm ngôi sao", (x) => x.starLabels],
+          ["Khối ẩn / hiện", (x) => x.hidden],
+          ["Hiển thị trên Google", (x) => x.seo],
+        ],
+        a,
+        b,
+      );
+    },
+    [defs, saved],
+  );
+  const onRestored = useCallback(
+    (doc) => {
+      const n = normalize(doc, defs);
+      setData(n);
+      setSaved(JSON.stringify(n));
+      setUpdatedAt(doc?.updatedAt ?? null);
+      setSlideIndex(0);
+    },
+    [defs],
+  );
 
   if (loadError)
     return (
@@ -392,65 +513,63 @@ export default function HomeSettingsPage() {
   if (!data) return <LoadingBlock />;
 
   const filled = filledOf(data.banner.titleMain);
-  // Nút dịch + chọn ngôn ngữ: luôn đi cùng nhau, cùng hàng, cùng chiều cao
-  // compact: thanh lưu trên điện thoại → ẩn nút dịch (đã có ở đầu bản xem trước) để vừa 1 hàng
-  const langTools = (tabsClass, compact) => (
-    <div className="flex shrink-0 items-center gap-2">
-      <AutoTranslate
-        lang={lang}
-        value={translatable}
-        onChange={(next) => setData(normalize(next, defs))}
-        className={cn("px-3 ring-1 ring-brand-200/70", compact && "max-sm:hidden")}
-        label={
-          <>
-            <span className="max-[430px]:hidden">Dịch tự động</span>
-            <span className="min-[431px]:hidden">Dịch</span>
-          </>
-        }
-      />
-      <LangTabs value={lang} onChange={setLang} filled={filled} className={tabsClass} />
-    </div>
+  const viewUrl = lang === "en" ? "/" : `/${lang}`;
+  // Dịch tự động + ngôn ngữ: 1 chỗ duy nhất — thanh lưu (chỉ xem: khung trên)
+  const langTools = (
+    <LangTools
+      lang={lang}
+      onLang={setLang}
+      filled={filled}
+      canEdit={canEdit}
+      value={translatable}
+      onTranslate={(next) => setData(normalize(next, defs))}
+    />
   );
 
-  // Con số website tự tính cho khối "con số nổi bật" (hiện mờ khi nhân viên không tự nhập)
-  // (giống website: số sân bay có giá fast-track, số chỗ xe nhỏ nhất – lớn nhất tính từ Xe & Visa)
-  const autoStats = [
-    String(siteConfig.since),
-    tours.length ? `${shown(tours)}+` : "…",
-    destinations.length ? String(shown(destinations)) : "…",
-    services ? String(services.airports) : "…",
-    services ? services.seats : "…",
-    `${formatScore(defs?.reviewStats?.tripadvisor.rating ?? 5)}★`,
-  ];
+  // Trạng thái đặc biệt ở thanh lưu: đang chuẩn bị video / video, ảnh banner chưa dùng được
+  const status = videos.copying ? (
+    <span className="flex min-w-0 items-center gap-1.5 font-medium text-brand-700">
+      <Spinner className="size-4 shrink-0" />
+      <span className="line-clamp-2">Đang chuẩn bị video…</span>
+    </span>
+  ) : problems.length ? (
+    <span className="flex min-w-0 items-center gap-1.5 font-medium text-sun-600">
+      <AlertTriangle className="size-4 shrink-0" />
+      <span className="line-clamp-2">{problems[0].message}</span>
+    </span>
+  ) : null;
 
   return (
     <CopyContext.Provider value={copyContext}>
       <HomeImagesContext.Provider value={imagesContext}>
-        <PageHeader
+        <EditorHeader
           title="Trang chủ"
-          description={`Bản xem trước trang chủ theo đúng thứ tự trên website.${canEdit ? " Bấm vào chữ hoặc ảnh để chỉnh sửa, kéo thả thẻ để sắp xếp, sau đó bấm Lưu." : ""}`}
+          readOnly={!canEdit}
+          intro="Bản xem trước trang chủ theo đúng thứ tự trên website. Bấm thẳng vào chữ, ảnh hoặc thẻ để sửa — rê chuột lên thẻ để sắp xếp, thay, gỡ — rồi bấm Lưu."
+          updatedAt={updatedAt}
+          onBack={goBack}
+          actions={
+            <>
+              <ViewLiveLink href={viewUrl} dirty={dirty} />
+              {canEdit && edited && <ResetAllButton onClick={resetAll} />}
+            </>
+          }
         />
 
         {/* ----- Khung "trang web thu nhỏ" ----- */}
         <ReadOnlyArea readOnly={!canEdit}>
-          <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_24px_48px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-slate-100 px-3.5 py-2">
-              <span className="flex gap-1.5 max-sm:hidden" aria-hidden>
-                <span className="size-2.5 rounded-full bg-sun-400" />
-                <span className="size-2.5 rounded-full bg-amber-brand" />
-                <span className="size-2.5 rounded-full bg-emerald-400" />
-              </span>
-              <span className="min-w-0 flex-1 truncate rounded-full bg-white px-3 py-1 text-[11px] text-slate-500 ring-1 ring-slate-200 max-sm:hidden">
-                Trang chủ · đang sửa nội dung{" "}
-                <b className="text-slate-700">
-                  {lang === "en" ? "tiếng Anh" : lang === "zh" ? "tiếng Trung" : "tiếng Việt"}
-                </b>
-              </span>
-              <div className="max-sm:flex max-sm:flex-1 max-sm:justify-between">
-                {langTools("bg-white")}
-              </div>
-            </div>
-
+          <EditorFrame
+            name="Trang chủ"
+            lang={lang}
+            tools={
+              <>
+                <JumpMenu />
+                <HistoryButton onClick={() => setHistoryOpen(true)} active={historyOpen} />
+                <QuickHelp />
+                {!canEdit && langTools}
+              </>
+            }
+          >
             <HomeSitePreview
               lang={lang}
               data={data}
@@ -464,81 +583,60 @@ export default function HomeSettingsPage() {
               themesStatus={themesStatus}
               destinations={destinations}
               destinationsStatus={destinationsStatus}
-              autoFeatured={autoFeatured}
-              autoLong={autoLong}
               autoStats={autoStats}
               searchTours={searchTours}
             />
-          </div>
+          </EditorFrame>
         </ReadOnlyArea>
 
         <p className="mt-3 text-center text-xs text-slate-500">
           Ô để trống sẽ dùng nội dung mặc định của website.
         </p>
 
+        {/* Hiển thị trên Google: thu gọn sẵn */}
+        <ReadOnlyArea readOnly={!canEdit} notice={false}>
+          <SeoCard
+            value={data.seo}
+            onChange={(seo) => set({ seo })}
+            lang={lang}
+            fallbackTitle={defs?.meta?.[lang]?.title}
+            fallbackDescription={defs?.meta?.[lang]?.description}
+            path=""
+          />
+        </ReadOnlyArea>
+
         {/* ----- Thanh lưu ----- */}
         {canEdit && (
-          <div className="sticky bottom-3 z-30 mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-white/95 px-3.5 py-2.5 shadow-[0_12px_40px_-12px_rgba(10,37,60,0.4)] ring-1 ring-slate-200 backdrop-blur sm:bottom-4 sm:px-4">
-            {langTools(undefined, true)}
-            <div
-              className={cn(
-                "flex min-w-0 flex-1 items-center gap-2 text-xs",
-                !problems.length && "max-sm:hidden",
-              )}
-            >
-              {videos.copying ? (
-                <span className="flex min-w-0 items-center gap-1.5 font-medium text-brand-700">
-                  <Spinner className="size-4 shrink-0" />
-                  <span className="line-clamp-2">Đang chuẩn bị video…</span>
-                </span>
-              ) : problems.length ? (
-                <span className="flex min-w-0 items-center gap-1.5 font-medium text-sun-600">
-                  <AlertTriangle className="size-4 shrink-0" />
-                  <span className="line-clamp-2">{problems[0].message}</span>
-                </span>
-              ) : dirty ? (
-                <Badge tone="amber">Chưa lưu</Badge>
-              ) : (
-                <span className="flex items-center gap-1.5 text-slate-500">
-                  <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
-                  <span className="max-sm:hidden">Đã lưu mọi thay đổi</span>
-                </span>
-              )}
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              {dirty && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={RotateCcw}
-                  onClick={discard}
-                  disabled={busy}
-                  aria-label="Hoàn tác"
-                >
-                  <span className="max-sm:hidden">Hoàn tác</span>
-                </Button>
-              )}
-              {videos.waiting && (
+          <SaveBar
+            tools={langTools}
+            dirty={dirty}
+            status={status}
+            onDiscard={discard}
+            onSave={save}
+            busy={busy}
+            saving={busy || autoFill.busy || images.busy || videos.waiting}
+            saveLabel={(videos.waiting && "Đang chuẩn bị video… vui lòng chờ") || images.label}
+            extra={
+              videos.waiting && (
                 <Button variant="ghost" size="sm" onClick={videos.cancelWait}>
-                  Huỷ lưu
+                  Huỷ lưu video
                 </Button>
-              )}
-              <Button
-                icon={Save}
-                onClick={save}
-                loading={busy || autoFill.busy || images.busy || videos.waiting}
-                disabled={!dirty}
-              >
-                {(videos.waiting && "Đang chuẩn bị video… vui lòng chờ") || images.label || (
-                  <>
-                    <span className="max-sm:hidden">Lưu thay đổi</span>
-                    <span className="sm:hidden">Lưu</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
+              )
+            }
+          />
         )}
+
+        <HistoryDrawer
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          contentKey="home"
+          title="Trang chủ"
+          describe={describe}
+          onRestored={onRestored}
+          dirty={dirty}
+          canRestore={canEdit}
+          tags={TAGS}
+        />
       </HomeImagesContext.Provider>
     </CopyContext.Provider>
   );

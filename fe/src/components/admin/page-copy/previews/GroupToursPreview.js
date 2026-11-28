@@ -112,7 +112,7 @@ export default function GroupToursPreview({ lang }) {
         </div>
       </Zone>
 
-      <Zone name="Luôn bao gồm">
+      <Zone name="Luôn bao gồm" hide="included">
         <section className="relative isolate overflow-hidden bg-[#d3e9e6] py-14 lg:py-[4.5rem]">
           <BgEdit f="includedImage" tone="mist" />
           <Container>
@@ -149,7 +149,7 @@ export default function GroupToursPreview({ lang }) {
         </section>
       </Zone>
 
-      <Zone name="Dải cam kết" dark>
+      <Zone name="Dải cam kết" hide="pillars" dark>
         <div className="relative isolate overflow-hidden bg-[#16a777] py-10 text-white">
           <BgEdit f="pillarsImage" tone="dark" />
           <Container className="grid grid-cols-2 gap-6 text-center md:grid-cols-4">
@@ -187,11 +187,7 @@ export default function GroupToursPreview({ lang }) {
                         )}
                       >
                         <div className="relative h-44 overflow-hidden bg-slate-100">
-                          <Photo
-                            f={`groupImages.${i}`}
-                            sizes="(min-width: 1024px) 25vw, 50vw"
-                            pill="top-3 right-3"
-                          />
+                          <Photo f={`groupImages.${i}`} sizes="(min-width: 1024px) 25vw, 50vw" />
                           <span className="absolute bottom-3 left-3 grid size-11 place-items-center rounded-xl bg-white text-brand-600 shadow">
                             <Icon className="size-5" />
                           </span>
@@ -212,7 +208,7 @@ export default function GroupToursPreview({ lang }) {
         </section>
       </Zone>
 
-      <Zone name="Cách làm việc">
+      <Zone name="Cách làm việc" hide="how">
         <section className="relative isolate overflow-hidden bg-surface py-14 lg:py-[4.5rem]">
           <BgEdit f="howImage" tone="light" />
           <Container>
@@ -241,7 +237,7 @@ export default function GroupToursPreview({ lang }) {
 
       <Zone name="Form lên kế hoạch" dark>
         <section className="relative isolate overflow-hidden py-14 lg:py-[4.5rem]">
-          <Photo f="planImage" className="-z-10" pill="top-3 right-3" />
+          <Photo f="planImage" className="-z-10" />
           <div className="absolute inset-0 -z-10 bg-brand-950/80" />
           <Container className="max-w-4xl">
             <SectionHeading
@@ -265,7 +261,7 @@ export default function GroupToursPreview({ lang }) {
         </section>
       </Zone>
 
-      <Zone name="Đánh giá" dark>
+      <Zone name="Đánh giá" hide="reviews" dark>
         {dict && reviews.length > 0 ? (
           <Auto
             dark
@@ -307,7 +303,7 @@ export default function GroupToursPreview({ lang }) {
         )}
       </Zone>
 
-      <Zone name="Câu hỏi thường gặp">
+      <Zone name="Câu hỏi thường gặp" hide="faq">
         <section className="py-14 lg:py-[4.5rem]">
           <Container className="max-w-4xl">
             <SectionHeading title={<Txt f="faqTitle" />} />
